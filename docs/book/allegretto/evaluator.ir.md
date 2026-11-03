@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -68,6 +68,8 @@ T28. Layer, with Allegretto as L0 and Allegro Standard as L2. defined-at: ../lay
 T29. Discriminator rule. defined-at: ../units.md#32-the-discriminator-rule [decided: docs/book/units.md §3.2]
 
 T30. Tail call. An application of a composed function whose result is the enclosing function body's result. anchor: #def-tail-call [decided: owner, 2026-11-01]
+
+T31. Speculation mark. The `compileMode` host property that `speculate` sets on the fresh child scope it makes for one speculative evaluation. anchor: #3-partial-evaluation-as-implemented [decided: owner, 2026-11-03]
 
 ## Claims
 
@@ -221,7 +223,7 @@ C50. `src/evaluator.ts` leaves PE Rule 2 to each lazy primitive's implementation
 
 C51. A lazy primitive's result carries the union of the primitive's own effect tags and the effects of every evaluation made through the primitive's evaluation function. evidence: E11, E39. [decided: owner, 2026-11-01]
 
-C178. `eval_if` in `src/primitives.ts` evaluates both branches speculatively when its condition is unresolved, at run time as in the precompile pass. evidence: E12, E50. [proposed: this IR]
+C178. `eval_if` in `src/primitives.ts` evaluates both branches speculatively when its condition is unresolved, at run time as in the precompile pass. evidence: E12, E50. [decided: owner, 2026-11-03]
 
 C53. `eval_if` then returns a residual `eval_if` over the condition and the two evaluated branches. evidence: E12. [decided: owner, 2026-11-01]
 
@@ -229,21 +231,21 @@ C54. The residual `eval_if` carries a type when the two evaluated branches have 
 
 C55. `eval_when` returns a residual without evaluating any branch when its subject is unresolved. evidence: E13. [decided: owner, 2026-11-01]
 
-C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [proposed: this IR]
+C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [decided: owner, 2026-11-03]
 
-C185. The residual of `&&` or `||` under an unresolved left operand holds the left operand and the evaluated right operand in a thunk. evidence: E14, E50. [proposed: this IR]
+C185. The residual of `&&` or `||` under an unresolved left operand holds the left operand and the evaluated right operand in a thunk. evidence: E14, E50. [decided: owner, 2026-11-03]
 
-C180. A speculative evaluation runs in a fresh child scope of the caller's scope that carries the `compileMode` flag. evidence: E49. [proposed: this IR]
+C180. A speculative evaluation runs in a fresh child scope of the caller's scope that carries the `compileMode` flag. evidence: E49. [decided: owner, 2026-11-03]
 
-C186. An effectful primitive that a speculative evaluation reaches returns a residual carrying its effects, at run time as in the precompile pass. evidence: E8, E11, E49, E50. [proposed: this IR]
+C186. An effectful primitive that a speculative evaluation reaches returns a residual carrying its effects, at run time as in the precompile pass. evidence: E8, E11, E49, E50. [decided: owner, 2026-11-03]
 
-C187. A speculative evaluation leaves the caller's own scope without the `compileMode` flag. evidence: E49, E50. [proposed: this IR]
+C187. A speculative evaluation leaves the caller's own scope without the `compileMode` flag. evidence: E49, E50. [decided: owner, 2026-11-03]
 
-C182. A `TailCall` sentinel that a speculative evaluation produces is applied there: with an inline cutoff installed, `applyComposed` applies the call; with none installed, the call becomes a residual Expression carrying the callee's effects. evidence: E49, E50. [proposed: this IR]
+C182. A `TailCall` sentinel that a speculative evaluation produces is applied there: with an inline cutoff installed, `applyComposed` applies the call; with none installed, the call becomes a residual Expression carrying the callee's effects. evidence: E49, E50. [decided: owner, 2026-11-03]
 
-C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. evidence: E49, E50. [proposed: this IR]
+C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. evidence: E49, E50. [decided: owner, 2026-11-03]
 
-C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [proposed: this IR]
+C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [decided: owner, 2026-11-03]
 
 C181. `eval_when` does not meet PE Rule 2. [inferred: R2]
 
@@ -343,7 +345,7 @@ C133. B-136 (scope leaves `Value`) owns the execution of D49. [decided: D49]
 
 C97. A scope today is a Structure with `isScope` set. evidence: E28. [decided: owner, 2026-11-01]
 
-C184. `src/evaluator.ts` writes one scope property, the `compileMode` flag: `precompileFunction` sets it on its compile scope, and a speculative evaluation sets it on the fresh child scope it makes before that scope escapes. evidence: E2, E19, E49. [proposed: this IR]
+C184. `src/evaluator.ts` writes one scope property, the `compileMode` flag: `precompileFunction` sets it on its compile scope, and a speculative evaluation sets it on the fresh child scope it makes before that scope escapes. evidence: E2, E19, E49. [decided: owner, 2026-11-03]
 
 C99. `precompileFunction` restores the `compileMode` flag's previous value after the body's evaluation, even when the evaluation throws. evidence: E19. [decided: owner, 2026-11-01]
 
@@ -467,7 +469,7 @@ G11. cluster: C46, C139, C45 [decided: owner, 2026-11-01]
 
 G12. cluster: C48, C49, C50, C51 [decided: owner, 2026-11-01]
 
-G36. cluster: C178, C53, C54, C55, C179, C185, C180, C186, C187, C182, C183, C188, C181 [proposed: this IR]
+G36. cluster: C178, C53, C54, C55, C179, C185, C180, C186, C187, C182, C183, C188, C181 [decided: owner, 2026-11-03]
 
 G14. cluster: C58, C59, C60, C61, C62, C69 [decided: owner, 2026-11-01]
 
@@ -487,7 +489,7 @@ G21. cluster: C91, C92 [decided: owner, 2026-11-01]
 
 G22. cluster: C93, C94, C95, C96, C133, C97 [decided: owner, 2026-11-01]
 
-G37. cluster: C184, C99, C100, C101 [proposed: this IR]
+G37. cluster: C184, C99, C100, C101 [decided: owner, 2026-11-03]
 
 G24. cluster: C102, C103, C104 [decided: owner, 2026-11-01]
 
@@ -646,3 +648,5 @@ A2 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the term
 A3. Ratify in bulk the re-proposed claims about the switch in `evaluate`, as chunk C5 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G35: C173, C177, C176. C174 is inferred through R1, and C175 is decided by ruling RR5. Depends: C173, C177, C176.
 
 A4. Ratify in bulk the re-proposed claims about speculative evaluation and the branch tail call, as chunk C2 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their clusters G36 and G37: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184. C181 is inferred through R2. Depends: C178, C179, C185, C180, C186, C187, C182, C183, C188, C184.
+
+A4 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
