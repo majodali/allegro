@@ -403,6 +403,7 @@ over unresolved information) are cited in the same text.
     the signature. Divergence, its cost, is already handled by the
     inline cutoff. Taken at C1's PR.
   - **Standing: (a) recommended; taken at C1's PR on its numbers.**
+  **Taken: (a)**, 2026-11-03, at the merge of PR #149 (chunk C1's numbers).
 - **RR2 — What "evaluates both branches" means for `eval_when`.** An
   arm's body cannot be evaluated without its pattern names bound.
   - (a) Evaluate each arm's guard and body with its pattern names as
@@ -699,3 +700,110 @@ over unresolved information) are cited in the same text.
       0 files outside (the activation commit's files listed with this
       chunk's).
     - `npm run test:shards`: 0 failed, gate passed.
+- **2026-11-03 — C2 landed; C5 reapplied.** At the merge of PR #149 the
+  maintainer took RR1 (a) and deferred C5 until C2 (option (b) of the C1
+  record). C2 implements RR3 (a) and RR7 (a) for `eval_if`, `&&` and
+  `||`; C5's commit is cherry-picked unchanged. One gated count rose,
+  put to the maintainer as a stop (below).
+  - **What changed.** `src/evaluator.ts`:
+    `evaluateSpeculatively` (line 266), the speculation entry point a lazy
+    primitive calls with its evaluation function; the speculative switch
+    of `applyPrimitive`'s evaluation function (`SpeculativeEvalFn`, lines
+    274 and 632), so the speculation's result reaches the lazy
+    primitive's effect tracking as any evaluation does; `speculate`
+    (lines 290 to 313), which makes a fresh child scope with `scopeNew`
+    and sets the `compileMode` flag on it before it escapes, unwraps a
+    thunk, and applies a `TailCall` sentinel: a residual carrying the
+    callee's effects when `inlineCutoff` is null (lines 308 to 312),
+    `applyComposed` otherwise (line 313). A throw inside a speculation
+    propagates, as on the resolved path. `src/scope.ts` is untouched:
+    `scopeNew` is its exported constructor. `src/primitives.ts`:
+    `eval_if_impl` (`eval_if`) evaluates both branches through
+    `evaluateSpeculatively` (lines 603 to 604); `typed_and_impl` (`&&`)
+    and `typed_or_impl` (`||`) evaluate the right operand the same way
+    under an unresolved left operand and hold it in a thunk in the
+    residual (lines 2229 and 2326). The switch of `evaluate` has C5's
+    default arm (`src/evaluator.ts` lines 505 to 512).
+  - **The term proposed.** *Speculation mark*: the `compileMode` host
+    property that `speculate` sets on the fresh child scope it makes for
+    one speculative evaluation. Put to the maintainer for ratification.
+  - **The pins flipped**, in `src/test/evaluator.ts`, each comment saying
+    C2 flipped it and under which ruling: under RR3, the `&&` and `||`
+    residual pins (the right operand is the deferred `print`, the
+    residual and `andop`, `orop` carry `io`) and the `pure`-declared `&&`
+    and `||` rows (now halting with the mismatch); under RR7, the branch
+    tail call pin (`inbranch` and `local` infer `io`, the `pure`-declared
+    branch call halts, no residual holds a sentinel) and the pin of
+    `evaluate` reached with a sentinel (now: `via_if` precompiles with no
+    fault, and `via_if(zzz)` and `inbranch(zzz)` leave residuals holding
+    no sentinel); under RR3, the run-time `eval_if` pin (nothing printed,
+    for an unresolved Symbol condition and for an unresolved Param
+    condition, in Standard mode and in Allegretto). One pin added: with
+    an inline cutoff installed, a branch call is unfolded and a recursive
+    one is cut. The C3 gap pins are unchanged. A probe on `evaluate` over
+    the 68 programs of `tests/` and `demos/` found no sentinel handed to
+    it, where C1 found one in 17 programs.
+  - **Outputs** (§3 check 3), 136 CLI runs each, against `0e6ea93`
+    (C1's merge): after the `&&`/`||` commit, 136 identical; after the
+    `eval_if` commit, 135 identical; after C5's cherry-pick, 136
+    identical to the `eval_if` commit, so C5 itself changes nothing. The
+    one difference is `tests/functions.alg` with `inspect`: the safety
+    grade goes from `has-errors` to `proven-safe`, and the lines `type
+    errors: 1` and `error in via_if: Cannot read properties of undefined
+    (reading 'meta')` are gone. The cause is C2: the residual `eval_if`
+    bound to `y` in `via_if` holds the residual call of `pick`, not a
+    sentinel, so `evaluate` never falls through its switch. No `//
+    expect:` line, no inferred effect set and no other `inspect` line
+    changed. RR8 (a) names the gap pins and the inferred-effect lines,
+    not a grade or a warning line; the change is the `inspect` rendering
+    of the notification the flipped `via_if` gap pin asserts, and is put
+    to the maintainer under RR8.
+  - **Stop: a gated count rose.** `npm run lint:load`:
+    `tests/totality-decreases-demo.alg` `evaluates` 31,182 to 31,222
+    (+40, above the baseline), `cutoffResiduals` 2 to 10 (a rise, which
+    the floor allows); every other count unchanged. The cause: the tail
+    calls in the branches of `countdown` (`countdown(n - 1)`, the demo's
+    line 23) and `ack_inner` (lines 31 and 32) were sentinels left in the
+    residual and never evaluated; now applied, they pass through
+    `applyComposed`'s argument evaluation and checks before the inline
+    cutoff cuts them. The `&&`/`||` commit alone leaves every count at
+    the baseline. Two options, for the maintainer under RR8 (a):
+    - (a) Keep `applyComposed`, as RR7 (a) says ("as `evaluateExpr`
+      applies a sentinel"), and raise the baseline for this source to
+      `evaluates` 31,222 and `cutoffResiduals` 10, in one commit made in
+      the B-164 form, by widening lane D by `bench/load-baseline.json`
+      or by lane P.
+    - (b) In `speculate`, with a cutoff installed, return the cutoff's
+      residual directly for a call on a cycle with an unresolved
+      argument, without `applyComposed`. Measured in a scratch copy:
+      `evaluates` 31,182 and `cutoffResiduals` 8, the same outputs
+      (135 of 136, the same difference) and the first oracle filter 51
+      of 51. Its cost: a speculative tail call would skip the viral check
+      and the argument checks that a call outside a branch goes through.
+  - **The IR** (`docs/book/allegretto/evaluator.ir.md`, RR4 (a)): C178
+    replaces C52; C179 and C185 replace C56; C181 replaces C57; C184
+    replaces C98; C180, C186, C187, C182, C183 and C188 are new; cluster
+    G36 replaces G13, G37 replaces G23; relation R2 re-pointed; evidence
+    E49 and E50 added and every pointer moved by C2 and C5 re-synced.
+    C55 stays, since `eval_when` is C3's. New ask A4. C5's own claims,
+    C173 to C177 with cluster G35 and ask A3, come with the cherry-pick.
+  - **Oracle**, on the final tree:
+    - `bash scripts/typecheck.sh`: typecheck clean (9 TS6059
+      rootDir-convention diagnostics ignored).
+    - `ALLEGRO_TEST_FILTER="evaluator|R1 verdict pin|R2|R3" npm test`:
+      51 total, 51 passed, 0 failed.
+    - `ALLEGRO_TEST_FILTER="effects|refine|totality|file: " npm test`:
+      146 total, 146 passed, 0 failed.
+    - `npm run lint:load`: failed on the one count above, every other
+      count at or below the baseline.
+    - `npm run lint:units`: the unit DAG holds at its baseline.
+    - `npm run lint:planes`: the storage plane is reached only through
+      the accessor layer.
+    - `npm run lint:docs:check`: anchors 0, order 0, gate passed.
+    - `npm run lint:ir`: 5 files, clean, 0 warnings.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npx tsx scripts/analyze/lane-lint.ts --base origin/main`: lane D,
+      0 files outside.
+    - `npm run test:shards`: 1,291 test runs, 1,291 passed, 0 failed;
+      the gate fails on the load lint's one count alone.
