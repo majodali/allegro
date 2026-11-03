@@ -124,7 +124,7 @@
         "evaluates": 31222,
         "inlineExpansions": 0,
         "precompiles": 4,
-        "cutoffResiduals": 2
+        "cutoffResiduals": 10
       }
     }
   }
