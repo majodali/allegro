@@ -1567,28 +1567,40 @@ allow. Two rules govern what happens when they do not allow much:
 
 - **PE Rule 1.** An application with an unresolved argument produces a
   **residual** — the application itself, as a value — with metadata fields
-  propagated onto it per their rules.
+  propagated onto it per their rules, unless it applies a composed function.
+  A composed function is **unfolded**: its body is evaluated with the
+  arguments substituted, and Rule 1 governs each application inside it. Two
+  calls are residualised instead, carrying the callee's effects: a call into
+  a recursion cycle during a typed compilation, because unfolding it cannot
+  converge; and a call reached inside a `when` arm that Rule 2 evaluates,
+  because the unfoldings nested there grow without bound.
 - **PE Rule 2.** A lazy primitive whose control input is unresolved evaluates
   **both** branches and residualises, so that what is known on either path is
   still discovered.
 
 **Rationale.** Rule 1 is what makes compilation and execution the same act:
 a partially-evaluated program is an ordinary value (SC-3), so there is no
-separate IR and no separate checking pass. Rule 2 is what stops an unknown
+separate IR and no separate checking pass. Unfolding is what lets partial
+evaluation discharge inside a call: refinement checks, effect inference and
+theorem discharge run on the unfolded body, where a residual would hide
+everything behind the callee's signature. Rule 2 is what stops an unknown
 condition from hiding everything behind it — without it, a single unresolved
 `if` would end analysis for the whole branch.
 
 **As implemented.** In [`allegretto/evaluator.md` §3](allegretto/evaluator.md), the chapter for the
-`evaluator` unit; the definition stays here.
+`evaluator` unit; the definition stays here. Under an unresolved control
+input, `eval_if`, `&&` and `||` evaluate both branches and `eval_when`
+every arm, each speculatively: the program may never take that path, so the
+evaluation runs no effect, and an effect it reaches is carried on the
+residual instead.
 
-**Delta.** Neither rule is implemented as specified: a composed function
-applied to an unresolved argument is unfolded rather than residualised, so
-Rule 1 governs only an eager primitive application and an unresolved
-function position; and of the lazy primitives only `eval_if` evaluates both
-branches, so `eval_when`, `&&` and `||` do not meet Rule 2.
-[`allegretto/evaluator.md` §3](allegretto/evaluator.md) (partial evaluation
-as implemented) states both with evidence. **→ B-172** (the partial-evaluation
-rules as implemented against the spine).
+**Delta.** No delta: both rules are implemented as stated since chunks C2
+to C4 of **B-172** (the partial-evaluation rules as implemented against the
+spine). The `when`-arm exception of Rule 1 is to be revisited, in the
+maintainer's words, "when we want to push PE for more optimizations, or if
+we run into cases where we need the full metadata evaluation"
+([`plans/pe-rules.md`](../plans/pe-rules.md) §6, ruling RR9 (unfolding
+inside a speculated `when` arm)). **→ B-172**.
 
 <a id="def-resolved-unresolved-residual"></a>
 ## 26. Resolved, unresolved, residual
