@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-172
 lane: D
 merge: human-gated
@@ -29,12 +29,11 @@ boundary:
 
 # The partial-evaluation rules and the evaluator in agreement — the PE-rules stream
 
-> **Status: draft** — filed 2026-11-03 as a proposal. The maintainer
-> ratifies it by merging its PR, after taking the rulings of §6. Ruling
-> RR1 is taken on the numbers chunk C1 measures, at C1's PR; the others
-> are taken before C1 starts. The status line and the header's `status`
-> say the same thing (K-007 (plan status transitions): draft → active →
-> closed).
+> **Status: active** — drafted 2026-11-03 from the evidence in §2;
+> ratified at the merge of PR #147 on 2026-11-03 with every
+> recommendation taken (RR2 to RR8; RR1's recommendation (a) stands, to
+> be confirmed on C1's numbers) and the four terms of §1 ratified. The
+> status line and the header's `status` say the same thing.
 >
 > **Reader**: the session that runs lane D (L2 semantics), and the
 > maintainer ruling on §6. Assumed known: the layers
@@ -403,6 +402,7 @@ over unresolved information) are cited in the same text.
     residualising every unresolved call would hide everything behind
     the signature. Divergence, its cost, is already handled by the
     inline cutoff. Taken at C1's PR.
+  - **Standing: (a) recommended; taken at C1's PR on its numbers.**
 - **RR2 — What "evaluates both branches" means for `eval_when`.** An
   arm's body cannot be evaluated without its pattern names bound.
   - (a) Evaluate each arm's guard and body with its pattern names as
@@ -424,6 +424,7 @@ over unresolved information) are cited in the same text.
   - **Recommended: (a).** It closes the effect gap within the
     evaluator's own knowledge; (b) can follow when a stream owns the
     type side.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 - **RR3 — Speculative evaluation and effects.** Evaluating the right
   operand of `&&` or `||`, or a branch, can reach an effectful
   primitive. During the precompile pass that is already safe: compile
@@ -445,6 +446,7 @@ over unresolved information) are cited in the same text.
     of speculation, from a mechanism the evaluator already has, and
     removes an effect that fires on a path the program may not take.
     C1 measures which outputs, if any, depend on today's `eval_if`.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 - **RR4 — How the evaluator chapter is kept true.** The chapter's next
   edit runs count 2 of the stranger rounds, with three defects waiting
   in §2 (`docs/book/allegretto/evaluator.review.md`, "After the
@@ -461,6 +463,7 @@ over unresolved information) are cited in the same text.
     rule of `docs/book/process.md` §3. Count 2 is several stranger
     rounds and should run once, on the final text, with the three
     waiting defects fixed in the same pass.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 - **RR5 — The default arm of `evaluate`.**
   - (a) An inert default, as `docs/book/units.md` §3.2 ratified: the
     switch names the participating kinds, and the default arm returns
@@ -487,6 +490,7 @@ over unresolved information) are cited in the same text.
     a kernel fault (a plain `Error`) rather than an `AllegroError`,
     since the fault is the engine's, and the amendment of §3.2 goes to
     lane K first.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 - **RR6 — B-171's halt finding.** B-171's second finding is that the
   precompile pass's error-severity notifications do not halt, against
   CE-R1. Options: (a) out of scope; (b) in scope.
@@ -494,6 +498,7 @@ over unresolved information) are cited in the same text.
   `src/runtime.ts`, outside this boundary, and it concerns what a
   notification does, not what partial evaluation produces. It stays
   B-171's, in lane D after this stream.
+  **Taken: (a), out**, 2026-11-03, at the merge of PR #147.
 - **RR7 — A tail call inside a speculatively evaluated branch** (§2.5,
   finding 1).
   - (a) The branch's `TailCall` sentinel is applied, as `evaluateExpr`
@@ -513,6 +518,7 @@ over unresolved information) are cited in the same text.
   - **Recommended: (a).** It follows RR1's policy and makes the effects
     of a branch call visible, as for a call outside a branch. In C2,
     with the same applied to `eval_when` arms in C3.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 - **RR8 — What may move.** C2 and C3 change what the precompile pass
   infers, so some reports change by design.
   - (a) Allowed: the gap pins each chunk names; new effects in the
@@ -529,6 +535,7 @@ over unresolved information) are cited in the same text.
   - **Recommended: (a).** The corpus's own code has no `&&`, `||` or
     `when` under an unresolved input, so no count is expected to move;
     a rise would be news and deserves a look.
+  **Taken: (a)**, 2026-11-03, at the merge of PR #147.
 
 ## 7. Record
 
@@ -538,3 +545,7 @@ over unresolved information) are cited in the same text.
   the partial-evaluation rules`, appends the manifest row, and names the
   stream in lane D's row and in B-172's entry. Rulings RR1 to RR8
   await the maintainer, RR1 on C1's numbers.
+- **2026-11-03 — Ratified** at the merge of PR #147; rulings RR2 to RR8
+  taken as recommended; the maintainer filed B-180 (recursion handling
+  under partial evaluation) and B-181 (the hard-coded precompile and
+  compile-time phases) for later review, outside this stream's scope.
