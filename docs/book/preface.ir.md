@@ -2,20 +2,20 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft
+Status: draft (count 1 paused after round 2, owing round 3; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
 
 ## Terms
 
-T1. Decision section. A section of the book that presents one decision, or a few tightly related decisions. anchor: #def-decision-section [proposed: this IR]
+T1. Decision section. A section of the book that presents one decision, or a few tightly related decisions. anchor: #def-decision-section [decided: owner, 2026-11-03]
 
-T2. Swappable decision. A decision for which trying another option replaces one unit of code behind the unit's interface. anchor: #def-swappable-decision [proposed: this IR]
+T2. Swappable decision. A decision for which trying another option replaces one unit of code behind the unit's interface. anchor: #def-swappable-decision [decided: owner, 2026-11-03]
 
-T3. Foundational decision. A decision for which trying another option cascades through the decisions that depend on the foundational decision. anchor: #def-foundational-decision [proposed: this IR]
+T3. Foundational decision. A decision for which trying another option cascades through the decisions that depend on the foundational decision. anchor: #def-foundational-decision [decided: owner, 2026-11-03]
 
-T4. Open decision. A decision the project has not yet taken. anchor: #def-open-decision [proposed: this IR]
+T4. Open decision. A decision the project has not yet taken. anchor: #def-open-decision [decided: owner, 2026-11-03]
 
 T5. Unit. defined-at: units.md#def-unit [decided: D50]
 
@@ -26,6 +26,8 @@ T6. Intermediate representation. defined-at: https://github.com/majodali/methodo
 ### Reader and authority
 
 C1. The book is written for you: a working programmer who is curious about language design and new to Allegro's repository. reworded in count 1, round 1. [decided: owner, 2026-11-03]
+
+C71. The table of contents marks each chapter rewritten to this organization. evidence: E9 [decided: owner, 2026-11-03]
 
 C2. The principles of this preface also bind every author of the book, human or agent. [decided: owner, 2026-11-03]
 
@@ -39,25 +41,25 @@ C5. You are invited into the design of Allegro, which is still under way. reword
 
 C6. The code is organized so that you can branch the code to try another option for a decision. [decided: owner, 2026-11-03]
 
-C7. Most chapters of the book do not yet follow the organization this preface describes. evidence: E1 [proposed: this IR]
+C7. Most chapters of the book do not yet follow the organization this preface describes. evidence: E1 [decided: owner, 2026-11-03]
 
-C8. The book is being rewritten to the organization of this preface one chapter at a time. evidence: E1 [proposed: this IR]
+C8. The book is being rewritten to the organization of this preface one chapter at a time. evidence: E1 [decided: owner, 2026-11-03]
 
 ### Decisions in dependency order
 
 C10. A decision comes after the decisions it builds on. [decided: owner, 2026-11-03]
 
-C11. Everything a decision rests on is therefore explained before the decision itself. [proposed: this IR]
+C11. Everything a decision rests on is therefore explained before the decision itself. [decided: owner, 2026-11-03]
 
 C12. Among decisions that do not depend on each other, the more significant decision comes first. [decided: owner, 2026-11-03]
 
-C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [proposed: this IR]
+C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [decided: owner, 2026-11-03]
 
 C13. A tour will open the book, telling the story of the few large choices that define Allegro. reworded in count 1, rounds 1 and 2, C14 merged in. [decided: owner, 2026-11-03]
 
 C70. Each choice in the tour will point forward to the choice's full treatment later in the book. split from C13 in count 1, round 2. [decided: owner, 2026-11-03]
 
-C9. The tour is not yet written. evidence: E2 [proposed: this IR]
+C9. The tour is not yet written. evidence: E2 [decided: owner, 2026-11-03]
 
 C15. After the tour, the book descends through the decisions in dependency order. [decided: owner, 2026-11-03]
 
@@ -67,43 +69,43 @@ C17. The book marks each concept at the concept's definition. [decided: docs/boo
 
 C18. Every other chapter links its first use of a concept back to the concept's definition. [decided: docs/book/README.md, Term links]
 
-C64. A concept never appears before the concept's meaning. [proposed: this IR]
+C64. A concept never appears before the concept's meaning. [decided: owner, 2026-11-03]
 
 ### The seven blocks of a decision section
 
-C19. A decision section presents one decision, or a few tightly related decisions. [proposed: this IR]
+C19. A decision section presents one decision, or a few tightly related decisions. [decided: owner, 2026-11-03]
 
 C20. Most decisions have a decision section of their own. [decided: owner, 2026-11-03]
 
 C21. By default, a decision section has seven blocks, in this order. [decided: owner, 2026-11-03]
 
-C22. The problem says what has to be decided. [proposed: this IR]
+C22. The problem says what has to be decided. [decided: owner, 2026-11-03]
 
-C23. The forces are the pressures that any answer must balance. [proposed: this IR]
+C23. The forces are the pressures that any answer must balance. [decided: owner, 2026-11-03]
 
-C24. The options are the answers worth considering, each with its strengths and its costs. [proposed: this IR]
+C24. The options are the answers worth considering, each with its strengths and its costs. [decided: owner, 2026-11-03]
 
-C25. The decision and rationale name the option taken, with the reasons for taking the option. [proposed: this IR]
+C25. The decision and rationale name the option taken, with the reasons for taking the option. [decided: owner, 2026-11-03]
 
-C26. The consequences say what the decision makes possible and what the decision rules out. [proposed: this IR]
+C26. The consequences say what the decision makes possible and what the decision rules out. [decided: owner, 2026-11-03]
 
-C27. The as-implemented block points to the unit of code that holds the decision. [proposed: this IR]
+C27. The as-implemented block points to the unit of code that holds the decision. [decided: owner, 2026-11-03]
 
-C28. The explore block says how to try another option in the code. [proposed: this IR]
+C28. The explore block says how to try another option in the code. [decided: owner, 2026-11-03]
 
 C30. A decision about the language's vision or aesthetics may need fewer blocks. [decided: owner, 2026-11-03]
 
 C31. The decision and rationale block may show how a rejected option fails. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C32. The evidence of such a failure is an experiment written into the book, one experiment you can run again yourself. reworded in count 1, round 1, C68 and C65 merged in. [proposed: this IR]
+C32. The evidence of such a failure is an experiment written into the book, one experiment you can run again yourself. reworded in count 1, round 1, C68 and C65 merged in. [decided: owner, 2026-11-03]
 
 C33. Nothing in the book is drawn from the project's history. [decided: owner, 2026-11-03]
 
 ### Swappable and foundational decisions
 
-C34. A swappable decision is one for which trying another option replaces one unit of code behind the unit's interface. [proposed: this IR]
+C34. A swappable decision is one for which trying another option replaces one unit of code behind the unit's interface. [decided: owner, 2026-11-03]
 
-C35. A foundational decision is one for which trying another option cascades through the decisions that depend on the foundational decision. [proposed: this IR]
+C35. A foundational decision is one for which trying another option cascades through the decisions that depend on the foundational decision. [decided: owner, 2026-11-03]
 
 C36. Each decision section labels its decision swappable or foundational. [decided: owner, 2026-11-03]
 
@@ -111,13 +113,15 @@ C37. The label tells you what an alternative costs before you branch the code. [
 
 ### Open decisions as invitations
 
-C38. An open decision is a decision the project has not yet taken. [proposed: this IR]
+C38. An open decision is a decision the project has not yet taken. [decided: owner, 2026-11-03]
 
 C39. Every open decision in the book takes one shared form. [decided: owner, 2026-11-03]
 
+C72. The section of an open decision takes the seven blocks of a decision section, with the question still open in place of the decision and rationale. [decided: owner, 2026-11-03]
+
 C40. Each open decision invites you to contribute an alternative. [decided: owner, 2026-11-03]
 
-C41. The section of an open decision says how to make the contribution. [decided: owner, 2026-11-03]
+C41. The explore block of an open decision says how and where to contribute an alternative. reworded at the ruling on A4, 2026-11-03. [decided: owner, 2026-11-03]
 
 ### The code organized to match the book
 
@@ -129,13 +133,13 @@ C45. A unit can be replaced by another unit that offers the replaced unit's inte
 
 C69. The replacement needs no edit to the units below the replaced unit. evidence: E3 [decided: docs/book/units.md §2]
 
-C46. The code is divided into units today, each with the units it may depend on. evidence: E4 [proposed: this IR]
+C46. The code is divided into units today, each with the units it may depend on. evidence: E4 [decided: owner, 2026-11-03]
 
-C47. A check in the project's test suite fails when a change adds an import that the order of the units forbids. evidence: E5 [proposed: this IR]
+C47. A check in the project's test suite fails when a change adds an import that the order of the units forbids. evidence: E5 [decided: owner, 2026-11-03]
 
-C48. Some source files still hold the decisions of several units. evidence: E6 [proposed: this IR]
+C48. Some source files still hold the decisions of several units. evidence: E6 [decided: owner, 2026-11-03]
 
-C49. Such a file is split when its code is next changed for another reason. evidence: E7 [proposed: this IR]
+C49. Such a file is split when its code is next changed for another reason. evidence: E7 [decided: owner, 2026-11-03]
 
 ### Two forms of each chapter
 
@@ -143,7 +147,7 @@ C50. Each chapter of the book has two forms, one for software agents and one for
 
 C51. The form for agents is an intermediate representation: a numbered list of claims, each claim a single statement with its evidence and pointers into the code. reworded in count 1, round 2. [decided: owner, 2026-11-03]
 
-C52. A chapter's intermediate representation sits beside the chapter's prose, in a file whose name ends in `.ir.md`. evidence: E8 [proposed: this IR]
+C52. A chapter's intermediate representation sits beside the chapter's prose, in a file whose name ends in `.ir.md`. evidence: E8 [decided: owner, 2026-11-03]
 
 C53. The form for people is prose, like this preface. [decided: owner, 2026-11-03]
 
@@ -151,57 +155,55 @@ C54. The prose keeps every claim of the intermediate representation. [decided: o
 
 C55. The prose aims to be clear and brief enough to hold your interest. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C56. Rendering each sentence from one claim of the intermediate representation keeps out the phrasing habits of agents that make text harder for you to follow. reworded in count 1, round 1, C57 folded in. [decided: owner, 2026-11-03]
-
 ### Tracking numbers and process detail stay outside the book
 
 C59. The text of the book carries no tracking numbers. [decided: owner, 2026-11-03]
 
 C60. Each decision and each chapter has a short, clear name instead of a number. [decided: owner, 2026-11-03]
 
-C67. A name tells you what a decision is about without a lookup. [proposed: this IR]
+C67. A name tells you what a decision is about without a lookup. [decided: owner, 2026-11-03]
 
 C61. The numbers live in the intermediate representations and in the project's records, such as the project's decision register. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C58. The project's process, measurements, file maps and studies live outside the book's narrative, which keeps the narrative on the design and the reasons for the design. reworded in count 1, round 2, C66 merged in. [proposed: this IR]
+C58. The project's process, measurements, file maps and studies live outside the book's narrative, which keeps the narrative on the design and the reasons for the design. reworded in count 1, round 2, C66 merged in. [decided: owner, 2026-11-03]
 
 ### Clusters
 
 G2. cluster: C3, C1, C4, C5, C6 [decided: owner, 2026-11-03]
 
-G3. cluster: C7, C8, C2 [proposed: this IR]
+G3. cluster: C7, C8, C71, C2 [decided: owner, 2026-11-03]
 
-G4. cluster: C10, C11, C12, C62 [proposed: this IR]
+G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
 
-G5. cluster: C13, C70, C15, C9 [proposed: this IR]
+G5. cluster: C13, C70, C15, C9 [decided: owner, 2026-11-03]
 
-G6. cluster: C16, C17, C18, C64 [proposed: this IR]
+G6. cluster: C16, C17, C18, C64 [decided: owner, 2026-11-03]
 
-G7. cluster: C19, C20, C21 [proposed: this IR]
+G7. cluster: C19, C20, C21 [decided: owner, 2026-11-03]
 
-G8. cluster: C22, C23, C24, C25, C26, C27, C28 [proposed: this IR]
+G8. cluster: C22, C23, C24, C25, C26, C27, C28 [decided: owner, 2026-11-03]
 
 G9. cluster: C30 [decided: owner, 2026-11-03]
 
-G10. cluster: C31, C32, C33 [proposed: this IR]
+G10. cluster: C31, C32, C33 [decided: owner, 2026-11-03]
 
-G11. cluster: C34, C35, C36, C37 [proposed: this IR]
+G11. cluster: C34, C35, C36, C37 [decided: owner, 2026-11-03]
 
-G12. cluster: C38, C39, C40, C41 [proposed: this IR]
+G12. cluster: C38, C39, C72, C40, C41 [decided: owner, 2026-11-03]
 
 G13. cluster: C43 [decided: owner, 2026-11-03]
 
-G14. cluster: C44, C45, C69, C46, C47 [proposed: this IR]
+G14. cluster: C44, C45, C69, C46, C47 [decided: owner, 2026-11-03]
 
-G15. cluster: C48, C49 [proposed: this IR]
+G15. cluster: C48, C49 [decided: owner, 2026-11-03]
 
-G16. cluster: C50, C51, C52, C53, C54 [proposed: this IR]
+G16. cluster: C50, C51, C52, C53, C54 [decided: owner, 2026-11-03]
 
-G17. cluster: C56, C55 [decided: owner, 2026-11-03]
+G17. cluster: C55 [decided: owner, 2026-11-03]
 
-G19. cluster: C59, C60, C67, C61 [proposed: this IR]
+G19. cluster: C59, C60, C67, C61 [decided: owner, 2026-11-03]
 
-G18. cluster: C58 [proposed: this IR]
+G18. cluster: C58 [decided: owner, 2026-11-03]
 
 ## Relations
 
@@ -237,16 +239,30 @@ E7. `docs/book/units.md` lines 73–75: the physical moves are not scheduled as 
 
 E8. `docs/book/allegretto/evaluator.ir.md` beside `docs/book/allegretto/evaluator.md`, and `docs/book/preface.ir.md` beside `docs/book/preface.md`: a chapter's intermediate representation sits beside its prose.
 
+E9. `docs/reading-order.json` line 8 and the Preface row of `docs/book/README.md`: the preface's entry carries `"organized": true`, and its table-of-contents row carries the marker *organized*.
+
 ## Asks
 
 A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C9, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C9, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
 
+A1 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the listed claims carry decided provenance from that date.
+
 A2. Ratify or strike the proposed terms decision section (T1), swappable decision (T2), foundational decision (T3) and open decision (T4). The plan ratified the first three concepts on 2026-11-03, as one term "swappable or foundational" for the second and third. The preface is their definition site in the book. Depends: C19, C34, C35, C38.
+
+A2 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the four terms carry decided provenance, and the preface is their definition site.
 
 A3. Decide how a reader tells a chapter rewritten to this organization from one not yet rewritten. Proposed: each rewritten chapter's entry in `docs/reading-order.json` carries `"organized": true`, and the table of contents in `docs/book/README.md` marks the chapter. The preface then gains one claim saying that the table of contents marks each rewritten chapter. Depends: C7, C8.
 
+A3 resolved: taken as proposed at the merge of PR #157, 2026-11-03; claim C71 added, the preface's reading-order entry and table-of-contents row marked.
+
 A4. Decide the form every open decision takes. Proposed: the seven blocks of a decision section, with "decision and rationale" replaced by "the question still open", and with the explore block saying how to contribute an alternative and where to propose it. The preface then gains one claim stating the form. Depends: C39, C40, C41.
+
+A4 resolved: taken as proposed at the merge of PR #157, 2026-11-03; claim C72 added and C41 reworded.
 
 A5. Decide whether the preface shows one worked decision section, or points to one, once the pilot chapter exists. Round 1 of count 1 asked for it. Depends: C19, C21.
 
-A6. Decide whether the preface keeps the sentence on how the prose is written (C56), given that process detail stays outside the book (C58). Strangers flagged C56 in count 1 at round 1's confirmation, as a contradiction, and at round 2, as a lost thread. The round 2 stranger disputes holding the passage: the sentence gives no reason why a reader needs it, so the thread stays lost whatever the ruling. The options are therefore to keep C56 and add the reader's gain, or to cut C56. The passage stays unchanged until the ruling. Depends: C56, C58.
+A5 resolved: taken as proposed at the merge of PR #157, 2026-11-03; the preface will point to the pilot chapter once that chapter exists; no text change now.
+
+A6. Decide whether the preface keeps the sentence on how the prose is written (C56), given that process detail stays outside the book (C58). Strangers flagged C56 in count 1 at round 1's confirmation, as a contradiction, and at round 2, as a lost thread. The round 2 stranger disputes holding the passage: the sentence gives no reason why a reader needs it, so the thread stays lost whatever the ruling. The options are therefore to keep C56 and add the reader's gain, or to cut C56. The passage stays unchanged until the ruling. Depends: C55, C58.
+
+A6 resolved: option (a) at the merge of PR #157, 2026-11-03; C56 cut from the IR and the prose, C55 kept.

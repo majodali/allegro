@@ -25,6 +25,9 @@ every section is tagged with its implementation status:
 - **[under revision]** — previously settled, now being redesigned (says why
   and what supersedes it)
 
+In the tables below, *organized* marks a chapter rewritten to the
+organization that the preface (`preface.md`) describes.
+
 ## Term links
 
 A term has one definition site, a heading preceded by
@@ -36,7 +39,7 @@ A term has one definition site, a heading preceded by
 
 | Order | Document | What it holds |
 |---|---|---|
-| Preface | `preface.md` (*lookahead*) | How this book is organized: decisions in dependency order after a tour, the seven blocks of a decision section, swappable and foundational decisions, open decisions as invitations, the code organized to match, the two forms of each chapter, what stays outside the book. Normative for every author of the book. Definition site of *decision section*, *swappable decision*, *foundational decision* and *open decision*. Beside it, `preface.ir.md` |
+| Preface | `preface.md` (*lookahead*, *organized*) | How this book is organized: decisions in dependency order after a tour, the seven blocks of a decision section, swappable and foundational decisions, open decisions as invitations, the code organized to match, the two forms of each chapter, what stays outside the book. Normative for every author of the book. Definition site of *decision section*, *swappable decision*, *foundational decision* and *open decision*. Beside it, `preface.ir.md` |
 
 ## Part I: foundations
 

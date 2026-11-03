@@ -199,3 +199,33 @@ ruled.
 
 Meta-review: not indicated at the pause (signals checked: first, second
 and fourth; the count has not ended).
+
+## Rulings taken, 2026-11-03, at the merge of PR #157
+
+The maintainer took the default on every ask of the IR and merged PR
+#157 on 2026-11-03.
+
+- A1: the listed proposed claims are ratified; they carry
+  `[decided: owner, 2026-11-03]`, and so do the clusters.
+- A2: the terms decision section, swappable decision, foundational
+  decision and open decision are ratified; unratified terms 0.
+- A3: a chapter rewritten to the organization carries `"organized":
+  true` on its entry in `docs/reading-order.json`, and its row in
+  `docs/book/README.md` carries the marker *organized*, explained in one
+  sentence under the README's status convention. Applied to the preface
+  itself. New claim C71: "The table of contents marks each chapter
+  rewritten to this organization."
+- A4: new claim C72: "The section of an open decision takes the seven
+  blocks of a decision section, with the question still open in place
+  of the decision and rationale." C41 reworded: "The explore block of an
+  open decision says how and where to contribute one."
+- A5: the preface will point to the pilot chapter once that chapter
+  exists. No text change now.
+- A6, option (a): C56 is cut from the IR and the prose. C55, the
+  prose's aim, is kept. Finding 14 of round 2 and finding 27 of round
+  1's carry-over are resolved by the cut.
+
+After the rulings: 63 claims, 953 words (by `wc`), the render map
+covering all 63. The count stays paused after round 2. Round 3 owes a
+fresh stranger instance reading the prose and the IR as they now stand.
+Status of the IR: draft, count 1 owing round 3.
