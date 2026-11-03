@@ -12,7 +12,14 @@
   "lanes": {
     "A": {
       "name": "reval docs",
-      "globs": ["docs/book/**", "docs/documentation-census.md", "docs/reading-order.json", "scripts/doc-lint-baseline.json"]
+      "globs": [
+        "docs/book/**",
+        "docs/documentation-census.md",
+        "docs/reading-order.json",
+        "scripts/doc-lint-baseline.json",
+        "docs/plans/book-pass-briefs.md",
+        "docs/records/book-pass/**"
+      ]
     },
     "B": {
       "name": "suite split",
@@ -100,7 +107,7 @@
         "docs/book/extension/**",
         "docs/book/implementation-map.md",
         "docs/book/standard/totality.md",
-    "docs/book/platform/build-pipeline.ir.md",
+        "docs/book/platform/build-pipeline.ir.md",
         "docs/plans/fast-library-load.md",
         "package.json"
       ]
