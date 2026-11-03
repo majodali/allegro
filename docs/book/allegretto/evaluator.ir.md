@@ -189,9 +189,9 @@ C202. PE Rule 1 says that a composed function is unfolded: its body is evaluated
 
 C203. PE Rule 1 says that two calls are residualised instead of unfolded, carrying the callee's effects: a call into a recursion cycle during a typed compilation, and a call reached inside a `when` arm that PE Rule 2 evaluates. [decided: docs/book/concepts.md §25]
 
-C204. An eager primitive application and an application whose function position is unresolved produce a residual under an unresolved argument, as PE Rule 1 states. evidence: E6, E8. [proposed: this IR]
+C204. An eager primitive application and an application whose function position is unresolved produce a residual under an unresolved argument, as PE Rule 1 states. evidence: E6, E8. [decided: owner, 2026-11-03]
 
-C205. `applyComposed` unfolds a composed call with an unresolved argument into its substituted body, except a call into a recursion cycle during a typed compilation or one made inside a `when` arm speculation, which it residualises. evidence: E9, E15, E52. [proposed: this IR]
+C205. `applyComposed` unfolds a composed call with an unresolved argument into its substituted body, except a call into a recursion cycle during a typed compilation or one made inside a `when` arm speculation, which it residualises. evidence: E9, E15, E52. [decided: owner, 2026-11-03]
 
 C154. In an unfolded body, PE Rule 1 governs each application the body contains. evidence: E8, E15. [decided: owner, 2026-11-01]
 
@@ -485,7 +485,7 @@ G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26
 
 G8. cluster: C31, C32, C33, C163, C34 [decided: owner, 2026-11-01]
 
-G40. cluster: C201, C168, C202, C203, C204, C205, C154 [proposed: this IR]
+G40. cluster: C201, C168, C202, C203, C204, C205, C154 [decided: owner, 2026-11-03]
 
 G10. cluster: C41, C42, C43 [decided: owner, 2026-11-01]
 
@@ -692,3 +692,5 @@ A5. Ratify in bulk the re-proposed claims about `eval_when` under PE Rule 2, as 
 A5 resolved: ratified by the owner at the merge of PR #155, 2026-11-03; the statuses are flipped.
 
 A6. Ratify in bulk the re-proposed claims about PE Rule 1 as implemented, as chunk C4 of B-172 (the partial-evaluation rules as implemented against the spine) restated the rule in `docs/book/concepts.md` §25, with their cluster G40: C204, C205. C201, C202 and C203 quote the restated rule and are decided by the spine. Depends: C204, C205.
+
+A6 resolved: ratified by the owner at the merge of PR #158, 2026-11-03; the statuses are flipped.
