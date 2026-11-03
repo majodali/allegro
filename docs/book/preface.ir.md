@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1: round 3 not readable, owing round 4; ask A7 open; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
+Status: draft (count 1: round 3 not readable, paused for the ruling on ask A7, round 4 after it; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -43,7 +43,7 @@ C6. The code is organized so that you can branch the code to try another option 
 
 C7. Most chapters of the book do not yet follow the organization this preface describes. evidence: E1 [decided: owner, 2026-11-03]
 
-C8. The chapters of the book are being rewritten one at a time. evidence: E1 reworded in count 1, round 3. [decided: owner, 2026-11-03]
+C8. The chapters of the book are being rewritten to this organization one at a time. evidence: E1 reworded in count 1, round 3 and its confirmation. [decided: owner, 2026-11-03]
 
 ### Decisions in dependency order
 
@@ -163,7 +163,9 @@ C67. A name tells you what a decision is about without a lookup. [decided: owner
 
 C61. The numbers live in the intermediate representations and in the project's records, such as the project's decision register. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C58. The project's process, measurements, file maps and studies live outside the book's narrative, which keeps the narrative on the design and its reasons. reworded in count 1, rounds 2 and 3, C66 merged in. [decided: owner, 2026-11-03]
+C58. The project's process, measurements, file maps and studies live outside the book's narrative. split at round 3's confirmation, count 1. [decided: owner, 2026-11-03]
+
+C73. That separation keeps the narrative on the design and its reasons. split from C58 at round 3's confirmation, count 1. [decided: owner, 2026-11-03]
 
 ### Clusters
 
@@ -201,7 +203,7 @@ G17. cluster: C55 [decided: owner, 2026-11-03]
 
 G19. cluster: C59, C60, C67, C61 [decided: owner, 2026-11-03]
 
-G18. cluster: C58 [decided: owner, 2026-11-03]
+G18. cluster: C58, C73 [decided: owner, 2026-11-03]
 
 ## Relations
 

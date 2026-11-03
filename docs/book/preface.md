@@ -11,7 +11,7 @@ Allegro, which is still under way. The code is organized so that you can branch 
 try another option for a decision.
 
 Most chapters do not yet follow the organization this preface describes.
-The chapters are being rewritten one at a time. The
+The chapters are being rewritten to this organization one at a time. The
 [table of contents](README.md) marks each rewritten chapter. The principles of this preface also bind every author of the book, human
 or agent.
 
@@ -98,7 +98,7 @@ of the units forbids.
 Some source files still hold the decisions of several units.
 Such a file is split when its code is next changed for another reason.
 
-## Prose for people, a structured form for agents
+## Prose for people, an intermediate representation for agents
 
 Each chapter of the book has two forms, one for software agents and one
 for people. The form for agents is an
@@ -121,7 +121,7 @@ and in the project's records, such as its
 [decision register](../decisions.md).
 
 The project's process, measurements, file maps and studies live outside
-the book's narrative, which keeps the narrative on the design and its
-reasons.
+the book's narrative. That separation keeps the narrative on the design
+and its reasons.
 
-<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C71→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C70→¶4 C15→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C37→¶10 C38→¶11 C39→¶11 C72→¶11 C40→¶11 C41→¶11 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 -->
+<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C71→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C70→¶4 C15→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C37→¶10 C38→¶11 C39→¶11 C72→¶11 C40→¶11 C41→¶11 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 C73→¶18 -->

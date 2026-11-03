@@ -275,4 +275,25 @@ the fixed IR is carried (62 of 62 in the render map). C9 is merged into
 C13, and relation R1, which related the two, is removed. No claim
 reported missing or stale. Prose words after the fixes 943 (by `wc`).
 
-Confirmation: pending.
+Confirmation: the round's stranger instance confirmed the fixes of 1,
+2, 3, 5, 8 and 9, and accepted the declines of 6 and 10 and the hold of
+4 under ask A7. Finding 7 is unfixed: the reason clause of C58 is still
+a compound the reader judges separately. The stranger named two new
+defects of the round 3 fixes.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| 7 | "which keeps the narrative on the design and its reasons" | compound (unfixed at confirmation) | stranger | fixed: C58 split into C58 and C73, "That separation keeps the narrative on the design and its reasons." |
+| 11 | heading "Prose for people, a structured form for agents" differs from the paragraph's term | pattern | round 3 fixes | fixed: heading "Prose for people, an intermediate representation for agents"; the term stays linked at its first use in the paragraph |
+| 12 | "The chapters are being rewritten one at a time." | lost thread | round 3 fixes | fixed: C8 reads "The chapters are being rewritten to this organization one at a time." |
+
+Claims check after the confirmation fixes: 63 of 63 claims carried in
+the render map; C73 is a new split of C58; no claim missing or stale.
+
+## The count paused for ask A7
+
+The count pauses after round 3 for the maintainer's ruling on ask A7.
+Round 4 runs after the ruling, with a fresh stranger instance.
+
+Meta-review: not indicated at the pause (signals checked: first, second
+and fourth; the count has not ended).
