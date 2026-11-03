@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-172
 lane: D
 merge: human-gated
@@ -25,15 +25,30 @@ boundary:
   - docs/book/allegretto/evaluator.ir.md
   - docs/book/allegretto/evaluator.md
   - docs/plans/pe-rules.md
+  - scripts/analyze/units-baseline.json
 ---
 
 # The partial-evaluation rules and the evaluator in agreement — the PE-rules stream
 
-> **Status: active** — drafted 2026-11-03 from the evidence in §2;
-> ratified at the merge of PR #147 on 2026-11-03 with every
-> recommendation taken (RR2 to RR8; RR1's recommendation (a) stands, to
-> be confirmed on C1's numbers) and the four terms of §1 ratified. The
-> status line and the header's `status` say the same thing.
+> **Status: closed → B-172** (2026-11-03) — the chunk sequence of §5 is
+> complete and the §1 outcome is met: both rules of
+> `docs/book/concepts.md` §25 are implemented as stated, `eval_when`,
+> `&&` and `||` speculate under an unresolved input and no speculation
+> runs an effect, no residual holds a `TailCall` sentinel, the switch in
+> `evaluate` has its inert default arm, and every `// expect:` line,
+> totality verdict and count is unchanged but what RR8 allowed (§7, the
+> closing entry). The plan was drafted 2026-11-03 from the evidence in
+> §2 and ratified at the merge of PR #147 the same day, RR2 to RR8 as
+> recommended; RR1 was taken as (a) at PR #149 on C1's numbers, and RR9
+> as option C on PR #155. The stream ran human-gated, one PR per chunk:
+> #147 the plan, #148 the activation, #149 C1 with RR1's numbers, #150
+> C2 and C5, #155 C3, #158 C4, and C6 the closing PR, with lane P's #151 and #152 raising
+> C2's count. It closes with B-172 and the unused reserves B-178 (first
+> out-of-scope finding of the PE-rules stream) and B-179 (second
+> out-of-scope finding of the PE-rules stream). The evaluator chapter's
+> prose and its count 2 go to lane A (RR4 (a)). RR9's revisit stays
+> open by ruling. Kept for its §7 record. The status line and the
+> header's `status` say the same thing.
 >
 > **Reader**: the session that runs lane D (L2 semantics), and the
 > maintainer ruling on §6. Assumed known: the layers
@@ -1070,3 +1085,171 @@ over unresolved information) are cited in the same text.
     - `ALLEGRO_TEST_FILTER="doc-ref|doc lints|IR lint|stream plans|lane
       lint|evaluator" MTOOL_HOME=/home/user/majodali/methodology-tools npm
       test`: 37 total, 37 passed, 0 failed.
+- **2026-11-03 — C6 landed; the stream closes.** PR #158 (C4) merged
+  with no comment, which ratified ask A6 of the evaluator IR (claims
+  C204 and C205, cluster G40), the spine term *unfolded* (set in bold in
+  `docs/book/concepts.md` §25 with its inline meaning and no `def-`
+  anchor; it means what this plan's ratified term [unfold](#def-unfold)
+  means), and the default that the book pass fixes the one-line summary
+  of Rule 1 under requirement R2 when it reaches the spine. The merge
+  also accepted the widening that the C4 PR's ask announced: the
+  header's `boundary` gains `scripts/analyze/units-baseline.json`, since
+  C3's lowering commit was set aside because the boundary did not list
+  that file. C6 is docs and status documents, plus that one baseline
+  commit; no file under `src/`, `tests/`, `bench/` or `lib/` changed.
+  - **The A6 flip.** In `docs/book/allegretto/evaluator.ir.md`, C204,
+    C205 and G40 go from proposed to decided (3 statuses); A6 resolved.
+    No proposed status remains in the file.
+  - **The outcome of §1, clause by clause.** Each clause is quoted.
+    1. "`docs/book/concepts.md` §25 and the evaluator agree. Each rule
+       is either implemented as stated or restated with the
+       implementation's policy and its reason. The delta row is empty,
+       or names only what a ruling of §6 leaves open." **Met.** Rule 1
+       is restated with its policy (`docs/book/concepts.md:1568` to
+       `:1576`, C4) and its reason (`:1583` to `:1586`); Rule 2 is
+       unchanged (`:1577` to `:1579`) and implemented as stated since
+       C2 and C3. The IR quotes the restated rule in C201 to C203 and
+       checks the code against it in C204 and C205, all decided. The
+       delta row (`:1597` to `:1604`) reads closed and names only the
+       revisit that RR9 (unfolding inside a speculated `when` arm)
+       leaves open by ruling.
+    2. "`eval_when`, `&&` and `||` meet PE Rule 2 as ruled (RR2, RR3),
+       and no speculative evaluation runs an effect (RR3)." **Met.**
+       `typed_and_impl` and `typed_or_impl` speculate the right operand
+       (`src/primitives.ts:2307`, `:2404`, C2); `speculateWhenArms`
+       speculates every arm (`src/primitives.ts:865`, C3); `speculate`
+       sets the speculation mark on a fresh child scope
+       (`src/evaluator.ts:331`), so an effectful primitive defers. Pins
+       in `src/test/evaluator.ts`: "Rule 2 — && with an unresolved left
+       operand evaluates the right operand speculatively" (line 445),
+       its `||` twin (467), the `pure`-declared `&&`, `||` and `when`
+       rows (495, 502, 508), "eval_when with an unresolved subject
+       evaluates every arm speculatively" (305), "eval_if at run time
+       with an unresolved condition runs neither branch's effects"
+       (610), and "at run time &&, || and when with an unresolved input
+       print nothing" (649).
+    3. "A call in tail position inside a branch evaluated under an
+       unresolved condition is handled as RR7 rules (§2.5, finding 1);
+       under RR7's options (a) and (b), no residual holds a `TailCall`
+       sentinel." **Met** under RR7 (a), C2: `speculate` applies the
+       sentinel. Pins: "a tail call in a branch under an unresolved
+       condition is applied; no residual holds a sentinel" (line 529),
+       "a tail call in a branch, with a cutoff installed, is unfolded;
+       a recursive one is cut" (568), and "evaluate is no longer reached
+       with a TailCall sentinel; via_if precompiles cleanly" (587). IR
+       claims C183 and C188, decided.
+    4. "The switch in `evaluate` has the default arm the discriminator
+       rule (`docs/book/units.md` §3.2) requires, as RR5 rules."
+       **Met** under RR5 (a), C5: the switch from `src/evaluator.ts:504`
+       names Symbol, Expression, the two function kinds and Param, and
+       its default arm (`:546` to `:553`) returns the value. IR claims
+       C173 and C177, decided.
+    5. "The evaluator chapter's IR
+       (`docs/book/allegretto/evaluator.ir.md`) describes the result,
+       and its prose and count 2 are handed on as RR4 rules." **Met.**
+       Each chunk re-proposed the claims it changed, and every one is
+       now decided: C173 to C205, with no proposed status left and
+       `npm run lint:ir` clean (oracle below). C6 checked the PE claims
+       and their evidence pointers against the code at `d2bf712` and
+       found none false. The IR's Status line records the close and the
+       hand-off below.
+    6. "Every `// expect:` line, every totality verdict and every count
+       in `bench/load-baseline.json` is unchanged, except what RR8 lists
+       as allowed to move." **Met.** `git diff --stat 0cff2bf origin/main
+       -- tests/ basics.alg demos/ lib/` is empty, so no `// expect:`
+       line changed. Under `src/test/` the stream added
+       `src/test/evaluator.ts` and one import line in
+       `src/test/index.ts`; `VERDICT_PIN` in `src/test/totality.ts` is
+       untouched. The one count that moved is C2's, for
+       `tests/totality-decreases-demo.alg`, by lane P under RR8 (a):
+       PR #151 raised `evaluates` from 31,182 to 31,222 and
+       `cutoffResiduals` from 2 to 10, and PR #152 raised the cutoff
+       floor to 10. What else moved is what RR8 (a) allows: the gap pins
+       C2 flipped (seven) and C3 flipped (two), and the inferred-effect
+       sets of the functions whose `&&`, `||`, `when` or branch tail
+       call hid an effect. The one `inspect` change, `tests/functions.alg`
+       going from `has-errors` to `proven-safe`, was put to the
+       maintainer under RR8 at PR #150, which merged.
+  - **The hand-off to lane A** (RR4 (a)). The book pass
+    (`docs/plans/book-pass.md`) takes the evaluator chapter after this
+    stream reads `status: closed`. This stream never edited
+    `docs/book/allegretto/evaluator.md`; its prose is as stream A left
+    it, and the IR is the normative text it must be brought to. What is
+    stale, by line on `origin/main` at `d2bf712`, with what each should
+    now say:
+    - §2, lines 98 to 101: "The switch in `evaluate` names all seven
+      kinds, with no default arm. That switch is a defect against the
+      discriminator rule. No backlog item owns the defect." Should say:
+      the switch names Symbol, Expression, the two function kinds and
+      Param, and one default arm returns the value for every other kind
+      (C173, C177; the sentence about the `units` report skipping the
+      unit, C176, stays true).
+    - §3, lines 127 to 129: "As implemented, PE Rule 1 governs an eager
+      primitive application and an application whose function position
+      is unresolved." Should say: PE Rule 1 governs every application,
+      a composed call included (C201, C204).
+    - §3, lines 129 to 133: "The exception to PE Rule 1 is a composed
+      function applied to an unresolved argument, which `applyComposed`
+      unfolds into its substituted body unless the call enters a
+      recursion cycle during a typed compilation." Should say: unfolding
+      is the rule for a composed call, with two calls residualised
+      instead, one into a recursion cycle during a typed compilation and
+      one inside a speculated `when` arm (C202, C203, C205).
+    - §3, lines 173 to 174: "`eval_if` in `src/primitives.ts` evaluates
+      both branches when its condition is unresolved." Should add: it
+      evaluates them speculatively, so no effect runs (C178, C186).
+    - §3, lines 177 to 180: "`eval_when` returns a residual without
+      evaluating any branch when its subject is unresolved. `&&` and
+      `||` return a residual without evaluating the right operand when
+      the left operand is unresolved. So `eval_when`, `&&` and `||` do
+      not meet PE Rule 2." Should say: `eval_when` speculates every arm
+      and `&&` and `||` the right operand, so all three meet PE Rule 2
+      for effects (C179, C185, C189 to C196).
+    - The `[partial]` tag of §3's heading (line 108): stale with them;
+      §3 now describes rules implemented as stated.
+    - Count 2 of the stranger rounds, which RR4 (a) puts after C6, run
+      once on the final text with the three defects that
+      `docs/book/allegretto/evaluator.review.md` ("After the count")
+      holds: round 7's finding 2, touch-up edit A and the excess in the
+      C172 sentence. The orchestrating session holds the count-2
+      briefs.
+    - Requirement R2's one-line summary of Rule 1 in
+      `docs/book/concepts.md` (lines 165 to 167, "PE Rule 1 (unresolved
+      argument produces a residual with propagated metadata)"): it
+      predates the restated rule, and the book pass fixes it at its
+      chunk F11 (the spine), as the merge of PR #158 ruled.
+  - **The PRs.** #147 (the plan), #148 (the activation, rulings taken,
+    B-180 and B-181 filed), #149 (C1 and RR1's numbers), #150 (C2 and
+    C5), #151 and #152 (lane P's baseline raises for C2's count), #155
+    (C3, RR9 taken), #158 (C4), and C6's PR, the close.
+  - **Closed with the stream**: B-172; the reserves B-178 (first
+    out-of-scope finding of the PE-rules stream) and B-179 (second
+    out-of-scope finding of the PE-rules stream), unused. Lane D's
+    later reviews are B-180 (recursion handling under partial
+    evaluation) and B-181 (the hard-coded precompile and compile-time
+    phases), filed at PR #148.
+  - **The units discriminator baseline** lowers from 458 to 456 in the
+    top commit, C3's lowering commit applied unchanged after the branch
+    was brought up to date with `origin/main` (B-164 (ratchet baselines
+    under concurrent merges)). C3's `speculateWhenArms` walk moved its
+    kind questions into the evaluator and the count fell to 456 there.
+  - **Oracle**, on the tree before the baseline commit:
+    measured on this branch merged with `origin/main` at `564881f` (the
+    merge of PR #157, B-174's preface), which moved while C6 was written.
+    - `npm run lint:streams`: 6 plans checked, 0 with findings.
+    - `npm run lint:docs:check`: anchors 0, order 0, ids 784, gate
+      passed (main's count, unchanged).
+    - `MTOOL_HOME=/home/user/majodali/methodology-tools npm run lint:ir`:
+      6 files, clean, 0 violations, 0 warnings; unratified terms 4, all
+      in `docs/book/preface.ir.md` from main, none in the evaluator IR.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npm run lint:units`: the unit DAG holds at its baseline;
+      discriminator 456, baseline 458 before the top commit.
+    - `PR_TITLE="B-172: the stream closes, both rules implemented as
+      stated, the prose and count 2 handed to lane A (C6)" npx tsx
+      scripts/analyze/lane-lint.ts --base origin/main`: lane D, 6 files,
+      0 outside, before the baseline commit adds the seventh.
+    - `ALLEGRO_TEST_FILTER="doc-ref|doc lints|IR lint|stream plans|lane
+      lint|units|evaluator" MTOOL_HOME=/home/user/majodali/methodology-tools
+      npm test`: 41 total, 41 passed, 0 failed.
