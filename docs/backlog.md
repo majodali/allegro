@@ -3340,13 +3340,33 @@ table and the stream plans.
   only the PR, and never appends one. The tidy-up stream's own plan
   names this item as its `backlog` when it opens. Lines: none yet.
   **Pointer**: `docs/plans/book-pass.md` §2.3, §2.4 and §6 (R1, R2)
-- [ ] **B-183** (first out-of-scope finding of the book pass) · T-docs ·
-  Reserved by the book pass (`docs/plans/book-pass.md`) for a finding
-  that is not a tidy-up. Placeholder until used; the stream rewrites
-  this entry when it files the finding, and closes it unused when the
-  stream closes.
-- [ ] **B-184** (second out-of-scope finding of the book pass) · T-docs
-  · As B-183 (first out-of-scope finding of the book pass).
+- [ ] **B-183** (a trailing comment breaks a contract body's parse) ·
+  L1 · Filed 2026-11-03 by the book pass (`docs/plans/book-pass.md`),
+  ruling R-F1-5 of its review of the root README. A contract body
+  (`requires`) whose last line ends in a trailing `//` comment, followed
+  by a blank line, fails to parse: "Parse error at position 49" on the
+  minimal case of `docs/records/book-pass/f1-readme.md` §7. It parses
+  with no blank line, with no comment, or without `requires`. The
+  README's taste example hits it as printed. Owner: lane P's grammar
+  files (`src/grammar2/`) or the contracts body form in `lib/`, not
+  located further. Worked by the orchestrating session; the book pass
+  only filed it.
+- [ ] **B-184** (the root README's corrections) · T-docs · Filed
+  2026-11-03 by the book pass, rulings R-F1-1 to R-F1-4 of its review of
+  the root README (`docs/records/book-pass/f1-readme.md`). One lane-S PR,
+  worked by the orchestrating session, since no lane holds `README.md`:
+  (1) widen lane S's globs in `scripts/analyze/lanes.json` by `README.md`
+  and `demos/rung1/README.md`, and lane A's by
+  `book-pass-inventory.md` under `docs/plans/` (ruling R15 (where the decision
+  inventory lives) of the plan); (2) in `README.md`, move the trailing
+  comment of the taste example above `double_pos`, name `first.alg`,
+  and say once that `allegro` stands for `npx tsx src/index.ts`; (3)
+  "Node.js 22 or later" for "18+"; (4) "No claim is a bare yes or no:
+  each resolves to a tier" for "No boolean "verified" anywhere"; (5)
+  the rung-1 description as four runnable scenes and a walkthrough,
+  three with a "break it" block, here and at `demos/rung1/README.md:4`
+  and `:21`. The book pass's chunk P1 (the decision inventory) waits for
+  step 1.
 - [ ] **B-185** (third out-of-scope finding of the book pass) · T-docs ·
   As B-183 (first out-of-scope finding of the book pass). Reserved
   2026-11-03 at the review session's request, with B-186 (fourth

@@ -32,6 +32,12 @@ A term has one definition site, a heading preceded by
 `[plane](concepts.md#def-plane)`. The convention and the lints are in
 `../plans/documentation-book.md` §4.1 and §4.2.
 
+## Preface
+
+| Order | Document | What it holds |
+|---|---|---|
+| Preface | `preface.md` (*lookahead*) | How this book is organized: decisions in dependency order after a tour, the seven blocks of a decision section, swappable and foundational decisions, open decisions as invitations, the code organized to match, the two forms of each chapter, what stays outside the book. Normative for every author of the book. Definition site of *decision section*, *swappable decision*, *foundational decision* and *open decision*. Beside it, `preface.ir.md` |
+
 ## Part I: foundations
 
 | Order | Document | What it holds |

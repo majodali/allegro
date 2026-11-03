@@ -46,7 +46,7 @@ own artifact types are given where one applies.
 | **Stream plan** | a feature plan a stream runs from: outcome, oracle, file boundary, stop conditions, merge policy, chunk list and reserved backlog ids, opening with a machine-readable header a coordinating service reads (B-166 (the stream-plan document type); defined in `docs/plans/parallel-streams.md` §1, template `docs/plans/stream-plan-template.md`, checked by `npm run lint:streams`) | the session running the stream; a coordinating service; the maintainer gating it | Plan (a specialization) | 2 (added 2026-10-30) |
 | **Methodology proposal** | an amendment drafted for `majodali/methodology` | the methodology's owner | Plan (closest) | 3 |
 | **Consumable** | tutorial, reference or explanation for a user of the language | a language user | Specification (literate) or none | 4 |
-| **Orientation** | the root README | a visitor | Readme | 1 |
+| **Orientation** | the root README; the book's preface | a visitor; the book's reader | Readme | 2 (the preface added 2026-11-03) |
 | **Agent bootstrap** | commands, invariants, pointers | an agent session | Agent bootstrap | 1 |
 
 Two types the methodology lacks and this project has: **vocabulary** and
@@ -85,6 +85,7 @@ Approximate bare-identifier counts are in the findings as "~N bare IDs".
 
 | Document | Type | Reader | Authority | Promoted | Findings | Priority |
 |---|---|---|---|---|---|---|
+| `docs/book/preface.md` | Orientation (book chapter, Preface; normative) | the book's reader; every author of the book | Tier 1 | yes (written to the standard, 2026-11-03) | New: the book's preface, "How this book is organized", written IR first and rendered by the reasoning role from the organizing principles of `docs/plans/book-pass.md` §2.6 (the organizing principles); definition site of *decision section*, *swappable decision*, *foundational decision* and *open decision*. States that most chapters do not yet follow the organization. Beside it, `preface.ir.md`, which rides this row. | 4 |
 | `docs/book/concepts.md` | Conceptual model | learner | Tier 1 | partly | Part 0 **revised 2026-10-20**: the analysis passes moved verbatim to `concepts-analyses.md`; every R, SC and IC entry now has the four-part shape; §1.0 states the status of all twenty requirement IDs in one table; SC-6 marked superseded by D49; SC-7 and SC-8 entered as proposed specification items; R3′ renamed R3 and the retired identifiers moved to the record's §0 (2026-10-21). Remaining: the requirement set is still unratified as a set (an ask, not a defect); T0 to T5 entries keep their ~80 bare IDs and em-dash headers; 2,694 lines. | 2 |
 | `docs/records/concepts-analyses.md` | Record | reader wanting the argument | Tier 1 (history) | n/a | New 2026-10-20; the first instance of the record type the standards proposal §6.2 asks for. Header declares it history, which exempts it from supersession marking entry by entry. | 4 |
 | `docs/book/architecture-vocabulary.md` | Vocabulary | design-doc reader | Tier 1 | yes | None found. Reviewed by the maintainer 2026-10. | 4 |

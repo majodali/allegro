@@ -977,3 +977,96 @@ over unresolved information) are cited in the same text.
     unfolded). Outputs: 136 of 136 identical against `origin/main`. The
     IR gains C197, C198 and C200 (proposed, in ask A5) and C199 (decided
     by RR9), cluster G39 and relation R11 (C197 refines C44).
+- **2026-11-03 — C4 landed.** At the merge of PR #155 the maintainer
+  took every default, which ratifies ask A5 and the residual's shape of
+  the C3 record. C4 restates PE Rule 1 in the spine under RR1 (a), as
+  amended by RR9. Docs only: no file under `src/`, `tests/`, `bench/` or
+  `scripts/` changed.
+  - **The C3 flip.** In `docs/book/allegretto/evaluator.ir.md`, C189 to
+    C195, C197, C198 and C200 and clusters G38 and G39 go from proposed
+    to decided (12 statuses); A5 resolved. No proposed status was left
+    before C4's own claims.
+  - **The restated rule**, `docs/book/concepts.md` §25 (partial
+    evaluation), lines 1568 to 1576: "An application with an unresolved
+    argument produces a **residual** — the application itself, as a
+    value — with metadata fields propagated onto it per their rules,
+    unless it applies a composed function. A composed function is
+    **unfolded**: its body is evaluated with the arguments substituted,
+    and Rule 1 governs each application inside it. Two calls are
+    residualised instead, carrying the callee's effects: a call into a
+    recursion cycle during a typed compilation, because unfolding it
+    cannot converge; and a call reached inside a `when` arm that Rule 2
+    evaluates, because the unfoldings nested there grow without bound."
+    Rule 2's wording is unchanged. The Rationale gains the reason for
+    unfolding (lines 1583 to 1586): refinement checks, effect inference
+    and theorem discharge run on the unfolded body, where a residual
+    would hide everything behind the callee's signature. The
+    As-implemented paragraph (lines 1590 to 1595) adds that `eval_if`,
+    `&&`, `||` and `eval_when` evaluate their branches or arms
+    speculatively and that the evaluation runs no effect. The spine
+    still defines *residual* in §26; §25 keeps its inline gloss ("the
+    application itself, as a value"), as before.
+  - **The delta row**, lines 1597 to 1603: "No delta: both rules are
+    implemented as stated since chunks C2 to C4 of **B-172** (the
+    partial-evaluation rules as implemented against the spine). The
+    `when`-arm exception of Rule 1 is to be revisited, in the
+    maintainer's words, "when we want to push PE for more
+    optimizations, or if we run into cases where we need the full
+    metadata evaluation" (`plans/pe-rules.md` §6, ruling RR9 (unfolding
+    inside a speculated `when` arm)). **→ B-172**." (The link on
+    `plans/pe-rules.md` is elided.) The pointer is to
+    RR9 rather than to B-180 (recursion handling under partial
+    evaluation), since the `when`-arm exception is not a recursion
+    question. C6 removes or rewrites the `→ B-172` pointer when the
+    stream closes.
+  - **The IR** (RR4 (a)). C35 is replaced by C201 (residual unless a
+    composed function); C202 (unfolding) and C203 (the two exceptions)
+    are new; the three quote the spine and are decided by it. C161 ("as
+    implemented, PE Rule 1 governs an eager primitive application and an
+    application whose function position is unresolved") became false
+    under the restated rule, which governs a composed call too, and is
+    replaced by C204 (those two applications produce a residual, as the
+    rule states). C44 (one exception) is replaced by C205
+    (`applyComposed` unfolds, except a call into a recursion cycle
+    during a typed compilation or one made inside a `when` arm
+    speculation). C154 and C168 stay, both still true. Cluster G40
+    replaces G9; relations R3, R4 and R11 re-pointed from C35 and C44 to
+    C202 and C205; C44 and C161 leave ask A1's lists. New ask A6: C204
+    and C205.
+  - **Stale in `docs/book/allegretto/evaluator.md` §3**, for lane A's
+    count 2 under RR4 (a), the prose being unchanged by this stream:
+    lines 127 to 129, "As implemented, PE Rule 1 governs an eager
+    primitive application and an application whose function position is
+    unresolved" (C161's sentence); lines 129 to 133, "The exception to
+    PE Rule 1 is a composed function applied to an unresolved argument,
+    which `applyComposed` unfolds into its substituted body unless the
+    call enters a recursion cycle during a typed compilation" (C44's
+    sentence: unfolding is now the rule, and there are two exceptions);
+    lines 173 to 174, "`eval_if` in `src/primitives.ts` evaluates both
+    branches when its condition is unresolved" (true, but silent on
+    speculation, stale since C2); lines 177 to 180, "`eval_when` returns
+    a residual without evaluating any branch when its subject is
+    unresolved. `&&` and `||` return a residual without evaluating the
+    right operand when the left operand is unresolved. So `eval_when`,
+    `&&` and `||` do not meet PE Rule 2" (false since C2 and C3). The
+    section's `[partial]` tag is stale with them.
+  - **`docs/book-changes.md`**: no row. Its rules log a non-monotonic
+    structural change (an identifier renamed, merged, removed,
+    renumbered or reclassified; a chapter moved, split or merged; a
+    definition site moved). A restated rule is none of these, and the
+    file has never logged an IR claim's replacement.
+  - **Oracle**, on the final tree:
+    - `npm run lint:docs:check`: anchors 0, order 0, ids 784, gate
+      passed (main's count, unchanged).
+    - `MTOOL_HOME=/home/user/majodali/methodology-tools npm run lint:ir`:
+      5 files, clean, 0 violations, 0 warnings, unratified terms 0.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npm run lint:streams`: 6 plans checked, 0 with findings.
+    - `PR_TITLE="B-172: Rule 1 restated in the spine, unfolding as the
+      policy with its two exceptions (C4)" npx tsx
+      scripts/analyze/lane-lint.ts --base origin/main`: lane D, 4 files,
+      0 outside.
+    - `ALLEGRO_TEST_FILTER="doc-ref|doc lints|IR lint|stream plans|lane
+      lint|evaluator" MTOOL_HOME=/home/user/majodali/methodology-tools npm
+      test`: 37 total, 37 passed, 0 failed.
