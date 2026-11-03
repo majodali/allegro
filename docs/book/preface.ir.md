@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1: round 3 not readable, round 4 not readable, round 5 owed; ask A7 ruled 2026-11-03; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
+Status: draft (count 1 closed at round 5: not readable; meta-review in docs/book/preface.review.md; asks A8 and A9 open; ask A7 ruled 2026-11-03; rulings of PR #157 applied 2026-11-03; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -39,9 +39,11 @@ C4. The book aims to present every design and implementation decision of Allegro
 
 C5. You are invited into the design of Allegro, which is still under way. reworded in count 1, rounds 1 and 2. [decided: owner, 2026-11-03]
 
-C6. The code is organized so that you can branch the code to try another option for a decision. [decided: owner, 2026-11-03]
+C6. The code is organized so that you can branch the code to try another option for a decision, as the explore block of each decision section shows. reworded in count 1, round 5. [decided: owner, 2026-11-03]
 
-C7. The tour that opens the book is not yet written, and most chapters do not yet follow the organization this preface describes. evidence: E1, E2 [decided: owner, 2026-11-03]
+C7. The tour that opens the book is not yet written. evidence: E2 split in count 1, round 5. [decided: owner, 2026-11-03]
+
+C78. Most chapters do not yet follow the organization this preface describes. evidence: E1 split from C7 in count 1, round 5. [decided: owner, 2026-11-03]
 
 C8. The chapters of the book are being rewritten to this organization one at a time. evidence: E1 reworded in count 1, round 3 and its confirmation. [decided: owner, 2026-11-03]
 
@@ -113,7 +115,7 @@ C76. Choosing purely functional semantics for aesthetic reasons would be a found
 
 C37. The label tells you what an alternative costs before you branch the code. [decided: owner, 2026-11-03]
 
-### Open decisions as invitations
+### Open decisions
 
 C38. An open decision is a decision the project has not yet taken. [decided: owner, 2026-11-03]
 
@@ -141,13 +143,13 @@ C47. A check in the project's test suite fails when a change adds an import that
 
 C48. Some source files still hold the decisions of several units. evidence: E6 [decided: owner, 2026-11-03]
 
-C49. Such a file is split when its code is next changed for another reason. evidence: E7 [decided: owner, 2026-11-03]
-
 ### Two forms of each chapter
 
 C50. Each chapter of the book has two forms, one for software agents and one for people. [decided: owner, 2026-11-03]
 
-C51. The form for agents is an intermediate representation: a numbered list of claims, each claim a single statement with its evidence and pointers into the code. reworded in count 1, round 2. [decided: owner, 2026-11-03]
+C51. The form for agents is an intermediate representation, a numbered list of claims. split in count 1, round 5. [decided: owner, 2026-11-03]
+
+C79. Each claim is a single statement with the claim's evidence and pointers into the code. split from C51 in count 1, round 5. [decided: owner, 2026-11-03]
 
 C52. A chapter's intermediate representation sits beside the chapter's prose, in a file whose name ends in `.ir.md`. evidence: E8 [decided: owner, 2026-11-03]
 
@@ -175,7 +177,7 @@ C73. That separation keeps the narrative on the design and its reasons. split fr
 
 G2. cluster: C3, C1, C4, C5, C6 [decided: owner, 2026-11-03]
 
-G3. cluster: C7, C8, C71, C2 [decided: owner, 2026-11-03]
+G3. cluster: C7, C78, C8, C71, C2 [decided: owner, 2026-11-03]
 
 G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
 
@@ -199,9 +201,9 @@ G13. cluster: C43 [decided: owner, 2026-11-03]
 
 G14. cluster: C44, C45, C69, C46, C47 [decided: owner, 2026-11-03]
 
-G15. cluster: C48, C49 [decided: owner, 2026-11-03]
+G15. cluster: C48 [decided: owner, 2026-11-03]
 
-G16. cluster: C50, C51, C52, C53, C54 [decided: owner, 2026-11-03]
+G16. cluster: C50, C51, C79, C52, C53, C54 [decided: owner, 2026-11-03]
 
 G17. cluster: C55 [decided: owner, 2026-11-03]
 
@@ -237,15 +239,13 @@ E5. `package.json` line 24 and `docs/book/units.md` lines 477–481: `npm run li
 
 E6. `scripts/analyze/units-baseline.json` lines 7–13: five source files recorded as mixed, each holding the decisions of several units.
 
-E7. `docs/book/units.md` lines 73–75: the physical moves are not scheduled as a campaign, and each happens when its unit is next touched for another reason.
-
 E8. `docs/book/allegretto/evaluator.ir.md` beside `docs/book/allegretto/evaluator.md`, and `docs/book/preface.ir.md` beside `docs/book/preface.md`: a chapter's intermediate representation sits beside its prose.
 
 E9. `docs/reading-order.json` line 8 and the Preface row of `docs/book/README.md`: the preface's entry carries `"organized": true`, and its table-of-contents row carries the marker *organized*.
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
+A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C46, C47, C48, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C52.
 
 A1 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the listed claims carry decided provenance from that date.
 
@@ -274,3 +274,5 @@ A7. Decide whether a decision about vision or aesthetics carries the swappable-o
 A7 resolved: option (a) with a correction, ruled by the owner on PR #161, 2026-11-03. Aesthetics describes a decision's rationale, never its outcome. Every decision section carries the label (C36), and the label follows from what other decisions rest on the decision (C74). C30 reworded; C74 and C75 added.
 
 A8. Decide whether the aim sentence C55 keeps "enough to hold your interest" (the owner asked for an engaging book) or cuts it to "The prose aims to be clear and brief." Strangers flagged the phrase as excess in rounds 2, 3 and 4 of count 1, and round 4's stranger disputed the decline at confirmation. The passage stays unchanged until the ruling. Depends: C55.
+
+A9. Decide the tour's place in the preface. The tour passage (C7, C13, C77) drew findings in all five rounds of count 1, under every structure tried. Options: (a) cut the tour from the preface until the tour is written; principle 4 stays in the plan, and the preface gains the tour's description when the tour exists; (b) keep the passage as it stands, with "will open" in C13; (c) the owner words the passage. Recommended: (a). The passage stays unchanged until the ruling. Depends: C7, C13, C77.
