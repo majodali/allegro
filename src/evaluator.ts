@@ -456,21 +456,16 @@ export function evaluate(
     }
   }
 
+  // The discriminator rule (docs/book/units.md §3.2): the switch names only
+  // the kinds that participate — Symbol resolves, Expression applies, the
+  // function kinds and Param take part in application — and one default arm
+  // takes the inert rest.
   switch (value.kind) {
-    case ValueKind.Bits:
     case ValueKind.PrimitiveFunction:
     case ValueKind.ComposedFunction:
-      return value;
-
-    case ValueKind.Structure:
-      // Structures self-evaluate. B-121 C4 deleted the CARRIER arm that stood
-      // here — it re-evaluated the wrapped value, because a residual under
-      // metadata was still pending computation. A residual now carries its own
-      // metadata as an Expression and is handled by that case; `mergeOverMeta`,
-      // extracted from this arm at C2, is what it calls.
-      return value;
-
     case ValueKind.Param:
+      // Each takes part in application (evaluateExpr, applyComposed,
+      // substitution), and evaluates to itself.
       return value;
 
     case ValueKind.Symbol: {
@@ -506,6 +501,15 @@ export function evaluate(
       }
       return result as Value;
     }
+
+    default:
+      // The inert rest: Bits, Structure, and "a kind a fork adds is inert
+      // until its author says otherwise" (docs/book/units.md §3.2; B-172's
+      // ruling RR5, option (a)). A Structure self-evaluates: B-121 C4 deleted
+      // the CARRIER arm that stood here, which re-evaluated the wrapped value
+      // because a residual under metadata was still pending computation; a
+      // residual now carries its own metadata as an Expression.
+      return value;
   }
 }
 

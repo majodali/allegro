@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -143,13 +143,15 @@ C172. Under the discriminator rule, the two function kinds and Param participate
 
 C157. One default arm of the evaluator's switch must take the inert rest of the kinds. [decided: docs/book/units.md §3.2, ratified 2026-10]
 
-C158. The switch in `evaluate` names all seven kinds, with no default arm. evidence: E3. [decided: owner, 2026-11-01]
+C173. The switch in `evaluate` names five kinds: Symbol, Expression, the two function kinds and Param. evidence: E3. [proposed: this IR]
 
-C164. The switch in `evaluate` is a defect against the discriminator rule. [inferred: R1]
+C177. The switch in `evaluate` has one default arm, which returns the value unchanged for every kind the switch does not name, Bits and Structure among them. evidence: E3. [proposed: this IR]
 
-C165. No backlog item owns the defect of the switch in `evaluate` against the discriminator rule. evidence: E48. [decided: owner, 2026-11-01]
+C174. The switch in `evaluate` meets the discriminator rule. [inferred: R1]
 
-C151. Nothing counts the defect of the switch in `evaluate` against the discriminator rule: the `units` report's discriminator count skips the `evaluator` unit. evidence: E45. [decided: owner, 2026-11-01]
+C175. B-172 (the partial-evaluation rules as implemented against the spine) owns the default arm of the switch in `evaluate`: the stream's ruling RR5 took option (a), an inert default arm. [decided: docs/plans/pe-rules.md §6, RR5, taken at the merge of PR #147, 2026-11-03]
+
+C176. The `units` report's discriminator count skips the `evaluator` unit, so no lint counts the kinds that the switch in `evaluate` names. evidence: E45. [proposed: this IR]
 
 C24. Two walkers in `src/evaluator.ts`, `subst` and `remapParams`, switch on kind themselves. evidence: E10. [decided: owner, 2026-11-01]
 
@@ -439,7 +441,7 @@ G5. cluster: C14, C15, C170, C16, C17, C18 [decided: owner, 2026-11-01]
 
 G6. cluster: C19, C20, C27, C28, C29, C30 [decided: owner, 2026-11-01]
 
-G7. cluster: C22, C153, C172, C157, C158, C164, C165, C151, C24, C25, C26 [decided: owner, 2026-11-01]
+G35. cluster: C22, C153, C172, C157, C173, C177, C174, C175, C176, C24, C25, C26 [proposed: this IR]
 
 G8. cluster: C31, C32, C33, C163, C34 [decided: owner, 2026-11-01]
 
@@ -497,7 +499,7 @@ G34. cluster: C36, C37, C38, C39, C40, C47 [decided: owner, 2026-11-01]
 
 ## Relations
 
-R1. C164 depends-on C153 because C158 states that the switch in `evaluate` names all seven kinds without the default arm, where the ratified C153 and C157 require the participating kinds and one default arm.
+R1. C174 depends-on C153 because C173 and C177 state that the switch in `evaluate` names the participating kinds and has one default arm, which the ratified C153 and C157 require.
 
 R2. C57 depends-on C55 because a residual `eval_when` evaluates no branch, and C56 shows the same for `&&` and `||`.
 
@@ -523,23 +525,23 @@ E1. `scripts/analyze/units.json` lines 16 and 51: the `evaluator` unit's permitt
 
 E2. `src/evaluator.ts` lines 3–13: the imports, including seven symbols from `src/refinements.ts` and `src/effects.ts`, `primitives` and `renderExprSource` from `src/primitives.ts`, and three reads from `src/scope.ts`.
 
-E3. `src/evaluator.ts` lines 375–439: `evaluate`, with the depth bound at line 378 and the switch, which names all seven kinds and has no default arm.
+E3. `src/evaluator.ts` lines 375–443: `evaluate`, with the depth bound at line 378 and the switch from line 392, which names Symbol, Expression, the two function kinds and Param, and whose default arm at lines 434–441 returns the value.
 
-E4. `src/evaluator.ts` lines 405–426: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
+E4. `src/evaluator.ts` lines 400–421: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
 
-E5. `src/evaluator.ts` lines 428–485: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 464–468; the immediate application at lines 458–460; the constructor slot at lines 472–485.
+E5. `src/evaluator.ts` lines 423–431 and 445–489: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 468–472; the immediate application at lines 462–464; the constructor slot at lines 476–489.
 
-E6. `src/evaluator.ts` lines 487–537: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
+E6. `src/evaluator.ts` lines 491–541: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
 
 E7. `src/types.ts` lines 455–472: `isResolved`, false for Param, Symbol and Expression, true otherwise.
 
-E8. `src/evaluator.ts` lines 594–699: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 669.
+E8. `src/evaluator.ts` lines 598–703: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 673.
 
-E9. `src/evaluator.ts` lines 771–796: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
+E9. `src/evaluator.ts` lines 775–800: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
 
-E10. `src/evaluator.ts` lines 828–862 and 875–949: `remapParams` and `subst`, each a switch on kind.
+E10. `src/evaluator.ts` lines 832–866 and 879–953: `remapParams` and `subst`, each a switch on kind.
 
-E11. `src/evaluator.ts` lines 550–592: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function, the compile-mode deferral of an effectful lazy primitive.
+E11. `src/evaluator.ts` lines 554–596: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function, the compile-mode deferral of an effectful lazy primitive.
 
 E12. `src/primitives.ts` lines 567–621: `eval_if_impl`, both branches evaluated under an unresolved condition, the residual, the shared type.
 
@@ -547,15 +549,15 @@ E13. `src/primitives.ts` lines 821–834: `eval_when_impl` returns a residual fo
 
 E14. `src/primitives.ts` lines 2217–2247 and 2315–2340: `typed_and_impl` and `typed_or_impl`: an unresolved left operand residualises with the right thunk unevaluated; the right thunk is applied as a call.
 
-E15. `src/evaluator.ts` lines 728–819: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 742, with the body evaluated at `depth + 1` at line 806 and the tail-call check at lines 809–815. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
+E15. `src/evaluator.ts` lines 732–823: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 746, with the body evaluated at `depth + 1` at line 810 and the tail-call check at lines 813–819. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
 
-E16. `src/evaluator.ts` lines 864–897 and 938–946: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
+E16. `src/evaluator.ts` lines 868–901 and 942–950: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
 
-E17. `src/evaluator.ts` lines 843–860 and 899–935: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
+E17. `src/evaluator.ts` lines 847–864 and 903–939: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
 
-E18. `src/evaluator.ts` lines 967–991: `checkArg`, every installed field check, and the throw when none is installed.
+E18. `src/evaluator.ts` lines 971–995: `checkArg`, every installed field check, and the throw when none is installed.
 
-E19. `src/evaluator.ts` lines 1009–1109: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
+E19. `src/evaluator.ts` lines 1013–1113: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
 
 E20. `src/evaluator.ts` lines 225–243: the `TailCall` interface, `isTailCall`, `makeTailCall`.
 
@@ -585,7 +587,7 @@ E32. `src/metadata.ts` lines 142–166: `metaReadRaw` reads the value's own `met
 
 E33. `src/metadata.ts` lines 325–375: `viralOnto` (the first viral field, with its candidate's `type`) and `mergeOverMeta` (inner fields win, `union` fields merge).
 
-E34. `src/evaluator.ts` lines 702–724: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
+E34. `src/evaluator.ts` lines 706–728: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
 
 E35. `src/evaluator.ts` lines 26–42 and `src/runtime.ts` lines 1285 and 1387: `setInlineCutoff` takes a bare callback; the pipeline clears it and installs the cycle set.
 
@@ -613,14 +615,14 @@ E46. `src/primitives.ts` line 42, `docs/book/units.md` line 241 and `scripts/ana
 
 E47. `scripts/analyze/index.ts` lines 259–268: an edge starts with the verdict `unresolved` and is judged `ok` or `violation` only when neither end's file maps to several units.
 
-E48. `docs/backlog.md`, searched on 2026-10-31: no entry names the switch in `evaluate`, the kinds it names or its default arm.
-
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C151, C154, C156, C158, C161, C162, C165, C166, C167, C169, C170, C171.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the two about the chapter's reader and terms: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171. Depends: C5, C8, C160, C10, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C24, C27, C28, C29, C30, C32, C33, C163, C34, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C49, C50, C51, C52, C53, C54, C55, C56, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C85, C86, C87, C88, C89, C90, C91, C92, C97, C98, C99, C100, C101, C102, C103, C104, C108, C109, C110, C111, C112, C113, C115, C116, C117, C118, C119, C120, C122, C123, C126, C128, C129, C132, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C154, C156, C161, C162, C166, C167, C169, C170, C171.
 
 A1 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the claims carry decided provenance from that date.
 
 A2. Ratify or strike the proposed term tail call (T30). Depends: C2, C29, C79, C140.
 
 A2 resolved: ratified by the owner at the merge of PR #129, 2026-11-01; the term's definition site is the chapter's anchor.
+
+A3. Ratify in bulk the re-proposed claims about the switch in `evaluate`, as chunk C5 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G35: C173, C177, C176. C174 is inferred through R1, and C175 is decided by ruling RR5. Depends: C173, C177, C176.
