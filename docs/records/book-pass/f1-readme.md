@@ -178,4 +178,8 @@ claims recur in `docs/book/getting-started.md:9` and `:91` (chunk F2).
 
 ## Rulings taken
 
-Added by one commit before the merge.
+The maintainer accepted every recommendation on 2026-11-03, at the
+merge of PR #156: R-F1-1 to R-F1-8 each took option (a), and the term
+*unstreamed PR* was ratified. The merge came before this section was
+written, so the next PR of the stream records it. That is the one
+edit to this record after its merge.

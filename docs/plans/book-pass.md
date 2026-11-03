@@ -19,6 +19,7 @@ boundary:
   - docs/records/book-pass/**
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
+  - docs/plans/book-pass-inventory.md
   - scripts/doc-lint-baseline.json
 ---
 
@@ -269,7 +270,25 @@ merges, this list is their text.
 8. **Engaging, clear, succinct.** Writing the prose from the IR also
    helps break the phrasing patterns agents fall into. Many of those
    patterns reduce clarity. The review checks for them, and the briefs
-   carry the list.
+   carry the list. The list starts with these, and grows as the pass
+   meets others:
+   - **Uninformative headings.** A document or section heading names
+     the section's shape, not its content: "The problem, measured", "The
+     design question this plan exists to settle". A heading uses the
+     section's own terms and says what the section holds: "Deviations
+     from the partial-evaluation rules".
+   - **Burying the lede.** Information not presented in order of
+     significance. The most significant point comes first, in the
+     document, in each section and in each paragraph.
+   - **Contrast framing**: "not X, but Y" where a plain statement of Y
+     would do.
+   - **Groups of three** added for rhythm, not content.
+   - **Em-dash chains** joining clauses a reader would judge separately.
+   - **Signposting**: "this section explains", "as we will see".
+   - **Closing restatements** of what a paragraph or section just said.
+   - **Intensifiers**: "key", "crucial", "load-bearing", "critically".
+   - **Bold labels** on every line or list item.
+   - **Abstract nouns** where a verb would do.
 9. **Process detail moves out.** How the project is worked on (process,
    lanes, measurement, file maps, studies) leaves the book's narrative.
 10. **A concept is defined where it is first used or decided.**
@@ -341,6 +360,9 @@ five:
 - `docs/reading-order.json`, `docs/documentation-census.md`.
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
+- `docs/plans/book-pass-inventory.md`: the decision inventory, chunk
+  P1 (the decision inventory). Lane A's globs do not hold it yet; the
+  lane-S PR of B-184 (the root README's corrections) widens them.
 - This plan.
 - `scripts/doc-lint-baseline.json`, the ids baseline, in a lowering
   commit only (§3; amendment M1 of §6). Lane A's manifest entry holds
@@ -697,6 +719,20 @@ maintainer in the review session after PR #154's merge.
   The maintainer's reading is the test of human readability; a stranger
   brief in the persona's voice may catch cheaper failures first. Taken.
 
+**Rulings taken 2026-11-03, after PR #156.** The maintainer merged
+PR #156 with every recommendation accepted, F1's rulings R-F1-1 to
+R-F1-8 included. Two further rulings, the same day:
+
+- **R15 — Where the decision inventory lives.** Options: (a) a working
+  file under `docs/plans/`, beside the briefs; (b) an IR in the book,
+  `docs/book/decision-map.ir.md`. Taken: (a),
+  `docs/plans/book-pass-inventory.md`. Project working material stays
+  out of the book.
+- **R16 — The phrasing patterns.** The list of principle 8 in §2.6: the
+  maintainer's two structural patterns first, uninformative headings and
+  burying the lede, then the sentence-level candidates. The list grows
+  as the pass meets others.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -726,6 +762,16 @@ maintainer in the review session after PR #154's merge.
   recorded in §6; the purpose in §1, the twelve principles in §2.6, the
   front chunks P0 to P2 in §5. Four terms added to §1 and ratified the
   same day. No chapter edited.
+- **2026-11-03 — F1's rulings recorded; P0 opened** (the review
+  session). PR #156 merged before its rulings commit, so the rulings
+  are recorded in `docs/records/book-pass/f1-readme.md` by this PR, the
+  one edit after its merge. B-183 (a trailing comment breaks a contract
+  body's parse) and B-184 (the root README's corrections) filed under
+  R-F1-5 and R-F1-1. **For the orchestrating session:** B-184 is a
+  lane-S PR. It lands README's fixes and widens two globs: lane S by
+  `README.md` and `demos/rung1/README.md`, lane A by
+  `docs/plans/book-pass-inventory.md`. Chunk P1 waits for that widening.
+  R15 and R16 recorded in §6; the pattern list in §2.6.
 
 ## 8. Sessions
 
