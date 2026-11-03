@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-174
 lane: A
 merge: human-gated
@@ -19,15 +19,17 @@ boundary:
   - docs/records/book-pass/**
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
+  - scripts/doc-lint-baseline.json
 ---
 
 # Every chapter of the book reviewed and edited IR first — the book pass
 
-> **Status: draft** — drafted 2026-11-03 by the orchestrating session
-> (§8), at the maintainer's instruction of the same day; a proposal the
-> maintainer ratifies by merging its PR. Every open question is a ruling
-> in §6 with options and a recommendation. The status line and the
-> header's `status` say the same thing.
+> **Status: active** — drafted 2026-11-03 by the orchestrating session
+> (§8), at the maintainer's instruction of the same day. Ratified the
+> same day by the merge of PR #154, which took every ruling of §6 as
+> recommended. Two amendments were ruled after the merge (§6, "Rulings
+> taken"). The status line and the header's `status` say the same
+> thing.
 >
 > **Reader**: the review session (§1) that runs this stream, starting
 > with no context, and the maintainer ruling on §6. Assumed known: the
@@ -216,6 +218,8 @@ after it is up to date with `origin/main`:
 no demo. The ids baseline may only fall. A fall is recorded in §7 and
 the baseline is lowered in its own commit, after the branch is up to
 date, under the B-164 (ratchet baselines under concurrent merges) rule.
+The baseline file, `scripts/doc-lint-baseline.json`, is in this plan's
+boundary for that commit alone (amendment M1 of §6).
 
 **What no tool checks.** That a pinned example is a verbatim excerpt of
 its source; that a review's claims about the code are true. The
@@ -259,19 +263,24 @@ five:
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
 - This plan.
+- `scripts/doc-lint-baseline.json`, the ids baseline, in a lowering
+  commit only (§3; amendment M1 of §6). Lane A's manifest entry holds
+  it; no other file under `scripts/` is in the boundary.
 - The status documents under B-162, which every lane edits: this
   stream's section of `docs/CHANGELOG.md`; in `docs/backlog.md` B-174,
   B-183, B-184, lane A's row, and B-182 as R2 rules; this plan's row of
   `docs/plans/README.md`; rows of `docs/book-changes.md`.
 
-Lane A's globs in `scripts/analyze/lanes.json` do not hold
-`docs/records/book-pass/**` or `docs/plans/book-pass-briefs.md` today.
-R8 rules how they enter it.
+Lane A's globs in `scripts/analyze/lanes.json` hold
+`docs/records/book-pass/**` and `docs/plans/book-pass-briefs.md` since
+PR #153 (B-163 (the lane manifest and its check)), merged 2026-11-03 as
+R8 asked.
 
 **Outside the boundary, on purpose.** A chunk that needs one of these
 stops:
 
-- `src/**`, `lib/**`, `tests/**`, `demos/**`, `bench/**`, `scripts/**`,
+- `src/**`, `lib/**`, `tests/**`, `demos/**`, `bench/**`, `scripts/**`
+  (except the ids baseline, as above),
   `pcp/**`, `web/**`, `website/**`: code, demos and tools.
 - The root `README.md`: no lane A glob holds it (R9).
 - The Tier-0 chapters `docs/book/vision.md` and `docs/book/process.md`
@@ -393,8 +402,25 @@ a file no unit holds.
 
 ## 6. Rulings
 
-Each ruling is put to the maintainer at this plan's PR. The merge with
+Each ruling was put to the maintainer at this plan's PR. The merge with
 "defaults" takes every recommendation.
+
+**Rulings taken.** The maintainer merged PR #154 on 2026-11-03 with no
+ruling comment. The merge took the defaults: R1 to R9 as recommended,
+and the six terms of §1 ratified. The maintainer then ruled two
+amendments the same day, in the review session, both as recommended:
+
+- **M1 — The ids baseline is in the boundary.** Lane A's manifest entry
+  holds `scripts/doc-lint-baseline.json`, and §3 has the stream lower
+  it. The header's `boundary` did not list it, so the lane check would
+  have refused the lowering commit. The header now lists it, for that
+  commit only. The option not taken: the orchestrating session makes
+  every lowering.
+- **M2 — R8 restated as decided in effect.** PR #153 widened lane A as
+  R8's option (a) asked, before the plan merged. What R8 left open is
+  how the reviews are listed. Each merged review gets one appendix row
+  in `docs/reading-order.json`. One index record, option (c), is the
+  fallback if the rows crowd the appendix.
 
 **R1 — Tidy-ups beside stream D.** Lane D is internally serial (the lane
 table in `docs/backlog.md`, "Internally serial, permanently"). The
@@ -585,7 +611,7 @@ two sessions share. Neither reads the other's conversation.
 **What each session never does.**
 
 - The review session never edits `src/`, `lib/`, `tests/`, `demos/`,
-  `bench/` or `scripts/`; never edits a file inside stream D's or the
+  `bench/` or `scripts/`, except the ids baseline under M1 (§6); never edits a file inside stream D's or the
   tidy-up stream's boundary; never checks off a B-182 line; never edits
   another stream's backlog items, lane row, manifest row or changelog
   section.
