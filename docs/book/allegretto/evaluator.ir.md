@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: the `when` arm policy of ruling RR9 (claims C197 to C200, cluster G39, relation R11, evidence E52 and E53; E9 and every pointer moved re-synced), unratified terms 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed; edited 2026-11-03: the switch in `evaluate` given its default arm by B-172's chunk C5 (claims C173 to C177 and cluster G35; C151, C158, C164, C165, cluster G7 and evidence E48 removed; relation R1 re-pointed), unratified terms 0; edited 2026-11-03: speculative evaluation and the branch tail call by B-172's chunk C2 (claims C178 to C188, clusters G36 and G37; C52, C56, C57, C98, clusters G13 and G23 removed; relation R2 re-pointed; evidence E49 and E50 added; the `src/evaluator.ts` and `src/primitives.ts` pointers re-synced after C2 and C5), unratified terms 0; edited 2026-11-03: claims C178 to C180 and C182 to C188, clusters G36 and G37 and the term speculation mark (T31) ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: `eval_when` under PE Rule 2 by B-172's chunk C3 (claims C189 to C196 and cluster G38; C55, C181 and cluster G36 removed; C55 also dropped from ask A1; relation R2 re-pointed; evidence E51 added; E13, E14, E23, E50 and every `src/evaluator.ts` pointer moved by C3 re-synced), unratified terms 0; edited 2026-11-03: claims C173, C176 and C177 and cluster G35 ratified at the merge of PR #150, unratified terms 0; edited 2026-11-03: the `when` arm policy of ruling RR9 (claims C197 to C200, cluster G39, relation R11, evidence E52 and E53; E9 and every pointer moved re-synced), unratified terms 0; edited 2026-11-03: claims C189 to C195, C197, C198 and C200 and clusters G38 and G39 ratified at the merge of PR #155, unratified terms 0)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -229,19 +229,19 @@ C53. `eval_if` then returns a residual `eval_if` over the condition and the two 
 
 C54. The residual `eval_if` carries a type when the two evaluated branches have matching type names. evidence: E12. [decided: owner, 2026-11-01]
 
-C189. `eval_when` evaluates the guard and the body of every arm speculatively when its subject is unresolved, at run time as in the precompile pass. evidence: E13, E51. [proposed: this IR]
+C189. `eval_when` evaluates the guard and the body of every arm speculatively when its subject is unresolved, at run time as in the precompile pass. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C190. In the speculation of an arm whose pattern is a binder, the pattern's name is bound to the evaluated subject. evidence: E13, E51. [proposed: this IR]
+C190. In the speculation of an arm whose pattern is a binder, the pattern's name is bound to the evaluated subject. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C191. In the speculation of an arm whose type pattern or destructuring pattern binds names, each name stays the arm function's own Param, unbound and untyped. evidence: E13, E51. [proposed: this IR]
+C191. In the speculation of an arm whose type pattern or destructuring pattern binds names, each name stays the arm function's own Param, unbound and untyped. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C192. Under an unresolved subject, `eval_when` speculates a written `else` but never evaluates the default `when_no_match` arm. evidence: E13, E51. [proposed: this IR]
+C192. Under an unresolved subject, `eval_when` speculates a written `else` but never evaluates the default `when_no_match` arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C193. The residual `eval_when` under an unresolved subject holds the evaluated subject with the pattern, the guard, the arm and the rest of the chain as written. evidence: E13, E51. [proposed: this IR]
+C193. The residual `eval_when` under an unresolved subject holds the evaluated subject with the pattern, the guard, the arm and the rest of the chain as written. evidence: E13, E51. [decided: owner, 2026-11-03]
 
-C194. The residual `eval_when` carries the effects of every speculated arm and carries no type. evidence: E11, E13, E51. [proposed: this IR]
+C194. The residual `eval_when` carries the effects of every speculated arm and carries no type. evidence: E11, E13, E51. [decided: owner, 2026-11-03]
 
-C195. A residual `eval_when` evaluated in a scope that resolves its subject runs only the matching arm. evidence: E13, E51. [proposed: this IR]
+C195. A residual `eval_when` evaluated in a scope that resolves its subject runs only the matching arm. evidence: E13, E51. [decided: owner, 2026-11-03]
 
 C179. `&&` and `||` evaluate the right operand speculatively when the left operand is unresolved. evidence: E14, E50. [decided: owner, 2026-11-03]
 
@@ -259,13 +259,13 @@ C183. No residual of `eval_if`, `&&` or `||` holds a `TailCall` sentinel. eviden
 
 C188. `evaluate` is handed no `TailCall` sentinel in the programs of `tests/` and `demos/`. evidence: E50. [decided: owner, 2026-11-03]
 
-C197. While a speculation of a `when` arm is open, `applyComposed` residualises a composed call with an unresolved argument instead of unfolding it. evidence: E52, E53. [proposed: this IR]
+C197. While a speculation of a `when` arm is open, `applyComposed` residualises a composed call with an unresolved argument instead of unfolding it. evidence: E52, E53. [decided: owner, 2026-11-03]
 
-C198. The residual of a composed call inside a speculated `when` arm carries the callee's stashed effects. evidence: E52, E53. [proposed: this IR]
+C198. The residual of a composed call inside a speculated `when` arm carries the callee's stashed effects. evidence: E52, E53. [decided: owner, 2026-11-03]
 
 C199. Ruling RR9 narrows the unfolding of RR1 (a) inside speculated `when` arms only, until partial evaluation is pushed for further optimisation or a case needs the full metadata evaluation inside an arm. [decided: docs/plans/pe-rules.md §6, RR9, taken by the owner on PR #155, 2026-11-03]
 
-C200. Outside a speculated `when` arm, a composed call in a speculated branch of `eval_if`, `&&` or `||` is still unfolded. evidence: E52, E53. [proposed: this IR]
+C200. Outside a speculated `when` arm, a composed call in a speculated branch of `eval_if`, `&&` or `||` is still unfolded. evidence: E52, E53. [decided: owner, 2026-11-03]
 
 C196. `eval_when` meets PE Rule 2 for effects, though its residual holds the arms as written rather than the evaluated arms. [inferred: R2]
 
@@ -489,9 +489,9 @@ G11. cluster: C46, C139, C45 [decided: owner, 2026-11-01]
 
 G12. cluster: C48, C49, C50, C51 [decided: owner, 2026-11-01]
 
-G38. cluster: C178, C53, C54, C189, C190, C191, C192, C193, C194, C195, C179, C185, C180, C186, C187, C182, C183, C188, C196 [proposed: this IR]
+G38. cluster: C178, C53, C54, C189, C190, C191, C192, C193, C194, C195, C179, C185, C180, C186, C187, C182, C183, C188, C196 [decided: owner, 2026-11-03]
 
-G39. cluster: C197, C198, C199, C200 [proposed: this IR]
+G39. cluster: C197, C198, C199, C200 [decided: owner, 2026-11-03]
 
 G14. cluster: C58, C59, C60, C61, C62, C69 [decided: owner, 2026-11-01]
 
@@ -684,3 +684,5 @@ A4. Ratify in bulk the re-proposed claims about speculative evaluation and the b
 A4 resolved: ratified by the owner at the merge of PR #150, 2026-11-03; the statuses are flipped.
 
 A5. Ratify in bulk the re-proposed claims about `eval_when` under PE Rule 2, as chunk C3 of B-172 (the partial-evaluation rules as implemented against the spine) left the code, with their cluster G38, and the claims of ruling RR9 (the arm policy) with their cluster G39: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200. C196 is inferred through R2, and C199 is decided by ruling RR9. Depends: C189, C190, C191, C192, C193, C194, C195, C197, C198, C200.
+
+A5 resolved: ratified by the owner at the merge of PR #155, 2026-11-03; the statuses are flipped.
