@@ -77,7 +77,7 @@ The grouping below comes from co-change measurement over the last 40
 | **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); next B-174 (the book's existing chapters retrofitted to IR) as the lane's next stream; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Creates NEW `docs/book/**` chapters; touches no `src/`. Human-gated |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
-| **D — L2 semantics** | B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, proposed: draft until its PR merges) | B-172 (the partial-evaluation rules as implemented against the spine) — the stream's item, with B-178 and B-179 as its spare ids; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 | **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **K — kernel hygiene** (added 2026-10-30, B-167 (lane K for kernel hygiene)) | The M1 residue, the L0 band that is ratchet and audit work: B-104 (retire the dunder convention), B-110, B-113, B-114, B-118, B-119, B-123, B-124, B-126, B-128 b onward, B-132, B-135/B-137 (the host-plane declaration), B-143, B-147. Each stream plan in K reserves the items it takes; none blocks a rung | **Runs alongside A, C, P and S.** The L0 unit files (`src/structure.ts`, `src/slot-accessors.ts`, `src/metadata.ts`, `src/symbols.ts`, `src/scope.ts`), the boundary battery and its baseline, `scripts/analyze/`, the Allegretto chapters and `docs/book/units.md`. Overlaps D in the evaluator, the primitives and the type files — taken only when D is not in them (the P rule), and a coordinating service refuses the overlap at dispatch. B-104 is the wide one: its stream plan's `boundary` widens per chunk and its PRs need D idle. Globs in `scripts/analyze/lanes.json`, declared from this band, refined when a stream plan opens |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29; **stream P, the recursion cutoff restored**, plan `docs/plans/recursive-precompile.md`, filed 2026-10-30, **closed 2026-11-01**) | The follow-ons of B-157 (the performance stream): ~~B-159 (precompile and termination analysis of recursive definitions)~~ closed 2026-11-01 by stream P, the gate's work down about 95%, with ~~B-087 (totality-analyzer performance)~~ closed as superseded; B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
@@ -3010,7 +3010,8 @@ table and the stream plans.
   of the evalSource pipeline)); the missing default arm joins
   this item. What remains is the code question: whether the evaluator
   changes to meet the rules as stated (lane D), or the spine's rules are
-  restated to the implementation (lane A).
+  restated to the implementation (lane A). Stream plan:
+  `docs/plans/pe-rules.md`, proposed 2026-11-03.
 - [ ] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
   lane C (items 7 and 11 lie in lane K) · **Eleven defects in the CLI and
   its documentation that the tooling chapter's IR records and no item
@@ -3193,6 +3194,13 @@ table and the stream plans.
   states the defect; the chapter's reasoning role edits the IR when the
   code changes. **Pointer**: `docs/book/demo-ladder.ir.md`; the plan's §7
   A5 bullet, `docs/plans/book-chapters-now.md`
+- [ ] **B-178** (first out-of-scope finding of the PE-rules stream) ·
+  L0 · Reserved by stream D (`docs/plans/pe-rules.md`) for a finding
+  outside its boundary. Placeholder until used; the stream rewrites this
+  entry when it files the finding, and closes it unused when the stream
+  closes.
+- [ ] **B-179** (second out-of-scope finding of the PE-rules stream) ·
+  L0 · As B-178 (first out-of-scope finding of the PE-rules stream).
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
