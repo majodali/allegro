@@ -19,12 +19,12 @@ import { test, eq } from "./harness.js";
 import { typeExt } from "./fixtures.js";
 import { libLoader } from "./alg-files.js";
 import { evalSource as runtimeEval, type Extension, type CompilationReport } from "../runtime.js";
-import { setEvalStatsSink, isTailCall, type EvalReport, type EvalStats } from "../evaluator.js";
+import { setEvalStatsSink, isTailCall, evaluate, type EvalReport, type EvalStats } from "../evaluator.js";
 import { effectsOf } from "../effects.js";
 import { metaReadRaw } from "../metadata.js";
 import { scopeCompileMode } from "../scope.js";
 import { getName } from "../slot-accessors.js";
-import { makePrimitive, bitsToString, ValueKind, type Value, type BitsValue, type StructureValue } from "../types.js";
+import { makePrimitive, makeStructure, bitsToString, ValueKind, type Value, type BitsValue, type StructureValue } from "../types.js";
 
 // --- Helpers ----------------------------------------------------------------
 
@@ -415,6 +415,39 @@ test("B-172 C1 evaluator: gap pin (C2 flips, RR7) — a tail call in a branch un
   }
   eq(c.printed.length, 0, "h was not run");
   eq(haltOf(pureDeclared("if b then h(b) else 0")), null, "the pure-declared branch call compiles (C2: halts)");
+});
+
+test("B-172 C1 evaluator: gap pin (C2 flips, RR7) — evaluate reached with a TailCall sentinel falls through its switch to undefined", () => {
+  // GAP PIN, a consequence of the plan's §2.5 finding 1. C2 flips it under
+  // RR7 (a): no residual will hold a sentinel, so `evaluate` is no longer
+  // reached with one and `via_if` precompiles cleanly. Today the residual
+  // `eval_if` bound to `y` holds the then-branch's sentinel (a host object
+  // with no `kind`); `bump(y)` unfolds and evaluates that residual again,
+  // `eval_if` hands the sentinel to `evaluate`, and the switch, which names
+  // every kind and has no default arm, falls through to `undefined`. The
+  // next read of it is a host TypeError that the precompile pass reports
+  // as a `precompile-type-error`. Measured at C1: `evaluate` meets a
+  // sentinel in 17 of the 68 programs of `tests/` and `demos/`; this is the
+  // one whose `inspect` output shows it (`tests/functions.alg`, `via_if`).
+  // C5's default arm, set aside at C1, would return the sentinel instead.
+  const c = compile(
+    "pick(q) => q\nbump(v) => v + 1\n" +
+    "via_if(q) =>\n  y = if q > 1 then pick(q) else 0\n  bump(y)\n" +
+    "print(via_if(5))\n");
+  eq(JSON.stringify(c.printed), JSON.stringify(["6"]), "the run itself is unaffected");
+  const faults = c.report.notifications.filter(n => n.kind === "precompile-type-error");
+  eq(JSON.stringify(faults.map(n => `${n.binding}: ${n.message}`)),
+     JSON.stringify(["via_if: Cannot read properties of undefined (reading 'meta')"]),
+     "the host fault reported for via_if (C2: none)");
+  // The fall-through itself: take the sentinel the run-time residual of
+  // `inbranch(zzz)` holds and hand it to `evaluate`.
+  const t = compile("h(m) => print(m)\ninbranch(b: Int): Int => if b == 0 then h(b) else 0\nr = inbranch(zzz)\n");
+  const r = valueOf(t, "r");
+  if (r.kind !== ValueKind.Expression || r.args[0].kind !== ValueKind.Expression) throw new Error(`unexpected residual: ${shape(r)}`);
+  const sentinel = thunkBody(r.args[0].args[1]);
+  eq(isTailCall(sentinel), true, "the residual holds a sentinel (C2: none)");
+  eq((sentinel as any).kind, undefined, "a sentinel has no kind");
+  eq(evaluate(sentinel, makeStructure(), 0), undefined, "evaluate falls through its switch to undefined");
 });
 
 test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — eval_if at run time with an unresolved condition runs both branches' effects", () => {
