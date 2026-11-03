@@ -594,14 +594,14 @@ const eval_if_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   }
   // Condition unresolved — Rule 2: partially evaluate BOTH branches
   // so that type information and other MultiValue meta propagate.
-  const evalThen = evalFn!(args[1], ctx!);
-  const evalElse = evalFn!(args[2], ctx!);
-
-  // Unwrap thunks after partial evaluation
-  const thenVal = (evalThen.kind === ValueKind.ComposedFunction && evalThen.params.length === 0)
-    ? evalFn!(evalThen.body, ctx!) : evalThen;
-  const elseVal = (evalElse.kind === ValueKind.ComposedFunction && evalElse.params.length === 0)
-    ? evalFn!(evalElse.body, ctx!) : evalElse;
+  // B-172 C2, rulings RR3 (a) and RR7 (a): each branch is evaluated
+  // speculatively (`evaluateSpeculatively`), in a scope compile mode marks,
+  // at run time as in the precompile pass, so an effect in a branch defers
+  // to a residual carrying its effects instead of running; a call in tail
+  // position of a branch is applied there, so the residual holds a value,
+  // never a TailCall sentinel. The thunk is unwrapped inside the speculation.
+  const thenVal = _evaluateSpeculatively(args[1], ctx!, evalFn!);
+  const elseVal = _evaluateSpeculatively(args[2], ctx!, evalFn!);
 
   // Build the residual expression with partially evaluated branches
   const residual = makeExpr(eval_if_value, [

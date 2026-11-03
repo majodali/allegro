@@ -48,6 +48,7 @@ interface Compiled {
   stats: EvalStats;
   printed: string[];
   seen: Value[];
+  ctx: StructureValue;
 }
 
 /** The counts a pin asserts, as one comparable string. */
@@ -81,7 +82,7 @@ function compileOnce(src: string, typed: boolean, extra: Extension[] = []): Comp
   for (const [name, b] of (result.evalCtx as any).bindings as Map<string, { value?: Value }>) {
     if (b.value !== undefined) values.set(name, b.value);
   }
-  return { values, report: result.compilationReport!, stats: own[0].stats, printed, seen: p.seen };
+  return { values, report: result.compilationReport!, stats: own[0].stats, printed, seen: p.seen, ctx: result.evalCtx as StructureValue };
 }
 
 /** `compileOnce` three times: the counts must not differ between runs in one
@@ -391,14 +392,27 @@ test("B-172 C1 evaluator: gap pin (C3 flips, RR2) — a pure-declared function w
 
 // --- The two findings of the plan's §2.5 ---------------------------------------
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR7) — a tail call in a branch under an unresolved condition leaves a TailCall sentinel in the residual and infers no effect", () => {
-  // GAP PIN, the plan's §2.5 finding 1. C2 flips it under RR7 (a): the
-  // branch's sentinel will be applied, so the call is unfolded (or
-  // residualised where no cutoff is installed), no residual holds a
-  // sentinel, and `inbranch`, `local` and the pure-declared `g` will see
-  // `h`'s `io`. Today `h(b)` sits in tail position of the then-branch,
-  // `evaluateExpr` returns a TailCall sentinel for it, and `eval_if` puts
-  // that host object into its residual.
+/** True when `v`, or any value reachable from it through an Expression's
+ *  function position and arguments or a function's body, is a TailCall
+ *  sentinel. */
+function holdsSentinel(v: Value, seen: Set<unknown> = new Set()): boolean {
+  if (isTailCall(v)) return true;
+  if (v === null || typeof v !== "object" || seen.has(v)) return false;
+  seen.add(v);
+  if (v.kind === ValueKind.Expression) return holdsSentinel(v.fn, seen) || v.args.some(a => holdsSentinel(a, seen));
+  if (v.kind === ValueKind.ComposedFunction) return holdsSentinel(v.body, seen);
+  return false;
+}
+
+test("B-172 C1 evaluator: Rule 2 — a tail call in a branch under an unresolved condition is applied; no residual holds a sentinel (gap pin, C2 flipped it, RR7)", () => {
+  // Was a GAP PIN, the plan's §2.5 finding 1; C2 flipped it under RR7 (a).
+  // `h(b)` sits in tail position of the then-branch, so `evaluateExpr`
+  // returns a TailCall sentinel for it; the speculation of the branch
+  // (`evaluateSpeculatively`) applies it there. This program has no
+  // recursion cycle, so no inline cutoff is installed and the call is
+  // residualised as an Expression carrying `h`'s effects: `inbranch`,
+  // `local` and the pure-declared `g` see `h`'s `io`. Until C2 the residual
+  // `eval_if` held the sentinel and none of them inferred an effect.
   const c = compile(
     "h(m) => print(m)\n" +
     "direct(b: Int): Int => h(b)\n" +
@@ -406,72 +420,107 @@ test("B-172 C1 evaluator: gap pin (C2 flips, RR7) — a tail call in a branch un
     "local(b: Int): Int =>\n  y = if b == 0 then h(b) else 0\n  y\n" +
     "r = inbranch(zzz)\n");
   eq(effectsText(valueOf(c, "direct")), "io", "direct's effects: the unfolded call carries io");
-  eq(effectsText(valueOf(c, "inbranch")), "none", "inbranch's effects (C2: io)");
-  eq(effectsText(valueOf(c, "local")), "none", "local's effects (C2: io)");
+  eq(effectsText(valueOf(c, "inbranch")), "io", "inbranch's effects");
+  eq(effectsText(valueOf(c, "local")), "io", "local's effects");
   // At run time, `inbranch(zzz)` unfolds to its body's residual: the
   // `type_check` wrapper over the residual `eval_if`, whose then-branch
-  // holds the sentinel, not a value.
+  // holds the residual call of `h`, a value.
   const r = valueOf(c, "r");
   eq(shape(r), "Expression(primitive type_check; 2 args)", "r is inbranch's wrapped body");
   if (r.kind === ValueKind.Expression) {
     const iff = r.args[0];
     eq(shape(iff), "Expression(primitive eval_if; 3 args)", "the residual eval_if");
     if (iff.kind === ValueKind.Expression) {
-      eq(isTailCall(thunkBody(iff.args[1])), true, "the then-branch holds a TailCall sentinel (C2: none)");
+      const then = thunkBody(iff.args[1]);
+      eq(isTailCall(then), false, "the then-branch holds no TailCall sentinel");
+      eq(shape(then), "Expression(ComposedFunction; 1 args)", "the then-branch holds the residual call of h");
+      eq(effectsText(then), "io", "the residual call carries h's io");
       eq(thunkBody(iff.args[2]).kind, ValueKind.Bits, "the else-branch holds a value");
     }
   }
+  eq(holdsSentinel(r), false, "no residual reachable from r holds a sentinel");
   eq(c.printed.length, 0, "h was not run");
-  eq(haltOf(pureDeclared("if b then h(b) else 0")), null, "the pure-declared branch call compiles (C2: halts)");
+  eq(haltOf(pureDeclared("if b then h(b) else 0"))?.includes(MISMATCH), true, "the pure-declared branch call halts");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR7) — evaluate reached with a TailCall sentinel falls through its switch to undefined", () => {
-  // GAP PIN, a consequence of the plan's §2.5 finding 1. C2 flips it under
-  // RR7 (a): no residual will hold a sentinel, so `evaluate` is no longer
-  // reached with one and `via_if` precompiles cleanly. Today the residual
-  // `eval_if` bound to `y` holds the then-branch's sentinel (a host object
-  // with no `kind`); `bump(y)` unfolds and evaluates that residual again,
-  // `eval_if` hands the sentinel to `evaluate`, and the switch, which names
-  // every kind and has no default arm, falls through to `undefined`. The
-  // next read of it is a host TypeError that the precompile pass reports
-  // as a `precompile-type-error`. Measured at C1: `evaluate` meets a
-  // sentinel in 17 of the 68 programs of `tests/` and `demos/`; this is the
-  // one whose `inspect` output shows it (`tests/functions.alg`, `via_if`).
-  // C5's default arm, set aside at C1, would return the sentinel instead.
+test("B-172 C1 evaluator: Rule 2 — a tail call in a branch, with a cutoff installed, is unfolded; a recursive one is cut (C2, RR7)", () => {
+  // RR7 (a) where an inline cutoff is installed: a typed compilation with a
+  // recursion cycle (`loop`). The branch's call of `h` is unfolded, as a
+  // call outside a branch is, and `inbranch` infers `h`'s `io`; the branch's
+  // recursive call of `loop` is cut by the cutoff and residualised.
+  const c = compile(
+    "h(m) => print(m)\n" +
+    "loop(n: Int): Int => if n == 0 then 0 else loop(n - 1)\n" +
+    "inbranch(b: Int): Int => c1_probe(if b == 0 then h(b) else 0)\n");
+  eq(effectsText(valueOf(c, "inbranch")), "io", "inbranch's effects");
+  for (const r of c.seen) {
+    eq(shape(r), "Expression(primitive eval_if; 3 args)", "the residual eval_if");
+    if (r.kind !== ValueKind.Expression) continue;
+    eq(shape(thunkBody(r.args[1])), "Expression(primitive print; 1 args)", "the then-branch holds h's unfolded body");
+    eq(holdsSentinel(r), false, "the residual holds no sentinel");
+  }
+  eq(c.stats.cutoffResiduals > 0, true, "the recursive branch call of loop was cut");
+});
+
+test("B-172 C1 evaluator: Rule 2 — evaluate is no longer reached with a TailCall sentinel; via_if precompiles cleanly (gap pin, C2 flipped it, RR7)", () => {
+  // Was a GAP PIN, a consequence of the plan's §2.5 finding 1; C2 flipped it
+  // under RR7 (a). The residual `eval_if` bound to `y` holds the residual
+  // call of `pick`, a value, so when `bump(y)` unfolds and evaluates that
+  // residual again, `evaluate` meets values only and the precompile pass
+  // reports no fault for `via_if` (`tests/functions.alg`). Until C2 the
+  // residual held the then-branch's sentinel, `evaluate` fell through its
+  // switch to `undefined`, and the pass reported the `precompile-type-error`
+  // "Cannot read properties of undefined (reading 'meta')".
   const c = compile(
     "pick(q) => q\nbump(v) => v + 1\n" +
     "via_if(q) =>\n  y = if q > 1 then pick(q) else 0\n  bump(y)\n" +
-    "print(via_if(5))\n");
+    "print(via_if(5))\nt = via_if(zzz)\n");
   eq(JSON.stringify(c.printed), JSON.stringify(["6"]), "the run itself is unaffected");
   const faults = c.report.notifications.filter(n => n.kind === "precompile-type-error");
-  eq(JSON.stringify(faults.map(n => `${n.binding}: ${n.message}`)),
-     JSON.stringify(["via_if: Cannot read properties of undefined (reading 'meta')"]),
-     "the host fault reported for via_if (C2: none)");
-  // The fall-through itself: take the sentinel the run-time residual of
-  // `inbranch(zzz)` holds and hand it to `evaluate`.
+  eq(JSON.stringify(faults.map(n => `${n.binding}: ${n.message}`)), "[]", "no host fault reported for via_if");
+  // At run time with an unresolved argument (C1 saw a host TypeError out of
+  // `evalSource` here): a residual, holding no sentinel.
+  eq(holdsSentinel(valueOf(c, "t")), false, "via_if(zzz)'s residual holds no sentinel");
   const t = compile("h(m) => print(m)\ninbranch(b: Int): Int => if b == 0 then h(b) else 0\nr = inbranch(zzz)\n");
-  const r = valueOf(t, "r");
-  if (r.kind !== ValueKind.Expression || r.args[0].kind !== ValueKind.Expression) throw new Error(`unexpected residual: ${shape(r)}`);
-  const sentinel = thunkBody(r.args[0].args[1]);
-  eq(isTailCall(sentinel), true, "the residual holds a sentinel (C2: none)");
-  eq((sentinel as any).kind, undefined, "a sentinel has no kind");
-  eq(evaluate(sentinel, makeStructure(), 0), undefined, "evaluate falls through its switch to undefined");
+  eq(holdsSentinel(valueOf(t, "r")), false, "inbranch(zzz)'s residual holds no sentinel");
 });
 
-test("B-172 C1 evaluator: gap pin (C2 flips, RR3) — eval_if at run time with an unresolved condition runs both branches' effects", () => {
-  // GAP PIN, the plan's §2.5 finding 2. C2 flips it under RR3 (a):
-  // speculative evaluation will run in a compile-mode scope at run time too,
-  // so each `print` defers to a residual and nothing is printed. Today no
-  // compile mode is set at run time, so both branches print, in Standard
-  // mode and in Allegretto alone.
-  const src = `r = if zzz then print("then-ran") else print("else-ran")\n`;
+test("B-172 C1 evaluator: Rule 2 — eval_if at run time with an unresolved condition runs neither branch's effects (gap pin, C2 flipped it, RR3)", () => {
+  // Was a GAP PIN, the plan's §2.5 finding 2; C2 flipped it under RR3 (a):
+  // speculative evaluation runs in a compile-mode scope at run time too, so
+  // each `print` defers to a residual carrying `io` and nothing is printed,
+  // in Standard mode and in Allegretto alone. Until C2 both branches
+  // printed. `zzz` is bound nowhere, so it evaluates to itself, an
+  // unresolved Symbol, and `branches(zzz)` substitutes that Symbol for `c`.
+  // An unresolved Param behaves the same: below, the body of `branches`,
+  // with its own Param `c` unresolved, is evaluated at run time.
+  const src = `r = if zzz then print("then-ran") else print("else-ran")\n` +
+    `branches(c) => if c then print("then-ran") else print("else-ran")\ns = branches(zzz)\n`;
   for (const typed of [true, false]) {
     const c = compile(src, typed);
     const mode = typed ? "Standard" : "Allegretto";
-    eq(JSON.stringify(c.printed), JSON.stringify(["then-ran", "else-ran"]), `${mode}: both branches printed (C2: nothing)`);
-    const r = valueOf(c, "r");
-    eq(shape(r), "Expression(primitive eval_if; 3 args)", `${mode}: the residual eval_if`);
-    eq(effectsText(r), "io", `${mode}: the residual carries io`);
+    eq(JSON.stringify(c.printed), "[]", `${mode}: nothing printed`);
+    for (const name of ["r", "s"]) {
+      const v = valueOf(c, name);
+      eq(shape(v), "Expression(primitive eval_if; 3 args)", `${mode}: ${name} is the residual eval_if`);
+      eq(effectsText(v), "io", `${mode}: ${name} carries io`);
+      if (v.kind !== ValueKind.Expression) continue;
+      eq(shape(thunkBody(v.args[1])), "Expression(primitive print; 1 args)", `${mode}: ${name}'s then-branch, a deferred print`);
+      eq(shape(thunkBody(v.args[2])), "Expression(primitive print; 1 args)", `${mode}: ${name}'s else-branch, a deferred print`);
+    }
+    const fn = valueOf(c, "branches");
+    if (fn.kind !== ValueKind.ComposedFunction) throw new Error(`branches is not a function: ${fn.kind}`);
+    const origLog = console.log;
+    const printedNow: string[] = [];
+    console.log = (...a: any[]) => { printedNow.push(a.join(" ")); };
+    let p: Value;
+    try { p = evaluate(fn.body, c.ctx, 0); } finally { console.log = origLog; }
+    eq(scopeCompileMode(c.ctx), false, `${mode}: the program's scope is not in compile mode`);
+    eq(JSON.stringify(printedNow), "[]", `${mode}: an unresolved Param condition prints nothing`);
+    eq(effectsText(p), "io", `${mode}: the Param condition's residual carries io`);
+    if (p.kind === ValueKind.Expression) {
+      eq(p.args[0].kind, ValueKind.Param, `${mode}: the condition is branches' unresolved Param`);
+    }
   }
 });
 
