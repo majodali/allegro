@@ -574,6 +574,22 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-03 — the re-scope, and the preface.** The book pass now
+  writes the book for human readers too: the re-scope rulings of
+  `docs/plans/book-pass.md` §6, the twelve organizing principles in its
+  §2.6, the three front chunks in its §5 (the preface, the decision
+  inventory, a pilot chapter). The preface
+  `docs/book/preface.md` ("How this book is organized"), written IR
+  first (`docs/book/preface.ir.md`), is the book's first entry and the
+  definition site of *decision section*, *swappable decision*,
+  *foundational decision* and *open decision*. A count read as the
+  curious programmer (`docs/book/preface.review.md`): round 1 not
+  readable at 22 findings, round 2 not readable at 16; paused for the
+  maintainer's rulings. The briefs gain the pattern checks and a
+  human-reader stranger brief. F1's rulings recorded; B-183 (a trailing
+  comment breaks a contract body's parse) and B-184 (the root README's
+  corrections) filed. Ids 784.
+
 - **2026-11-03 — the plan ratified, and chunk F1 reviewed.** The merge
   of PR #154 took rulings R1 to R9 of `docs/plans/book-pass.md` §6 as
   recommended; amendments M1 (the ids baseline in the boundary) and M2
