@@ -589,6 +589,18 @@ would govern Tier-0 text, so it waits for the same sign-off.
   review session records the rulings taken in §6 and flips the header to
   `status: active` in its first chunk's PR, as `docs/plans/pe-rules.md`
   did at PR #148.
+- **2026-11-03 — plan ratified; F1 reviewed** (the review session).
+  PR #154 merged the same day with no ruling comment, taken as the
+  defaults: R1 to R9 as recommended, the six terms of §1 ratified.
+  Amendments M1 and M2 ruled the same day (§6). Header `status:
+  active`. F1, review only (R9): `docs/records/book-pass/f1-readme.md`,
+  20 claims checked (13 hold, 6 wrong, 0 stale, 1 unverifiable), no
+  term moved, no tidy-up, one out-of-scope finding for B-183 (a parse
+  failure in the README's taste example), rulings R-F1-1 to R-F1-8 and
+  one term (*unstreamed PR*) put to the maintainer. Lints:
+  `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 5 files
+  clean, unratified terms 0; `doc-ref-lint` all resolve; `lint:streams`
+  0 findings. One PR, as §5 allows for a review-only chunk.
 
 ## 8. Sessions
 

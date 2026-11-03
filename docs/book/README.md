@@ -93,4 +93,6 @@ Outside the order check. `../decisions.md` · `../backlog.md` ·
 `../../V1-INVENTORY.md` · `../records/concepts-analyses.md` (record: the analysis
 passes and measured rulings behind Part 0 of the spine, moved out
 verbatim 2026-10-20; read for the argument, the outcomes are in
-`concepts.md` Part 0).
+`concepts.md` Part 0) · `../records/book-pass/f1-readme.md` (record: the
+book pass's review of the root `README.md`, chunk F1 of
+`../plans/book-pass.md`).
