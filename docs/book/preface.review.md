@@ -37,6 +37,7 @@ and no jargon; no lost thread.
 | 2 | 913 | 63 | 16 | 17.5 | not readable (restatement mismatches 4: 2 own, 2 prose; contradictions 1; undefined terms 2; jargon 2; lost thread 2, one of them counting under the override) |
 | 3 | 935 | 63 | 10 | 10.7 | not readable (restatement mismatches 2: 1 own, 1 prose; contradictions 1, held for ask A7; undefined terms 1; jargon 0; lost thread 3) |
 | 4 | 1,000 | 65 | 6 | 6.0 | not readable (restatement mismatches 4: 3 own, 1 prose; contradictions 0; undefined terms 0; jargon 0; lost thread 1) |
+| 5 | 1,020 | 65 | 11 | 10.8 | not readable (restatement mismatches 1, own; contradictions 1, held for ask A9; undefined terms 0; jargon 1, held for A9; lost thread 3); count closed for the meta-review |
 
 ## Round 1
 
@@ -388,3 +389,116 @@ the status sits once with the other status.
 Claims check after the confirmation fixes: 65 of 65 claims carried in
 the render map, re-numbered for 18 paragraphs; C77 new; C13 moved; C7
 reworded. No claim missing or stale. Prose words 983 (by `wc`).
+
+## Round 5
+
+Words about 1,020, claims 65, findings 11, from a fresh stranger
+instance reading fcaf9f1. The restatement was correct, with one own
+mismatch and none attributed to the prose. Contradictions 1 (finding 1,
+the tour). Undefined terms 0. Jargon 1 (finding 4, the tour). Lost
+thread 3 (findings 5 and 6, and the paragraph opening "You are invited
+into the design of Allegro", which moves to branching code with no
+link; finding 5 covers it). Verdict: not readable. The stranger wanted
+to read on at the seven blocks and at the swappable-or-foundational
+distinction.
+
+Override comparison by passage. The tour passage drew findings in every
+round:
+
+| Round | Cluster | Claims | Findings |
+|---|---|---|---|
+| 1 | G3, G5 | C9, C13 | 1 (undefined term), 2 (lost thread), 3 (jargon) |
+| 3 | G5 | C9, C13 | 2 (lost thread) |
+| 4 | G5 | C13, C70 | 2 (lost thread) |
+| 4, confirmation | G3 | C13 | 2 unfixed (lost thread) |
+| 5 | G3, G5 | C7, C13, C77 | 1 (contradiction), 4 (jargon), 10 (pattern), 11 (excess) |
+
+The structures tried were: a status sentence in the opening (round 1),
+a sentence after the tour's description (rounds 1 to 3), a merged
+sentence in the dependency-order section (round 3), the tour moved into
+the status paragraph (round 4), and the tour described as structure
+with its status folded into the status paragraph (round 4's
+confirmation). None held. A lost thread, a contradiction and a jargon
+finding are outside the override, which counts restatement mismatches;
+the recurrence is recorded for the maintainer as ask A9. No restatement
+mismatch recurs on one passage across the five rounds.
+
+| # | Finding (shortened) | Kind | Origin | Decision |
+|---|---|---|---|---|
+| M1 | (the stranger's own) | restatement mismatch (own) | stranger | no fix needed |
+| 1 | C13 "The book opens with a tour" against C7 "not yet written" | contradiction | stranger | held: ask A9; the passage stays as it stands |
+| 2 | C7 joins the tour's status and the chapters' status | compound | stranger | fixed: split into C7 "The tour that opens the book is not yet written." and C78 "Most chapters do not yet follow the organization this preface describes." |
+| 3 | C55 "enough to hold your interest" | excess (recurring: rounds 2 to 5) | stranger | held: ask A8 |
+| 4 | "the tour" used in the status paragraph before its description | jargon | stranger | held: ask A9 |
+| 5 | C6, branching the code with no link to the explore block | lost thread | stranger | fixed: C6 reads "The code is organized so that you can branch it to try another option for a decision, as the explore block of each decision section shows." (the term linked to its definition) |
+| 6 | C49 "Such a file is split when its code is next changed…" | lost thread | stranger | fixed: C49 cut, a maintenance rule and process detail by the principle that process stays outside the book; C48 stands without it; evidence E7 removed with it |
+| 7 | heading "Open decisions as invitations" | pattern | stranger | fixed: heading "Open decisions" |
+| 8 | C73 "That separation keeps…" | pattern | stranger | declined: round 3's stranger asked for this split and round 4's accepted it; the strangers disagree |
+| 9 | C51 joins the definition and the gloss of a claim | compound | stranger | fixed: split into C51 "The form for agents is an intermediate representation, a numbered list of claims." and C79 "Each claim is a single statement with its evidence and pointers into the code." |
+| 10 | C77 "After the tour, the book descends…" | pattern (signposting) | stranger | held: ask A9 |
+| 11 | C77 repeats "dependency order" | excess | stranger | held: ask A9 |
+
+Claims check after the fix pass, against round 5's prose: 66 of 66
+claims carried in the render map; C49 cut; C78 and C79 new splits. No
+claim missing or stale. Prose words after the fixes 976 (by `wc`).
+
+The count stops after round 5 at the review session's decision, for the
+meta-review below. No confirmation round is run on round 5's fixes; the
+next count's round 1 reviews them.
+
+## Meta-review
+
+Written by the reasoning role at the review session's instruction,
+2026-11-03, from this record. The methodology's specification places
+the meta-review in a session the owner starts; this one is the
+reasoning role's analysis for the maintainer, who may dispatch a
+meta-review session as well.
+
+**The curve.** Findings per 1,000 words fell from 23.3 (round 1) to
+17.5, 10.7 and 6.0 (round 4), then rose to 10.8 at round 5. The fall
+was sentence-level: compounds, referents, jargon and patterns fixed and
+held. The rise came from passages already fixed in earlier rounds.
+
+**The signals.**
+
+- First signal (a fix not held at confirmation, or a claim reported
+  missing or stale, in two or more rounds): fires. Fixes were unfixed
+  or disputed at confirmation in round 1 (finding 22), round 2 (finding
+  14), round 3 (finding 7) and round 4 (findings 2 and 3).
+- Second signal (a declined finding raised again; or a restatement
+  mismatch recurring on one passage): fires on its first clause. The
+  aim sentence C55 was declined in rounds 2, 3 and 4 and raised again
+  in round 5. The separation sentence was declined as a compound in
+  round 2 (finding 17), split at round 3's confirmation, then flagged
+  in rounds 4 and 5 for the split. No restatement mismatch recurred on
+  one passage.
+- Third signal: struck by the specification.
+- Fourth signal (in round 3 or later, a contradiction in a passage an
+  earlier fix touched): fires. Round 3's finding 4 fell on C36 against
+  C30, whose cluster round 1's fix touched. Round 5's finding 1 fell on
+  C13 and C7, both touched by round 4's fixes.
+
+**Diagnosis.** Three causes remain after the sentence-level findings
+converged. First, the tour passage describes a part of the book that
+does not exist: every structure either promises content or states a
+status that contradicts the structure, so no wording holds (ask A9).
+Second, strangers of one brief disagree on tone and on splitting: the
+aim sentence and the separation sentence were asked for by one round
+and flagged by the next. Third, a reader persona of the human reader,
+played by a smaller model, judges engagement inconsistently. The
+specification's rounds measure whether a stranger can restate the
+text; restatement was correct in every round from 2 on.
+
+**Recommendations.** Rule asks A8 and A9. Take the maintainer's reading
+as the test of human readability, as ruling R14 (the human reader) of
+the plan provides. For the briefs: a finding declined twice goes to the
+owner as an ask at its second raise rather than recurring; a chapter
+does not describe a part of the book that is not yet written.
+
+Meta-review: delivered (in this record, written by the reasoning role
+at the review session's instruction, 2026-11-03; signals checked: first,
+second and fourth, all three firing).
+
+Count 1 closed at round 5 without a readable verdict. The maintainer's
+reading is the test of human readability (ruling R14 (the human reader)
+of `docs/plans/book-pass.md`). Asks A8 and A9 are open.
