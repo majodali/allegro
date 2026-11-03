@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `evaluator` unit (unit 13): evaluation and partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, and the edges the unit still owes.
-Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0)
+Status: delivered (count 1 stopped at round 7, 2026-10-31, ruled not readable by the meta-review of 2026-11-02, count 2 at the next edit; ratified at the merge of PR #129, 2026-11-01; unratified terms 0; footprint: declared 9, changed 10, surprises 1, misses 0; edited 2026-11-03: evidence re-pointed to the current lines of `src/evaluator.ts`, `src/primitives.ts`, `src/runtime.ts` and the suite after stream P and B-172's chunk C1, no claim changed)
 Source: chunk A1 of docs/plans/book-chapters-now.md (stream A, B-170); src/evaluator.ts as assigned to unit 13 since B-112's exit
 Normative: yes
 Footprint: docs/book/allegretto/evaluator.md; docs/book/allegretto/evaluator.ir.md; docs/book/allegretto/evaluator.review.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/concepts.md; docs/book-changes.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
@@ -523,49 +523,49 @@ E1. `scripts/analyze/units.json` lines 16 and 51: the `evaluator` unit's permitt
 
 E2. `src/evaluator.ts` lines 3–13: the imports, including seven symbols from `src/refinements.ts` and `src/effects.ts`, `primitives` and `renderExprSource` from `src/primitives.ts`, and three reads from `src/scope.ts`.
 
-E3. `src/evaluator.ts` lines 363–427: `evaluate`, with the depth bound at line 366 and the switch, which names all seven kinds and has no default arm.
+E3. `src/evaluator.ts` lines 375–439: `evaluate`, with the depth bound at line 378 and the switch, which names all seven kinds and has no default arm.
 
-E4. `src/evaluator.ts` lines 393–414: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
+E4. `src/evaluator.ts` lines 405–426: the Symbol arm: `scopeLookup`, `mergeOverMeta` over the Symbol's own fields, `scopeFactsFor` with `withPredicates`, and the dependency collector for an unresolved name.
 
-E5. `src/evaluator.ts` lines 416–473: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 452–456; the immediate application at lines 446–448; the constructor slot at lines 460–473.
+E5. `src/evaluator.ts` lines 428–485: the Expression arm and `evaluateExpr`'s dispatch on the callee's kind; the sentinel at lines 464–468; the immediate application at lines 458–460; the constructor slot at lines 472–485.
 
-E6. `src/evaluator.ts` lines 475–525: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
+E6. `src/evaluator.ts` lines 487–537: the residual for an unresolved function position, with the Param's effects and `viralOnto`.
 
 E7. `src/types.ts` lines 455–472: `isResolved`, false for Param, Symbol and Expression, true otherwise.
 
-E8. `src/evaluator.ts` lines 582–687: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 657.
+E8. `src/evaluator.ts` lines 594–699: the eager path of `applyPrimitive`: evaluated arguments, the compile-mode deferral, the viral check, the unresolved residual and the dispatchers, the predicate-set propagation, the post-call `type` stamp, the effect union; the unresolved-stub throw at line 669.
 
-E9. `src/evaluator.ts` lines 759–783: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
+E9. `src/evaluator.ts` lines 771–796: the inline cutoff in `applyComposed`, a residual for a speculative call into a recursion cycle.
 
-E10. `src/evaluator.ts` lines 815–849 and 862–936: `remapParams` and `subst`, each a switch on kind.
+E10. `src/evaluator.ts` lines 828–862 and 875–949: `remapParams` and `subst`, each a switch on kind.
 
-E11. `src/evaluator.ts` lines 538–580: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function, the compile-mode deferral of an effectful lazy primitive.
+E11. `src/evaluator.ts` lines 550–592: the lazy path of `applyPrimitive`: unevaluated arguments, the tracking evaluation function, the compile-mode deferral of an effectful lazy primitive.
 
 E12. `src/primitives.ts` lines 567–621: `eval_if_impl`, both branches evaluated under an unresolved condition, the residual, the shared type.
 
 E13. `src/primitives.ts` lines 821–834: `eval_when_impl` returns a residual for an unresolved subject before evaluating any branch.
 
-E14. `src/primitives.ts` lines 2190–2220 and 2288–2313: `typed_and_impl` and `typed_or_impl`: an unresolved left operand residualises with the right thunk unevaluated; the right thunk is applied as a call.
+E14. `src/primitives.ts` lines 2217–2247 and 2315–2340: `typed_and_impl` and `typed_or_impl`: an unresolved left operand residualises with the right thunk unevaluated; the right thunk is applied as a call.
 
-E15. `src/evaluator.ts` lines 716–806: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 730, with the body evaluated at `depth + 1` at line 793 and the tail-call check at lines 796–802. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
+E15. `src/evaluator.ts` lines 728–819: `applyComposed`: argument evaluation, the viral check, the dispatchers' call binding with `checkArg`, substitution; the loop from line 742, with the body evaluated at `depth + 1` at line 806 and the tail-call check at lines 809–815. `depth` is not reassigned inside the loop, so every round evaluates its body at the depth of the first round.
 
-E16. `src/evaluator.ts` lines 851–884 and 925–933: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
+E16. `src/evaluator.ts` lines 864–897 and 938–946: positional substitution, ownership by membership through `ownsParam`, Symbols left in place, unchanged subtrees returned, the tail mark copied.
 
-E17. `src/evaluator.ts` lines 830–847 and 886–922: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
+E17. `src/evaluator.ts` lines 843–860 and 899–935: an inner composed function copied with fresh Params, `carryMeta` and `PRESERVED_FN_META_KEYS`; `remapParams` copying the tail mark.
 
-E18. `src/evaluator.ts` lines 954–978: `checkArg`, every installed field check, and the throw when none is installed.
+E18. `src/evaluator.ts` lines 967–991: `checkArg`, every installed field check, and the throw when none is installed.
 
-E19. `src/evaluator.ts` lines 996–1095: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
+E19. `src/evaluator.ts` lines 1009–1109: `precompileFunction`: placeholders with `type` and `domain`, the `compileMode` flag set and restored in `finally`, the sentinel loop bounded at 10,000, the inferred type read, the `inferredEffects` write, errors returned.
 
-E20. `src/evaluator.ts` lines 213–231: the `TailCall` interface, `isTailCall`, `makeTailCall`.
+E20. `src/evaluator.ts` lines 225–243: the `TailCall` interface, `isTailCall`, `makeTailCall`.
 
-E21. `src/evaluator.ts` lines 233–320: `markTailCalls`, `forwardedArgIndex`, `isBranchingPrimitive`; the in-place `_tailPosition` write at line 245.
+E21. `src/evaluator.ts` lines 245–332: `markTailCalls`, `forwardedArgIndex`, `isBranchingPrimitive`; the in-place `_tailPosition` write at line 257.
 
-E22. `src/runtime.ts` lines 452–482 and 1152–1156: `markTailCallsInContext` collapses body-form metadata first, then marks each composed function body; called after `resolveSymbols`.
+E22. `src/runtime.ts` lines 452–482 and 1259–1263: `markTailCallsInContext` collapses body-form metadata first, then marks each composed function body; called after `resolveSymbols`.
 
-E23. `src/primitives.ts` lines 2629–2638 and 3457–3463: `type_check_impl` and `ensures_check_impl` return a sentinel untouched.
+E23. `src/primitives.ts` lines 2656–2665 and 3484–3490: `type_check_impl` and `ensures_check_impl` return a sentinel untouched.
 
-E24. `src/test/totality.ts` lines 735–765: a typed tail-recursive countdown returns 0, from 5 and from 100,000.
+E24. `src/test/totality.ts` lines 739–769: a typed tail-recursive countdown returns 0, from 5 and from 100,000.
 
 E25. `tests/functions.alg` lines 52–69: an `if` or `when` binding whose branch is a call (`// expect: 6`, `// expect: 6`, `// expect: 42`).
 
@@ -575,9 +575,9 @@ E27. `docs/backlog.md`, the B-113 entry: tail-call forwarding is enforced by a r
 
 E28. `src/scope.ts` lines 32–38 and 84–91: `scopeNew` makes a Structure and sets `isScope`; `scopeCompileMode` walks the parent chain.
 
-E29. `src/evaluator.ts` lines 337–359 and `src/runtime.ts` lines 215–223: `markPatternBinders` rewrites a `when` pattern argument in place during symbol resolution.
+E29. `src/evaluator.ts` lines 349–371 and `src/runtime.ts` lines 215–223: `markPatternBinders` rewrites a `when` pattern argument in place during symbol resolution.
 
-E30. `src/runtime.ts` lines 717–733: the pipeline skips a library-owned function before calling `precompileFunction`.
+E30. `src/runtime.ts` lines 814–830: the pipeline skips a library-owned function before calling `precompileFunction`.
 
 E31. `src/metadata.ts` lines 383–455: `CheckSite`, `fieldChecks`, `CallSite`, `CallBinding`, `DispatchInstall` and `dispatchers`; a declining dispatcher returns null.
 
@@ -585,9 +585,9 @@ E32. `src/metadata.ts` lines 142–166: `metaReadRaw` reads the value's own `met
 
 E33. `src/metadata.ts` lines 325–375: `viralOnto` (the first viral field, with its candidate's `type`) and `mergeOverMeta` (inner fields win, `union` fields merge).
 
-E34. `src/evaluator.ts` lines 690–712: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
+E34. `src/evaluator.ts` lines 702–724: `assertPropagationTableLinkage` over `error`, `effects`, `shape`, `predicates`, `domain` and `discharged`.
 
-E35. `src/evaluator.ts` lines 26–42 and `src/runtime.ts` lines 1177 and 1260: `setInlineCutoff` takes a bare callback; the pipeline clears it and installs the cycle set.
+E35. `src/evaluator.ts` lines 26–42 and `src/runtime.ts` lines 1285 and 1387: `setInlineCutoff` takes a bare callback; the pipeline clears it and installs the cycle set.
 
 E36. `npx tsx scripts/analyze/index.ts units`, run on this branch on 2026-10-31: two violations, evaluator → refinements and evaluator → effects; `src/types.ts` and `src/primitives.ts` among the five mixed files.
 
@@ -603,7 +603,7 @@ E41. `docs/plans/plane-interfaces.md` §9.7, finding 4: `setInlineCutoff` is an 
 
 E42. `scripts/analyze/units.json` lines 4–41 and 44–70: the layer of each unit; `src/refinements.ts` and `src/effects.ts` mapped to one L2 unit each; `src/primitives.ts` mapped to seven units of L0, L1 and L2; `src/types.ts` mapped to ten units.
 
-E43. `src/test/index.ts` lines 14–38 and 61: the suite's index imports every test area and runs the boundary gates of `src/boundary-tests.ts`, which import their reads from `src/metadata.ts` (line 36).
+E43. `src/test/index.ts` lines 14–39 and 62: the suite's index imports every test area and runs the boundary gates of `src/boundary-tests.ts`, which import their reads from `src/metadata.ts` (line 36).
 
 E44. `package.json` line 24: `lint:units` runs `scripts/analyze/index.ts units --check` against `scripts/analyze/units.json`.
 
