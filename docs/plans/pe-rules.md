@@ -549,3 +549,153 @@ over unresolved information) are cited in the same text.
   taken as recommended; the maintainer filed B-180 (recursion handling
   under partial evaluation) and B-181 (the hard-coded precompile and
   compile-time phases) for later review, outside this stream's scope.
+- **2026-11-03 — C1 landed; C5 measured and set aside.** The pins, the
+  RR1 experiment and the evidence re-sync, with no behaviour change. C5
+  was built and measured, changed one output, and waits for the
+  maintainer's choice.
+  - **The pins.** `src/test/evaluator.ts`, a new test module registered
+    by one import line in `src/test/index.ts`, 20 tests. Each compiles
+    a small program written inline through `evalSource` and the stats
+    sink (`setEvalStatsSink`). A lazy probe primitive, `c1_probe`,
+    records what its argument evaluates to in compile mode, so a test
+    can assert the shape of a residual: its kind, its function position
+    and its argument count.
+    - Rule 1, 8 pins: a composed call with an unresolved argument
+      [unfolds](#def-unfold) (2 `inlineExpansions`, 1 per precompile;
+      at run time 1 `applyComposed` call and no expansion counted);
+      unfolding infers `twice: Int` through an untyped helper; a call
+      into a recursion cycle [residualises](#def-residualise) and
+      carries the callee's `io` (4 `cutoffResiduals`); a self-recursive
+      call residualises with no effect, since the callee's set is not
+      yet stashed while it is itself precompiled; an eager primitive
+      residualises, typed `Int` by the dispatcher in Standard mode and
+      untyped in Allegretto; an unresolved function position
+      residualises, the Param carrying its effect variable `e`, `opaque`
+      when unannotated, nothing under `f: pure`; a `pure`-declared
+      function whose unfolded call hides a `print` halts with the
+      mismatch.
+    - Rule 2, 2 pins: `eval_if` (`eval_if_impl`) under an unresolved
+      condition evaluates both branches and residualises, the deferred
+      `print` carrying `io` up; the `pure`-declared `if` row of §2.4
+      halts.
+    - 9 [gap pins](#def-gap-pin), each named "gap pin (C<n> flips,
+      RR<m>)" with a comment. C2 flips seven: `&&` (`typed_and_impl`)
+      and `||` (`typed_or_impl`) residualise with the right operand
+      unevaluated (RR3); the `pure`-declared `&&` and `||` rows compile
+      (RR3); a tail call in a branch under an unresolved condition
+      leaves a `TailCall` sentinel in the residual and infers no effect,
+      `inbranch` and `local` inferring nothing where `direct` infers
+      `io` (RR7); `evaluate` reached with that sentinel falls through
+      its switch to `undefined`, which the precompile pass reports for
+      `via_if` of `tests/functions.alg` as the `precompile-type-error`
+      "Cannot read properties of undefined (reading 'meta')" (RR7);
+      `eval_if` at run time prints both branches, in Standard mode and
+      in Allegretto (RR3). C3 flips two: `eval_when` (`eval_when_impl`)
+      residualises with no arm evaluated, and the `pure`-declared `when`
+      row compiles (RR2).
+    - 1 plain pin: `&&`, `||` and `when` with an unresolved input print
+      nothing at run time, which RR3 (a) keeps.
+  - **Determinism.** Every counted test compiles its program three times
+    in one process and asserts equal counts. Each test also passes run
+    alone, where its program is the first compilation in its process,
+    and in the full suite and the sharded gate, where other compilations
+    run first.
+  - **The RR1 experiment**, behind a flag in a scratch copy of the tree,
+    never committed: `applyComposed` residualised every composed call
+    with an unresolved argument, as the inline cutoff's branch does,
+    carrying the callee's effects. The cutoff's own branch kept its
+    counter; the flag's residuals were counted apart.
+
+    | Measure | Flag off | Flag on |
+    |---|---|---|
+    | CLI runs, `run` and `inspect` over the 68 programs of `tests/*.alg` and `demos/**/*.alg` | 136 identical | 135 identical; `tests/planning-handlers-demo.alg` `inspect` gains `error in build_plan: Cannot read properties of undefined (reading 'length')` (its grade was `has-errors` already) |
+    | `run` outputs and `// expect:` lines changed | 0 | 0 |
+    | `VERDICT_PIN` (`src/test/totality.ts`) | 13 of 13 pass | 13 of 13 pass |
+    | Suite failures caused by the flag | 0 | 7: "Stage F2: polymorphic apply propagates io callback's effects to caller", "Stage C3: multi-variable apply2[e1, e2] propagates each var independently", "Stage C3: explicit [e: Effect] annotation propagates through forwarded params, auto-promotion stays opaque", and four C1 pins (the three Rule 1 unfolding pins and the residual's shape in the RR7 pin) |
+    | `ALLEGRO_TEST_FILTER="effects\|refine\|totality\|file: "` | 146 of 146 | 145 of 146 |
+    | Precompile corpus, 8 sources, `npm run bench:load` | the baseline's counts | every count identical; the flag residualised no call |
+    | `lib/units.alg` | `evaluate` 4,755, `applyComposed` 83, `applyPrimitive` 1,318, `inlineExpansions` 37, `cutoffResiduals` 0 | 3,853, 88, 1,046, 0, 0; 49 calls residualised by the flag |
+    | `lib/planning.alg` | 26,035, 746, 5,804, 502, 245 | 13,541, 452, 2,990, 6, 47; 360 by the flag |
+    | `tests/planning-solve-demo.alg` | 9,950,954, 565,195, 2,315,455, 502, 245 | 9,938,460, 564,901, 2,312,641, 6, 47 |
+    | `demos/rung3/01-model.alg` | 838,144, 48,671, 196,050, 502, 245 | 825,650, 48,377, 193,236, 6, 47 |
+    | `demos/rung3/02-solve.alg` | 3,585,707, 200,730, 836,660, 502, 245 | 3,573,213, 200,436, 833,846, 6, 47 |
+
+    `precompiles` did not move anywhere (26 for `lib/units.alg`, 251
+    for each run loading `lib/planning.alg`). Four suite failures under
+    both settings came from the scratch copy not being a git checkout
+    (the doc, IR and boundary lints) and are not counted. The three
+    results of §2.3:
+    1. Effect variables instantiated at the call site: **confirmed
+       lost**. The three effects tests above fail; the residual carries
+       the callee's variable `e`, or nothing, instead of `io`.
+    2. Effects through `arr.map`'s `mapAllegro`: **not confirmed**.
+       "Stage F3b: declaration check via PE catches mismatch through
+       HOF" still halts with the flag. Its program makes no
+       `applyComposed` call either way: `arr.map` on the unresolved
+       `arr` is an unresolved method call, and its residual takes the
+       `io` of the callback argument (`src/evaluator.ts` lines 515 to
+       523). §2.3 item 2's account of the mechanism is wrong; the
+       result does not depend on unfolding.
+    3. Return types inferred through untyped helpers: **confirmed
+       lost**. `twice` has no inferred return type with the flag.
+
+    RR1 is put to the maintainer on these numbers; the recommendation
+    (a) stands.
+  - **The evidence re-sync.** Every evidence pointer of
+    `docs/book/allegretto/evaluator.ir.md` whose lines moved since the
+    IR was written (`bdcc0da`) is re-pointed by a line diff, with no
+    claim changed: in `src/evaluator.ts` E3, E4, E5, E6, E8, E9, E10,
+    E11, E15 to E21, E29 and E34; in `src/primitives.ts` E14 and E23
+    (E12 and E13 were current); in `src/runtime.ts` E22, E30 and E35;
+    in the suite E24 and E43.
+  - **C5, measured and set aside.** RR5 (a) was built: the switch in
+    `evaluate` named `PrimitiveFunction`, `ComposedFunction`, `Param`,
+    `Symbol` and `Expression`, and one `default:` arm returned the value
+    for Bits, Structure and any later kind; the IR's C158, C164, C165
+    and C151 were re-proposed as C173 to C177. The typecheck was clean
+    and every gate check passed, but outputs were not identical: 135 of
+    136 runs, the `inspect` of `tests/functions.alg` going from
+    `has-errors` to `proven-safe` with the `via_if` host-fault warning
+    gone. The cause is the sentinel of §2.5 finding 1: `evaluate` is
+    handed a `TailCall` sentinel, a host object with no `kind`, in 17
+    of the 68 programs, mostly in the loads of `lib/units.alg` and
+    `lib/planning.alg`. The old switch fell through to `undefined`; the
+    default arm returned the sentinel as if it were a value, so it is
+    not inert. Three options: (a) accept the changed `inspect` output;
+    (b) defer C5 until C2 lands under RR7 (a), after which no residual
+    holds a sentinel; (c) a default arm that keeps the fall-through for
+    a non-value. (b) is the default the PR proposes. C5's commit is
+    kept on branch `majodali/b172-c5-default-arm` and waits for the
+    maintainer's choice; the IR keeps C158, C164, C165 and C151 until
+    then.
+  - **A further observation.** At run time, `via_if(zzz)` (an
+    unresolved argument) throws the same host TypeError out of
+    `evalSource`, for the same reason. C2 removes the cause; the pin
+    above avoids the call.
+  - **Outputs** (§3 check 3), for the committed tree against its parent
+    `5cdd4b9`: 136 of 136 runs identical in stdout, stderr (stats lines
+    stripped) and exit code; two runs of the parent were identical too.
+  - **Oracle**, on the committed tree. The first filter selects this
+    module and stream P's tests by chunk: R1 (the measurement lands),
+    R2 (one object per definition) and R3 (the second precompile of a
+    top-level literal skipped).
+    - `bash scripts/typecheck.sh`: typecheck clean (9 TS6059
+      rootDir-convention diagnostics ignored).
+    - `ALLEGRO_TEST_FILTER="evaluator|R1 verdict pin|R2|R3" npm test`:
+      50 total, 50 passed, 0 failed.
+    - `ALLEGRO_TEST_FILTER="effects|refine|totality|file: " npm test`:
+      146 total, 146 passed, 0 failed.
+    - `npm run lint:load`: counts at or below baseline; 7 sources and 8
+      precompile sources.
+    - `npm run lint:units`: the unit DAG holds at its baseline
+      (discriminator 458, baseline 458).
+    - `npm run lint:planes`: the storage plane is reached only through
+      the accessor layer.
+    - `npm run lint:docs:check`: anchors 0, order 0, gate passed.
+    - `npm run lint:ir`: 5 files, clean.
+    - `npx tsx scripts/doc-ref-lint.ts`: all markdown doc references
+      resolve.
+    - `npx tsx scripts/analyze/lane-lint.ts --base origin/main`: lane D,
+      0 files outside (the activation commit's files listed with this
+      chunk's).
+    - `npm run test:shards`: 0 failed, gate passed.

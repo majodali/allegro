@@ -450,6 +450,29 @@ Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the
 per-chunk gate). Opened 2026-11-03 with the plan, draft until its PR
 merges; entries newest first, directly below this line.
 
+### 2026-11 — Both rules pinned and the RR1 experiment measured (B-172, chunk C1); the default arm measured and set aside (C5)
+
+B-172 (the partial-evaluation rules as implemented against the spine),
+chunk C1 of `docs/plans/pe-rules.md`, with no behaviour change. A new
+test module, `src/test/evaluator.ts`, pins both PE rules of
+`docs/book/concepts.md` §25 through `evalSource` and the stats sink: 8
+Rule 1 pins, 2 Rule 2 pins, 1 plain pin and 9 gap pins, which chunk C2
+(seven) and chunk C3 (two) flip under rulings RR2 (what "evaluates both
+branches" means for `eval_when`), RR3 (speculative evaluation and
+effects) and RR7 (a tail call inside a speculatively evaluated branch).
+The experiment for ruling RR1 (PE Rule 1: restate the spine, or change
+the code), behind a flag and never committed, residualised every
+composed call with an unresolved argument: one `inspect` output of 136
+runs changed, no verdict or `// expect:` line, seven suite tests failed,
+and two of the three results the plan's §2.3 credits to unfolding were
+lost. The evaluator IR's evidence is re-pointed to the current lines.
+Chunk C5 (the default arm, ruling RR5 (the default arm of `evaluate`)
+option (a)) was built but is set aside: its default arm returned a
+`TailCall` sentinel as a value, changing the `inspect` output of
+`tests/functions.alg`. Its commit waits on branch
+`majodali/b172-c5-default-arm` for the maintainer's choice. The record
+is the plan's §7.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
