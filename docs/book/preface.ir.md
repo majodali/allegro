@@ -19,7 +19,7 @@ T4. Open decision. A decision the project has not yet taken. anchor: #def-open-d
 
 T5. Unit. defined-at: units.md#def-unit [decided: D50]
 
-T6. Intermediate representation. defined-at: https://github.com/majodali/methodology/blob/v1.6.0/docs/vocabulary.md#def-intermediate-representation [decided: majodali/methodology docs/vocabulary.md, v1.6.0]
+T6. Intermediate representation. defined-at: https://github.com/majodali/methodology/blob/v1.6.0/docs/vocabulary.md#def-intermediate-representation [decided: the methodology vocabulary at v1.6.0]
 
 ## Claims
 
@@ -101,7 +101,7 @@ C31. An option's rationale may show how the option fails. [decided: owner, 2026-
 
 C32. The evidence of a failure is an experiment written for the book and included in the book. [decided: owner, 2026-11-03]
 
-C65. An experiment shows the failure on the code as the code stands. [proposed: this IR]
+C65. Any reader can run an experiment in the book again. [proposed: this IR]
 
 C33. Nothing in the book is drawn from the project's history. [decided: owner, 2026-11-03]
 
