@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1 paused after round 2, owing round 3; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
+Status: draft (count 1: round 3 not readable, owing round 4; ask A7 open; rulings of PR #157 applied 2026-11-03: A1 to A6 taken as recommended; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -27,7 +27,7 @@ T6. Intermediate representation. defined-at: https://github.com/majodali/methodo
 
 C1. The book is written for you: a working programmer who is curious about language design and new to Allegro's repository. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C71. The table of contents marks each chapter rewritten to this organization. evidence: E9 [decided: owner, 2026-11-03]
+C71. The table of contents marks each rewritten chapter. evidence: E9 reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
 C2. The principles of this preface also bind every author of the book, human or agent. [decided: owner, 2026-11-03]
 
@@ -43,7 +43,7 @@ C6. The code is organized so that you can branch the code to try another option 
 
 C7. Most chapters of the book do not yet follow the organization this preface describes. evidence: E1 [decided: owner, 2026-11-03]
 
-C8. The book is being rewritten to the organization of this preface one chapter at a time. evidence: E1 [decided: owner, 2026-11-03]
+C8. The chapters of the book are being rewritten one at a time. evidence: E1 reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
 ### Decisions in dependency order
 
@@ -55,11 +55,9 @@ C12. Among decisions that do not depend on each other, the more significant deci
 
 C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [decided: owner, 2026-11-03]
 
-C13. A tour will open the book, telling the story of the few large choices that define Allegro. reworded in count 1, rounds 1 and 2, C14 merged in. [decided: owner, 2026-11-03]
+C13. A tour, not yet written, will open the book by telling the story of the few large choices that define Allegro. evidence: E2 reworded in count 1, rounds 1 to 3, C14 and C9 merged in. [decided: owner, 2026-11-03]
 
 C70. Each choice in the tour will point forward to the choice's full treatment later in the book. split from C13 in count 1, round 2. [decided: owner, 2026-11-03]
-
-C9. The tour is not yet written. evidence: E2 [decided: owner, 2026-11-03]
 
 C15. After the tour, the book descends through the decisions in dependency order. [decided: owner, 2026-11-03]
 
@@ -93,13 +91,13 @@ C27. The as-implemented block points to the unit of code that holds the decision
 
 C28. The explore block says how to try another option in the code. [decided: owner, 2026-11-03]
 
-C30. A decision about the language's vision or aesthetics may need fewer blocks. [decided: owner, 2026-11-03]
+C30. Not every decision needs all seven blocks: a decision about the language's vision or aesthetics may need fewer. reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
 C31. The decision and rationale block may show how a rejected option fails. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
 C32. The evidence of such a failure is an experiment written into the book, one experiment you can run again yourself. reworded in count 1, round 1, C68 and C65 merged in. [decided: owner, 2026-11-03]
 
-C33. Nothing in the book is drawn from the project's history. [decided: owner, 2026-11-03]
+C33. Nothing in the book, evidence included, is drawn from the project's history. reworded in count 1, round 3. [decided: owner, 2026-11-03]
 
 ### Swappable and foundational decisions
 
@@ -165,7 +163,7 @@ C67. A name tells you what a decision is about without a lookup. [decided: owner
 
 C61. The numbers live in the intermediate representations and in the project's records, such as the project's decision register. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
-C58. The project's process, measurements, file maps and studies live outside the book's narrative, which keeps the narrative on the design and the reasons for the design. reworded in count 1, round 2, C66 merged in. [decided: owner, 2026-11-03]
+C58. The project's process, measurements, file maps and studies live outside the book's narrative, which keeps the narrative on the design and its reasons. reworded in count 1, rounds 2 and 3, C66 merged in. [decided: owner, 2026-11-03]
 
 ### Clusters
 
@@ -175,7 +173,7 @@ G3. cluster: C7, C8, C71, C2 [decided: owner, 2026-11-03]
 
 G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
 
-G5. cluster: C13, C70, C15, C9 [decided: owner, 2026-11-03]
+G5. cluster: C13, C70, C15 [decided: owner, 2026-11-03]
 
 G6. cluster: C16, C17, C18, C64 [decided: owner, 2026-11-03]
 
@@ -206,8 +204,6 @@ G19. cluster: C59, C60, C67, C61 [decided: owner, 2026-11-03]
 G18. cluster: C58 [decided: owner, 2026-11-03]
 
 ## Relations
-
-R1. C9 refines C13 because C13 states that a tour will open the book, where C9 states that the tour is not yet written.
 
 R2. C7 refines C4 because C4 states what the book presents, where C7 states how few chapters present the decisions in that organization today.
 
@@ -243,7 +239,7 @@ E9. `docs/reading-order.json` line 8 and the Preface row of `docs/book/README.md
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C9, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C9, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
+A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C46, C47, C48, C49, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C49, C52.
 
 A1 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the listed claims carry decided provenance from that date.
 
@@ -266,3 +262,5 @@ A5 resolved: taken as proposed at the merge of PR #157, 2026-11-03; the preface 
 A6. Decide whether the preface keeps the sentence on how the prose is written (C56), given that process detail stays outside the book (C58). Strangers flagged C56 in count 1 at round 1's confirmation, as a contradiction, and at round 2, as a lost thread. The round 2 stranger disputes holding the passage: the sentence gives no reason why a reader needs it, so the thread stays lost whatever the ruling. The options are therefore to keep C56 and add the reader's gain, or to cut C56. The passage stays unchanged until the ruling. Depends: C55, C58.
 
 A6 resolved: option (a) at the merge of PR #157, 2026-11-03; C56 cut from the IR and the prose, C55 kept.
+
+A7. Decide whether a decision about vision or aesthetics carries the swappable-or-foundational label. Options: (a) every decision section carries the label (C36 as it stands); (b) the label applies only to decisions with an implementation, and a vision or aesthetics decision carries none. Recommended: (b). Round 3 of count 1 found C36 in possible contradiction with C30, C34 and C35. The passage stays unchanged until the ruling. Depends: C30, C34, C35, C36.
