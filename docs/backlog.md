@@ -3390,8 +3390,17 @@ table and the stream plans.
   three with a "break it" block, here and at `demos/rung1/README.md:4`
   and `:21`. The book pass's chunk P1 (the decision inventory) waits for
   step 1.
-- [ ] **B-185** (third out-of-scope finding of the book pass) · T-docs ·
-  As B-183 (first out-of-scope finding of the book pass). Reserved
+- [ ] **B-185** (a sampled induction proof reported as discharged) ·
+  L2 · Filed 2026-11-04 by the book pass, from chunk P1's decision
+  inventory (`docs/plans/book-pass-inventory.md`, Open questions).
+  `prove_induction` checks the base case and four sampled steps
+  (`src/primitives.ts:4330`–`4377`) and returns a proof marked
+  discharged with no tier (`makeProof`, `src/types-std.ts:4681`). The
+  verdict's theorem record carries a tier only for equality-law backing
+  (`src/pcp.ts`), so a sampled induction is reported as discharged and
+  never reaches the assumption ledger, against the decision that every
+  claim states its discharge strength. Worked by the orchestrating
+  session; the book pass only filed it. Reserved
   2026-11-03 at the review session's request, with B-186 (fourth
   out-of-scope finding of the book pass), once chunk F1 had used the
   first two.

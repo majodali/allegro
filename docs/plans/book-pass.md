@@ -850,6 +850,20 @@ maintainer merged PR #161 and ruled its two open asks by message:
   tour) open. The preface: 66 claims, 976 words. P1's research ran
   beside it: three fragments (97, 95 and 92 entries), being merged in
   the scratchpad until this PR merges.
+- **2026-11-04 — P1, the decision inventory; the preface finished**
+  (the review session). R21 and R22 recorded in §6. The preface: the
+  tour cut, the aim sentence ruled. `docs/plans/book-pass-inventory.md`:
+  256 decisions (significance 5: 10, 4: 51, 3: 100, 2: 83, 1: 12;
+  foundational 100, swappable 156; settled 177, partly built 42, open
+  37), merged from three fragments, ordered by dependency with
+  significance breaking ties; a proposed table of contents of six parts
+  and thirty-three chapters after the preface and the tour; today's
+  chapters mapped; the pilot recommended as planned. B-185 (a sampled
+  induction proof reported as discharged) filed. PR #161 merged before
+  its last four commits; this PR carries them. Stream D closed
+  (PR #162), so the evaluator chapter and the spine's §25 are no longer
+  waiting (§2.4). From this PR on, each PR has its own branch, at the
+  maintainer's request: the repository deletes a head branch on merge.
 
 ## 8. Sessions
 
