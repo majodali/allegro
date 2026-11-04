@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's preface: how the book is organized and why, the invitation to follow each decision and try an alternative in code organized to match, and the principles that bind every author of the book.
-Status: draft (count 1 closed at round 5: not readable; meta-review in docs/book/preface.review.md; asks A8 and A9 open; ask A7 ruled 2026-11-03; rulings of PR #157 applied 2026-11-03; unratified terms 0)
+Status: draft (count 1 closed at round 5: not readable; meta-review in docs/book/preface.review.md; all asks ruled, A8 and A9 on 2026-11-04 after the merge of PR #161; no further rounds now, by the owner's direction of 2026-11-04; unratified terms 0)
 Source: chunk P0 of docs/plans/book-pass.md (the book pass, B-174); the organizing principles of its §2.6 and the rulings R10 to R16 of its §6, taken 2026-11-03; docs/book/units.md for the code as organized
 Normative: yes
 Footprint: docs/book/preface.md; docs/reading-order.json; docs/book/README.md; docs/book-changes.md; docs/documentation-census.md
@@ -41,8 +41,6 @@ C5. You are invited into the design of Allegro, which is still under way. reword
 
 C6. The code is organized so that you can branch the code to try another option for a decision, as the explore block of each decision section shows. reworded in count 1, round 5. [decided: owner, 2026-11-03]
 
-C7. The tour that opens the book is not yet written. evidence: E2 split in count 1, round 5. [decided: owner, 2026-11-03]
-
 C78. Most chapters do not yet follow the organization this preface describes. evidence: E1 split from C7 in count 1, round 5. [decided: owner, 2026-11-03]
 
 C8. The chapters of the book are being rewritten to this organization one at a time. evidence: E1 reworded in count 1, round 3 and its confirmation. [decided: owner, 2026-11-03]
@@ -56,10 +54,6 @@ C11. Everything a decision rests on is therefore explained before the decision i
 C12. Among decisions that do not depend on each other, the more significant decision comes first. [decided: owner, 2026-11-03]
 
 C62. The decisions that shape most of Allegro arrive as early as their dependencies allow. [decided: owner, 2026-11-03]
-
-C13. The book opens with a tour of the few large choices that define Allegro, each choice pointing forward to its full treatment. restructured at round 4's confirmation, C9, C14 and C70 merged in. [decided: owner, 2026-11-03]
-
-C77. After the tour, the book descends through the decisions in dependency order. the cut C15 reinstated at round 4's confirmation. [decided: owner, 2026-11-03]
 
 C16. A concept is defined where the book first uses the concept or where the book settles the concept's meaning. reworded in count 1, round 1. [decided: owner, 2026-11-03]
 
@@ -157,7 +151,7 @@ C53. The form for people is prose, like this preface. [decided: owner, 2026-11-0
 
 C54. The prose keeps every claim of the intermediate representation. [decided: owner, 2026-11-03]
 
-C55. The prose aims to be clear and brief enough to hold your interest. reworded in count 1, round 1. [decided: owner, 2026-11-03]
+C55. The prose aims to be clear, brief and engaging. reworded at the ruling on A8. [decided: owner, 2026-11-04]
 
 ### Tracking numbers and process detail stay outside the book
 
@@ -177,11 +171,9 @@ C73. That separation keeps the narrative on the design and its reasons. split fr
 
 G2. cluster: C3, C1, C4, C5, C6 [decided: owner, 2026-11-03]
 
-G3. cluster: C7, C78, C8, C71, C2 [decided: owner, 2026-11-03]
+G3. cluster: C78, C8, C71, C2 [decided: owner, 2026-11-03]
 
 G4. cluster: C10, C11, C12, C62 [decided: owner, 2026-11-03]
-
-G5. cluster: C13, C77 [decided: owner, 2026-11-03]
 
 G6. cluster: C16, C17, C18, C64 [decided: owner, 2026-11-03]
 
@@ -213,7 +205,7 @@ G18. cluster: C58, C73 [decided: owner, 2026-11-03]
 
 ## Relations
 
-R2. C7 refines C4 because C4 states what the book presents, where C7 states how few chapters present the decisions in that organization today.
+R2. C78 refines C4 because C4 states what the book presents, where C78 states how few chapters present the decisions in that organization today.
 
 R3. C37 depends-on C34 because the cost of an alternative follows from whether trying the alternative replaces one unit, which C34 and C35 distinguish.
 
@@ -229,8 +221,6 @@ R7. C64 depends-on C16 because a concept defined at its first use is never met b
 
 E1. `docs/plans/book-pass.md` lines 59–60 and 409–411: the present chapters of the reading order are all still to be reviewed and rewritten, and chunk P2 rewrites the first pilot chapter to the principles.
 
-E2. `docs/reading-order.json` lines 15–17: the first chapters after the preface are the introduction, a getting-started guide and a language reference, none of them the tour.
-
 E3. `docs/book/units.md` lines 83–94: a unit holds one decision or one cohesive group of decisions, and can be replaced by another unit with the same interface.
 
 E4. `scripts/analyze/units.json` lines 3–19: the manifest of units, each with its layer and its permitted dependencies, opening with the L0 units.
@@ -245,7 +235,7 @@ E9. `docs/reading-order.json` line 8 and the Preface row of `docs/book/README.md
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C7, C8, C46, C47, C48, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C7, C8, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C52.
+A1. Ratify in bulk the proposed claims: the claims about the book and the code as they stand (C78, C8, C46, C47, C48, C52), the reasons given for the principles (C11, C62, C64, C67), the claim on process detail with its reason (C58), the definitions (C19, C34, C35, C38) and the merged claim on experiments (C32) and the descriptions of the seven blocks (C22, C23, C24, C25, C26, C27, C28). Depends: C78, C8, C11, C62, C64, C32, C58, C67, C19, C22, C23, C24, C25, C26, C27, C28, C34, C35, C38, C46, C47, C48, C52.
 
 A1 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the listed claims carry decided provenance from that date.
 
@@ -253,7 +243,7 @@ A2. Ratify or strike the proposed terms decision section (T1), swappable decisio
 
 A2 resolved: ratified by the owner at the merge of PR #157, 2026-11-03 (defaults); the four terms carry decided provenance, and the preface is their definition site.
 
-A3. Decide how a reader tells a chapter rewritten to this organization from one not yet rewritten. Proposed: each rewritten chapter's entry in `docs/reading-order.json` carries `"organized": true`, and the table of contents in `docs/book/README.md` marks the chapter. The preface then gains one claim saying that the table of contents marks each rewritten chapter. Depends: C7, C8.
+A3. Decide how a reader tells a chapter rewritten to this organization from one not yet rewritten. Proposed: each rewritten chapter's entry in `docs/reading-order.json` carries `"organized": true`, and the table of contents in `docs/book/README.md` marks the chapter. The preface then gains one claim saying that the table of contents marks each rewritten chapter. Depends: C78, C8.
 
 A3 resolved: taken as proposed at the merge of PR #157, 2026-11-03; claim C71 added, the preface's reading-order entry and table-of-contents row marked.
 
@@ -275,4 +265,8 @@ A7 resolved: option (a) with a correction, ruled by the owner on PR #161, 2026-1
 
 A8. Decide whether the aim sentence C55 keeps "enough to hold your interest" (the owner asked for an engaging book) or cuts it to "The prose aims to be clear and brief." Strangers flagged the phrase as excess in rounds 2, 3 and 4 of count 1, and round 4's stranger disputed the decline at confirmation. The passage stays unchanged until the ruling. Depends: C55.
 
-A9. Decide the tour's place in the preface. The tour passage (C7, C13, C77) drew findings in all five rounds of count 1, under every structure tried. Options: (a) cut the tour from the preface until the tour is written; principle 4 stays in the plan, and the preface gains the tour's description when the tour exists; (b) keep the passage as it stands, with "will open" in C13; (c) the owner words the passage. Recommended: (a). The passage stays unchanged until the ruling. Depends: C7, C13, C77.
+A8 resolved: ruled by the owner on 2026-11-04, after the merge of PR #161: C55 reads "The prose aims to be clear, brief and engaging."
+
+A9. Decide the tour's place in the preface. The tour passage (C7, C13 and C77, all three cut at the ruling) drew findings in all five rounds of count 1, under every structure tried. Options: (a) cut the tour from the preface until the tour is written; principle 4 stays in the plan, and the preface gains the tour's description when the tour exists; (b) keep the passage as it stands, with "will open" in; (c) the owner words the passage. Recommended: (a). The passage stays unchanged until the ruling. Depends: C78.
+
+A9 resolved: option (a), ruled by the owner on 2026-11-04, after the merge of PR #161: "leave the tour out of the preface until it's written." C7, C13 and C77, cluster G5 and evidence E2 cut; C78 keeps the chapters' status.

@@ -502,3 +502,25 @@ second and fourth, all three firing).
 Count 1 closed at round 5 without a readable verdict. The maintainer's
 reading is the test of human readability (ruling R14 (the human reader)
 of `docs/plans/book-pass.md`). Asks A8 and A9 are open.
+
+## Rulings taken, 2026-11-04, after the merge of PR #161
+
+- A9, option (a). The maintainer: "leave the tour out of the preface
+  until it's written." Applied IR first: C7 (the tour's status), C13
+  (the tour as the book's opening) and C77 (the descent after the tour)
+  cut, with cluster G5 and evidence E2. C78 keeps the chapters' status:
+  "Most chapters do not yet follow the organization this preface
+  describes." Relation R2 re-pointed to C78. The tour findings of
+  rounds 1, 3, 4 and 5 are resolved by the cut.
+- A8. C55 reads "The prose aims to be clear, brief and engaging."
+  (decided: owner, 2026-11-04). Finding 3 of round 5 and its recurrences
+  are resolved by the ruling.
+
+The maintainer's direction, in the same message, verbatim: "The preface
+will do for now. At this stage we are making sure the logical structure
+of the book holds and the content is correct - we'll work on making it
+brief, clear and engaging later."
+
+The count stays closed; no further rounds run now. Every ask of the IR
+is ruled. After the rulings: 63 claims, the render map covering all 63,
+unratified terms 0.
