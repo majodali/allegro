@@ -19,7 +19,7 @@ boundary:
   - docs/records/book-pass/**
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
-  - docs/plans/book-pass-inventory.*
+  - docs/plans/book-pass-inventory.md
   - scripts/doc-lint-baseline.json
 ---
 
@@ -363,7 +363,7 @@ five:
 - `docs/reading-order.json`, `docs/documentation-census.md`.
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
-- `book-pass-inventory.md` under `docs/plans/`: the decision inventory, chunk
+- `docs/plans/book-pass-inventory.md`: the decision inventory, chunk
   P1 (the decision inventory). Lane A's globs do not hold it yet; the
   lane-S PR of B-184 (the root README's corrections) widens them.
 - This plan.
@@ -729,7 +729,7 @@ R-F1-8 included. Two further rulings, the same day:
 - **R15 — Where the decision inventory lives.** Options: (a) a working
   file under `docs/plans/`, beside the briefs; (b) an IR in the book,
   `decision-map.ir.md` under `docs/book/`. Taken: (a),
-  `book-pass-inventory.md` under `docs/plans/`. Project working material stays
+  `docs/plans/book-pass-inventory.md`. Project working material stays
   out of the book.
 - **R16 — The phrasing patterns.** The list of principle 8 in §2.6: the
   maintainer's two structural patterns first, uninformative headings and
@@ -754,6 +754,24 @@ took every recommendation of the preface's PR:
 - **R20 — Spare ids.** The maintainer or the orchestrating session picks
   the stream's next two spare backlog ids; the review session does not
   number them. Open until the numbers are given.
+
+**Rulings taken 2026-11-04, after the merge of PR #161.** The
+maintainer merged PR #161 and ruled its two open asks by message:
+
+- **R21 — The preface's last two passages.** The tour leaves the preface
+  until it is written (the IR's ask A9). The aim sentence reads "The
+  prose aims to be clear, brief and engaging." (A8).
+- **R22 — Structure and correctness first.** The maintainer's words: "At
+  this stage we are making sure the logical structure of the book holds
+  and the content is correct - we'll work on making it brief, clear and
+  engaging later." Reading of it, put to the maintainer at chunk P1's
+  PR: a chapter's review and edit check the order of its decisions, its
+  definitions and links, and its claims against the code; the IR is
+  still written first. Stranger-round counts for readability, ruling R5
+  (when a stranger-round count runs), are deferred to a later pass that
+  works on brevity, clarity and tone. The preface's count stays closed.
+- **Practice.** Rulings are given in PR comments before a merge, so the
+  rulings commit lands in the same PR.
 
 ## 7. Record
 
@@ -792,7 +810,7 @@ took every recommendation of the preface's PR:
   R-F1-5 and R-F1-1. **For the orchestrating session:** B-184 is a
   lane-S PR. It lands README's fixes and widens two globs: lane S by
   `README.md` and `demos/rung1/README.md`, lane A by
-  `book-pass-inventory.md` under `docs/plans/`. Chunk P1 waits for that widening.
+  `docs/plans/book-pass-inventory.md`. Chunk P1 waits for that widening.
   R15 and R16 recorded in §6; the pattern list in §2.6.
 - **2026-11-03 — P0, the preface, written; count paused** (the review
   session). `docs/book/preface.ir.md` first, then `docs/book/preface.md`
