@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
+chunks: [P0, P1, P1b, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
 reserves: [B-183, B-184, B-185, B-186]
 boundary:
   - docs/book/**
@@ -19,7 +19,7 @@ boundary:
   - docs/records/book-pass/**
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
-  - docs/plans/book-pass-inventory.*
+  - docs/plans/book-pass-inventory.md
   - scripts/doc-lint-baseline.json
 ---
 
@@ -363,7 +363,7 @@ five:
 - `docs/reading-order.json`, `docs/documentation-census.md`.
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
-- `book-pass-inventory.md` under `docs/plans/`: the decision inventory, chunk
+- `docs/plans/book-pass-inventory.md`: the decision inventory, chunk
   P1 (the decision inventory). Lane A's globs do not hold it yet; the
   lane-S PR of B-184 (the root README's corrections) widens them.
 - This plan.
@@ -409,6 +409,12 @@ further chapter, each one PR, human-gated:
   rank and its swappability. P1 proposes the book's new table of
   contents from it, chapter names included. It must give any chapter
   the context it needs.
+- **P1b (the decision types).** Each inventory entry gains its type,
+  capability or implementation (R29), and every dependency is checked
+  against the rule that no capability decision depends on an
+  implementation decision. Cycles and mutual capability dependencies
+  are resolved by restating, as R29 says. The chunk also proposes how
+  R28's per-decision code changes are made.
 - **P2 (the pilot chapter).** One chapter rewritten to the principles,
   `docs/book/allegretto/metadata-and-capability.md` unless P1's table of
   contents proposes another. The maintainer's reading is its test. The
@@ -729,7 +735,7 @@ R-F1-8 included. Two further rulings, the same day:
 - **R15 — Where the decision inventory lives.** Options: (a) a working
   file under `docs/plans/`, beside the briefs; (b) an IR in the book,
   `decision-map.ir.md` under `docs/book/`. Taken: (a),
-  `book-pass-inventory.md` under `docs/plans/`. Project working material stays
+  `docs/plans/book-pass-inventory.md`. Project working material stays
   out of the book.
 - **R16 — The phrasing patterns.** The list of principle 8 in §2.6: the
   maintainer's two structural patterns first, uninformative headings and
@@ -754,6 +760,68 @@ took every recommendation of the preface's PR:
 - **R20 — Spare ids.** The maintainer or the orchestrating session picks
   the stream's next two spare backlog ids; the review session does not
   number them. Open until the numbers are given.
+
+**Rulings taken 2026-11-04, after the merge of PR #161.** The
+maintainer merged PR #161 and ruled its two open asks by message:
+
+- **R21 — The preface's last two passages.** The tour leaves the preface
+  until it is written (the IR's ask A9). The aim sentence reads "The
+  prose aims to be clear, brief and engaging." (A8).
+- **R22 — Structure and correctness first.** The maintainer's words: "At
+  this stage we are making sure the logical structure of the book holds
+  and the content is correct - we'll work on making it brief, clear and
+  engaging later." Reading of it, put to the maintainer at chunk P1's
+  PR: a chapter's review and edit check the order of its decisions, its
+  definitions and links, and its claims against the code; the IR is
+  still written first. Stranger-round counts for readability, ruling R5
+  (when a stranger-round count runs), are deferred to a later pass that
+  works on brevity, clarity and tone. The preface's count stays closed.
+- **Practice.** Rulings are given in PR comments before a merge, so the
+  rulings commit lands in the same PR.
+
+**Rulings taken 2026-11-05, on PR #163.** The maintainer answered the
+PR's six asks in a comment, and added two rules:
+
+- **R23 — The contents and the tour.** The proposed contents have the
+  right shape and are working placeholders. The tour becomes a
+  significant conceptual journey: the shape of Allegro (a minimal
+  kernel, extension, the type philosophy, maximal domains, and Allegro
+  in use: execution, tooling, pipelines), with reasoning that
+  establishes the kernel's requirements and features, prefiguring the
+  later chapters. It likely concludes with the ten choices or similar
+  ones. "The bet" is a placeholder, incomplete; more detail comes in
+  discussion. The maintainer's motivations for Allegro, given in the
+  review session the same day, are recorded in
+  `docs/plans/book-pass-inventory.md` for the tour.
+- **R24 — The pilot.** "Metadata and the capability to write it".
+- **R25 — Chapters leaving the book.** As proposed. Units and layers are
+  discussed early as architectural principles, in appendices.
+- **R26 — R22 (structure and correctness first) read correctly.**
+- **R27 — Conflicts between sources** are settled as the pass reaches
+  each decision. Two rulings now: the parser algorithm stays swappable,
+  except that ordered choice must not be required; and a new decision,
+  that every language extension, grammar extensions and definitions
+  included, is declarative, so definition order carries no meaning.
+  The shipped ordered choice is an expedient, to be replaced by GLL or a
+  similar algorithm. `eval_when` and PE Rule 2 need careful review; their
+  decisions may change to make them coherent.
+- **R28 — The monotonic pass.** Every decision is worked through in
+  order and analysed. Any may change, be removed, or gain new
+  neighbours, and the resulting code and test changes are made. Once a
+  decision is approved and its code changes made, every decision up to
+  it, and the code stemming from them, is final and correct. A point of
+  non-monotonicity is a process failure: the pass goes back, reorders
+  or revises, and repeats until the list is fully ordered and monotonic.
+- **R29 — Capability and implementation decisions.** Each decision is
+  about language capability or about implementation. No capability
+  decision may depend on an implementation decision. Capability
+  decisions that necessarily depend on each other are stated as one.
+
+**What R28 changes in this plan.** The unit of work becomes a decision,
+taken in inventory order, and a decision's code changes are part of
+its approval. This stream edits documents only (§4), so how code
+changes are made per decision is an open question, put to the
+maintainer with chunk P1b (the decision types).
 
 ## 7. Record
 
@@ -792,7 +860,7 @@ took every recommendation of the preface's PR:
   R-F1-5 and R-F1-1. **For the orchestrating session:** B-184 is a
   lane-S PR. It lands README's fixes and widens two globs: lane S by
   `README.md` and `demos/rung1/README.md`, lane A by
-  `book-pass-inventory.md` under `docs/plans/`. Chunk P1 waits for that widening.
+  `docs/plans/book-pass-inventory.md`. Chunk P1 waits for that widening.
   R15 and R16 recorded in §6; the pattern list in §2.6.
 - **2026-11-03 — P0, the preface, written; count paused** (the review
   session). `docs/book/preface.ir.md` first, then `docs/book/preface.md`
@@ -820,6 +888,38 @@ took every recommendation of the preface's PR:
   waits for B-184's lane widening. R20 open: the stream has no spare id.
   Lints: `lint:docs:check` anchors 0 · order 0 · ids 784; `lint:ir` 6
   files clean, unratified terms 0; `doc-ref-lint` all resolve.
+- **2026-11-03 — the label ruled; count 1 closed at round 5** (the
+  review session). The maintainer ruled the IR's ask A7 on PR #161:
+  every decision section carries the label, "aesthetic" names the
+  rationale, and the label depends on what rests on the decision.
+  Rounds 4 and 5: 6 then 11 findings (6.0, then 10.8 per 1,000 words).
+  The count closed at round 5 on its meta-review: the curve rose, the
+  tour passage drew findings in five rounds under every structure, and
+  strangers contradicted each other. The maintainer's reading is the
+  test (R14 (the human reader)). Asks A8 (the aim sentence) and A9 (the
+  tour) open. The preface: 66 claims, 976 words. P1's research ran
+  beside it: three fragments (97, 95 and 92 entries), being merged in
+  the scratchpad until this PR merges.
+- **2026-11-04 — P1, the decision inventory; the preface finished**
+  (the review session). R21 and R22 recorded in §6. The preface: the
+  tour cut, the aim sentence ruled. `docs/plans/book-pass-inventory.md`:
+  256 decisions (significance 5: 10, 4: 51, 3: 100, 2: 83, 1: 12;
+  foundational 100, swappable 156; settled 177, partly built 42, open
+  37), merged from three fragments, ordered by dependency with
+  significance breaking ties; a proposed table of contents of six parts
+  and thirty-three chapters after the preface and the tour; today's
+  chapters mapped; the pilot recommended as planned. B-185 (a sampled
+  induction proof reported as discharged) filed. PR #161 merged before
+  its last four commits; this PR carries them. Stream D closed
+  (PR #162), so the evaluator chapter and the spine's §25 are no longer
+  waiting (§2.4). From this PR on, each PR has its own branch, at the
+  maintainer's request: the repository deletes a head branch on merge.
+- **2026-11-05 — P1's rulings** (the review session). R23 to R29
+  recorded in §6, from the maintainer's comment on PR #163. The
+  inventory gains its rulings section, the maintainer's motivations
+  mapped to the ten choices for the tour, and one decision (language
+  extensions are declarative): 257 decisions. Chunk P1b (the decision
+  types) added before the pilot.
 
 ## 8. Sessions
 

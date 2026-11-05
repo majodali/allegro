@@ -8,28 +8,25 @@ new to Allegro's repository. The book aims to present every design and
 implementation decision of Allegro with the options it weighed and the
 rationale for the option taken. You are invited into the design of
 Allegro, which is still under way. The code is organized so that you can branch it to
-try another option for a decision.
+try another option for a decision, as the explore block of each
+[decision section](#def-decision-section) shows.
 
-Most chapters do not yet follow the organization this preface describes.
-The chapters are being rewritten to this organization one at a time. The
-[table of contents](README.md) marks each rewritten chapter. The principles of this preface also bind every author of the book, human
-or agent.
+Most chapters do not yet
+follow the organization this preface describes. The chapters are
+being rewritten to this organization one at a time. The
+[table of contents](README.md) marks each rewritten chapter. The
+principles of this preface also bind every author of the book, human or
+agent.
 
 ## Decisions in dependency order
 
-The first rule is dependency order: a decision comes after the decisions
+Decisions come in dependency order: a decision comes after the decisions
 it builds on. Everything a decision rests on is therefore explained
 before the decision itself. Among decisions that do not depend on each
 other, the more significant one comes first. The decisions that shape
 most of Allegro arrive as early as their dependencies allow.
 
-A tour, not yet written, will open the book by telling the story of the
-few large choices that define Allegro. Each choice in the tour will
-point forward to its full treatment later in the book. After the tour,
-the book descends through the decisions in dependency order.
-
-A concept is defined where the book
-first uses it, or where the book settles its meaning. The book marks
+A concept is defined where the book first uses it, or where the book settles its meaning. The book marks
 each concept at its definition. Every other chapter links its first use
 of a concept back to that definition. A concept never appears before its
 meaning.
@@ -72,20 +69,20 @@ depend on it. Each [decision section](#def-decision-section) labels its
 decision swappable or foundational. The label depends only on what other
 decisions rest on the decision, whatever its rationale. Choosing an
 offside-rule grammar, where indentation marks block ends, for aesthetic
-reasons would likely be a swappable decision, whereas choosing purely
-functional semantics for aesthetic reasons would be a foundational one.
+reasons would likely be a swappable decision. Choosing purely functional
+semantics for aesthetic reasons would be a foundational one.
 That label tells you what an alternative costs before you branch the
 code.
 
-## Open decisions as invitations
+## Open decisions
 
 An <a id="def-open-decision"></a>**open decision** is a decision the
 project has not yet taken. Every open decision in the book takes one
 shared form. The section of an open decision takes the seven blocks of a
 decision section, with the question still open in place of the decision
 and rationale. Each open decision invites you to contribute an
-alternative. The explore block of an open decision says how and where
-to contribute one.
+alternative. The explore block says how and where to contribute
+one.
 
 ## The code organized to match the book
 
@@ -101,20 +98,19 @@ project's test suite fails when a change adds an import that the order
 of the units forbids.
 
 Some source files still hold the decisions of several units.
-Such a file is split when its code is next changed for another reason.
 
 ## Prose for people, an intermediate representation for agents
 
 Each chapter of the book has two forms, one for software agents and one
 for people. The form for agents is an
-[intermediate representation](https://github.com/majodali/methodology/blob/v1.6.0/docs/vocabulary.md#def-intermediate-representation):
-a numbered list of claims, each claim a single statement with its
+[intermediate representation](https://github.com/majodali/methodology/blob/v1.6.0/docs/vocabulary.md#def-intermediate-representation),
+a numbered list of claims. Each claim is a single statement with its
 evidence and pointers into the code. A
 chapter's intermediate representation sits beside its prose, in a file
 whose name ends in `.ir.md`. The form for people is prose, like this
 preface. The prose keeps every claim of the intermediate representation.
 
-The prose aims to be clear and brief enough to hold your interest.
+The prose aims to be clear, brief and engaging.
 
 ## Tracking numbers and process detail stay outside the book
 
@@ -129,4 +125,4 @@ The project's process, measurements, file maps and studies live outside
 the book's narrative. That separation keeps the narrative on the design
 and its reasons.
 
-<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C7→¶2 C8→¶2 C71→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C13→¶4 C70→¶4 C15→¶4 C16→¶5 C17→¶5 C18→¶5 C64→¶5 C19→¶6 C20→¶6 C21→¶6 C22→¶7 C23→¶7 C24→¶7 C25→¶7 C26→¶7 C27→¶7 C28→¶7 C30→¶8 C31→¶9 C32→¶9 C33→¶9 C34→¶10 C35→¶10 C36→¶10 C74→¶10 C75→¶10 C37→¶10 C38→¶11 C39→¶11 C72→¶11 C40→¶11 C41→¶11 C43→¶12 C44→¶13 C45→¶13 C69→¶13 C46→¶13 C47→¶13 C48→¶14 C49→¶14 C50→¶15 C51→¶15 C52→¶15 C53→¶15 C54→¶15 C55→¶16 C59→¶17 C60→¶17 C67→¶17 C61→¶17 C58→¶18 C73→¶18 -->
+<!-- render map: C3→¶1 C1→¶1 C4→¶1 C5→¶1 C6→¶1 C78→¶2 C8→¶2 C71→¶2 C2→¶2 C10→¶3 C11→¶3 C12→¶3 C62→¶3 C16→¶4 C17→¶4 C18→¶4 C64→¶4 C19→¶5 C20→¶5 C21→¶5 C22→¶6 C23→¶6 C24→¶6 C25→¶6 C26→¶6 C27→¶6 C28→¶6 C30→¶7 C31→¶8 C32→¶8 C33→¶8 C34→¶9 C35→¶9 C36→¶9 C74→¶9 C75→¶9 C76→¶9 C37→¶9 C38→¶10 C39→¶10 C72→¶10 C40→¶10 C41→¶10 C43→¶11 C44→¶12 C45→¶12 C69→¶12 C46→¶12 C47→¶12 C48→¶13 C50→¶14 C51→¶14 C79→¶14 C52→¶14 C53→¶14 C54→¶14 C55→¶15 C59→¶16 C60→¶16 C67→¶16 C61→¶16 C58→¶17 C73→¶17 -->

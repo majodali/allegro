@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-04 — the decision inventory, and the preface finished.**
+  `docs/plans/book-pass-inventory.md` lists 256 decisions of Allegro in
+  book order, with a proposed table of contents of six parts and
+  thirty-three chapters after the preface and the tour, and maps
+  today's chapters onto it. The preface drops the tour until it is
+  written, and its aim sentence reads "clear, brief and engaging". The
+  plan records that structure and correctness come first and polish
+  later. B-185 (a sampled induction proof reported as discharged)
+  filed. Ids 784.
+
 - **2026-11-03 — the preface's rulings applied, and round 3.** The
   maintainer's rulings at the merge of PR #157, recorded in
   `docs/plans/book-pass.md` §6 (the preface's asks, the two finding
@@ -586,6 +596,12 @@ name.
   maintainer (whether a vision or aesthetics decision carries the
   swappable-or-foundational label). The briefs' part (c) gains the rule
   that claims a reader takes as one idea are merged in the IR. Ids 784.
+  Then, the same day: the maintainer's ruling on the label (every
+  decision carries it; "aesthetic" names a rationale; the label depends
+  on what rests on the decision) applied with two illustrations; rounds
+  4 and 5 (6 and 11 findings); count 1 closed at round 5 without a
+  readable verdict, on a meta-review in `docs/book/preface.review.md`.
+  Two passages wait for the maintainer: the aim sentence and the tour.
 
 - **2026-11-03 — the re-scope, and the preface.** The book pass now
   writes the book for human readers too: the re-scope rulings of
