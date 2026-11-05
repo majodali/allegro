@@ -301,6 +301,54 @@ merges, this list is their text.
 12. **The code matches the book.** A decision lives in one unit where it
     can, so a reader can branch the code and try another design.
 
+### 2.7 The monotonic pass: how a decision is taken (proposed)
+
+Proposed at the PR of chunk P1b (the decision types), under R28 (the monotonic pass), R29
+(capability and implementation decisions) and R30 (who makes a
+decision's code changes). Until the maintainer rules, §3, §4 and §8 read
+as written.
+
+1. **One PR per chapter of the inventory's contents.** Its decisions are
+   taken in inventory order. The PR opens with the chapter review (the
+   decisions as they stand, against the code; the changes proposed, each
+   a ruling). The maintainer rules each decision in PR comments. The PR
+   then carries, per decision in order: the decision's text in the
+   chapter's IR and prose, and its code and test changes. A decision
+   whose code change is large gets a PR of its own, in the same order.
+   A chapter is approved, and final under R28, when its PR merges.
+2. **Code changes are a decision's own.** A change implements the
+   decision as ruled and nothing else. A change that a later decision
+   needs waits for that decision. A finding about an earlier, approved
+   decision is a non-monotonicity: the pass stops, reports it, and goes
+   back as R28 says.
+3. **The lane.** Lane A holds no code, and the lane check
+   (`scripts/analyze/lane-lint.ts`) accepts one lane per PR, narrowed by
+   the plan's `boundary`. Options: (a) a new lane for this pass whose
+   globs cover the book's files and the code (`src/**`, `lib/**`,
+   `tests/**`, `demos/**`), with this plan's `boundary` widened per
+   chapter to that chapter's documents and unit files, as B-104 (retire
+   the dunder convention) widens its boundary per chunk; (b) lane A's
+   globs widened to the code; (c) two PRs per decision, documents in
+   lane A and code in the code's lane under a companion plan.
+   Recommended: (a). (b) makes lane A overlap every lane; (c) splits a
+   decision from its code, which R28 forbids. The lane is a lane-S
+   change to `scripts/analyze/lanes.json` and the lane table, made by
+   the orchestrating session.
+4. **Coordination.** A chapter's PR touches only files no other active
+   stream holds (stop condition 5 of §3). A chapter whose files another
+   stream holds waits, as a waiting chunk does. The orchestrating
+   session's streams in the same files wait for the chapter's PR in
+   turn; the lane table states the rule.
+5. **The oracle widens** with the code: `bash scripts/typecheck.sh`,
+   the full suite (`npm run test:shards`), `npm run lint:planes`,
+   `npm run lint:units` and `npm run lint:load`, beside the doc lints.
+   Every `// expect:` pin moves only by a decision that changes it,
+   named in the PR. Ratchet baselines fall only in their own commit
+   (B-164 (ratchet baselines under concurrent merges)).
+6. **Tidy-ups.** B-182 (unit tidy-ups from the book pass) stays for
+   changes no decision needs; a decision's own code change never goes
+   there.
+
 ## 3. Oracle and stop conditions
 
 **What decides a chunk.** Each command in the header, run on the branch
@@ -819,9 +867,16 @@ PR's six asks in a comment, and added two rules:
 
 **What R28 changes in this plan.** The unit of work becomes a decision,
 taken in inventory order, and a decision's code changes are part of
-its approval. This stream edits documents only (§4), so how code
-changes are made per decision is an open question, put to the
-maintainer with chunk P1b (the decision types).
+its approval.
+
+**Ruling taken 2026-11-05, after PR #163's merge.**
+
+- **R30 — Who makes a decision's code changes.** Options: (a) this
+  stream, per decision, its boundary widened to the decision's files;
+  (b) the orchestrating session, as a chunk through a hand-off item,
+  the next decision waiting for its merge; (c) one session runs both.
+  Taken: (a). The mechanics are proposed in §2.7 and put to the
+  maintainer at chunk P1b's PR.
 
 ## 7. Record
 
