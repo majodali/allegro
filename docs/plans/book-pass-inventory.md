@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 256 decisions. By significance: 5: 10, 4: 51, 3: 100, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 177, partly built 42, open 37. Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03.
+> Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"). By significance: 5: 10, 4: 51, 3: 100, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 177, partly built 42, open 37. Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -133,6 +133,47 @@ The order binds by dependency: every decision comes after the decisions it depen
    - Draws on: [vision.md](../book/vision.md) §6, [platform/README.md](../book/platform/README.md) undelivered tracks.
 
 **The recommended pilot.** The plan names `metadata-and-capability.md` as the pilot. That chapter becomes chapter 7 of these contents, "Metadata and the capability to write it", with its propagation sections moving to chapter 8 and its install section to chapter 10. Chapter 7 is the recommended pilot. Of its thirteen decisions, eleven are settled and two partly built (the metadata slot as a mixin, and the fixed propagation vocabulary, whose `positional` rule has no path); none is open, so the review rules on presentation rather than on open design. It sits early, after only the thesis and three short kernel chapters, so the concepts it needs (value, kind, structure, immutability) come from chapters the pilot's author can point to without rewriting them. It holds both labels (foundational channels and origination; swappable registration and denial details), so the swappable and foundational marks get tested. Its present text is one chapter already organized by unit, which keeps the rewrite to one source file.
+
+## Rulings on the inventory, 2026-11-05
+
+The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pass.md](book-pass.md) §6, "Rulings taken 2026-11-05", as the record:
+
+- **The contents have the right shape.** They are working placeholders. The tour becomes a significant conceptual journey: it lays out the shape of Allegro (a minimal kernel, extension, the type philosophy, maximal domains, and Allegro in use: execution, tooling, pipelines), with reasoning that establishes the kernel's requirements and features, prefiguring the later chapters. It will likely conclude with the ten choices listed above, or very similar ones. "The bet" is a placeholder too, and incomplete; more detail comes in later discussion.
+- **The pilot** is "Metadata and the capability to write it".
+- **The chapters leaving the book** leave as proposed. Units and layers are discussed early as architectural principles, in appendices, not chapters.
+- **Every decision is worked through in order.** Any decision may change, be removed, or gain new neighbours, and the resulting code and test changes are made. The process is strictly monotonic: once a decision is approved and its code changes made, every decision up to it, and the code stemming from them, is final and correct. A point of non-monotonicity is a process failure: the pass goes back, reorders or revises, and repeats until the list is fully ordered and monotonic.
+- **Two types of decision.** Each decision is about language capability or about implementation. No capability decision may depend on an implementation decision. The three cycles the merge broke looked like decisions whose type was unclear. Capability decisions that necessarily depend on each other are stated as one decision.
+- **Language extensions are declarative.** A new decision, below in "A small base and the surfaces above it". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
+- **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
+
+Not yet applied to the entries: the type of each decision (capability or implementation), and the check of every dependency against the rule above. Both are the next chunk of the plan.
+
+## The author's motivations, for the tour
+
+The maintainer's account of why Allegro exists, given on 2026-11-05 in the review session, recorded here for the tour to open from. It is not book text yet. The question the book poses and answers first: why a new programming language right when programming is becoming obsolete?
+
+The motivations, in the maintainer's words, lightly condensed:
+
+1. **Power from a small kernel.** A programming language's power is related to both the small size of its basic language and how much functionality can be delivered through extensions: a minimal kernel with maximal extensibility.
+2. **Semantic model precedes syntax.** Language discussion focuses on syntax, and innovation is usually aesthetic evolution of syntax with tiny incremental changes in semantics. Decoupling semantics from syntax enables greater semantic exploration: form follows function, like a user interface.
+3. **Model-driven engineering.** Many problem spaces simplify with declarative formal models and declarative mappings between them for specific functions: data models to user interfaces, phrase-structure grammars to semantic models, data transformations for analysis or business processes. Domain-specific languages were a key enabler, but development stalled when they remained informal and far poorer cousins of first-class languages.
+4. **Declarative paradigms, for anyone.** Declarative paradigms are rarely adopted: each applies well to a narrow set of problems (data definition and retrieval, logic, constraints) and is hard to extend to broader real-world projects. Multi-language, multi-paradigm systems suffer inconsistent tooling and integration at compile time and run time. Earlier answers (object-relational mappers, several languages on one runtime) needed heavy investment from language and tool builders. The aim: give that capability to anyone.
+5. **Reflection without the fire.** Code reflection, code transformation and access to a language's internal models connected all of these, and let tool builders and customisers work, but without consistent end-to-end type checking and validation.
+6. **Formal and agile, in one practice.** A mathematician's fondness for formal proof, against an engineering leader's agile practice: the two in extreme tension, never close in practice. The aim: a synthesis, formal and experimental, scientific and practical.
+
+They came together over years of exploration into most of what Allegro is today. Then the AI revolution promised, or threatened, to change everything.
+
+**How they lead to the ten choices** (the review session's mapping, a proposal for the tour to test):
+
+| Motivation | The choices it leads to |
+|---|---|
+| 1. Power from a small kernel | Programmable language platform; One value universe; Metadata on every value |
+| 2. Semantic model precedes syntax | Programmable language platform (the parser above a syntax-free base); Types are values |
+| 3. Model-driven engineering | Programmable language platform (a DSL inherits the whole kernel); Types are values; Refinement types |
+| 4. Declarative paradigms, for anyone | Programmable language platform; Partial evaluation as the compilation model (extensions cost nothing at run time); the new decision that extensions are declarative |
+| 5. Reflection without the fire | One value universe (code is data); Metadata on every value; One predicate machinery for correctness and safety |
+| 6. Formal and agile | Evaluation total over unresolved information; Refinement types; Compile-time first: failures halt the build; the three-leg proof strategy |
+| The AI revolution | Participant-neutral proving with recorded authorship; Every claim states its discharge strength; One predicate machinery: code written by anyone, checked the same way |
 
 ## Today's chapters, mapped
 
@@ -337,6 +378,18 @@ The order binds by dependency: every decision comes after the decisions it depen
 - Notes: violated today by the evaluator's seven imports from `refinements` and `effects` (B-146) and two carry-by-name paths (B-145); `futures.ts` imports `withType`, `ErrorType`, `StringType` (concepts.md §23). concepts.md R6's Delta still cites "27 symbols" and B-112 while §23 says 7 after B-112's exit: R6's delta is stale. Significance calibrated from 5.
 - Chapter: A small base and the surfaces above it
 
+#### Language extensions are declarative
+- Decides: every language extension, grammar extensions and definitions included, is declarative, so the order of definitions in code carries no meaning.
+- Status: settled in principle (maintainer, 2026-11-05); partly built (the shipped parser uses ordered choice)
+- Rationale kind: mixed
+- Depends on: Programmable language platform: minimal core, extensions are the language
+- Significance: 4 — every extension, and every author of one, depends on it
+- Label: foundational — the parser algorithm, ambiguity detection and module loading rest on it
+- Units: grammar-formalism, base-grammar, modules (to be checked)
+- Options recorded: ordered choice, where alternative order resolves ambiguity (shipped as an expedient, to be removed)
+- Sources: the maintainer's comment on PR #163, 2026-11-05; docs/book/grammar-formalism.md §1, §3.1
+- Chapter: A small base and the surfaces above it
+- Notes: added by ruling; its type (capability) and its dependants are checked in the next chunk.
 #### Allegretto is syntax-free; the parser lives above the base
 - Decides: Allegretto (L0) is a specification with no concrete syntax; the standard parser and all concrete syntax belong to the extension substrate (L1) and may later be re-hosted on Vivace's parser generator.
 - Status: settled
@@ -1561,7 +1614,7 @@ The order binds by dependency: every decision comes after the decisions it depen
 - Rationale kind: technical
 - Depends on: Scannerless parsing; Grammars are Allegro values
 - Significance: 3 — fixes parse cost and which grammars run
-- Label: swappable — behind the grammar-formalism unit's parse interface
+- Label: swappable — behind the grammar-formalism unit's parse interface; by the maintainer's ruling of 2026-11-05, any algorithm may replace it except one that requires ordered choice, and the shipped ordered choice is to be replaced by GLL or a similar algorithm
 - Units: grammar-formalism
 - Options recorded: GLL (the formalism's stated choice); full GLL "where Warth iteration falls short" (open gap); the retired Pratt + Earley hybrid
 - Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3
@@ -1573,7 +1626,7 @@ The order binds by dependency: every decision comes after the decisions it depen
 - Decides: the intended design is that precedence, associativity and longest-match metadata drive disambiguation, ambiguity is a compile-time error, and alternative order carries no meaning.
 - Status: open
 - Rationale kind: mixed
-- Depends on: Grammars are Allegro values; Memoized recursive-descent engine with seed-growing left recursion
+- Depends on: Grammars are Allegro values; Language extensions are declarative
 - Significance: 3 — decides whether user extensions inherit silent ordering hazards
 - Label: foundational — the analyzer's disjointness check, `@prec`/`@assoc` semantics and every base production that relies on order
 - Units: grammar-formalism, base-grammar

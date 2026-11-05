@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
+chunks: [P0, P1, P1b, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
 reserves: [B-183, B-184, B-185, B-186]
 boundary:
   - docs/book/**
@@ -409,6 +409,12 @@ further chapter, each one PR, human-gated:
   rank and its swappability. P1 proposes the book's new table of
   contents from it, chapter names included. It must give any chapter
   the context it needs.
+- **P1b (the decision types).** Each inventory entry gains its type,
+  capability or implementation (R29), and every dependency is checked
+  against the rule that no capability decision depends on an
+  implementation decision. Cycles and mutual capability dependencies
+  are resolved by restating, as R29 says. The chunk also proposes how
+  R28's per-decision code changes are made.
 - **P2 (the pilot chapter).** One chapter rewritten to the principles,
   `docs/book/allegretto/metadata-and-capability.md` unless P1's table of
   contents proposes another. The maintainer's reading is its test. The
@@ -773,6 +779,50 @@ maintainer merged PR #161 and ruled its two open asks by message:
 - **Practice.** Rulings are given in PR comments before a merge, so the
   rulings commit lands in the same PR.
 
+**Rulings taken 2026-11-05, on PR #163.** The maintainer answered the
+PR's six asks in a comment, and added two rules:
+
+- **R23 — The contents and the tour.** The proposed contents have the
+  right shape and are working placeholders. The tour becomes a
+  significant conceptual journey: the shape of Allegro (a minimal
+  kernel, extension, the type philosophy, maximal domains, and Allegro
+  in use: execution, tooling, pipelines), with reasoning that
+  establishes the kernel's requirements and features, prefiguring the
+  later chapters. It likely concludes with the ten choices or similar
+  ones. "The bet" is a placeholder, incomplete; more detail comes in
+  discussion. The maintainer's motivations for Allegro, given in the
+  review session the same day, are recorded in
+  `docs/plans/book-pass-inventory.md` for the tour.
+- **R24 — The pilot.** "Metadata and the capability to write it".
+- **R25 — Chapters leaving the book.** As proposed. Units and layers are
+  discussed early as architectural principles, in appendices.
+- **R26 — R22 (structure and correctness first) read correctly.**
+- **R27 — Conflicts between sources** are settled as the pass reaches
+  each decision. Two rulings now: the parser algorithm stays swappable,
+  except that ordered choice must not be required; and a new decision,
+  that every language extension, grammar extensions and definitions
+  included, is declarative, so definition order carries no meaning.
+  The shipped ordered choice is an expedient, to be replaced by GLL or a
+  similar algorithm. `eval_when` and PE Rule 2 need careful review; their
+  decisions may change to make them coherent.
+- **R28 — The monotonic pass.** Every decision is worked through in
+  order and analysed. Any may change, be removed, or gain new
+  neighbours, and the resulting code and test changes are made. Once a
+  decision is approved and its code changes made, every decision up to
+  it, and the code stemming from them, is final and correct. A point of
+  non-monotonicity is a process failure: the pass goes back, reorders
+  or revises, and repeats until the list is fully ordered and monotonic.
+- **R29 — Capability and implementation decisions.** Each decision is
+  about language capability or about implementation. No capability
+  decision may depend on an implementation decision. Capability
+  decisions that necessarily depend on each other are stated as one.
+
+**What R28 changes in this plan.** The unit of work becomes a decision,
+taken in inventory order, and a decision's code changes are part of
+its approval. This stream edits documents only (§4), so how code
+changes are made per decision is an open question, put to the
+maintainer with chunk P1b (the decision types).
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -864,6 +914,12 @@ maintainer merged PR #161 and ruled its two open asks by message:
   (PR #162), so the evaluator chapter and the spine's §25 are no longer
   waiting (§2.4). From this PR on, each PR has its own branch, at the
   maintainer's request: the repository deletes a head branch on merge.
+- **2026-11-05 — P1's rulings** (the review session). R23 to R29
+  recorded in §6, from the maintainer's comment on PR #163. The
+  inventory gains its rulings section, the maintainer's motivations
+  mapped to the ten choices for the tour, and one decision (language
+  extensions are declarative): 257 decisions. Chunk P1b (the decision
+  types) added before the pilot.
 
 ## 8. Sessions
 
