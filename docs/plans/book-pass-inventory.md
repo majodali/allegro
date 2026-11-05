@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"). By significance: 5: 10, 4: 51, 3: 100, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 177, partly built 42, open 37. Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03.
+> Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Language extensions are declarative"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -20,8 +20,8 @@ The order binds by dependency: every decision comes after the decisions it depen
 1. **One engine for compiling and proving** (8 decisions). The defining bets: a platform of extensions over a minimal core, partial evaluation as the compiler, and proof by the same evaluation, with failures halting the build.
    - Decisions: Programmable language platform: minimal core, extensions are the language; Partial evaluation as the compilation model; Provable correctness and safety as one predicate machinery; Compile-time first: failures halt the build; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
    - Draws on: [vision.md](../book/vision.md) §1, §1a, §2, §5, [concepts.md](../book/concepts.md) Part 0 R1, R2, [proving-in-allegro.md](../book/proving-in-allegro.md) When PE-as-discharge isn't enough.
-2. **A small base and the surfaces above it** (8 decisions). Why the base stays small and ignorant of its layers, how every language above it is a surface inheriting the whole kernel, and how the code is cut into units that match.
-   - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Allegretto is syntax-free; the parser lives above the base; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
+2. **A small base and the surfaces above it** (9 decisions). Why the base stays small and ignorant of its layers, how every language above it is a surface inheriting the whole kernel, and how the code is cut into units that match.
+   - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Language extensions are declarative; Allegretto is syntax-free; the parser lives above the base; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
    - Draws on: [vision.md](../book/vision.md) §1 Substrate and surfaces, §1a, §5, [architecture-vocabulary.md](../book/architecture-vocabulary.md) layer, track, unit, [layers.md](../book/layers.md) §1, [units.md](../book/units.md) §1, §2, §4, §5, [concepts.md](../book/concepts.md) Part 0 R6, §23, [allegretto/README.md](../book/allegretto/README.md) the boundary, [extension/README.md](../book/extension/README.md) the L1 boundary, [demo-ladder.ir.md](../book/demo-ladder.ir.md) the ladder.
 3. **Claims a reader can trust** (6 decisions). How verification results show their strength, how claims are written in the program's own syntax and disclosed progressively, and how review works top-down.
    - Decisions: Every claim states its discharge strength; Formal claims written in the program's own syntax; Reviewability through a top-down semantic view; Progressive disclosure of formality; Analyzer silence over guessing; Surface syntax is provisional, reviewed against a corpus.
@@ -36,7 +36,7 @@ The order binds by dependency: every decision comes after the decisions it depen
    - Decisions: Expressions are values, forming a DAG; Symbol identity is a fully-qualified name; Host functions as values with declared evaluation control; Expressions memoize per evaluation context; Positional parameters owned by membership; Functions are data: params plus body; Transient reference symbols resolved by base name; Symbols interned by FQN.
    - Draws on: [concepts.md](../book/concepts.md) T0 §4 to §7, [allegretto/structures.md](../book/allegretto/structures.md) §5, Value, the kinds and the assembly (planned).
 6. **Structures** (8 decisions). The one composite kind, how its entries are laid out, how it is constructed, and why it is immutable.
-   - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; The composite is one sequence of optionally-keyed entries; Arrays are structures with unkeyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
+   - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; The composite is one sequence of optionally-keyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
    - Draws on: [concepts.md](../book/concepts.md) T0 §9, §12 to §14, [allegretto/structures.md](../book/allegretto/structures.md) §1, §2.
 7. **Metadata and the capability to write it** *(recommended pilot)* (13 decisions). Every value carries independent metadata fields, and only the holder of a field's writer may originate it.
    - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled; Fixed propagation vocabulary; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Capability denial is an abort, not an error value.
@@ -53,14 +53,14 @@ The order binds by dependency: every decision comes after the decisions it depen
 11. **Scopes** (4 decisions). The evaluation environment, kept outside the value universe and layered by parent chain, with its facts plane.
    - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; Facts plane immutable-layered and opaque to the base.
    - Draws on: [concepts.md](../book/concepts.md) §15, [allegretto/structures.md](../book/allegretto/structures.md) §4, Scope (planned).
-12. **Evaluation over unresolved information** (12 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
-   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness is a value in a slot; Future cells: write-once, monotonic, flattening; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Specified aborts; Evaluation depth bound.
+12. **Evaluation over unresolved information** (11 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
+   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Specified aborts; Evaluation depth bound.
    - Draws on: [concepts.md](../book/concepts.md) §25 to §29, [allegretto/structures.md](../book/allegretto/structures.md) §10, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 to §6, Futures and the base primitives (planned).
 
 **Part III: Syntax and modules**
 
 13. **Grammars as values** (10 decisions). The grammar formalism: grammars as Allegro values, scannerless parsing, the memoized engine, precedence, layout and ambiguity.
-   - Decisions: Grammars are Allegro values; Scannerless parsing; Memoized recursive-descent engine with seed-growing left recursion; Ambiguity is banned and detected, not resolved by alternative order; Named, partially ordered precedence levels; Offside rule through stateful indent terminals; The precedence ladder runs as repetition, and memo invalidation tracks dependencies; Guards and reservation sets separate keywords from identifiers; Parse failure reporting and recovery; Static analysis of grammars.
+   - Decisions: Grammars are Allegro values; Scannerless parsing; Ambiguity is banned and detected, not resolved by alternative order; Named, partially ordered precedence levels; Offside rule through stateful indent terminals; Guards and reservation sets separate keywords from identifiers; Parse failure reporting and recovery; Memoized recursive-descent engine with seed-growing left recursion; The precedence ladder runs as repetition, and memo invalidation tracks dependencies; Static analysis of grammars.
    - Draws on: [extension/README.md](../book/extension/README.md) the boundary, [grammar-formalism.md](../book/grammar-formalism.md) §1 to §5, §7, §8, [extension/grammar.md](../book/extension/grammar.md) §1, §2.
 14. **Extending the grammar** (4 decisions). Grammar extension as operation deltas that never mutate the base, and the declarative grammar block.
    - Decisions: Grammar extension as operation deltas, extensible by default; Grammar extension never mutates the base; The declarative `grammar { … }` block with hygienic templates; Rules for user-written EBNF.
@@ -126,7 +126,7 @@ The order binds by dependency: every decision comes after the decisions it depen
    - Decisions: Inspect reports only what the pipeline computed; Safety grade as the default verification surface; One command-line entry with subcommands; File runner as one evaluation with futures drained; REPL as successive evaluations over a persistent scope; Obligations and proposals as machine and human views; Execution tracing and step-through debugging.
    - Draws on: [getting-started.md](../book/getting-started.md) subcommands, [vision.md](../book/vision.md) §3, §6, [platform/tooling.ir.md](../book/platform/tooling.ir.md).
 32. **Hosts: the terminal and the browser** (9 decisions). Environment capabilities, the host boundary, asynchronous host results, the browser-compatible core and the sandbox.
-   - Decisions: Environment capabilities outside the base, effect-labelled; A stated host boundary in a host unit; Asynchronous host results arrive as future cells; A browser-compatible core; Browser sandbox as an IIFE bundle with a library registry; Liveness of host sources declared per source; Module loader takes its file reader from the host; Asynchronous I/O capabilities beyond timers and HTTP GET; Browser runtime packaging.
+   - Decisions: Environment capabilities outside the base, effect-labelled; A stated host boundary in a host unit; Asynchronous host results arrive as future cells; Browser sandbox as an IIFE bundle with a library registry; A browser-compatible core; Liveness of host sources declared per source; Module loader takes its file reader from the host; Asynchronous I/O capabilities beyond timers and HTTP GET; Browser runtime packaging.
    - Draws on: Futures and the base primitives (planned), [standard/effects.md](../book/standard/effects.md) environment capabilities, [platform/host.ir.md](../book/platform/host.ir.md).
 33. **Compiling beyond the interpreter** (4 decisions). Multi-phase builds, code generation from the expression graph, rewrites licensed by laws, and self-hosting.
    - Decisions: Multi-phase build as successive partial evaluation; Code generation from the expression graph, JavaScript first; Laws licence rewrites; Self-hosting and a package ecosystem.
@@ -146,7 +146,7 @@ The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pas
 - **Language extensions are declarative.** A new decision, below in "A small base and the surfaces above it". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
 - **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
 
-Not yet applied to the entries: the type of each decision (capability or implementation), and the check of every dependency against the rule above. Both are the next chunk of the plan.
+Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "Incompleteness lives in write-once future cells". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
 
 ## The author's motivations, for the tour
 
@@ -226,6 +226,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Programmable language platform: minimal core, extensions are the language
 - Decides: Allegro is a minimal formal core (Allegretto) under a curated stack of extensions (Allegro Standard, then Vivace), and everything beyond the value kinds and their primitives, syntax and type system included, is an importable extension built with the same mechanisms user extensions use.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: none
 - Significance: 5 — every layer and unit boundary follows from it
@@ -240,6 +241,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Partial evaluation as the compilation model
 - Decides: each build phase is a partial-evaluation step in which more symbols are bound, and type checking, effect inference, totality and proof discharge are all evaluation over partially resolved programs on one engine, never a parallel analyser.
 - Status: settled
+- Type: capability — the language exposes it: residuals are values, and every check is an evaluation a user can read
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 5 — the defining technical bet; every L2 analysis is evaluation
@@ -254,6 +256,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Provable correctness and safety as one predicate machinery
 - Decides: the defining feature is provable correctness (positive: refinements, contracts, invariants) and safety (negative: effects, capabilities, information flow), all stated as predicates and discharged by the same machinery (predicate sets, abstract domains, entailment, PE reduction), with the falsifiable constraint that a feature needing parallel infrastructure fails the thesis and is surfaced as a thesis-level concern, never quietly built.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Partial evaluation as the compilation model
 - Significance: 5 — the thesis every L2 feature is checked against
@@ -268,6 +271,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Compile-time first: failures halt the build
 - Decides: specifications are discharged during partial evaluation and the executable carries only residuals, runtime checks being the fallback; a failed proof, an undeclared effect (`div` included) or a failed refinement or type annotation halts compilation, in libraries as in user code, while two paths stay weaker: construction-path invariant failure yields an error value and non-exhaustive matching an info notice, promotion of either being a maintainer decision.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Partial evaluation as the compilation model
 - Significance: 5 — "build safety in": a failed proof never becomes a running program
@@ -282,6 +286,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Participant-neutral prover protocol with the kernel as trust boundary
 - Decides: humans, AI agents, hybrids and tools propose [implementation, proof] pairs through one protocol, the kernel verifies each independently as the single trust boundary, and authorship is recorded per discharged theorem.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Provable correctness and safety as one predicate machinery
 - Significance: 4 — defines who discharges claims and why AI output is checkable
@@ -296,6 +301,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
 - Decides: predicates are Allegro lambdas discharged by evaluating them to `true` (primary), provers supply implementation and proof together (primary), and SMT is a use-case-driven fallback for arithmetic-heavy obligations, never foundational.
 - Status: partly built
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Partial evaluation as the compilation model; Participant-neutral prover protocol with the kernel as trust boundary
 - Significance: 5 — sets the discharge mechanism the evaluator was designed for
@@ -310,6 +316,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### SMT as a selective fallback
 - Decides: SMT is to be explored only where PE is not strong enough or prover-generated proofs are uneconomical, combining with the other legs, never as the foundation.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
 - Significance: 3 — bounds what the kernel will ever trust
@@ -324,6 +331,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Proofs exportable to external checkers
 - Decides: proofs should be exportable to external checkers (Lean, Coq or similar) with transitive assurance through dependencies, and representation choices prefer forms that translate to standard proof-assistant primitives.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
 - Significance: 3 — constrains every foundational representation choice
@@ -340,6 +348,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Substrate and surfaces: a DSL inherits the whole kernel
 - Decides: Allegretto is the substrate and every language built on it, Allegro Standard included, is a surface that inherits the whole kernel (types, proofs, effects, laws, prover protocol), so general-purpose versus domain-specific is a breadth axis, not two kinds of language.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 4 — frames what every DSL, pilot and rung is
@@ -354,6 +363,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Simplicity criterion for the base
 - Decides: every Allegretto feature must earn its place by being something Allegro cannot be built without, and that question adjudicates every base trade.
 - Status: settled
+- Type: capability — it decides what the base language offers
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 4 — the criterion behind SC-1, SC-2, SC-5
@@ -367,6 +377,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The base does not know about the layers
 - Decides: no Allegro Standard concept (type, effect, proof, refinement, contract) may appear in Allegretto, and dependencies point downward only; the base supplies mechanism, extensions supply policy.
 - Status: partly built
+- Type: capability — it fixes what Allegretto, the language `--base` runs, may contain
 - Rationale kind: technical
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 4 — the rule every L0 file is measured against
@@ -381,6 +392,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Language extensions are declarative
 - Decides: every language extension, grammar extensions and definitions included, is declarative, so the order of definitions in code carries no meaning.
 - Status: settled in principle (maintainer, 2026-11-05); partly built (the shipped parser uses ordered choice)
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 4 — every extension, and every author of one, depends on it
@@ -390,9 +402,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's comment on PR #163, 2026-11-05; docs/book/grammar-formalism.md §1, §3.1
 - Chapter: A small base and the surfaces above it
 - Notes: added by ruling; its type (capability) and its dependants are checked in the next chunk.
+
 #### Allegretto is syntax-free; the parser lives above the base
 - Decides: Allegretto (L0) is a specification with no concrete syntax; the standard parser and all concrete syntax belong to the extension substrate (L1) and may later be re-hosted on Vivace's parser generator.
 - Status: settled
+- Type: capability — a user can replace the syntax, because none is in the base
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language; Simplicity criterion for the base; The base does not know about the layers
 - Significance: 4 — every surface form, including Allegro Standard's own syntax, is an extension
@@ -407,6 +421,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Units in a narrow DAG
 - Decides: the code is divided into the smallest units, each holding one decision or an inseparable group, depending only on named units below it by import edges, with one home, replaceable without editing what does not name it; layers become bands of units, and each physical move happens when its unit is next touched.
 - Status: partly built
+- Type: implementation — code organisation
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 4 — makes each decision findable and forkable
@@ -421,6 +436,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The three moves as the test of a new capability
 - Decides: every capability must present as a composition of three moves (everything is a value under one engine; every claim is a predicate with a visible discharge strength; every participant goes through the same kernel), and a capability that needs a fourth move is a thesis-level concern.
 - Status: settled
+- Type: capability — a test every capability must pass
 - Rationale kind: vision
 - Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Provable correctness and safety as one predicate machinery
 - Significance: 3 — the positioning analog of the falsifiable constraint; shapes how features are admitted
@@ -435,6 +451,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The demo ladder as the thesis test
 - Decides: the thesis is tested by a ladder of rungs, each composing the three moves and resting on the rungs below: rung 1 verified code at AI velocity, rung 2 a provable DSL, rung 3 a Vivace domain model, rung 4 mixed-model optimisation as direction only.
 - Status: settled
+- Type: capability — it decides what the platform must demonstrate
 - Rationale kind: vision
 - Depends on: The three moves as the test of a new capability; Provable correctness and safety as one predicate machinery
 - Significance: 3 — orders the demonstration of the whole platform
@@ -449,6 +466,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Unit granularity rule
 - Decides: split a unit when its halves have different dependency sets or hold decisions that could be revised independently; never split for size alone.
 - Status: settled
+- Type: implementation — code organisation
 - Rationale kind: technical
 - Depends on: Units in a narrow DAG
 - Significance: 2 — decides how many units exist
@@ -464,6 +482,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Every claim states its discharge strength
 - Decides: no verification answer is a bare checkmark: each claim reports its tier, visibly and transitively through results; the verdict lists theorems and obligations with their tiers, an assumption ledger lists the admitted and sampled backings with the proofs resting on each, and a weaker check never borrows a stronger one's vocabulary.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Provable correctness and safety as one predicate machinery
 - Significance: 4 — shapes every verdict surface and the discharge tiers
@@ -478,6 +497,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Formal claims written in the program's own syntax
 - Decides: refinements, contracts, effects, termination metrics and theorems are written in the program's own syntax, as ordinary statements and leading body lines, not in a separate specification language.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Substrate and surfaces: a DSL inherits the whole kernel
 - Significance: 4 — the user-visible face of "types as values; one engine"
@@ -492,6 +512,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Reviewability through a top-down semantic view
 - Decides: review works through a layered view of inferred types, effects, discharged invariants and semantic diffs over the code, surfaced as a safety grade with drill-down, rather than bottom-up line reading; the safety grade and `inspect` exist, while semantic diffs and editor (LSP) integration are not built.
 - Status: partly built
+- Type: capability
 - Rationale kind: vision
 - Depends on: Every claim states its discharge strength
 - Significance: 3 — motivates introspection and safety grades
@@ -506,6 +527,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Progressive disclosure of formality
 - Decides: beginners write ordinary code with everything inferred, intermediates add targeted invariants, experts write proof tactics; formal work concentrates in libraries and DSLs, inferences are always displayable and annotations optional.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Formal claims written in the program's own syntax
 - Significance: 3 — sets what a user must write versus what the compiler must infer
@@ -520,6 +542,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Analyzer silence over guessing
 - Decides: when an analysis cannot determine the facts it stays silent rather than guessing, because false positives erode trust.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Every claim states its discharge strength
 - Significance: 2 — a policy every analysis follows
@@ -533,6 +556,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Surface syntax is provisional, reviewed against a corpus
 - Decides: every feature and syntax element is expected to be reviewed and possibly redefined once a corpus of real use exists, so surface syntax is treated as provisional and redos get deprecation paths.
 - Status: settled
+- Type: capability — a policy on the surface a user writes
 - Rationale kind: mixed
 - Depends on: none
 - Significance: 2 — licenses every surface entry below to be swappable
@@ -549,6 +573,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One value universe
 - Decides: everything the evaluator can meet is a value; there are no statements, declarations or types that are not values.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Simplicity criterion for the base; Programmable language platform: minimal core, extensions are the language
 - Significance: 5 — lets extensions build and return any part of the language
@@ -563,6 +588,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Seven representation kinds
 - Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure.
 - Status: settled
+- Type: capability — concepts.md files it as a specification choice, visible to the layers above
 - Rationale kind: technical
 - Depends on: One value universe; Simplicity criterion for the base
 - Significance: 4 — the representation every unit above works over
@@ -577,6 +603,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Kind is a host discriminant, not a type
 - Decides: `v.kind` is an interpreter tag invisible at the language level, separate from types; the definitional ladder runs representations → values → types → kinds, and the language taxonomy is data versus computation forms.
 - Status: settled
+- Type: capability — it decides what the language does not expose
 - Rationale kind: technical
 - Depends on: Seven representation kinds
 - Significance: 4 — keeps the type system an extension
@@ -590,6 +617,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Value as a contract, seven kind units and an assembly
 - Decides: `Value` is an open registry contract naming no kind; each kind registers itself by declaration merging with its tag, interface, factories, guard and ops; one assembly closes the set per build, holds the ops table and the walkers, and is the fork point.
 - Status: partly built
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Seven representation kinds; Units in a narrow DAG
 - Significance: 4 — makes each kind replaceable and dependencies on a kind visible
@@ -604,6 +632,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Bits is the only scalar
 - Decides: Allegretto has one uninterpreted scalar, a bit vector of known length, and `Int`, `Float`, `String` and `Bool` are Bits with a type attached at L2.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Seven representation kinds; The base does not know about the layers
 - Significance: 4 — puts numeric and textual semantics in extensions
@@ -618,6 +647,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Minimal base surface of about forty primitives
 - Decides: Allegretto's irreducible base is about forty primitives in five groups (Bits, Expression, Structure, channels, Scope) plus core control (`eval_if`, `seq`, `id`); types, proofs, effects, contracts, totality, pattern matching, grammar tooling and IO are not base.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Simplicity criterion for the base; The base does not know about the layers
 - Significance: 4 — the layering proof
@@ -632,6 +662,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The discriminator rule for kind comparisons
 - Decides: a guard imports its kind instead of comparing tags, a walker uses the assembly's traversal protocol, and only the evaluator switches on kind for behaviour, naming only the participating kinds with an inert default arm.
 - Status: partly built
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Value as a contract, seven kind units and an assembly
 - Significance: 3 — makes a fork's new kind inert until its author says otherwise
@@ -646,6 +677,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scalar encodings inside Bits
 - Decides: an integer is 64-bit, a float is IEEE-754 packed into the same 64 bits, and a string is UTF-8 bytes.
 - Status: settled
+- Type: capability — the number semantics a program sees
 - Rationale kind: technical
 - Depends on: Bits is the only scalar
 - Significance: 1 — local encoding
@@ -662,6 +694,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Expressions are values, forming a DAG
 - Decides: an unevaluated application (a function value plus arguments) is an ordinary value, so a partially evaluated program is also a value, and expressions form a shared DAG rather than a tree.
 - Status: settled
+- Type: capability — a partially evaluated program is a value a user can hold
 - Rationale kind: technical
 - Depends on: One value universe; Partial evaluation as the compilation model
 - Significance: 4 — residuals flow through the same machinery as results
@@ -676,6 +709,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Symbol identity is a fully-qualified name
 - Decides: a registered symbol's identity is its defining scope's FQN plus base name (default FQN is the module path), the base name is only a projection for printing, serialisation and loose matching, and an ambiguous base name requires explicit qualification or is an error.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Seven representation kinds
 - Significance: 4 — conformance becomes an identity question
@@ -690,6 +724,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Host functions as values with declared evaluation control
 - Decides: a primitive function is host-implemented and carries declarations the evaluator acts on (`lazy`: do not evaluate my arguments; `effects`: labels I produce; `sourceAware`: attach each argument's originating expression), so primitives never reach into the evaluator.
 - Status: settled
+- Type: capability — evaluation control and effect labels are semantics a program observes
 - Rationale kind: technical
 - Depends on: Seven representation kinds
 - Significance: 3 — keeps the propagation table authoritative
@@ -704,6 +739,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Expressions memoize per evaluation context
 - Decides: an Expression carries a memo table keyed by evaluation context, and a clone shares it.
 - Status: settled
+- Type: implementation — concepts.md files it as an implementation choice
 - Rationale kind: technical
 - Depends on: Expressions are values, forming a DAG
 - Significance: 2 — PE cost
@@ -717,6 +753,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Positional parameters owned by membership
 - Decides: a Param is a positional placeholder, and a function owns a Param by its membership in the function's parameter list rather than through a back-pointer's identity.
 - Status: settled
+- Type: capability — parameters are positional for every program, and ownership decides what substitution replaces
 - Rationale kind: technical
 - Depends on: Seven representation kinds
 - Significance: 2 — makes substitution positional and clone-safe
@@ -731,6 +768,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Functions are data: params plus body
 - Decides: a composed function is a list of declared Params and a body value, so building, inspecting and specialising functions needs no reflection API, and every clone goes through shared helpers that preserve its properties.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Expressions are values, forming a DAG; Positional parameters owned by membership
 - Significance: 4 — specialising a function is substituting into a value
@@ -745,6 +783,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Transient reference symbols resolved by base name
 - Decides: the parser mints a transient Symbol per identifier occurrence, with no identity beyond it, resolved by base name against the enclosing scope, so resolution is not folded into parsing; scope binding keys may stay strings.
 - Status: settled
+- Type: implementation — how the parser hands names to resolution; the scoping is unchanged
 - Rationale kind: technical
 - Depends on: Symbol identity is a fully-qualified name
 - Significance: 2 — local to symbol resolution
@@ -758,6 +797,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Symbols interned by FQN
 - Decides: the same FQN is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
 - Status: settled
+- Type: implementation — concepts.md files it as an implementation choice; it realises symbol identity by name
 - Rationale kind: technical
 - Depends on: Symbol identity is a fully-qualified name
 - Significance: 2 — hot-path comparison cost
@@ -773,6 +813,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One composite kind: Structure
 - Decides: MultiValue and Context are condensed into one composite kind, Structure, the only kind with internal parts, used for records, arrays, types, proofs and module objects.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Simplicity criterion for the base; Seven representation kinds
 - Significance: 4 — the one composite every L2 construct is built from
@@ -787,6 +828,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Structures immutable by default; derive, never mutate
 - Decides: data structures are born immutable with deep immutability, a value is written in place only while provably unshared during construction, an unresolved future cell counts as immutable, and transient-to-immutable finalisation waits for the mutability track.
 - Status: partly built
+- Type: capability — immutability is what a program relies on; its in-place licence while unshared is the implementation's part
 - Rationale kind: technical
 - Depends on: One composite kind: Structure
 - Significance: 4 — the second leg of the integrity model and of PE soundness
@@ -798,25 +840,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: the in-place rule is stated, not enforced (B-143). The cross-module form, the owner-module invariant of B-158 (a library's values are immutable after load), belongs to the modules fragment. D22's own text still names the bit.
 - Chapter: Structures
 
-#### The composite is one sequence of optionally-keyed entries
-- Decides: a Structure stores an ordered sequence of optionally-keyed entries, with the by-name map a derived view and a lazy index built on first lookup past eight entries, whatever the structure's role.
-- Status: settled
-- Rationale kind: technical
-- Depends on: One composite kind: Structure
-- Significance: 3 — one representation for maps and lists
-- Label: swappable — the index is invisible above the specification
-- Units: structure
-- Options recorded: A map-first (the prior implementation); B sequence-first with no index; C two representations; E one entry sequence (taken)
-- Sources: docs/book/concepts.md IC-2, §12, §16, §17; docs/decisions.md D48(a), D48(d); docs/records/concepts-analyses.md §5.2 (not read)
-- Book home (fragments' proposal): allegretto/structures.md
-- Notes: concepts.md §13 still describes bindings as a stored map and a list maintained at each write site; since B-120 E3 `entries` is the store and `bindings` the derived view (`src/structure.ts:107-157`). The header comment of `src/structure.ts` (lines 17 and 31) still names `dense`. Role tag `isScope` is the last role field.
-- Chapter: Structures
-
 #### Arrays are structures with unkeyed entries
 - Decides: an array is a Structure whose entries all carry a null key, with no separate vector kind and no references inside Bits.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: The composite is one sequence of optionally-keyed entries; Bits is the only scalar
+- Depends on: One composite kind: Structure; Bits is the only scalar
 - Significance: 2 — local to the structure unit
 - Label: swappable — collection types choose representations above
 - Units: structure
@@ -826,9 +855,25 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: the collection half of D9 (encapsulated `Array[T]`, `Map`, `Set`) is open under B-041 and belongs to the L2 fragment.
 - Chapter: Structures
 
+#### The composite is one sequence of optionally-keyed entries
+- Decides: a Structure stores an ordered sequence of optionally-keyed entries, with the by-name map a derived view and a lazy index built on first lookup past eight entries, whatever the structure's role.
+- Status: settled
+- Type: implementation — concepts.md files it as an implementation choice: the index and the sequence are invisible above the specification
+- Rationale kind: technical
+- Depends on: One composite kind: Structure; Arrays are structures with unkeyed entries
+- Significance: 3 — one representation for maps and lists
+- Label: swappable — the index is invisible above the specification
+- Units: structure
+- Options recorded: A map-first (the prior implementation); B sequence-first with no index; C two representations; E one entry sequence (taken)
+- Sources: docs/book/concepts.md IC-2, §12, §16, §17; docs/decisions.md D48(a), D48(d); docs/records/concepts-analyses.md §5.2 (not read)
+- Book home (fragments' proposal): allegretto/structures.md
+- Notes: concepts.md §13 still describes bindings as a stored map and a list maintained at each write site; since B-120 E3 `entries` is the store and `bindings` the derived view (`src/structure.ts:107-157`). The header comment of `src/structure.ts` (lines 17 and 31) still names `dense`. Role tag `isScope` is the last role field.
+- Chapter: Structures
+
 #### Untyped structures allowed in Allegretto
 - Decides: Allegretto structures may be untyped, duck-typed over defined slot keys, and strict typing of every structure is a guarantee of Allegro Standard.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: The base does not know about the layers; One composite kind: Structure
 - Significance: 2 — states what the base promises about structure typing
@@ -843,6 +888,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Construction only through factories, one host class
 - Decides: every Structure is an instance of one host class with one declared hidden class, constructed only through the factory functions, so a stray object literal fails the boundary invariant.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: One composite kind: Structure
 - Significance: 2 — enforceability and hidden-class stability
@@ -856,6 +902,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Binding state belongs to the binding, not the value
 - Decides: export-ness, cell origin, completion state and pending dependencies are attributes of a binding in its scope, so copying a value never copies them.
 - Status: settled
+- Type: implementation — where binding attributes are stored; the export semantics are decided with the export form
 - Rationale kind: technical
 - Depends on: The composite is one sequence of optionally-keyed entries
 - Significance: 2 — fixes the `y = x` export-copy wart
@@ -869,6 +916,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Empty array and empty record are not told apart at L0
 - Decides: whether a structure's entries are wholly unkeyed is a private derived cache, and nothing at L0 distinguishes an empty array from an empty record, because that is the type's question.
 - Status: settled
+- Type: capability — it decides what L0 can tell apart
 - Rationale kind: technical
 - Depends on: Arrays are structures with unkeyed entries
 - Significance: 1 — local host bit
@@ -884,6 +932,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata channels are independent
 - Decides: each piece of named information about a value is handled by its own declaration, independently of every other, and no operation may disturb a field it does not know about.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model; The base does not know about the layers
 - Significance: 4 — without it every layer threads its information by hand
@@ -898,6 +947,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata is a field on every value
 - Decides: every representation kind carries an optional `meta` map, so a typed `42` is a Bits with a `type` field, and attaching metadata yields a new value of the same kind.
 - Status: settled
+- Type: capability — metadata rides each occurrence of a value, which a program observes; concepts.md files the representation as implementation and its R3 entry (Metadata channels are independent) calls placement a specification choice
 - Rationale kind: technical
 - Depends on: Metadata channels are independent; Seven representation kinds
 - Significance: 5 — every residual carries propagated fields this way
@@ -912,6 +962,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata fields registered with declared propagation rules
 - Decides: extensions register their own metadata fields, each with a declared propagation rule, rather than the base fixing a set of annotation channels.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Metadata channels are independent
 - Significance: 4 — the extension mechanism for value information
@@ -925,6 +976,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata origination is capability-controlled
 - Decides: a field carrying authority must be unforgeable by code without its writer; authority is a capability held, not a name.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Metadata channels are independent
 - Significance: 4 — metadata that anyone can write cannot be evidence
@@ -939,6 +991,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Fixed propagation vocabulary
 - Decides: a field's rule is one of `viral`, `union`, `computed`, `positional`, `drop`, applied by the base without knowing the field's meaning, with the semantics a rule needs (a merge for `union`) installed by the field's owner.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled
 - Significance: 4 — makes integrity enforceable over inspectable rules
@@ -953,6 +1006,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Writes gated by a capability, reads free
 - Decides: originating a field value requires its writer, propagation is evaluator-performed and authority-free, reads are free, and integrity fields may register only non-fabricating rules.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Metadata origination is capability-controlled; Fixed propagation vocabulary
 - Significance: 4 — the read/write asymmetry introspection and PCP need
@@ -967,6 +1021,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Writers are closures: delegable, attenuable, unforgeable
 - Decides: the capability is a PrimitiveFunction closure returned by registration; delegation is passing it, attenuation is wrapping it in a re-checking closure, and writers are non-serialisable, print redacted and identity-equal only.
 - Status: settled
+- Type: capability — delegation and attenuation are what a writer's holder can do
 - Rationale kind: technical
 - Depends on: Writes gated by a capability, reads free; Host functions as values with declared evaluation control
 - Significance: 4 — authority as a value, trackable in the PE dataflow
@@ -980,6 +1035,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### No seal operation: constructor trust decomposes
 - Decides: there is no seal primitive or per-value brand bit; trust in a constructed value decomposes into write authority over its integrity field, data immutability and a non-fabricating propagation rule, and it is global and structural.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Structures immutable by default; derive, never mutate; Writes gated by a capability, reads free
 - Significance: 4 — the integrity model proofs depend on
@@ -993,6 +1049,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata supplied at construction, one attachment operation
 - Decides: factories take an optional metadata argument so a value never exists without what it must carry, `withMeta` is the one attachment operation, and `carryMeta` moves metadata onto a derived value.
 - Status: settled
+- Type: implementation — concepts.md files it as an implementation choice: the host API for attaching metadata
 - Rationale kind: mixed
 - Depends on: Metadata is a field on every value; Structures immutable by default; derive, never mutate
 - Significance: 3 — lifecycle honesty and one fewer allocation on Rule 1's path
@@ -1007,6 +1064,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata slot mixed in from the metadata unit
 - Decides: the `meta` slot is not part of the `Value` contract; the `metadata` unit adds it by augmenting the base interface and stamps it in place while the value is unshared, so no kind unit reads it.
 - Status: partly built
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Value as a contract, seven kind units and an assembly; Metadata is a field on every value
 - Significance: 3 — keeps kinds independent of metadata
@@ -1021,8 +1079,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Symbols serialise by FQN; deserialisation never mints reachability
 - Decides: a symbol's wire form is its FQN, registration and exporting are separate maps, and deserialisation answers only from the exported registry, so a private or unknown FQN resolves to nothing.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Symbols interned by FQN; Writers are closures: delegable, attenuable, unforgeable
+- Depends on: Symbol identity is a fully-qualified name; Writers are closures: delegable, attenuable, unforgeable
 - Significance: 3 — cross-process trust bottoms out in re-verification
 - Label: swappable — the wire format is local to the symbol unit
 - Units: symbol
@@ -1034,6 +1093,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One-shot field registration with a pass epoch
 - Decides: the first registrant of a field receives its writer and no one else can obtain it, except that Allegro re-registration with the same rule in the same evaluation pass returns the held writer; kernel registrations never re-issue.
 - Status: settled
+- Type: capability — it decides who can obtain a writer
 - Rationale kind: technical
 - Depends on: Writers are closures: delegable, attenuable, unforgeable
 - Significance: 2 — makes R12 hold without a list of important fields
@@ -1047,6 +1107,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Capability denial is an abort, not an error value
 - Decides: refusing a write, an install or a fabricating rule aborts evaluation instead of returning an error value, because an error value would be forgeable.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Writes gated by a capability, reads free
 - Significance: 2 — local to the capability unit
@@ -1062,6 +1123,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Primitives receive full values
 - Decides: eager primitives receive their arguments with metadata intact, `lazy` is evaluation control only, and the propagation table alone governs metadata.
 - Status: settled
+- Type: implementation — a rule for host primitive code, realising that channels are independent
 - Rationale kind: technical
 - Depends on: Host functions as values with declared evaluation control; Fixed propagation vocabulary
 - Significance: 4 — removes the lazy/eager stripping asymmetry
@@ -1075,6 +1137,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### How the base applies propagation
 - Decides: on a residual the first viral field found on the callee or an argument is carried (first occurrence wins); on re-evaluation the outer value's fields are laid under the inner value's, merged where the rule is `union` and inner-wins otherwise; `drop` needs no code.
 - Status: partly built
+- Type: capability — which field value survives a residual is observable
 - Rationale kind: technical
 - Depends on: Fixed propagation vocabulary
 - Significance: 3 — the generic half of propagation
@@ -1089,6 +1152,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Errors as a viral metadata field
 - Decides: an error is a `viral` field with a public writer (`make_error`), so it rides every derived result through residual chains, user functions and an `if` condition, reproducing automatic error propagation without a special form.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: How the base applies propagation; Writes gated by a capability, reads free
 - Significance: 3 — the base's error model
@@ -1102,6 +1166,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The source field: an expression as metadata
 - Decides: a value can carry the Expression it evaluated from (plus span) as a `drop` field with a kernel-private writer, attached on demand at calls of source-aware functions and on resolved top-level bindings, read through `source of x` under the `observe` effect.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Fixed propagation vocabulary; Writes gated by a capability, reads free; Expressions are values, forming a DAG
 - Significance: 3 — gives meta-functions AST access without grammar productions
@@ -1116,6 +1181,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Each layer registers its own fields
 - Decides: a field is registered where its concept lives; the base registers only `error` and `source`, the fields whose concepts survive under `--base`, and a battery pins the ownership table.
 - Status: partly built
+- Type: capability — it decides which fields the base language has
 - Rationale kind: technical
 - Depends on: The base does not know about the layers; Metadata fields registered with declared propagation rules
 - Significance: 3 — R6 for fields
@@ -1130,6 +1196,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Field versus channel, and channel registration
 - Decides: open — a metadata field is storage and a channel is the capability built on one or more fields, their rules, writer and interpreting code; whether one channel-level registration ("these fields, these rules, this semantics, this owner") replaces field-by-field registration, and what the three ownerless fields are.
 - Status: open
+- Type: capability — the registration surface an extension author uses
 - Rationale kind: technical
 - Depends on: Each layer registers its own fields
 - Significance: 3 — closes the fourth owed plane interface
@@ -1143,6 +1210,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Subsumption of legacy primitives into channel operations
 - Decides: `mv_*` and `component_get` become channel reads and writers, `make_error` becomes the public writer of the viral `error` field, and the `*_attach` family collapses into writer invocations or function properties.
 - Status: partly built
+- Type: capability — it changes the base's primitive surface
 - Rationale kind: technical
 - Depends on: Minimal base surface of about forty primitives; Metadata fields registered with declared propagation rules
 - Significance: 2 — local cleanups that follow from channels
@@ -1159,6 +1227,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Four planes and the placement rule
 - Decides: a value's information lives on one of four planes, data (the value itself), binding (named parts), metadata (registered fields) and host (interpreter bookkeeping invisible to Allegro), and new information is placed by asking those questions in that order.
 - Status: settled
+- Type: capability — it decides where a value's information is visible; the host plane's invisibility is a guarantee
 - Rationale kind: technical
 - Depends on: Metadata is a field on every value; One composite kind: Structure
 - Significance: 4 — answers "where does this go?" for every new thing
@@ -1172,6 +1241,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Plane interfaces are sanctioned and policed
 - Decides: each plane is reached only through its sanctioned interface (accessors for engine slots, `metaReadRaw` and the propagation table for metadata, install for layer meaning), and reaching it any other way is a violation, enforced by `lint:planes` on the storage plane.
 - Status: partly built
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Four planes and the placement rule
 - Significance: 4 — the planes become a discipline instead of a taxonomy
@@ -1185,6 +1255,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Engine meta slots retired into registered members
 - Decides: no new `__*` slot is ever introduced; every engine-owned binding gets a declared home (a member, a metadata field, a base concept or the host side), the partition between engine slots and user fields is the registered set, not the prefix, and the remaining prefixed names are renamed.
 - Status: partly built
+- Type: implementation — it renames engine slots; no program's meaning changes
 - Rationale kind: technical
 - Depends on: Four planes and the placement rule; Symbol identity is a fully-qualified name
 - Significance: 3 — removes a duck-typing hazard and a privileged binding interface
@@ -1199,6 +1270,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The data plane has no accessor
 - Decides: a value is its data, so there is no data-plane accessor; data access is well defined because above L0 values are created or modified only through defined Allegretto functions.
 - Status: settled
+- Type: implementation — a statement about the accessor layer
 - Rationale kind: technical
 - Depends on: Metadata is a field on every value
 - Significance: 2 — closes a question the carrier left
@@ -1212,6 +1284,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Where the host plane is declared
 - Decides: open — whether interpreter-only properties are declared on the value interfaces or on a separate host-plane interface reachable only through generated accessors, whether the unregistered properties are registered first, and what happens to the two registered as destined for the metadata plane.
 - Status: open
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Four planes and the placement rule
 - Significance: 2 — removes the `as any` casts that hide host access from the lints
@@ -1228,6 +1301,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The layer installs; the base never imports
 - Decides: a layer gives the base meaning by installing an implementation under a slot keyed by field name (merge, check, dispatch, projection, facts merge), the base calls it with opaque values and never imports the layer, and the base stores symbols without interpreting them.
 - Status: partly built
+- Type: implementation — installs are host-level: no Allegro program installs into the base
 - Rationale kind: technical
 - Depends on: The base does not know about the layers; Plane interfaces are sanctioned and policed
 - Significance: 4 — how Allegro Standard attaches to Allegretto
@@ -1242,6 +1316,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Installs are gated by the field's writer
 - Decides: installing into any hook requires holding the writer of the corresponding field, checked by identity against the registry, and a foreign install is refused with an error.
 - Status: settled
+- Type: implementation — a gate on host-level installs
 - Rationale kind: technical
 - Depends on: The layer installs; the base never imports; Writers are closures: delegable, attenuable, unforgeable
 - Significance: 3 — otherwise any module could decide what type checking means
@@ -1255,6 +1330,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One check hook per field, called with a free reader
 - Decides: argument checking at a typed call site runs every installed field check, each receiving the expected constraint, the argument, a reader over all fields and the site, with no ordering between checks; a declared parameter type with no installed check aborts.
 - Status: settled
+- Type: implementation — the check wiring inside the evaluator; installs are host-level
 - Rationale kind: technical
 - Depends on: Installs are gated by the field's writer
 - Significance: 3 — removes type checking from the evaluator
@@ -1268,6 +1344,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Member dispatch and call-site unification through the dispatch hook
 - Decides: type-directed dispatch at primitive applications and composed calls, including member dispatch and call-site unification, is an installed dispatcher that may answer or decline with null, in which case the base proceeds as Allegretto.
 - Status: settled
+- Type: implementation — the dispatch wiring inside the evaluator; installs are host-level
 - Rationale kind: technical
 - Depends on: Installs are gated by the field's writer
 - Significance: 3 — the evaluator decides nothing about types
@@ -1281,6 +1358,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Carrying needs a handle; deciding needs a hook
 - Decides: open in its remainder — where the base only passes a layer's value through, it should hold an opaque handle given at registration rather than an installed implementation; the type-vocabulary population (base primitives naming types they build) is to be solved this way.
 - Status: open
+- Type: implementation
 - Rationale kind: technical
 - Depends on: The layer installs; the base never imports
 - Significance: 3 — touches every primitive that builds a typed result
@@ -1294,6 +1372,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Knowledge propagation inside the evaluator
 - Decides: open — how the evaluator's remaining effect and knowledge inference (predicate sets at primitive application, a Param's effect bound, the precompile stash) leaves L0, given that the generic `union` rule cannot encode an effect set.
 - Status: open
+- Type: implementation
 - Rationale kind: technical
 - Depends on: The layer installs; the base never imports; Fixed propagation vocabulary
 - Significance: 3 — the last two forbidden edges of the evaluator
@@ -1307,6 +1386,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Layers reach the base only through metadata and capability
 - Decides: every L2 unit reaches L0 through the `metadata` and `capability` units, never through a kind's representation, so `refinements` and `effects` sit below `type-core` and the grammar engine depends on nothing of Allegretto.
 - Status: partly built
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Units in a narrow DAG; The layer installs; the base never imports
 - Significance: 3 — P2 as a graph property
@@ -1320,6 +1400,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Computed projections installed, not stored
 - Decides: a field computed on read, such as `shape` over `type`, is an installed projection served by name from `metaReadRaw`, whose read path names no field.
 - Status: settled
+- Type: implementation — how `shape` is served
 - Rationale kind: technical
 - Depends on: Installs are gated by the field's writer
 - Significance: 2 — local to metadata reads
@@ -1334,6 +1415,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Analysis results cross upward through a gated install
 - Decides: when a lower unit needs an analysis only a higher unit computes (effects inferred, may diverge), the producer installs the answer under a question about a field and the consumer reads it by name, erroring if it is missing once a compilation has begun.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Installs are gated by the field's writer; Units in a narrow DAG
 - Significance: 2 — closes the reverse crossing
@@ -1348,6 +1430,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Shared TypeScript types as representation leakage
 - Decides: open — L2 representation types crossing into L0 erase at runtime but let the base destructure the layer's representation; the tension is accepted for now, with the `value` contract's own types as the sanctioned shared types, and its resolution deferred to a self-hosted semantic hierarchy.
 - Status: open
+- Type: implementation
 - Rationale kind: technical
 - Depends on: The layer installs; the base never imports; Value as a contract, seven kind units and an assembly
 - Significance: 2 — porous interfaces, bounded
@@ -1363,6 +1446,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scope is the evaluation environment, not data
 - Decides: the evaluation environment has its own protocol (parent-chain resolution, forward chaining, a facts plane), is barred from type dispatch and typing, and is mutable evaluator state where data is not.
 - Status: settled
+- Type: capability — it decides how a name resolves and that the environment is not user data
 - Rationale kind: technical
 - Depends on: One composite kind: Structure
 - Significance: 4 — separates the environment from user data
@@ -1376,6 +1460,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scope leaves the value universe
 - Decides: the evaluation environment becomes a non-value host construct with its own representation, so plane-violation checks become unrepresentable; custom scope kinds stay closed.
 - Status: settled
+- Type: implementation — no scope reaches user code as a value (its own options), so leaving `Value` changes the representation only
 - Rationale kind: technical
 - Depends on: Scope is the evaluation environment, not data; One value universe
 - Significance: 3 — removes five sites that exist only to undo the sharing
@@ -1390,6 +1475,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scopes layer by parent chain
 - Decides: extending a scope is O(1) and does not copy; lookup walks the parent chain.
 - Status: settled
+- Type: implementation — concepts.md files it as an implementation choice
 - Rationale kind: technical
 - Depends on: Scope is the evaluation environment, not data
 - Significance: 2 — cost of the operation PE performs most
@@ -1403,6 +1489,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Facts plane immutable-layered and opaque to the base
 - Decides: a fact about a name is layered onto a child scope that branches, asserts and `requires` push and discard, the base stores fact payloads as opaque values, and layers are combined only through an installed, writer-gated facts merge.
 - Status: settled
+- Type: implementation — how the evaluator stores knowledge; branch-local knowledge is decided in the contracts chapter
 - Rationale kind: technical
 - Depends on: Scopes layer by parent chain; Installs are gated by the field's writer
 - Significance: 3 — occurrence knowledge without in-place mutation
@@ -1419,6 +1506,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Evaluation is total over unresolved information
 - Decides: the evaluator has a rule for every value it can meet, and an unresolved input produces a residual, never a failure to proceed; no operation errors on an incomplete value.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model; Expressions are values, forming a DAG
 - Significance: 5 — without it compile and run would separate again
@@ -1433,6 +1521,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### PE Rule 1: residualise, but unfold composed calls
 - Decides: an application with an unresolved argument residualises with fields propagated, unless it applies a composed function, which is unfolded into its substituted body, except a call into a recursion cycle during a typed compilation and a call inside a speculated `when` arm, which residualise carrying the callee's effects.
 - Status: settled
+- Type: capability — it decides what a residual is, which every check reads
 - Rationale kind: technical
 - Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; How the base applies propagation
 - Significance: 4 — unfolding is what lets discharge see inside a call
@@ -1447,6 +1536,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### PE Rule 2: speculate every branch, run no effect
 - Decides: a lazy primitive with an unresolved control input evaluates every branch speculatively (`eval_if` both branches, `eval_when` every arm's guard and body with pattern names as fresh Params, the right operand of `&&` and `||`) in a fresh child scope marked as compile mode, so an effect reached there becomes a residual carrying its effects.
 - Status: settled
+- Type: capability — it decides what a residual is, which every check reads
 - Rationale kind: technical
 - Depends on: PE Rule 1: residualise, but unfold composed calls; Host functions as values with declared evaluation control
 - Significance: 4 — an unknown condition no longer hides everything behind it
@@ -1458,38 +1548,27 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: `allegretto/evaluator.md` §3 prose still says `eval_when`, `&&` and `||` do not meet Rule 2 and that `eval_when` evaluates no branch; the IR (C179, C189 to C196) and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. The residual `eval_when` holds arms as written, not evaluated (C196). Rule 2 is left to each lazy primitive's implementation (C50). RR9's narrowing is to be revisited "when we want to push PE for more optimizations".
 - Chapter: Evaluation over unresolved information
 
-#### Incompleteness is a value in a slot
-- Decides: structures are always structurally complete; incompleteness is an unresolved future occupying a slot, never a structure state, and one representation serves REPL declarations, forward chaining and async futures.
+#### Incompleteness lives in write-once future cells
+- Decides: structures are always structurally complete; incompleteness is an unresolved future occupying a slot, never a structure state, and the future is its sole external locus: a write-once monotonic cell filled once, with `Future[Future[T]]` flattening and equality on an unresolved future residualising, write-once enforced at the phase interface; one representation serves REPL declarations, forward chaining and async futures.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Evaluation is total over unresolved information
-- Significance: 3 — one representation for every kind of pending
-- Label: foundational — future cells and completion rest on it
+- Significance: 3 — one representation for every kind of pending; monotonicity keeps forward chaining sound
+- Label: foundational — completion, forward chaining and async rest on it
 - Units: scope, futures
-- Options recorded: `ctx_use` and `Binding.isUse` as a separate declared-without-value state (retired)
-- Sources: docs/decisions.md D12, D26; docs/book/allegretto/structures.md §4, §10
+- Options recorded: `ctx_use` and `Binding.isUse` as a separate declared-without-value state (retired); none recorded beyond the Oz/IVar precedent
+- Sources: docs/decisions.md D12, D26, D33, CE-R5, CE-R6; docs/book/allegretto/structures.md §4, §10; docs/book/concepts.md §28
 - Book home (fragments' proposal): futures chapter (planned)
-- Chapter: Evaluation over unresolved information
-
-#### Future cells: write-once, monotonic, flattening
-- Decides: a future is the sole external locus of incompleteness, a write-once monotonic cell filled once, with `Future[Future[T]]` flattening and equality on an unresolved future residualising; write-once is enforced at the phase interface.
-- Status: settled
-- Rationale kind: technical
-- Depends on: Incompleteness is a value in a slot
-- Significance: 3 — monotonicity keeps forward chaining sound
-- Label: foundational — completion and async rest on it
-- Units: futures
-- Options recorded: none recorded beyond the Oz/IVar precedent
-- Sources: docs/decisions.md D33, CE-R5, CE-R6; docs/book/concepts.md §28; docs/book/allegretto/structures.md §10
-- Book home (fragments' proposal): futures chapter (planned)
-- Notes: incompleteness detection as an effect and `Future[T]` as a type belong to the L2 fragment; CE-R6 (no future manager in base mode is a configuration error, not incompleteness) is L0.
+- Notes: Merged in chunk P1b from "Incompleteness is a value in a slot" and "Future cells: write-once, monotonic, flattening": the first states incompleteness as a future, the second states the future as the locus of incompleteness, so neither holds without the other (see "The type check, 2026-11-05"). From the second: incompleteness detection as an effect and `Future[T]` as a type belong to the L2 fragment; CE-R6 (no future manager in base mode is a configuration error, not incompleteness) is L0.
 - Chapter: Evaluation over unresolved information
 
 #### Evaluation resumes on new information by forward chaining
 - Decides: when a cell is filled, everything that residualised on it re-evaluates, and this completion cascade is base evaluator machinery, not a primitive.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Future cells: write-once, monotonic, flattening
+- Depends on: Incompleteness lives in write-once future cells
 - Significance: 4 — loading and async re-enter an evaluation that already ran
 - Label: foundational — module loading and async results depend on it
 - Units: futures
@@ -1502,6 +1581,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Determinism and confluence of evaluation
 - Decides: open — whether the same source and inputs must give the same residual, and whether arrival order of completions provably cannot matter.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Evaluation resumes on new information by forward chaining
 - Significance: 3 — reproducible builds and re-checkable proofs need it
@@ -1515,6 +1595,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Substitution of params into bodies
 - Decides: applying a composed function substitutes each owned Param by position, leaves Symbols to resolve by name through the scope, shares unchanged subtrees, and copies an inner function whose body changed with fresh Params and its metadata carried.
 - Status: settled
+- Type: implementation — how application is computed; name resolution is the scope's
 - Rationale kind: technical
 - Depends on: Positional parameters owned by membership; Functions are data: params plus body
 - Significance: 3 — the core of application
@@ -1528,6 +1609,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Tail calls by sentinel and loop
 - Decides: a call in tail position of a function body, marked before precompile, returns a host sentinel that the enclosing application loops on at the first round's depth, so recursion depth is not bounded by the host stack; body wrappers forward the sentinel.
 - Status: partly built
+- Type: implementation — the mechanism; a tail call that does not grow the depth is its effect
 - Rationale kind: technical
 - Depends on: Substitution of params into bodies
 - Significance: 3 — unbounded recursion through typed functions
@@ -1542,8 +1624,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### One residualising resolution semantics for scopes
 - Decides: resolving a name is one path: bound gives the value with merged facts, unresolved gives a residual and never a throw; a genuinely absent source-level name is a compile-time error, and the reflective lookup returns an error value.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
-- Depends on: Scopes layer by parent chain; Evaluation is total over unresolved information
+- Depends on: Scope is the evaluation environment, not data; Evaluation is total over unresolved information
 - Significance: 2 — unifies two divergent paths
 - Label: swappable — inside the scope unit
 - Units: scope
@@ -1556,6 +1639,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Specified aborts
 - Decides: open — the base aborts in exactly five distinguishable classes (host-invariant assertion, plane violation, capability denial, resource guard, ill-formed application), and type errors thrown by the base are rework, not specification.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Evaluation is total over unresolved information; Capability denial is an abort, not an error value
 - Significance: 2 — lets tools tell an interpreter bug from a user error
@@ -1570,6 +1654,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Evaluation depth bound
 - Decides: evaluation aborts past a depth of 10,000, as a resource guard distinguishable from unresolved information.
 - Status: partly built
+- Type: implementation — a resource limit of this interpreter, inside the classes "Specified aborts" names
 - Rationale kind: technical
 - Depends on: Evaluation is total over unresolved information
 - Significance: 1 — a host guard
@@ -1585,6 +1670,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Grammars are Allegro values
 - Decides: a grammar is an ordinary Allegro Object of named productions over a `Rule` union (Terminal, NonTerm, Seq, Alt, Rep, Opt, Guarded) with a start symbol, so grammars are built, composed and analysed like any other value.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Allegretto is syntax-free; the parser lives above the base; One value universe
 - Significance: 4 — runtime grammar extension, `use` activation and the analyzer all operate on grammar values
@@ -1598,6 +1684,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scannerless parsing
 - Decides: grammars consume characters directly with no tokenizer; whitespace is explicit in the formalism, and keywords and identifiers share character space.
 - Status: settled
+- Type: capability — grammar authors write character-level rules
 - Rationale kind: technical
 - Depends on: Grammars are Allegro values
 - Significance: 3 — extensions can add tokens (`**`, `3 m`) without a lexer change
@@ -1608,23 +1695,10 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): grammar-formalism
 - Chapter: Grammars as values
 
-#### Memoized recursive-descent engine with seed-growing left recursion
-- Decides: the engine is a scannerless recursive parser with memoization, ordered choice, Warth-style seed-growing left recursion and stateful indent terminals, with farthest-advance error reporting.
-- Status: partly built
-- Rationale kind: technical
-- Depends on: Scannerless parsing; Grammars are Allegro values
-- Significance: 3 — fixes parse cost and which grammars run
-- Label: swappable — behind the grammar-formalism unit's parse interface; by the maintainer's ruling of 2026-11-05, any algorithm may replace it except one that requires ordered choice, and the shipped ordered choice is to be replaced by GLL or a similar algorithm
-- Units: grammar-formalism
-- Options recorded: GLL (the formalism's stated choice); full GLL "where Warth iteration falls short" (open gap); the retired Pratt + Earley hybrid
-- Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3
-- Book home (fragments' proposal): extension/grammar (chapter "The parser engine")
-- Notes: contradiction — grammar-formalism.md §1 says "GLL is chosen" and §5.1 speaks of "GLL memoization", while grammar.md §1/§4 describe a memoized parser with "PEG-committed ordered choice". The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for the standalone `grammar_*` combinators; its retirement in favour of `grammar2_*` is a backlog item.
-- Chapter: Grammars as values
-
 #### Ambiguity is banned and detected, not resolved by alternative order
 - Decides: the intended design is that precedence, associativity and longest-match metadata drive disambiguation, ambiguity is a compile-time error, and alternative order carries no meaning.
 - Status: open
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Grammars are Allegro values; Language extensions are declarative
 - Significance: 3 — decides whether user extensions inherit silent ordering hazards
@@ -1639,6 +1713,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Named, partially ordered precedence levels
 - Decides: precedence levels are named and related by before/after constraints that the analyzer topologically sorts; one-sided constraints are accepted whenever they resolve every actual ambiguity, and no integers appear in the user-visible spec.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Grammars are Allegro values
 - Significance: 3 — makes operator extension composable between independent libraries
@@ -1653,8 +1728,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Offside rule through stateful indent terminals
 - Decides: indentation is expressed by stateful terminals `NEWLINE`, `INDENT`, `DEDENT`, `SAMELINE` with parser position `(offset, indent stack)`; `NEWLINE` fires only when the next content is at or below the block's indent, so continuation lines need no special construct.
 - Status: partly built
+- Type: capability — grammar authors name the indent terminals in their rules
 - Rationale kind: technical
-- Depends on: Scannerless parsing; Memoized recursive-descent engine with seed-growing left recursion
+- Depends on: Scannerless parsing
 - Significance: 3 — offside-rule grammars (the planning DSL) and mixed modes rest on it
 - Label: swappable — engine terminal handling
 - Units: grammar-formalism
@@ -1664,22 +1740,10 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: `SAMELINE` is not implemented (`src/grammar2/engine.ts:712`); §5.4's tab and empty-stack questions are "Proposed", not recorded as decided.
 - Chapter: Grammars as values
 
-#### The precedence ladder runs as repetition, and memo invalidation tracks dependencies
-- Decides: the base grammar's levels are specified left-recursively but rewritten to `tighter (OP tighter)*` and folded back into left-nested nodes by the tree builder; left-recursion growth invalidates only memo entries that read a seed at the same position.
-- Status: settled
-- Rationale kind: technical
-- Depends on: Memoized recursive-descent engine with seed-growing left recursion; Named, partially ordered precedence levels
-- Significance: 2 — parse performance with an unchanged built program
-- Label: swappable — engine and tree-builder internals
-- Units: grammar-formalism, base-grammar, tree-builder
-- Options recorded: running the left-recursive specification directly; clearing every memo entry at the position (the earlier conservative rule)
-- Sources: B-157 P7 and P5 (docs/book/extension/grammar.md §1); grammar-formalism.md §6.4; Warth, Douglass and Millstein 2008
-- Book home (fragments' proposal): extension/grammar
-- Chapter: Grammars as values
-
 #### Guards and reservation sets separate keywords from identifiers
 - Decides: zero-width guards (`NotFollowedBy`, `FollowedBy`, `Reserved(set)`) and named, cumulative reserved sets keep keywords out of identifiers; `left`/`right`/`none` are reserved globally for simplicity.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Scannerless parsing
 - Significance: 2 — every keyword an extension adds faces the same choice
@@ -1693,8 +1757,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Parse failure reporting and recovery
 - Decides: failure reports the farthest advance with expected-versus-got; error productions (`@error`) and `@sync` panic recovery are core features, with sync points declared at natural boundaries in the base grammar.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
-- Depends on: Memoized recursive-descent engine with seed-growing left recursion
+- Depends on: Grammars are Allegro values
 - Significance: 2 — user-facing parse diagnostics
 - Label: swappable — engine
 - Units: grammar-formalism
@@ -1704,9 +1769,39 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: farthest-advance ships; `@error` and `@sync` do not.
 - Chapter: Grammars as values
 
+#### Memoized recursive-descent engine with seed-growing left recursion
+- Decides: the engine is a scannerless recursive parser with memoization, ordered choice, Warth-style seed-growing left recursion and stateful indent terminals, with farthest-advance error reporting.
+- Status: partly built
+- Type: implementation — the parsing algorithm, which the rulings keep swappable
+- Rationale kind: technical
+- Depends on: Scannerless parsing; Grammars are Allegro values; Offside rule through stateful indent terminals; Parse failure reporting and recovery
+- Significance: 3 — fixes parse cost and which grammars run
+- Label: swappable — behind the grammar-formalism unit's parse interface; by the maintainer's ruling of 2026-11-05, any algorithm may replace it except one that requires ordered choice, and the shipped ordered choice is to be replaced by GLL or a similar algorithm
+- Units: grammar-formalism
+- Options recorded: GLL (the formalism's stated choice); full GLL "where Warth iteration falls short" (open gap); the retired Pratt + Earley hybrid
+- Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3
+- Book home (fragments' proposal): extension/grammar (chapter "The parser engine")
+- Notes: contradiction — grammar-formalism.md §1 says "GLL is chosen" and §5.1 speaks of "GLL memoization", while grammar.md §1/§4 describe a memoized parser with "PEG-committed ordered choice". The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for the standalone `grammar_*` combinators; its retirement in favour of `grammar2_*` is a backlog item.
+- Chapter: Grammars as values
+
+#### The precedence ladder runs as repetition, and memo invalidation tracks dependencies
+- Decides: the base grammar's levels are specified left-recursively but rewritten to `tighter (OP tighter)*` and folded back into left-nested nodes by the tree builder; left-recursion growth invalidates only memo entries that read a seed at the same position.
+- Status: settled
+- Type: implementation
+- Rationale kind: technical
+- Depends on: Memoized recursive-descent engine with seed-growing left recursion; Named, partially ordered precedence levels
+- Significance: 2 — parse performance with an unchanged built program
+- Label: swappable — engine and tree-builder internals
+- Units: grammar-formalism, base-grammar, tree-builder
+- Options recorded: running the left-recursive specification directly; clearing every memo entry at the position (the earlier conservative rule)
+- Sources: B-157 P7 and P5 (docs/book/extension/grammar.md §1); grammar-formalism.md §6.4; Warth, Douglass and Millstein 2008
+- Book home (fragments' proposal): extension/grammar
+- Chapter: Grammars as values
+
 #### Static analysis of grammars
 - Decides: `analyze(grammar)` is a pure function computing nullability, FIRST/FOLLOW and reporting undefined names, infinite repetition, unreachable productions (warning) and left-recursion classification, cached per grammar identity.
 - Status: partly built
+- Type: capability — a function grammar authors call
 - Rationale kind: technical
 - Depends on: Grammars are Allegro values; Ambiguity is banned and detected, not resolved by alternative order
 - Significance: 2 — the check that lets extensions fail early
@@ -1723,6 +1818,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Grammar extension as operation deltas, extensible by default
 - Decides: extension is `extend(base, delta)` where a delta maps productions to `Add`, `Append`, `Replace`, `ReplaceAlt`, `Remove` or `Wrap`; `Append` auto-wraps a non-Alt production, and every rule is extensible with no `@extensible` gate.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Grammars are Allegro values
 - Significance: 3 — the one mechanism every syntax extension lowers to
@@ -1736,6 +1832,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Grammar extension never mutates the base
 - Decides: extension is immutable layering with structural sharing; base grammars are never mutated.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Grammar extension as operation deltas, extensible by default; Structures immutable by default; derive, never mutate
 - Significance: 3 — makes per-file extension scope and shared libraries safe
@@ -1749,6 +1846,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The declarative `grammar { … }` block with hygienic templates
 - Decides: modules declare syntax with `infix`/`prefix`/`postfix`/`expr_prefix`, `rule NAME =`/`+=`/`-=`/`[alt] =`, `expr_form` and `stmt_form` clauses whose EBNF bodies bind labels positionally to a template, substituted at parse time; free symbols in templates resolve in the defining module's context at definition time.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Grammar extension as operation deltas, extensible by default; Named, partially ordered precedence levels
 - Significance: 3 — the user-facing extension surface that `lib/` forms (contracts, totality, units, match) use
@@ -1762,6 +1860,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Rules for user-written EBNF
 - Decides: `ws_any` is interleaved between sequence items unless an explicit whitespace production is written; `expr_form` alternatives splice at the front of `expr_atom`; `INDENT`/`NEWLINE`/`DEDENT` are reachable by name; a `stmt_form` expanding to `binding_decl(...)` declares a binding; a label's matched text builds as a string literal.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: The declarative `grammar { … }` block with hygienic templates; Offside rule through stateful indent terminals
 - Significance: 1 — local rules for extension authors
@@ -1778,8 +1877,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Extensions are the module substrate
 - Decides: anonymous extensions (named bindings injected by the execution context, layered between primitives and source) are the substrate, and a module is an extension built from an `.alg` file; `import name` is declarative, with module values provided through extensions rather than loaded at the import site.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Allegretto is syntax-free; the parser lives above the base; Scopes layer by parent chain
+- Depends on: Allegretto is syntax-free; the parser lives above the base; Scope is the evaluation environment, not data
 - Significance: 4 — the standard library, grammars and the type system all arrive as extensions
 - Label: foundational — loading, typed module objects and grammar harvesting
 - Units: module-loading
@@ -1791,6 +1891,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Module loading and typed module objects are separate layers
 - Decides: loading (paths, dependency resolution, caching, cycle detection) is L1 and knows nothing of types; typed module objects, export surfaces and encapsulation are L2.
 - Status: settled
+- Type: implementation — a cut between units
 - Rationale kind: technical
 - Depends on: Extensions are the module substrate
 - Significance: 3 — fixes the L1/L2 boundary for modules
@@ -1805,6 +1906,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Build pipeline as a track, not a layer
 - Decides: the build pipeline is a capability track that may consume any layer's surface and is never a dependency of a layer, and its delivered part, the `pipeline` unit, sits at the top of the unit DAG, the one unit allowed to import any other.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: The base does not know about the layers; Units in a narrow DAG
 - Significance: 3 — places assembly above everything
@@ -1819,6 +1921,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One evalSource pipeline for programs and libraries
 - Decides: every program, REPL entry, subcommand and library load passes through the same `evalSource` pipeline, so every compile-time check fires inside libraries exactly as in user code.
 - Status: settled
+- Type: implementation — it realises the clause of "Compile-time first: failures halt the build" that libraries are checked as user code
 - Rationale kind: mixed
 - Depends on: Extensions are the module substrate; Build pipeline as a track, not a layer
 - Significance: 4 — makes library assurance the same assurance as user code
@@ -1833,6 +1936,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### `use` header for language extension, `import` for module values
 - Decides: a file's top-of-file header activates extensions with `use NAME`, `use import NAME`, `use NAME.MEMBER` and `use grammar { … }`, while `import name` in the body declares a module value supplied as an extension, not loaded imperatively at the site.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Programmable language platform: minimal core, extensions are the language; Extensions are the module substrate
 - Significance: 3 — the gate between a file and every DSL it speaks
@@ -1847,6 +1951,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Activation by a `use` header, per file and not transitive
 - Decides: a top-of-file `use NAME` / `use import NAME` / `use NAME.MEMBER` / `use grammar { … }` header extends the active grammar before the rest of the file parses; the extension holds for that file only, never leaking into the modules it imports, the files that import it or the REPL, and is not re-exported; grammars merge only when one base chain (`allegro`, `empty`, or `extends X`) is a prefix of the other.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Grammar extension never mutates the base; Extensions are the module substrate; `use` header for language extension, `import` for module values
 - Significance: 3 — defines how syntax reaches a program
@@ -1861,8 +1966,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Module resolution, caching and the session's runtime
 - Decides: the loader resolves local `lib/` first then the system `lib/`, detects circular dependencies, loads each file once per process (cache keyed by resolved path and content) and threads the session's FutureManager into module evaluation; base mode without a manager keeps an explicit configuration error.
 - Status: settled
+- Type: capability — the search order, cycle detection and load-once are what a program sees; threading the future manager is the realising part
 - Rationale kind: technical
-- Depends on: Extensions are the module substrate; Future cells: write-once, monotonic, flattening
+- Depends on: Extensions are the module substrate; Incompleteness lives in write-once future cells
 - Significance: 2 — load cost and module identity
 - Label: swappable — module-loading internals
 - Units: module-loading
@@ -1874,6 +1980,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### A library's values are immutable after load
 - Decides: a module writes only into values it constructed (the owner module); in-place pipeline writers (member re-keying, the divergence stamp, the precompile effect write) skip library-owned values, and member re-keying is write-once.
 - Status: settled
+- Type: implementation — the owner-module rule for in-place writers
 - Rationale kind: technical
 - Depends on: Module resolution, caching and the session's runtime; One evalSource pipeline for programs and libraries
 - Significance: 3 — makes sharing one loaded library across programs sound
@@ -1887,6 +1994,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Execution contexts layer as a scope chain
 - Decides: primitives ← extensions ← base (REPL persistence) ← source are real scope-chain layers linked by parent pointers (O(1) extend), not a flat copy; the returned evaluation context is the source layer.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Scopes layer by parent chain; Extensions are the module substrate
 - Significance: 2 — how extensions become visible to source
@@ -1900,6 +2008,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Callers pre-scan and strip the `use` header
 - Decides: `evalSource` runs no `use` pre-scan; each caller scans the header, loads the named modules as extensions, and strips the header before the call.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: `use` header for language extension, `import` for module values
 - Significance: 2 — fixes the pipeline's input contract
@@ -1914,6 +2023,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Conflicts are validated before activation
 - Decides: a cross-fragment validator runs before merging and aborts the `use` with aggregated `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` or `E_INCOMPATIBLE_GRAMMARS`; replacing a base production with `rule NAME =` warns (`W_PRODUCTION_REPLACED`) rather than errors.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Activation by a `use` header, per file and not transitive
 - Significance: 2 — independent extensions fail loudly when they clash
@@ -1929,6 +2039,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Types are values that constrain values
 - Decides: a type is an ordinary Structure carried in a value's `type` metadata field, built by ordinary calls (`Type.define`), and a type is a predicate over values; a type check is an evaluation.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Partial evaluation as the compilation model; Metadata is a field on every value; One value universe
 - Significance: 5 — the type system is an extension and PE-as-discharge applies to it
@@ -1943,6 +2054,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Kinds are types, and Type is its own type
 - Decides: a kind is a type whose instances are types (`Type`, `Refinement`, `Interface`, `GenericType`, `Effect`, `Proof`), instance-of is shape-of, members live once on the kind, and `Type : Type` is kept with universe stratification left to the proof-export boundary.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Types are values that constrain values
 - Significance: 4 — Effect and Proof are re-derived through one kind recipe
@@ -1956,8 +2068,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Members are keyed by symbol and conformance is membership
 - Decides: type members are interned fully-qualified member symbols; a type conforms by drawing another type's member symbols, so two types that each spell `size` do not conform by accident.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Symbols interned by FQN; Types are values that constrain values
+- Depends on: Symbol identity is a fully-qualified name; Types are values that constrain values
 - Significance: 4 — conformance, laws and privacy all key on member symbols
 - Label: foundational — lawful interfaces, private members and `distinct`
 - Units: type-core
@@ -1969,6 +2082,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Every Standard value has a type, with no implicit fallback
 - Decides: in Standard mode every value is typed (base primitives entering the context are wrapped as `UntypedFunction`), and a typed operator with a missing type method is an error.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Types are values that constrain values
 - Significance: 4 — the Standard-layer typing guarantee
@@ -1982,6 +2096,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One meta-type with an optional name
 - Decides: `NominalType` collapsed into `Type` with an optional name; named versus anonymous is a value-shape distinction, not a type-of-types distinction.
 - Status: settled
+- Type: capability — named versus anonymous is a value-shape distinction a program sees
 - Rationale kind: technical
 - Depends on: Types are values that constrain values
 - Significance: 3 — anonymity becomes the loose/declared switch
@@ -1995,6 +2110,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One construction surface
 - Decides: `define` is uniform at every meta-level, Interface is a refinement of Type and Refinement a sub-kind of Type, and the reserved `construct` define-spec key is the per-kind minting authority (bottoming out in `struct_new`).
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Kinds are types, and Type is its own type
 - Significance: 3 — one way to mint at every level
@@ -2008,6 +2124,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Loose conformance for data, selected by anonymity
 - Decides: an anonymous expected type (`~T`, inline `{…}`) matches by base name (duck typing for data at boundaries, patterns and the marked escape hatch); a named expected type takes the declared path; anonymity alone is the switch.
 - Status: partly built
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Members are keyed by symbol and conformance is membership; One meta-type with an optional name
 - Significance: 3 — keeps declared conformance strict and still liveable
@@ -2022,6 +2139,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The core type roster
 - Decides: Standard ships Int (64-bit signed), Float (IEEE double), String (UTF-8 Bits), Bool (Int 0/1 with Bool type), Array (numeric-keyed structure, generic), Object, Function, UntypedFunction, None, Error and Any; Array's map/filter/reduce are Allegro functions so PE sees through them, and operators dispatch through `PRIM_TO_METHOD` on the operand's shape.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Every Standard value has a type, with no implicit fallback; Bits is the only scalar
 - Significance: 3 — the types every program uses
@@ -2036,6 +2154,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Generics are memoized type constructors
 - Decides: a generic is a function from parameters to concrete types; applied concretes are memoized (identity is physical), parameters may be values (`Vector[3]`), and a bare generic in annotation position applies `Any`.
 - Status: settled
+- Type: capability — type identity follows from the memo
 - Rationale kind: technical
 - Depends on: Kinds are types, and Type is its own type
 - Significance: 3 — `Array[T]`, `Future[T]`, `Function[...]` and effect parameters ride it
@@ -2049,6 +2168,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Function types with bidirectional call-site unification
 - Decides: typed functions carry `Function[ParamTypes, ReturnType]`; type variables bind progressively at call sites with bidirectional flow, contradictions are call-site type errors, and checks run in `applyComposed` before substitution rather than as wrappers in bodies.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Generics are memoized type constructors
 - Significance: 3 — how typed calls are checked
@@ -2062,6 +2182,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### `distinct` mints a fresh-symbol newtype
 - Decides: `distinct` re-declares members under a fresh scope, so a newtype does not conform to or equal its parent unless a coercion is declared.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Members are keyed by symbol and conformance is membership
 - Significance: 2 — newtypes without an is-a edge
@@ -2075,6 +2196,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The user-facing generics surface and parameter kinds
 - Decides: open — which kinds of parameter the language offers and how users define generics; GenericType's missing construct authority is a deferred public surface, not kernel privacy.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Generics are memoized type constructors
 - Significance: 2 — nominal dimension types and value-parameterized types wait on it
@@ -2091,6 +2213,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Abstract domains as sound approximations
 - Decides: predicates are recognised as interval, equality, not-equal, effects or opaque domains that answer "definitely yes" or "cannot tell"; anything unrecognised is opaque and keeps the predicate for a runtime check, and no deeper reasoning runs online.
 - Status: settled
+- Type: capability — it decides what a compile-time check can prove
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model
 - Significance: 4 — the cheap form of discharge over residuals
@@ -2105,6 +2228,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Refinement types
 - Decides: a refinement is a type plus a predicate (`Int & _ > 0`) that shares its parent's member set, carries an abstract domain for compile-time entailment, and is chained left-associatively one layer per clause; its constructor wraps and checks the parent's.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Types are values that constrain values; Abstract domains as sound approximations
 - Significance: 5 — "types are predicates" made literal; units, invariants and termination bounds use it
@@ -2119,6 +2243,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Shape and knowledge are separate
 - Decides: a value's shape (its type with member-transparent refinement layers walked off) drives dispatch, while knowledge (refinement bounds, domains, predicate sets) is a monotonic lattice excluded from identity, equality and dispatch; a refinement that mints its own members is a shape.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Refinement types
 - Significance: 4 — annotations narrow without coercing; equality and dispatch ignore knowledge
@@ -2133,6 +2258,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Declared inheritance dissolves into conformance, refinement and composition
 - Decides: there is no declared is-a edge between concrete types; the relations are member-symbol conformance, refinement (`Type.refines`) and composition (member bundles), with no `extend` sugar.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Members are keyed by symbol and conformance is membership; Refinement types
 - Significance: 4 — reshapes subtyping, invariants, exhaustiveness and multiple inheritance
@@ -2147,6 +2273,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Invariants are refinements
 - Decides: a lifecycle invariant is a refinement layer (`T & pred`, records reaching fields through `_`), and it persists down a chain because the layer is structurally present, not because of an inheritance policy.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Refinement types; Declared inheritance dissolves into conformance, refinement and composition
 - Significance: 3 — one mechanism for scalars and records
@@ -2160,6 +2287,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### An interface is a type drawn from, not instantiated
 - Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Declared inheritance dissolves into conformance, refinement and composition; One construction surface
 - Significance: 2 — defines what an interface is now inheritance is gone
@@ -2176,6 +2304,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Mediated member access
 - Decides: member access is one partial-evaluation act in four stages (project, availability, mediate, dispatch) inside `type_dispatch`; `fallbackMember` (3-ary) stays the only user policy hook, and operator and untyped meta-dispatch share the same gated path.
 - Status: settled
+- Type: capability — the user policy hook and one gated path are the surface; the four stages are its form
 - Rationale kind: technical
 - Depends on: Members are keyed by symbol and conformance is membership
 - Significance: 3 — every member read goes through it
@@ -2189,6 +2318,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Access is what a type's member lookup returns, in two tiers
 - Decides: a type exposes exactly what its member-access protocol returns; members may be marked `private(...)` through descriptor combinators (`readonly(...)` reserved), giving two tiers (private, public), with public and names-public as defaults.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Members are keyed by symbol and conformance is membership; Mediated member access
 - Significance: 3 — encapsulation for types and modules alike
@@ -2202,6 +2332,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Evidence is possession
 - Decides: authorization is what the requesting context holds (symbol reachability), never principal identity; mediators receive an opaque kernel-minted capsule answering only `holds(name)`, never the raw scope.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Mediated member access; Writes gated by a capability, reads free
 - Significance: 3 — the ocap basis of privacy and the forgery-E guarantee
@@ -2215,6 +2346,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Privacy across readers, reflection and mediation effects
 - Decides: destructuring a private field outside its scope is an error naming privacy, printing omits privates with `…`, conformance counts only reachable members; enumeration and visibility flags stay free while value-bearing reflection needs possession; kernel mediation is pure and folds, and an impure user mediator declares its own effect label.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Access is what a type's member lookup returns, in two tiers; Evidence is possession
 - Significance: 2 — closes the bespoke readers by policy
@@ -2228,8 +2360,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Export marks the binding, and a module with no exports is open
 - Decides: `export NAME = …` sets a visibility attribute on the scope binding (never the value); a module declaring no exports is fully open, any `export` closes it, and flat `use`-injection is filtered to the same export set.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Module loading and typed module objects are separate layers; Evidence is possession
+- Depends on: Extensions are the module substrate; Evidence is possession
 - Significance: 2 — closes a leak route and fixes aliasing behaviour
 - Label: swappable — typed-modules policy
 - Units: typed-modules
@@ -2241,6 +2374,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Imported modules are typed objects whose type encapsulates
 - Decides: an imported module is a typed Object; dot access dispatches through the module's type, whose `fallbackMember` hook exposes only exported fields, and the wire resolves foreign names against the exported registry only.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Export marks the binding, and a module with no exports is open; Mediated member access
 - Significance: 3 — module encapsulation reuses type dispatch instead of a separate mechanism
@@ -2256,6 +2390,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Indentation blocks, with brace and offside both as the goal
 - Decides: the base surface opens blocks by indentation (offside rule) and an expression continues across lines when the next line is indented deeper; Allegro should support both brace-delimited and indentation syntax, and until then every new construct must work in both modes.
 - Status: partly built
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: Offside rule through stateful indent terminals
 - Significance: 3 — every multi-line program and the planning surface use it
@@ -2270,6 +2405,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Refinement types written `T & predicate` with `_` as the value
 - Decides: a refinement is written `Base & predicate` where `_` names the value, and `ensures` uses the same `_` for the return value.
 - Status: settled
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: Refinement types
 - Significance: 3 — the most visible claim syntax; used by units and planning
@@ -2283,6 +2419,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Function declarations with `=>`
 - Decides: a function is declared `name(params) => body`, a lambda is `x => body` or `(x, y) => body`, and closures are ordinary nested lambdas.
 - Status: settled
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: Surface syntax is provisional, reviewed against a corpus
 - Significance: 2 — the most common declaration form, but a spelling
@@ -2297,6 +2434,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Expression-valued `if then else` with thunked branches
 - Decides: `if c then a else b` is an expression whose branches the parser wraps in thunks, so a lazy primitive evaluates only the chosen branch.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Host functions as values with declared evaluation control
 - Significance: 2 — local to the conditional, but its thunking interacts with tail calls
@@ -2311,6 +2449,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The `Y of x` component-access form
 - Decides: a metadata component of a value is read by the expression form `Y of x` (`type of x`, `error of x`, `source of x`), a general expression feature rather than a pattern feature.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Metadata is a field on every value; Errors as a viral metadata field
 - Significance: 2 — the reader's view of the metadata plane at the surface
@@ -2325,6 +2464,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Type annotations on parameters and returns
 - Decides: parameters and returns carry `: Type` annotations, generics are written `Array[Int]`, and a failed annotation check halts compilation.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Compile-time first: failures halt the build
 - Significance: 2 — spelling of the typing surface
@@ -2339,6 +2479,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Statement forms that declare a binding
 - Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement halts when its check fails.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Grammar extension as operation deltas, extensible by default; Type annotations on parameters and returns
 - Significance: 3 — lets a DSL declare names with the kernel's halt semantics; the planning `plan NAME:` form needs it
@@ -2353,6 +2494,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### `when / is / then` pattern matching
 - Decides: matching uses `when x is P then e` with nominal, structural and nested destructuring and `and`/`or` guards; a type pattern resolves first (value pattern matches the primary, type pattern matches the input's type, or either for a type input).
 - Status: settled
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: The declarative `grammar { … }` block with hygienic templates; Types are values that constrain values; Expression-valued `if then else` with thunked branches
 - Significance: 2 — the match surface
@@ -2367,6 +2509,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Allegro Standard by default, Allegretto by flag
 - Decides: every host entry (file runner, REPL, subcommands, sandbox) runs Allegro Standard with the type system as its one base extension, and `--base` selects bare Allegretto.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
 - Significance: 2 — which language a user meets
@@ -2381,6 +2524,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Combinators before keyword declaration syntax
 - Decides: types, interfaces, refinements and member modifiers are declared through combinator calls (`Type.define`, `Interface.define`, `private(...)`), and keyword declaration syntax waits until the API patterns settle, lowering to the same attributes when it lands.
 - Status: open
+- Type: capability
 - Rationale kind: mixed
 - Depends on: One construction surface; Access is what a type's member lookup returns, in two tiers
 - Significance: 2 — every surface keyword (private, effect declarations) waits on it
@@ -2395,6 +2539,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### String interpolation with braces
 - Decides: a string literal interpolates `{expr}`, with `\{` and `\}` as escapes.
 - Status: settled
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: Surface syntax is provisional, reviewed against a corpus
 - Significance: 1 — local spelling
@@ -2410,6 +2555,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Proofs are values discharged by evaluation
 - Decides: a proposition is an expression reducing to Bool; `theorem` and `verify` lower to `proof_by_eval`, the kernel verifies a proof by partial evaluation (reduction, not search), a failed proof halts with its counterexample, and only the kernel writes the `discharged` mark.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Partial evaluation as the compilation model; Writes gated by a capability, reads free; Kinds are types, and Type is its own type
 - Significance: 4 — the provability thesis in the language
@@ -2424,6 +2570,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Theorems as statements, proved `by` a term
 - Decides: `theorem NAME: proposition` names a referenceable proof and `verify proposition` is an anonymous one-shot, both lowering to `proof_by_eval`, and `by <term>` supplies a proof term that the kernel checks establishes exactly the stated proposition.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Proofs are values discharged by evaluation; Formal claims written in the program's own syntax
 - Significance: 3 — the proof surface every rung and the prover loop splice into
@@ -2437,6 +2584,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Discharge mechanisms without search
 - Decides: the kernel discharges without search, in order of preference: evaluation (`proof_by_eval`), refinement-domain entailment (`proof_refines`), equational combinators (`proof_refl`/`sym`/`trans`/`cong` via `by`), then quantification (finite enumeration by `prove_for_all_bool`, bounded-sample `prove_induction` and `proven` clauses at K=4), with a tactics library composing them and no SMT.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Proofs are values discharged by evaluation; Abstract domains as sound approximations
 - Significance: 3 — what can be proved today
@@ -2451,6 +2599,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Bounded sampling for universal claims
 - Decides: `prove_induction` verifies the base and K=4 inductive steps, and a function's `proven` clause is checked at K=4 sampled inputs of its parameter type, halting with the counterexample; full symbolic induction and symbolic-input verification are follow-ons.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Discharge mechanisms without search; Every claim states its discharge strength
 - Significance: 3 — the only universal-claim path beyond finite enumeration
@@ -2465,6 +2614,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Tactics as a pure Allegro library
 - Decides: reusable proof strategies (`same`, `flip`, `step`, `chain`, `rewrite`) are a library of plain Allegro over the kernel's combinators, adding no primitive.
 - Status: settled
+- Type: capability — where tactics live is what a prover imports
 - Rationale kind: vision
 - Depends on: Theorems as statements, proved `by` a term; Programmable language platform: minimal core, extensions are the language
 - Significance: 2 — shows proof strategy as user-extensible
@@ -2478,6 +2628,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One primer for human and machine provers
 - Decides: the proving guide is one participant-neutral document, and the `prove` loop sends that same file to the language model as its primer.
 - Status: settled
+- Type: capability — it decides what a machine prover is told
 - Rationale kind: vision
 - Depends on: Participant-neutral prover protocol with the kernel as trust boundary
 - Significance: 2 — makes the protocol's neutrality literal
@@ -2492,6 +2643,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One proof-term contract for human and machine provers
 - Decides: humans and LLM provers supply the same proof terms: an LLM prover answers with a fenced `allegro` block holding only the term, which the worker splices into the theorem's `by` slot and re-verifies through `evalSource`, keeping it only when the theorem discharges, for at most `--max-attempts` attempts (five by default); the kernel accepts or rejects every term alike.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Proofs are values discharged by evaluation; One primer for human and machine provers; Theorems as statements, proved `by` a term
 - Significance: 2 — the machine interface of the loop
@@ -2508,6 +2660,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Lawful interfaces
 - Decides: any member set may carry `law_`-prefixed members whose `for_all` propositions are schemas at declaration and become one pending Obligation per law when a type draws the set; laws attach to scopes because a law may reference several members.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Members are keyed by symbol and conformance is membership; Proofs are values discharged by evaluation
 - Significance: 4 — the mechanism that makes "lawful" checkable
@@ -2521,6 +2674,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Equality dispatches on shape, then coerces, else not-equal
 - Decides: `==` compares same-shape values with the shape's `equals`; for different shapes it coerces both operands to a least common type over declared coercions (`Coercion.declare(A, B, fn)` on the pair, with preservation and coherence obligations); with no path the answer is false, never an error.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Shape and knowledge are separate; Lawful interfaces
 - Significance: 4 — a lawful, globally stable equivalence
@@ -2535,6 +2689,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Kernel structural equality is the default
 - Decides: every structure-backed type gets a kernel `equals` (same shape, then field-wise or element-wise protocol equality), proven lawful once parametrically; a user override bears the three law obligations; None and Error keep identity semantics, and Bool is not equal to Int.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Equality dispatches on shape, then coerces, else not-equal
 - Significance: 3 — records and arrays compare without user code
@@ -2548,6 +2703,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Law discharge tiers and the first strict gate
 - Decides: law obligations discharge at a recorded tier (kernel, enumerated, witnessed, sampled, admitted via `Law.assume`, pending), proofs record the equality and tier they rest on, and `proof_trans` refuses a custom equality whose transitivity is neither proven nor admitted.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Lawful interfaces; Every claim states its discharge strength
 - Significance: 3 — "no boolean verified anywhere"
@@ -2564,6 +2720,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Effects are values in one lattice
 - Decides: effects are values of kind `Effect`, composed by conjunction with the dedicated `&` operator, with `pure` (bottom) and `opaque` (top) fixed in the core and all other labels defined by libraries; lattice operations are typed methods.
 - Status: partly built
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Kinds are types, and Type is its own type; Metadata is a field on every value
 - Significance: 4 — effect tracking reuses value, type and member machinery
@@ -2578,6 +2735,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Effect inference is driven by partial evaluation, and a declaration is a contract
 - Decides: effects are inferred automatically through PE propagation (no separate walker); an `effects` declaration is optional and verified, never trusted, and an inferred effect the declaration does not admit halts compilation.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Effects are values in one lattice; Partial evaluation as the compilation model
 - Significance: 4 — the falsifiable "one engine" claim applied to effects
@@ -2592,6 +2750,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Parameter effect bounds and explicit effect variables
 - Decides: a parameter's effect bound is written in the type slot (`f: pure`) or a `param_effects` body form and discharged at call sites; effect polymorphism needs an explicit `[e: Effect]`, and an unannotated function-typed parameter is `opaque`.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract; Generics are memoized type constructors
 - Significance: 3 — precise effects through higher-order code
@@ -2605,6 +2764,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Effects describe computations, refinements describe data
 - Decides: effects ride their own metadata field and parameter effect bounds use `Param.effectBound`; refinement predicate sets stay a separate lattice.
 - Status: settled
+- Type: implementation — where effect and knowledge information is stored
 - Rationale kind: technical
 - Depends on: Effects are values in one lattice; Refinement types
 - Significance: 2 — keeps the two lattices from mixing
@@ -2618,8 +2778,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Labels for observing knowledge and scheduling
 - Decides: observing knowledge or source (`certificate_peek`, `observe`) carries `observe`, and asking whether a value is resolved (`is_resolved`) carries `sched`; blocking reads need no label under PE because reads residualize.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Effects are values in one lattice; Future cells: write-once, monotonic, flattening
+- Depends on: Effects are values in one lattice; Incompleteness lives in write-once future cells
 - Significance: 2 — quarantines nondeterminism and knowledge-dependence from pure code
 - Label: swappable — label roster
 - Units: effects
@@ -2631,6 +2792,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Redefining primitives and core types is banned
 - Decides: extensions cannot replace primitives or core types, so no "replaces primitive" effect is needed.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effects are values in one lattice
 - Significance: 2 — closes one subversion vector by construction
@@ -2645,6 +2807,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The `unsafe` hierarchy and safe wrappers
 - Decides: unanalyzable operations sit under `unsafe.*` (memory, executable, codegen, ffi) between specific labels and `opaque`, accepted on author authority; a wrapper may claim a tighter effect, so callers do not inherit `unsafe`.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effects are values in one lattice
 - Significance: 2 — the honest boundary for FFI and codegen
@@ -2658,6 +2821,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Member and parameterized effects
 - Decides: `files.read` is property access on an Effect whose members are Effects, and `files.read_from "X"` is memoized generic application specialized by ordinary PE; prefix paths imply their parents.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effects are values in one lattice; Generics are memoized type constructors
 - Significance: 2 — parametric capabilities
@@ -2671,6 +2835,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Open effect surfaces
 - Decides: open — how new effects are declared (value bindings or an `effect files { … }` form), the module-init effect surface, and a runtime effect-check fallback (`allow | warn | error`).
 - Status: open
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Effects are values in one lattice; Combinators before keyword declaration syntax
 - Significance: 1 — surface choices
@@ -2686,6 +2851,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### A contract is a predicate that becomes knowledge, discharged by PE
 - Decides: `assert`, `requires` and `ensures` attach their predicate to the knowledge set on success, so later checks of the same property are free; there is no separate contract checker, and entailment against available knowledge removes the runtime check.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Shape and knowledge are separate; Partial evaluation as the compilation model
 - Significance: 4 — compile-time and runtime checking are one mechanism
@@ -2699,8 +2865,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Knowledge has intrinsic and occurrence carriers
 - Decides: intrinsic facts ride the value (refinement certificates, passing checks), occurrence facts live in the scope facts plane, and a check consults their meet; predicate sets are small ordered lists with dedup, opaque to user code.
 - Status: partly built
+- Type: capability — the two carriers decide where knowledge holds; the list form is a realising detail
 - Rationale kind: technical
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Scopes layer by parent chain
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Scope is the evaluation environment, not data
 - Significance: 3 — how facts reach a check
 - Label: swappable — carrier representation
 - Units: refinements, contracts
@@ -2713,6 +2880,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Body-form clauses at the head of a body, lowered through one chain
 - Decides: contracts and analysis declarations (`requires`, `ensures`, `effects`, `decreases`, `total`, `partial`, `assume terminates`, `proven`) are leading statements of a function body, recognised at parse time and lowered as marker primitive, then tree-builder attach, then `collapseBodyMetadata`, then function property; `requires` is hoisted ahead of the body and `ensures` wraps the result as `ensures_check(result, λ_)`, forwarding tail calls.
 - Status: settled
+- Type: capability — the clauses and what they lower to are the surface; the chain's stage names are its form
 - Rationale kind: mixed
 - Depends on: The declarative `grammar { … }` block with hygienic templates; Formal claims written in the program's own syntax; Grammar extension as operation deltas, extensible by default
 - Significance: 3 — every L2 annotation reaches analysers the same way
@@ -2727,6 +2895,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Branch refinement narrows knowledge per region
 - Decides: an `if` arm narrows knowledge for that arm only from literal comparisons and conjunctions, layered on scope and discarded on exit; `assert` and `requires` narrow the rest of the enclosing scope.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Knowledge has intrinsic and occurrence carriers
 - Significance: 2 — flow-sensitive knowledge
@@ -2740,6 +2909,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Contract checks sit at function entry and return
 - Decides: `requires` checks at function entry and `ensures` at return; per-call-site discharge already happens through PE, and relocating an undischarged check to the call site remains open.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: A contract is a predicate that becomes knowledge, discharged by PE
 - Significance: 2 — where residual checks are emitted
@@ -2753,6 +2923,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Choosing among refinement, contract, assert and law
 - Decides: prefer a refinement when the property is intrinsic, a contract when it concerns a function's relation to callers, `assert` for local knowledge, and a theorem or law when the claim is quantified over inputs; formal work concentrates in libraries.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Refinement types; A contract is a predicate that becomes knowledge, discharged by PE; Lawful interfaces
 - Significance: 2 — guidance that ties the mechanisms together
@@ -2766,6 +2937,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Unification and branch refinement in patterns
 - Decides: open — full unification in pattern mode, and narrowing predicate sets in `when` arms as `if` branches do.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: `when / is / then` pattern matching; Branch refinement narrows knowledge per region
 - Significance: 1 — precision of matching
@@ -2782,6 +2954,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Divergence is a computed effect
 - Decides: possible non-termination is the effect `div`, written into inferred sets by the termination analysis before the declaration check, so totality uses the effect calculus with no parallel machinery; no primitive carries it and no handler exists; kernel primitives are axiomatically total.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract
 - Significance: 4 — totality becomes one more effect
@@ -2795,6 +2968,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Four-tier discharge spectrum
 - Decides: every obligation is recorded per binding at one of auto, witnessed (kernel-checked `decreases`), admitted (`assume terminates` or an unverifiable metric) or undischarged (`partial`), verdict-visible and exported; surface forms `decreases`, `assume terminates`, `partial` and `total` are body forms in `lib/totality.alg`.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Divergence is a computed effect; Body-form clauses at the head of a body, lowered through one chain
 - Significance: 4 — "nothing is silently trusted" made operational
@@ -2809,8 +2983,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Completion is totality and liveness
 - Decides: incompleteness has two sources, divergence and blocking external reads; external sources discharge liveness by declared axiom (delay: live; fetch: admitted, ledger-visible), never by inference.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Divergence is a computed effect; Future cells: write-once, monotonic, flattening
+- Depends on: Divergence is a computed effect; Incompleteness lives in write-once future cells
 - Significance: 3 — frames what "the program completes" means
 - Label: foundational — liveness ledger and `sched`
 - Units: totality, futures
@@ -2822,6 +2997,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Strict at the contract, informational for undeclared code
 - Decides: discharge accounting is always strict and a declaration (effect set, `total`, an annotation) is strict when it exists, while undeclared code gets info-tier findings; making undeclared code strict is per-project configuration, never a global change.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Four-tier discharge spectrum
 - Significance: 3 — the severity policy for every analysis
@@ -2835,6 +3011,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Termination by bounded decrease
 - Decides: a recursive call decreases when an argument is `param - K` (literal K > 0) and the callee's parameter type has a non-negative lower bound read from refinement domains; a detected decrease on an untyped parameter stays silent.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Abstract domains as sound approximations; Divergence is a computed effect
 - Significance: 3 — automatic termination proof over refined types
@@ -2848,6 +3025,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Project severity configuration
 - Decides: open in shape — one per-project surface for `total`-by-default, per-notification promotion, blanket axiom patterns, and the construction-failure and exhaustiveness severity knobs (absorbing v1's `--strict`).
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Strict at the contract, informational for undeclared code
 - Significance: 2 — the relief valve for strictness
@@ -2861,6 +3039,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Mutual recursion requires every edge to decrease
 - Decides: over Tarjan SCCs, every in-cycle call must decrease individually; per-function `decreases` covers what the structural test cannot.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Termination by bounded decrease
 - Significance: 2 — mutual recursion criterion
@@ -2874,6 +3053,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Totality polymorphism is effect polymorphism
 - Decides: callback divergence propagates through effect propagation and effect variables; no `[t: Totality]` marker system exists, and a narrow stdlib-HOF structural check remains as a precision aid.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Divergence is a computed effect; Parameter effect bounds and explicit effect variables
 - Significance: 2 — avoids a parallel polymorphism
@@ -2887,6 +3067,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Exhaustiveness checking at info severity
 - Decides: each `when` chain is analysed; `else`, wildcard or a bind-anything pattern covers it, Bool coverage is checked with a witness, unknown subject types stay silent, and findings are info until project configuration promotes them.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: `when / is / then` pattern matching; Strict at the contract, informational for undeclared code
 - Significance: 2 — coverage of matches
@@ -2903,6 +3084,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Statement contracts halt, construction failure is an error value
 - Decides: a false `assert`, `requires` or `ensures` halts compilation, while a failed refinement check at construction or `assert_invariant` yields an error value in the error channel; promoting either path is a maintainer decision through project configuration.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Errors as a viral metadata field; Strict at the contract, informational for undeclared code
 - Significance: 3 — failure semantics of all contract forms
@@ -2916,6 +3098,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Mechanical purity gates
 - Decides: an `equals` or coercion implementation, and a value-inspecting invariant predicate, must infer an empty effect set, including `observe` and `div`; a violation is a compile error naming the label.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract; Divergence is a computed effect
 - Significance: 2 — keeps equality knowledge-independent and guards from hanging
@@ -2929,6 +3112,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The triggered construction guard
 - Decides: a refinement constructor checks its predicate on the built value; an unresolved check residualizes construction itself, a prior error propagates untouched, and only opaque (value-inspecting) predicates pay the div-freedom gate.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Invariants are refinements; Errors as a viral metadata field; Mechanical purity gates
 - Significance: 3 — an instance never exists tagged valid before its invariant holds
@@ -2942,6 +3126,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### `assume` is the admitted tier, and the silent assume is retired
 - Decides: trust boundaries are recorded, ledger-visible admissions (`Law.assume`, `assume terminates`, a future `assumes` form); `assume_invariant`, which attaches a fact without recording it, is retired.
 - Status: partly built
+- Type: capability
 - Rationale kind: vision
 - Depends on: Four-tier discharge spectrum
 - Significance: 2 — removes the one silent trust path
@@ -2956,6 +3141,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Every failure carries a legible counterexample
 - Decides: termination and exhaustiveness findings carry one-line executable witnesses, contract and refinement failures render the violated constraint and the actual Int value, a refinement predicate may return an error value whose text becomes the message, and an in-body `assert` over parameters is suggested as a `requires`.
 - Status: partly built
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Abstract domains as sound approximations; Termination by bounded decrease
 - Significance: 2 — diagnostics speak the program's terms
@@ -2970,6 +3156,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The verdict as accumulated metadata
 - Decides: open — the verdict should be the top-level value's accumulated metadata (each channel defining its accumulation), replacing `buildVerdict`'s out-of-band walk of top-level bindings.
 - Status: open
+- Type: implementation — how the verdict is computed; what it reports is "Every claim states its discharge strength"
 - Rationale kind: technical
 - Depends on: Four-tier discharge spectrum; Metadata fields registered with declared propagation rules
 - Significance: 2 — how obligations reach the verdict
@@ -2983,8 +3170,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Contracts in the verdict and the ledger
 - Decides: open — undischarged contracts should reach the verdict and assumption ledger; contracts reach only `inspect` today.
 - Status: open
+- Type: capability
 - Rationale kind: vision
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; The verdict as accumulated metadata
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Every claim states its discharge strength
 - Significance: 2 — closes a "silently trusted" gap
 - Label: swappable — verdict assembly
 - Units: contracts, pcp
@@ -2998,6 +3186,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Rung 2 domain: units of measure over state machines
 - Decides: rung 2's provable DSL is units-of-measure physics, chosen over state machines for the bridge to rung 3 and the mixed-model trajectory, built as a library with zero host code.
 - Status: settled
+- Type: capability — it decides which domain the thesis is shown in
 - Rationale kind: mixed
 - Depends on: The demo ladder as the thesis test; Substrate and surfaces: a DSL inherits the whole kernel
 - Significance: 3 — fixes the seriousness proof and the rung-3 measures
@@ -3011,6 +3200,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Dimensions as data, named dimensions as refinements over one Quantity
 - Decides: a dimension is structural data (the full seven-vector of SI base dimensions) and each named dimension is a refinement over one `Quantity` record, so dimensional soundness is refinement discharge, with a mechanics-focused shipped unit set.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Refinement types; Kernel structural equality is the default; Extensions are the module substrate; Rung 2 domain: units of measure over state machines; Provable correctness and safety as one predicate machinery
 - Significance: 3 — the demonstration that a domain check needs no new machinery
@@ -3025,6 +3215,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Quantity laws at honest tiers
 - Decides: the quantity laws are shown at their real tiers (sampled, admitted, pending), loudly, rather than restricting the demo to laws the kernel discharges.
 - Status: settled
+- Type: capability
 - Rationale kind: vision
 - Depends on: Law discharge tiers and the first strict gate; Every claim states its discharge strength; Dimensions as data, named dimensions as refinements over one Quantity
 - Significance: 2 — principle 9 applied to a demo
@@ -3039,6 +3230,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Number-anchored quantity literals
 - Decides: the units DSL works with zero grammar through typed operators; `use units` adds only number-anchored literals (`3 m/s^2`, `^` inside unit expressions only, horizontal whitespace between number and unit), and every computed value goes through the ordinary operator algebra.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Dimensions as data, named dimensions as refinements over one Quantity; The declarative `grammar { … }` block with hygienic templates; Rules for user-written EBNF
 - Significance: 1 — DSL syntax scope
@@ -3053,6 +3245,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Conversion sugar with `in`
 - Decides: open — `5 km in m` sugar is deferred; `.to(m)` is the surface.
 - Status: open
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: Number-anchored quantity literals
 - Significance: 1 — local sugar
@@ -3068,6 +3261,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Vivace adds a discipline, not machinery
 - Decides: a Vivace domain is an L1 grammar extension plus L2 types and contracts, introducing no new trust roots, its guarantees reducing to L2 provability; the layer exists for the model-first methodology.
 - Status: settled
+- Type: capability — it decides what the Vivace tier is made of
 - Rationale kind: vision
 - Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Provable correctness and safety as one predicate machinery
 - Significance: 3 — sets what a domain model may and may not add
@@ -3082,6 +3276,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Vivace hypothesis: models as the review artefacts
 - Decides: application developers are to work in the highest-abstraction model that expresses the problem, with predicates and proofs opt-in, models and their constraints as the review artefacts, failures as build errors with counterexamples every stakeholder can read, and specialist-authored models giving transitive assurance; the tier is a hypothesis tested by three domain pilots (planning workflow, software system model, physics simulation), specification and verification first with execution external.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Vivace adds a discipline, not machinery; Compile-time first: failures halt the build
 - Significance: 3 — the hypothesis rung 3 tests
@@ -3096,6 +3291,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Three different pilots, planning first
 - Decides: three deliberately different pilots test the hypothesis (project planning, a software system model, physics simulations), and the planning workflow goes first as a self-contained DSL with rich structural constraints.
 - Status: settled
+- Type: capability — it decides which domains the tier must express
 - Rationale kind: mixed
 - Depends on: Vivace hypothesis: models as the review artefacts
 - Significance: 3 — fixes rung 3's domain
@@ -3110,6 +3306,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Shape 1 before Shape 2
 - Decides: every pilot starts as Shape 1, specified and verified in Allegro with execution external, and Shape 2, in which Allegro runs the model, is a later, separable concern.
 - Status: settled
+- Type: capability — it decides that a Vivace model is verified, not run, for now
 - Rationale kind: mixed
 - Depends on: Vivace hypothesis: models as the review artefacts
 - Significance: 3 — keeps the pilot to specification and checking
@@ -3124,6 +3321,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Library before surface
 - Decides: the planning model is built and tested as a plain Allegro library through its API before the `plan NAME:` grammar, because the surface may surface engine work and the model is what rung 3 tests.
 - Status: settled
+- Type: implementation — a build order; another order changes no capability
 - Rationale kind: technical
 - Depends on: Three different pilots, planning first
 - Significance: 2 — sequencing that makes the API the model's truth
@@ -3140,6 +3338,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### A plan is an outcome graph with derived wiring
 - Decides: a plan is a DAG of nodes with typed inputs and outcomes, whose edges are derived from wiring an outcome into every input of the same type in scope, with names assigned only where a match is ambiguous; the performer is metadata, never structure.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Three different pilots, planning first
 - Significance: 3 — every check, budget and search reads the graph
@@ -3154,6 +3353,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Leaf and composite nodes, with `uses` to borrow a plan
 - Decides: a node is a leaf (estimate, instructions) or a composite with its own internal graph whose declared outcomes must be what that graph produces, and `Name: uses Other` makes a separately declared plan a node's graph, across files through `import`.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: A plan is an outcome graph with derived wiring; `use` header for language extension, `import` for module values
 - Significance: 3 — hierarchy without a sub-plan notion
@@ -3167,6 +3367,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Failure handlers over outcomes
 - Decides: a node declares the failure types it can raise (`fails:`); `on F:` inside a composite is an alternate graph that must produce the composite's outcomes from the scope's inputs and the outcomes upstream of every raiser; a failure propagates to the nearest matching handler, an unhandled one escalates to the plan's caller without a finding, and a handler for an undeclared failure is refused.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Leaf and composite nodes, with `uses` to borrow a plan
 - Significance: 3 — the model's error semantics
@@ -3181,6 +3382,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Two enforcement shapes for a well-formed plan
 - Decides: the plan constructor yields an error value in domain terms when a check fails (guarded construction, weaker than a halt), while a binding annotated `WellFormedPlan`, which the `plan` statement expands to, halts compilation.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Compile-time first: failures halt the build; Statement forms that declare a binding
 - Significance: 3 — makes "a plan that does not check does not build" literal
@@ -3195,6 +3397,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### A refinement predicate explains its own refusal
 - Decides: a refinement predicate that answers an error value explains the refusal, and the kernel carries that text into the halt or error value at every refusal site, with no registered slot and no renderer registry, so a model's legibility travels with its type.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Two enforcement shapes for a well-formed plan; Refinement types
 - Significance: 3 — counterexample legibility, one of the seven Vivace gaps
@@ -3209,8 +3412,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Planning surface conventions
 - Decides: one declaration keyword `plan`; no keyword for sub-units, a capitalised name with `:` and an indented block being a node; reserved lowercase configuration keys (`inputs`, `outcomes`, `estimate`, `instructions`, `budget`, `on`, `retry`, `uses`, `fails`, `options`).
 - Status: settled
+- Type: capability
 - Rationale kind: aesthetic
-- Depends on: Indentation blocks, with brace and offside both as the goal; Library before surface
+- Depends on: Indentation blocks, with brace and offside both as the goal; A plan is an outcome graph with derived wiring
 - Significance: 2 — the planning DSL's look
 - Label: swappable — `planning_grammar` only
 - Units: not yet a unit
@@ -3223,6 +3427,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Bracket constraints as refinements, named as predicate fixtures
 - Decides: `[predicate]` after an input or outcome is a refinement over the port's type, the predicate a snake_case fixture in the manner of behaviour-driven tests; a fixture on an outcome is a promise, on an input a requirement its producer must carry, and every node outcome must be consumed or declared.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Refinement types written `T & predicate` with `_` as the value; A plan is an outcome graph with derived wiring
 - Significance: 2 — how domain constraints are written
@@ -3236,6 +3441,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Planning-local effort and money, durations from the units DSL
 - Decides: effort and money are planning-local record types with their own arithmetic, so a mismatch is an error in planning vocabulary, while durations reuse the units DSL's time dimension.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Dimensions as data, named dimensions as refinements over one Quantity
 - Significance: 2 — the rung-2 to rung-3 bridge
@@ -3249,6 +3455,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Estimates roll up, budgets are proved
 - Decides: estimates are leaf costs in measures (duration, effort, money) that roll up as an upper bound (serial durations, a missing measure contributing nothing, a retry multiplying by its maximum attempts, handlers included in `rollup_bound`), and a budget is a constraint the rollup must not exceed, checked dimensionally.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: A plan is an outcome graph with derived wiring; Planning-local effort and money, durations from the units DSL
 - Significance: 3 — the plan's quantitative claim
@@ -3263,6 +3470,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Scheduling, resources, performers and latitude
 - Decides: whether and how plans carry scheduling, resource management, performer assignment and latitude grading; all are absent from a valid plan today, performer probably metadata.
 - Status: open
+- Type: capability
 - Rationale kind: mixed
 - Depends on: A plan is an outcome graph with derived wiring
 - Significance: 2 — the model's next dimensions
@@ -3276,6 +3484,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Fan-in through an explicit aggregator node
 - Decides: several outcomes join only through an explicit aggregator node (or a branch or a handler), and a universal fan-in shorthand is deferred.
 - Status: open
+- Type: capability
 - Rationale kind: aesthetic
 - Depends on: A plan is an outcome graph with derived wiring
 - Significance: 1 — a known wart in the surface
@@ -3289,6 +3498,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Explicit `raise` and failure context in handlers
 - Decides: whether a handler gets an explicit "cannot recover, propagate" directive and whether its graph may read what failed.
 - Status: open
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Failure handlers over outcomes
 - Significance: 1 — handler surface
@@ -3304,6 +3514,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Choices, templates and solution finding by enumeration
 - Decides: a node with `options:` is a choice, a plan with choices is a template, and `solve` enumerates resolutions, keeps the well-formed ones and answers the best by the bound's effort and then its duration, naming the cheapest failing resolution when none fits.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Estimates roll up, budgets are proved; Vivace hypothesis: models as the review artefacts
 - Significance: 3 — the first solution finding over a model
@@ -3318,6 +3529,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Completion from a catalog
 - Decides: a gap is what the wiring and outcome checks already report, a catalog is a list of nodes and plans, and `solve_from` fills the plan's own scope's gaps by chaining catalog nodes backward to a depth, then resolves, with no syntax marking a gap.
 - Status: settled
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Choices, templates and solution finding by enumeration
 - Significance: 3 — the shape of the AI iteration loop over a model
@@ -3332,6 +3544,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Library search over kernel residuals
 - Decides: the planning search computes its bound directly in the library rather than leaving choices unresolved and reading an interval off the kernel's residual rollup; revisit when a model's constraint is a predicate the kernel already reasons about.
 - Status: settled
+- Type: implementation — where the bound is computed; the answer is the same
 - Rationale kind: technical
 - Depends on: Completion from a catalog; Proofs are values discharged by evaluation
 - Significance: 3 — where Vivace search sits relative to the falsifiable constraint
@@ -3346,6 +3559,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Composition of models and the AI loop over a model
 - Decides: how two domain models compose (cross-domain predicates, arbitration) and how an AI agent iterates over a model with usable failure modes; both are Vivace gaps without a design.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Vivace hypothesis: models as the review artefacts; Completion from a catalog
 - Significance: 3 — the capstone's prerequisites
@@ -3359,6 +3573,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Mixed-model solution finding as the capstone
 - Decides: heterogeneous models coupled into one solution space, AI agents proposing, the kernel scoring and every candidate carrying its assumption ledger, is the summit the ladder climbs toward, kept as labelled direction.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Composition of models and the AI loop over a model; The demo ladder as the thesis test
 - Significance: 3 — the private motivation for sequencing
@@ -3372,6 +3587,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Search beyond enumeration
 - Decides: whether to add branch-and-bound over partial resolutions when a template outgrows enumeration.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Choices, templates and solution finding by enumeration
 - Significance: 2 — scale of the search
@@ -3387,6 +3603,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Precompile before the evaluation loop
 - Decides: under Allegro Standard only, precompile partially evaluates each function definition's body over typed placeholders before the evaluation loop, inferring return types and effects, skipping library-owned functions and recording mismatches as notifications.
 - Status: settled
+- Type: implementation — the mechanism by which a function's body is checked before it runs
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model; Types are values that constrain values
 - Significance: 4 — where type and effect inference happen
@@ -3401,6 +3618,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The evalSource stage order
 - Decides: `evalSource` runs, in order, channel sealing, the divergence-analysis placeholder, library-owned collection, grammar merge and parse, `buildProgram`, literal typing, symbol resolution, body-metadata collapse and tail marking, the divergence analysis, precompile, the post-precompile checks, the evaluation scope, the evaluation loop in source order, forward chaining, the proof and `proven` checks, and symbol registration.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: One evalSource pipeline for programs and libraries; Precompile before the evaluation loop
 - Significance: 3 — each stage's assumptions are the next stage's guarantees
@@ -3415,6 +3633,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Post-passes registered by layers
 - Decides: the post-passes, Allegro Standard concepts hardcoded into the base's stage list today, should be registered by the layer that owns them, through the plane-interface fix shape.
 - Status: open
+- Type: implementation — where the post-passes are registered in the code
 - Rationale kind: technical
 - Depends on: The evalSource stage order; Plane interfaces are sanctioned and policed
 - Significance: 3 — would make the pipeline layer-neutral
@@ -3428,6 +3647,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Definition and memo entries in the precompile context
 - Decides: in the precompile context a function definition becomes a definition entry, evaluated once at first lookup and binding the first object built for every later lookup, and any other unresolved binding a memo entry evaluated once at first lookup.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: Precompile before the evaluation loop
 - Significance: 2 — gives one object per definition, which the cutoff needs
@@ -3441,6 +3661,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Inline cutoff for recursive bindings
 - Decides: during a typed compilation, a speculative call with an unresolved argument into a recursion cycle (found by the divergence analysis, and recognised by the object its definition is bound to in the precompile context or a copy sharing its body) is residualised rather than unfolded, whatever its discharge tier; a fully applied call still executes.
 - Status: partly built
+- Type: implementation — a cutoff for a precompile performance pathology
 - Rationale kind: technical
 - Depends on: PE Rule 1: residualise, but unfold composed calls; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
 - Significance: 3 — without it precompile unfolds recursion until the stack overflows
@@ -3455,6 +3676,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Effects deferred during precompile
 - Decides: during precompile, an effectful primitive returns a residual even over resolved arguments, deferring its side effect to the run.
 - Status: settled
+- Type: implementation — a rule of the precompile mechanism
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model; Precompile before the evaluation loop
 - Significance: 2 — compile time runs no effect
@@ -3469,6 +3691,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Soft-fail evaluation for verdict tools
 - Decides: with `softFail` set, the halting post-passes record their error notifications without throwing, and `verify`, `obligations` and `propose` run that way so the verdict can describe the failures.
 - Status: settled
+- Type: capability — it decides what the verdict tools can report
 - Rationale kind: technical
 - Depends on: Compile-time first: failures halt the build
 - Significance: 2 — lets tooling report instead of stopping
@@ -3483,6 +3706,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Evaluation and parse statistics as diagnostics
 - Decides: four environment variables switch on diagnostics (`ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`), the two stats variables read inside the pipeline so they reach every caller, with stats sinks for tests and gates.
 - Status: settled
+- Type: implementation — diagnostics of this implementation
 - Rationale kind: technical
 - Depends on: The evalSource stage order
 - Significance: 1 — diagnostics
@@ -3499,8 +3723,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Inspect reports only what the pipeline computed
 - Decides: `inspect` adds no analysis of its own: each binding summary (type, refinements, contract, declared and inferred effects, totality notices, proof backings, promotion hints) is read from what parsing, resolution, precompile and evaluation already computed.
 - Status: settled
+- Type: capability — a guarantee to the tool's user
 - Rationale kind: vision
-- Depends on: Types are values that constrain values; The evalSource stage order
+- Depends on: Types are values that constrain values
 - Significance: 3 — keeps review on the one engine
 - Label: swappable — the `introspect` unit, depending on the pipeline alone
 - Units: introspect
@@ -3513,6 +3738,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Safety grade as the default verification surface
 - Decides: the default surface of verification is a coarse safety grade per module (`proven-safe`, `partial`, `has-warnings`, `has-errors`), with theorem-level detail as opt-in drill-down.
 - Status: partly built
+- Type: capability
 - Rationale kind: vision
 - Depends on: Inspect reports only what the pipeline computed; Every claim states its discharge strength; Progressive disclosure of formality
 - Significance: 3 — the reviewability claim's face
@@ -3527,8 +3753,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### One command-line entry with subcommands
 - Decides: `src/index.ts` is the single command-line entry named `allegro`, where a first argument naming one of five subcommands selects it, any other first argument is a file to run, and no argument starts the REPL, each subcommand's module imported dynamically.
 - Status: settled
+- Type: capability — the command-line surface
 - Rationale kind: technical
-- Depends on: One evalSource pipeline for programs and libraries
+- Depends on: none
 - Significance: 2 — the user's door
 - Label: swappable — the `cli` unit
 - Units: cli
@@ -3541,8 +3768,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### File runner as one evaluation with futures drained
 - Decides: the file runner creates one future manager per run, loads `use` modules and then the body's `import` modules (local `lib/` first, then the system `lib/`), evaluates the stripped body once, waits for every pending future, and turns any error into exit code 1.
 - Status: settled
+- Type: capability — what running a file guarantees: futures drained, an error as exit code 1
 - Rationale kind: technical
-- Depends on: Callers pre-scan and strip the `use` header; Future cells: write-once, monotonic, flattening
+- Depends on: `use` header for language extension, `import` for module values; Incompleteness lives in write-once future cells
 - Significance: 2 — the reference way a program runs
 - Label: swappable — `runFile` in the `cli` unit
 - Units: cli, module-loading
@@ -3555,8 +3783,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### REPL as successive evaluations over a persistent scope
 - Decides: the REPL evaluates each buffered entry through `evalSource` with the previous entry's scope as the base scope and one future manager for the session, continuing an entry when the line ends in an operator, comma or open bracket.
 - Status: partly built
+- Type: capability — the REPL's behaviour for its user
 - Rationale kind: technical
-- Depends on: One evalSource pipeline for programs and libraries
+- Depends on: Scope is the evaluation environment, not data
 - Significance: 2 — interactive use
 - Label: swappable — `repl` in the `cli` unit
 - Units: cli
@@ -3569,6 +3798,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Obligations and proposals as machine and human views
 - Decides: `obligations` emits one obligation per proof binding, undischarged `div` entry and law or coercion obligation, as JSON lines or text, and `propose` renders the pending ones as a Markdown TODO with the last failure, hints, lemmas in scope and prior attempts.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Participant-neutral prover protocol with the kernel as trust boundary; Soft-fail evaluation for verdict tools
 - Significance: 2 — the protocol's request side
@@ -3583,8 +3813,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Execution tracing and step-through debugging
 - Decides: the T-tooling track is to provide execution tracing, graph inspection and step-through debugging (milestone M7); the shape is undesigned.
 - Status: open
+- Type: capability
 - Rationale kind: technical
-- Depends on: The evalSource stage order
+- Depends on: Expressions are values, forming a DAG
 - Significance: 2 — tooling milestone
 - Label: swappable — a new tooling unit
 - Units: not yet a unit
@@ -3599,6 +3830,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Environment capabilities outside the base, effect-labelled
 - Decides: `print`, `fetch` and `delay` are environment-provided capabilities, not base primitives, each carrying an effect label (`io`, `net`, `time`), with the relocation of every non-base primitive out of the base registry as future work.
 - Status: partly built
+- Type: capability
 - Rationale kind: technical
 - Depends on: Minimal base surface of about forty primitives; Effect inference is driven by partial evaluation, and a declaration is a contract
 - Significance: 3 — makes I/O visible to the effect system
@@ -3613,8 +3845,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### A stated host boundary in a host unit
 - Decides: open: whether Allegretto states which primitives reach the host and with what effect labels, as an Environment interface in a `host` unit between `futures` and `base-primitives` that the CLI and the web bundle supply, in place of today's swapping by output capture and extension substitution.
 - Status: open
+- Type: capability — the stated boundary is the capability; the unit is its placement
 - Rationale kind: technical
-- Depends on: Environment capabilities outside the base, effect-labelled; Scope leaves the value universe
+- Depends on: Environment capabilities outside the base, effect-labelled
 - Significance: 3 — "env-provided capabilities" is a heading until this exists
 - Label: foundational — the primitives would import it and every host would supply it
 - Units: not yet a unit
@@ -3627,8 +3860,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Asynchronous host results arrive as future cells
 - Decides: `delay` and `fetch` return future cells filled when their JavaScript Promise settles, through `applyPhase`; a rejection or a non-2xx response fills the cell with an error value, never a throw, and both throw "requires async runtime" without a future manager.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
-- Depends on: Future cells: write-once, monotonic, flattening; Errors as a viral metadata field
+- Depends on: Incompleteness lives in write-once future cells; Errors as a viral metadata field
 - Significance: 3 — the I/O edge of the futures model
 - Label: swappable — the capability implementations
 - Units: futures, base-primitives
@@ -3638,25 +3872,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: `fetch` sends a bodiless GET only (C34).
 - Chapter: Hosts: the terminal and the browser
 
-#### A browser-compatible core
-- Decides: the core uses only APIs available in both Node and browsers (`TextEncoder`/`TextDecoder`, never `Buffer`), and Node globals are read only behind a `typeof process` test.
-- Status: partly built
-- Rationale kind: technical
-- Depends on: none
-- Significance: 3 — keeps the sandbox possible
-- Label: foundational — the web bundle depends on every core file obeying it
-- Units: none (a rule across L0 to L2 files)
-- Options recorded: none recorded
-- Sources: CLAUDE.md (Conventions & invariants, cited at host C102); docs/book/platform/host.ir.md C102 to C122; B-070 title
-- Book home (fragments' proposal): Host environments
-- Notes: no book chapter states the rule (C104); `src/evaluator.ts:23` reads `process.env` unguarded, so a bundle built from the branch fails in a browser (C110 to C117); nothing in CI builds or loads the bundle, and the typecheck uses Node types with no DOM library (C118 to C122).
-- Chapter: Hosts: the terminal and the browser
-
 #### Browser sandbox as an IIFE bundle with a library registry
 - Decides: the browser host is one esbuild IIFE bundle setting `window.Allegro` (`eval`, `evalAsync`, `reset`, `formatValue`, `registerLibrary`, `inspect`), keeping the scope between calls, streaming `print` through the future manager's output callback, and resolving `use NAME` only against libraries the page registered.
 - Status: settled
+- Type: capability — the page-facing API and the library registry; the bundle format is its form
 - Rationale kind: technical
-- Depends on: A browser-compatible core; Allegro Standard by default, Allegretto by flag
+- Depends on: Allegro Standard by default, Allegretto by flag
 - Significance: 3 — the public sandbox and the maintainer's primary sandbox
 - Label: swappable — `web/allegro-web.ts`, outside the unit DAG
 - Units: none (no file of `web/` is mapped)
@@ -3666,9 +3887,25 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: `import` silently does nothing in the sandbox (`import math` returns `<symbol:math>`, C80, C81); `scanUses` is duplicated (C79); the pages' copy of `lib/units.alg` is stale (C86); the live site is 372 commits behind (C101).
 - Chapter: Hosts: the terminal and the browser
 
+#### A browser-compatible core
+- Decides: the core uses only APIs available in both Node and browsers (`TextEncoder`/`TextDecoder`, never `Buffer`), and Node globals are read only behind a `typeof process` test.
+- Status: partly built
+- Type: implementation — a coding rule that keeps the browser sandbox possible
+- Rationale kind: technical
+- Depends on: Browser sandbox as an IIFE bundle with a library registry
+- Significance: 3 — keeps the sandbox possible
+- Label: foundational — the web bundle depends on every core file obeying it
+- Units: none (a rule across L0 to L2 files)
+- Options recorded: none recorded
+- Sources: CLAUDE.md (Conventions & invariants, cited at host C102); docs/book/platform/host.ir.md C102 to C122; B-070 title
+- Book home (fragments' proposal): Host environments
+- Notes: no book chapter states the rule (C104); `src/evaluator.ts:23` reads `process.env` unguarded, so a bundle built from the branch fails in a browser (C110 to C117); nothing in CI builds or loads the bundle, and the typecheck uses Node types with no DOM library (C118 to C122).
+- Chapter: Hosts: the terminal and the browser
+
 #### Liveness of host sources declared per source
 - Decides: each asynchronous source declares its liveness: `delay` is live because a timer always fires, and `fetch` is admitted under the assumption that the endpoint eventually responds, visible in the verdict.
 - Status: settled
+- Type: capability
 - Rationale kind: technical
 - Depends on: Asynchronous host results arrive as future cells; Four-tier discharge spectrum; Completion is totality and liveness
 - Significance: 2 — how the ledger records I/O assumptions
@@ -3683,6 +3920,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Module loader takes its file reader from the host
 - Decides: `ModuleLoader` reads no file itself; its caller supplies `readFile`, so the Node CLI passes `fs.readFileSync` and resolves `lib/` from `import.meta.url`.
 - Status: settled
+- Type: implementation
 - Rationale kind: technical
 - Depends on: A browser-compatible core
 - Significance: 2 — keeps module loading host-neutral
@@ -3697,6 +3935,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Asynchronous I/O capabilities beyond timers and HTTP GET
 - Decides: files, processes, sockets and further timers are to be environment-provided, effect-labelled capabilities; none is built.
 - Status: open
+- Type: capability
 - Rationale kind: technical
 - Depends on: Environment capabilities outside the base, effect-labelled; A stated host boundary in a host unit
 - Significance: 2 — breadth of the host
@@ -3710,8 +3949,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Browser runtime packaging
 - Decides: whether and how the runtime ships as a browser package (ES module build, npm package, versioned release) beyond the one IIFE bundle for the project's pages.
 - Status: open
+- Type: capability — it decides what a tool builder can install
 - Rationale kind: technical
-- Depends on: A browser-compatible core
+- Depends on: Browser sandbox as an IIFE bundle with a library registry
 - Significance: 2 — distribution
 - Label: swappable — a build output
 - Units: not yet a unit
@@ -3725,8 +3965,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Multi-phase build as successive partial evaluation
 - Decides: the build is to be a chain of phases (invocation, config, compile, emit, package, deploy, execute), each a partial-evaluation step binding more resources, with phase gates that scan the expression graph for unresolved elements before a phase may close.
 - Status: open
+- Type: capability
 - Rationale kind: vision
-- Depends on: Partial evaluation as the compilation model; Future cells: write-once, monotonic, flattening
+- Depends on: Partial evaluation as the compilation model; Incompleteness lives in write-once future cells
 - Significance: 3 — the T-build milestone M6 and the "config is a compile-time theorem" claim
 - Label: foundational — would define how every later binding stage is reached
 - Units: not yet a unit (only `applyPhase` exists, driven by futures alone)
@@ -3739,6 +3980,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Code generation from the expression graph, JavaScript first
 - Decides: target code generation is to compile the L0 expression graph, JavaScript first, then WASM or native, with provability-informed optimisation; the continuations decision it requires feeds algebraic effects.
 - Status: open
+- Type: capability — it decides what a program compiles to
 - Rationale kind: technical
 - Depends on: Partial evaluation as the compilation model; Multi-phase build as successive partial evaluation
 - Significance: 3 — milestone M8; a prerequisite of self-hosting
@@ -3752,6 +3994,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Laws licence rewrites
 - Decides: discharged laws are to license optimiser rewrites, making the optimiser user-extensible and unable to be wrong, with tree shaking by partial evaluation.
 - Status: open
+- Type: capability
 - Rationale kind: vision
 - Depends on: Lawful interfaces; Code generation from the expression graph, JavaScript first
 - Significance: 2 — a payoff of laws
@@ -3766,6 +4009,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### Self-hosting and a package ecosystem
 - Decides: L1 and L2 machinery are to be re-expressed in Allegro (milestone M9, with a Vivace parser generator able to re-host the L1 parser) and a package ecosystem with versioning and a registry built (M10); both are aspirational.
 - Status: open
+- Type: capability — the package ecosystem is user-facing; self-hosting is its implementation half
 - Rationale kind: vision
 - Depends on: Code generation from the expression graph, JavaScript first; Programmable language platform: minimal core, extensions are the language
 - Significance: 2 — long-range direction
@@ -3775,6 +4019,64 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/layers.md §2, §3 (M9, M10); docs/book/vivace/README.md (Provides; maintainer ruling 2026-07)
 - Book home (fragments' proposal): Capability tracks
 - Chapter: Compiling beyond the interpreter
+
+## The type check, 2026-11-05
+
+Chunk P1b typed every entry under the ruling that no capability decision depends on an implementation decision. A capability decision decides what the language or platform can express or guarantee to its user; an implementation decision decides how the code realises it, and another implementation could change it without changing any capability. Where an entry holds both, it is typed by what it decides first, and its Type line names the realising part. `docs/book/concepts.md` already files its entries as requirements, specification choices or implementation choices; requirements and specification choices are typed capability and implementation choices implementation, except where noted.
+
+Result: 256 decisions, 202 capability and 54 implementation. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. Resolutions: (a) the dependency was misread, 19; (b) the dependent entry is implementation, 2 (one entry); (c) the dependency is capability, 0; (d) a split, 0.
+
+| # | Entry | Depended on | Resolution | Why |
+|---|---|---|---|---|
+| 1 | Arrays are structures with unkeyed entries | The composite is one sequence of optionally-keyed entries | (a) Now depends on "One composite kind: Structure". The composite's representation now depends on this entry and follows it. | An array is a structure with unkeyed entries however the entries are stored; concepts.md files the sequence and its index as an implementation choice. |
+| 2 | Symbols serialise by FQN; deserialisation never mints reachability | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | The wire form is the name, interned or not; interning realises identity by name. |
+| 3 | One residualising resolution semantics for scopes | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Resolution rests on the parent-chain protocol that entry states; the constant-time chain is how it is built. |
+| 4 | Offside rule through stateful indent terminals | Memoized recursive-descent engine with seed-growing left recursion | (a) Removed. The engine now depends on this entry and follows it. | Grammar authors name the indent terminals; the engine implements them, so the edge pointed the wrong way. |
+| 5 | Parse failure reporting and recovery | Memoized recursive-descent engine with seed-growing left recursion | (a) Now depends on "Grammars are Allegro values". The engine now depends on this entry and follows it. | Error productions and sync points are features of a grammar; the engine's farthest-advance report realises them. |
+| 6 | Extensions are the module substrate | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Extensions layer by the scope's protocol, not by its cost. |
+| 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
+| 8 | Export marks the binding, and a module with no exports is open | Module loading and typed module objects are separate layers | (a) Now depends on "Extensions are the module substrate". | Export rests on modules existing; which unit loads them is a cut in the code. |
+| 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Occurrence facts live in the scope's facts plane, which that entry states. |
+| 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every claim states its discharge strength". | Contracts must reach the verdict and the ledger however the verdict is computed. |
+| 11 | Planning surface conventions | Library before surface | (a) Now depends on "A plan is an outcome graph with derived wiring". | The conventions spell the model; the order in which the library and the grammar were built changes no spelling. |
+| 12 | Post-passes registered by layers | The evalSource stage order | (b) Retyped implementation. | It decides where the code registers its post-passes; no program's meaning changes. |
+| 13 | Post-passes registered by layers | Plane interfaces are sanctioned and policed | (b) The same retyping. | As above. |
+| 14 | Inspect reports only what the pipeline computed | The evalSource stage order | (a) Removed; "Types are values that constrain values" remains. | Inspect promises to add no analysis of its own; which stage computes each fact is the pipeline's arrangement. |
+| 15 | One command-line entry with subcommands | One evalSource pipeline for programs and libraries | (a) Removed; the entry now depends on nothing. | The command-line surface holds whatever runs behind it; what every run checks is "Compile-time first: failures halt the build". |
+| 16 | File runner as one evaluation with futures drained | Callers pre-scan and strip the `use` header | (a) Now depends on "`use` header for language extension, `import` for module values". | The runner honours the header; the pre-scan is how a caller does it. |
+| 17 | REPL as successive evaluations over a persistent scope | One evalSource pipeline for programs and libraries | (a) Now depends on "Scope is the evaluation environment, not data". | An entry sees the earlier entries by scope layering; the shared pipeline is how it runs. |
+| 18 | Execution tracing and step-through debugging | The evalSource stage order | (a) Now depends on "Expressions are values, forming a DAG". | Tracing and graph inspection show evaluation and the expression graph, not the stage list. |
+| 19 | A stated host boundary in a host unit | Scope leaves the value universe | (a) Removed. | The edge recorded where the future manager is planted, on the scope's host plane, which is an implementation detail; the boundary rests on the environment capabilities. |
+| 20 | Browser sandbox as an IIFE bundle with a library registry | A browser-compatible core | (a) Removed. The core rule now depends on the sandbox and follows it. | The rule exists to keep the sandbox possible (its own significance line), so it realises the sandbox. |
+| 21 | Browser runtime packaging | A browser-compatible core | (a) Now depends on "Browser sandbox as an IIFE bundle with a library registry". | Packaging extends the sandbox's one bundle; the API rule is its implementation. |
+
+Three typings go against a source or need the maintainer's eye:
+
+- "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata channels are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata channels are independent" instead.
+- "Scope leaves the value universe" is typed implementation, although it supersedes a specification choice. Its own options line says no scope reaches user code as a value, so leaving `Value` changes the representation only.
+- "Partial evaluation as the compilation model" is typed capability. The language exposes it: residuals are values, and every check is an evaluation a user can read.
+
+**Mutual capability dependencies.** One pair was merged:
+
+| Merged entry | From | Why |
+|---|---|---|
+| Incompleteness lives in write-once future cells | "Incompleteness is a value in a slot"; "Future cells: write-once, monotonic, flattening" | The first states incompleteness as an unresolved future; the second states the future as the sole locus of incompleteness. Each is stated in the other's terms, so neither holds alone. Sources, options and notes are the union. |
+
+Not merged, because they relate without needing each other: "Mediated member access" and the access tiers and evidence it stages; "`use` header for language extension, `import` for module values" and "Activation by a `use` header, per file and not transitive"; "Metadata channels are independent" and "Metadata is a field on every value".
+
+**The three cycles the merge broke, re-examined.**
+
+1. "`use` header for language extension, `import` for module values" and "Callers pre-scan and strip the `use` header": a capability and its implementation. The pre-scan is implementation and keeps its edge to the header. No capability depends on the pre-scan any more (row 16).
+2. "Formal claims written in the program's own syntax" against "Body-form clauses at the head of a body, lowered through one chain" and "Theorems as statements, proved `by` a term": all three are capability, and they are not mutual. The principle is stated without any particular form; each form is one instance of it. The edges from the instances to the principle stand, and nothing is merged.
+3. "Precompile before the evaluation loop" and "The evalSource stage order": both implementation. The stage order places precompile, so it keeps the edge. Precompile realises checking a function's body before it runs; no capability depends on either.
+
+**Moves.** All within a chapter; no decision changed chapter.
+
+- "The composite is one sequence of optionally-keyed entries" moves after "Arrays are structures with unkeyed entries" (Structures).
+- "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies" move after "Parse failure reporting and recovery" (Grammars as values).
+- "A browser-compatible core" moves after "Browser sandbox as an IIFE bundle with a library registry" (Hosts: the terminal and the browser).
+
+**Contents changed.** "A small base and the surfaces above it" lists "Language extensions are declarative", which the rulings added but the list missed (9 decisions). "Evaluation over unresolved information" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
 
 ## Open questions
 
@@ -3790,7 +4092,7 @@ Three cycles appeared in the merged graph. Each was a misread direction, not two
 2. "Formal claims written in the program's own syntax" depended on the body-form clauses and on theorems as statements, both of which depend on it. The principle keeps no edge to its implementations.
 3. "Precompile before the evaluation loop" and "The evalSource stage order" depended on each other. The stage order places precompile, so only the stage order keeps the edge.
 
-Other edges were changed without a cycle forcing it, so that the order reads right. Thesis-level decisions dropped their edges to their own implementations: the discharge-strength claim, the prover protocol, the halt policy and proof export. "Progressive disclosure of formality" no longer depends on the safety grade; the edge was inverted. Law discharge tiers rest on the shared tier vocabulary, not on the divergence spectrum. "Effects deferred during precompile" gained an edge to precompile. Each entry's Notes say which.
+Other edges were changed without a cycle forcing it, so that the order reads right. Thesis-level decisions dropped their edges to their own implementations: the discharge-strength claim, the prover protocol, the halt policy and proof export. "Progressive disclosure of formality" no longer depends on the safety grade; the edge was inverted. Law discharge tiers rest on the shared tier vocabulary, not on the divergence spectrum. "Effects deferred during precompile" gained an edge to precompile. Each entry's Notes say which. Chunk P1b re-examined the three cycles by decision type: see "The type check, 2026-11-05".
 
 ### Conflicting sources the fragments recorded
 
