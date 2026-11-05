@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-05 — the decision types, and how a decision is taken.**
+  Every decision of `docs/plans/book-pass-inventory.md` is typed as
+  capability or implementation (202 and 54), and no capability decision
+  now depends on an implementation decision, by the maintainer's rule.
+  The plan records that the book pass makes each decision's code changes
+  itself, and proposes how a decision is taken: one PR per chapter, each
+  decision ruled in order with its code changes, in a lane of its own.
+  Ids 784.
+
 - **2026-11-04 — the decision inventory, and the preface finished.**
   `docs/plans/book-pass-inventory.md` lists 256 decisions of Allegro in
   book order, with a proposed table of contents of six parts and

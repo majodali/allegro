@@ -975,6 +975,16 @@ its approval.
   mapped to the ten choices for the tour, and one decision (language
   extensions are declarative): 257 decisions. Chunk P1b (the decision
   types) added before the pilot.
+- **2026-11-05 — P1b, the decision types** (the review session). R30
+  recorded in §6; the monotonic pass proposed in §2.7. Every inventory
+  entry typed: 256 decisions, 202 capability and 54 implementation. 21
+  dependencies of a capability on an implementation decision found in
+  20 entries: 19 misread (redirected to the capability they rest on, or
+  reversed), 2 resolved by retyping one entry as implementation. Two
+  mutually defined capability decisions merged (incompleteness and
+  future cells). The three cycles of the merge re-examined. Ten types
+  hard to call, put to the maintainer. The type check is recorded in
+  the inventory.
 
 ## 8. Sessions
 
