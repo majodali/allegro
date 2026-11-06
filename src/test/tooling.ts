@@ -19,6 +19,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "node:child_process";
 import * as nodePath from "path";
+import * as vm from "node:vm";
+import { build as esbuildBuild } from "esbuild";
 import type { LlmClient as BenchLlmClient } from "../../pcp/llm-worker.js";
 
 // --- PCP benchmark suite (bench/) ---
@@ -338,6 +340,169 @@ export function runLoadLintTests(): void {
     eq(failed ? out.trim() : "", "", "load-lint violations");
   });
 }
+
+// --- B-176 items 1 and 2: the web bundle loads in a browser-shaped context ---
+//
+// The bundle is built the way `npm run build:web` builds it, in memory
+// (`write: false`), once per process however many tests use it, and loaded
+// in a `node:vm` context whose global carries what a browser page has and
+// nothing Node adds: no `process`, no `Buffer`. A module-level read of
+// `process.env` without the `typeof process` guard throws there at load,
+// which is what the site's sandbox would do.
+
+const webRepoRoot = nodePath.resolve(import.meta.dirname, "../..");
+let webBundleText: Promise<string> | null = null;
+
+/** The bundle's text, built with `package.json`'s `build:web` options. */
+function webBundle(): Promise<string> {
+  webBundleText ??= esbuildBuild({
+    absWorkingDir: webRepoRoot,
+    entryPoints: ["web/allegro-web.ts"],
+    bundle: true,
+    outfile: "web/dist/allegro.js",
+    format: "iife",
+    globalName: "AllegroBundle",
+    platform: "browser",
+    write: false,
+    logLevel: "silent",
+  }).then((r) => r.outputFiles[0].text);
+  return webBundleText;
+}
+
+interface WebAllegro {
+  evalAllegro(source: string, standard?: boolean): { output: string[]; result: string | null; error: string | null };
+  inspectAllegro(source: string): { summary: string; grade: string; error: string | null };
+  registerLibrary(name: string, source: string): void;
+  resetContext(): void;
+}
+
+/** Load the bundle in a fresh context with a browser's globals only. The
+ *  context's `window` is its global, as a page's is. */
+function loadWebBundle(code: string): { bundle: WebAllegro; global: Record<string, unknown> } {
+  const global: Record<string, unknown> = {
+    console: { log: () => {}, error: () => {}, warn: () => {}, info: () => {} },
+    TextEncoder, TextDecoder, setTimeout, clearTimeout, queueMicrotask, performance,
+  };
+  global.window = global;
+  vm.createContext(global);
+  try {
+    vm.runInContext(code, global, { filename: "allegro.js" });
+  } catch (e) {
+    const err = e as { name?: string; message?: string };
+    throw new Error(`the bundle failed to load: ${err.name}: ${err.message}`);
+  }
+  return { bundle: global.AllegroBundle as WebAllegro, global };
+}
+
+const libSource = (name: string): string => fs.readFileSync(nodePath.join(webRepoRoot, "lib", `${name}.alg`), "utf-8");
+
+export async function runWebBundleTests(): Promise<void> {
+  await asyncTest("web bundle (B-176 item 1): builds, loads with no process or Buffer global, and runs a use", async () => {
+    const { bundle, global } = loadWebBundle(await webBundle());
+    eq("process" in global || "Buffer" in global, false, "the context is browser-shaped");
+    for (const name of ["evalAllegro", "inspectAllegro", "registerLibrary"] as const) {
+      eq(typeof bundle[name], "function", `AllegroBundle.${name}`);
+    }
+    eq(typeof (global.Allegro as { eval?: unknown })?.eval, "function", "the page's window.Allegro is installed");
+    bundle.registerLibrary("contracts", libSource("contracts"));
+    const r = bundle.evalAllegro("use contracts\nprint(\"contracts in the browser\")\n");
+    eq(r.error, null, "no error");
+    eq(r.output.join("\n"), "contracts in the browser");
+  });
+
+  // B-176 item 2: the pages' library registry matches lib/ — the check the
+  // script carries, in the gate. A plain test: the name hash gives it one
+  // shard, so it runs once per gate run, sharded or not.
+  test("web library registry (B-176 item 2): sync-web-libs --check passes", () => {
+    let out = "";
+    let failed = false;
+    try {
+      out = execFileSync("npx", ["tsx", "scripts/sync-web-libs.ts", "--check"], { cwd: webRepoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      failed = true;
+      const err = e as { stdout?: string; stderr?: string };
+      out = `${err.stdout ?? ""}${err.stderr ?? String(e)}`;
+    }
+    eq(failed ? out.trim() : "", "", "sync-web-libs --check");
+  });
+
+  // B-151 E2 (the website loop): `planning` in the browser. The page's own
+  // registry script runs in the vm, so the test registers exactly what a
+  // page registers; `lib/planning.alg` begins with `use totality` and `use
+  // units`, which the bundle resolves through the same registry.
+  await asyncTest("web bundle (B-151 E2): the page's registry loads planning, and the sandbox plan runs", async () => {
+    const { bundle, global } = loadWebBundle(await webBundle());
+    const html = fs.readFileSync(nodePath.join(webRepoRoot, "website/index.html"), "utf-8");
+    const begin = html.indexOf("// --- BEGIN LIB REGISTRY");
+    const end = html.indexOf("// --- END LIB REGISTRY ---");
+    eq(begin >= 0 && end > begin, true, "the registry region is in the page");
+    const registered = new Map<string, string>();
+    global.Allegro = { registerLibrary: (name: string, source: string) => { registered.set(name, source); bundle.registerLibrary(name, source); } };
+    vm.runInContext(html.slice(begin, end), global, { filename: "index.html registry" });
+    for (const name of ["units", "totality", "planning"]) {
+      eq(registered.get(name) === libSource(name), true, `the page registers lib/${name}.alg as it is on disk`);
+    }
+    const t0 = performance.now();
+    const r = bundle.evalAllegro(PLANNING_SANDBOX);
+    const ms = performance.now() - t0;
+    eq(r.error, null, "no error");
+    eq(r.output.join("\n"), PLANNING_SANDBOX_OUTPUT.join("\n"));
+    if (process.env.ALLEGRO_TEST_TRACE) console.error(`    use planning + the sandbox plan in the vm: ${(ms / 1000).toFixed(2)} s`);
+    // A library used by the program and by another library is one
+    // extension: a second run on the same page answers the same.
+    eq(bundle.evalAllegro(PLANNING_SANDBOX).output.join("\n"), PLANNING_SANDBOX_OUTPUT.join("\n"), "a second run");
+  });
+
+  // The text the test runs is the text the site shows: the landing
+  // section's editor and the sandbox preset in both sandbox pages.
+  test("web pages (B-151 E2): the landing sandbox and both sandbox presets carry the pinned plan", () => {
+    const page = fs.readFileSync(nodePath.join(webRepoRoot, "website/index.html"), "utf-8");
+    const editor = /<div class="sandbox" id="s-planning">\s*<textarea[^>]*>([\s\S]*?)<\/textarea>/.exec(page);
+    eq(editor?.[1], PLANNING_SANDBOX, "website/index.html, the s-planning editor");
+    for (const file of ["website/sandbox.html", "web/sandbox.html"]) {
+      const html = fs.readFileSync(nodePath.join(webRepoRoot, file), "utf-8");
+      const anchor = "\"Walkthrough 6 — A domain model (planning)\": `";
+      const start = html.indexOf(anchor);
+      eq(start >= 0, true, `${file}: the planning preset`);
+      const body = start + anchor.length;
+      eq(html.slice(body, html.indexOf("`", body)), PLANNING_SANDBOX, `${file}: the planning preset's text`);
+    }
+  });
+}
+
+/** The landing page's planning sandbox, verbatim (B-151 E2). */
+const PLANNING_SANDBOX = `// A project plan as a graph of outcomes, in a pure Allegro library.
+use units
+use planning
+plan Release:
+  inputs:   SourceCommit, ReleaseApproval
+  outcomes: DeployedRelease
+  budget:   40 person-hours
+  Build:
+    inputs:   SourceCommit
+    outcomes: ValidatedBuild
+    estimate: 1 hour, 2 person-hours
+  Deploy:
+    inputs:   ValidatedBuild, ReleaseApproval
+    outcomes: DeployedRelease
+    options:
+      BlueGreen:
+        estimate: 1 hour, 3 person-hours
+      Direct:
+        estimate: 6 hours, 1.5 person-hours
+
+// solve picks the option that passes every check, cheapest by effort.
+print(solution_show(solve(Release)))
+// A deadline moves the answer; when nothing fits, the refusal says why.
+print(solution_show(solve(with_budget(Release, budget(3 h, person_hours(40), none)))))
+print(error of solve(with_budget(Release, budget(1 h, person_hours(40), none))))`;
+
+const PLANNING_SANDBOX_OUTPUT = [
+  "Deploy via Direct; bound effort 3.5 person-hours, duration 7 h",
+  "Deploy via BlueGreen; bound effort 5 person-hours, duration 2 h",
+  "no choice of Deploy fits the budget of Release; the cheapest, Deploy via Direct, is duration 7 h against 1 h",
+];
+
 
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
 

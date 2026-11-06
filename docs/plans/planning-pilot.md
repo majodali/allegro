@@ -72,7 +72,7 @@ From the chapter (B-079) and the rulings above:
 | | D2 ✅ **landed 2026-10-27** | A larger search, decided on D1's evidence (maintainer, 2026-10-27, three rulings): completion from a catalog (the AI-loop shape; chapter §2.8, convention 14), the gap being the existing wiring or outcome finding, library first with chaining to a depth; the enumeration checks the template once; the kernel's residuals weighed and not taken (chapter §7) | a plan with a gap completed from a catalog and solved — **met** (`tests/planning-complete-demo.alg`: an order completed from leaves, a choice and a borrowed plan; solved under a deadline; refused at a dead end, at the depth, over the budget, and for an unsound completion) |
 | | D3 | Branch-and-bound over partial resolutions, when a template outgrows enumeration; a surface form for catalogs | not before a pilot plan needs either |
 | **E. Packaging** | E1 ✅ **landed 2026-10-27** | B-093 slice 1: `demos/rung3` (two suite-validated scenes with break-it halt transcripts), the claims register re-graded (D6 rows), the messaging skeleton's rung-3 story and claim with receipts, README and getting-started | the public story derives from delivered material only, with what is not claimed said — **met** (`demos/rung3/README.md`, `docs/messaging.md`) |
-| | E2 | B-093 slice 2, the website loop: landing section, sandbox preset, `planning` in the web library registry; the browser load time measured first | owner's deploy |
+| | E2 ✅ **landed 2026-11-06** | B-093 slice 2, the website loop: landing section, sandbox preset, `planning` in the web library registry; the browser load time measured first | owner's deploy — **met but for the deploy**: `use planning` plus the landing sandbox's plan runs in 0.62 to 0.73 s in the web bundle loaded in a `node:vm` context (three runs; `src/test/tooling.ts` pins its output); the deploy is the maintainer's |
 
 Stage A is the primitive version the maintainer asked for. Stages are
 ordered; chunks within a stage may merge if small. Each chunk follows
@@ -116,6 +116,31 @@ existing bullets of §4 and precede the paragraph on the seven gaps.
 > claim above except execution, which is a separable concern.
 
 ## 8. Chunk log
+
+- **2026-11-06 — E2 (the website loop) landed.** B-093 (rung-3
+  packaging) slice 2. The browser load time first, as E1 asked: the web
+  bundle, built as `npm run build:web` builds it and loaded in a
+  `node:vm` context with no `process` global, runs `use planning` plus
+  a 25-line plan in 0.62 to 0.73 s (three runs), far from the 68 s the
+  entry for D2 (completion from a catalog) measured on node before
+  B-157 (the performance stream). Two defects stood in the way and are
+  fixed in the same PR: the bundle did not load in a browser at all,
+  and the pages' copy of `lib/units.alg` had drifted (B-176 (the host
+  chapter's findings), items 1 and 2). `scripts/sync-web-libs.ts`
+  registers `totality` and `planning`; `web/allegro-web.ts` resolves a
+  registered library's own `use` header through the registry, as the
+  CLI's module loader does through the file system, one extension per
+  library per evaluation, so `units`' types are the same values in the
+  plan and in the library. `website/index.html`: the section "A domain
+  model the kernel checks and searches", with a sandbox plan derived
+  from `demos/rung3/02-solve.alg` (a choice, `solve` under a budget and
+  a deadline, the refusal when nothing fits), the halt of
+  `demos/rung3/transcripts/01-halt.txt`, and what the rung does and
+  does not show from `demos/rung3/README.md`; both sandbox pages carry
+  the plan as "Walkthrough 6 — A domain model (planning)". The suite
+  runs the page's registry script and the plan in the vm bundle and pins
+  that the three copies of the plan agree. Not in this chunk: the
+  deploy, which is the maintainer's.
 
 - **2026-10-27 — E1 (packaging, slice 1) landed.** The public story
   derived from what is delivered, per the release track's claims
