@@ -913,6 +913,27 @@ its approval.
   provers" (what the primer is). The incompleteness and future-cell
   decisions merge. §2.7 is accepted.
 
+**Rulings taken 2026-11-07, after PR #165 (amendment M3) merged.**
+
+- **R32 — M3 reconciled with R30 and §2.7.** The maintainer took three
+  recommendations and one option of their own:
+  1. The review session edits code in a chapter chunk, for its
+     decisions' own changes under §2.7 once B-186 lands, and in a
+     tidy-up chunk for changes that alter no behaviour. §8 and lane A's
+     row say so.
+  2. The review session, not the orchestrating session, makes B-186's
+     lane change, as a lane-S PR titled under B-163 (the lane manifest
+     and its check), as PR #153 was.
+  3. When a decision's change touches files an implementation stream of
+     the orchestrating session holds, or code that stream's work rests
+     on, the maintainer rules case by case (option (c); the options not
+     taken: the pass waits; implementation plans name the decisions
+     they rely on). The review session puts each such case to the
+     maintainer as an ask in the chapter's PR before making the change.
+  4. A chapter's tidy-ups ride in its PR, as separate commits each
+     passing the outputs-identical oracle, when its decisions touch the
+     same unit; otherwise they are tidy-up chunks under B-182.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1024,6 +1045,11 @@ its approval.
   §6; §2.7 accepted; B-186 (a lane for the monotonic pass) filed for the
   orchestrating session; three types put to review, the review session's
   findings recorded in the inventory's type check.
+- **2026-11-07 — M3 reconciled** (the review session). R32 recorded in
+  §6; §8 and lane A's row say where the review session edits code; B-186
+  moved to the review session. PR #166 (rung 3 on the site) reviewed:
+  its fixes leave twelve claims of `docs/book/platform/host.ir.md`
+  stale, for the maintainer to rule how they are re-proposed.
 
 ## 8. Sessions
 
@@ -1047,12 +1073,16 @@ two sessions share. Neither reads the other's conversation.
 
 **What each session never does.**
 
-- The review session, in a chapter chunk, never edits `src/`, `lib/`,
-  `tests/`, `demos/`, `bench/` or `scripts/`, except the ids baseline
-  under M1 (§6); in a tidy-up chunk it edits only the unit's files that
-  the tidy-up plan's boundary names, and never a file inside an active
-  implementation stream's boundary (R1, M3); never edits another
-  stream's backlog items, lane row, manifest row or changelog section.
+- The review session edits code in two kinds of chunk only (R32, §6).
+  In a chapter chunk, once B-186 (a lane for the monotonic pass) lands,
+  it makes the chapter's decisions' own code and test changes under
+  §2.7, and nothing else; until then a chapter chunk edits no `src/`,
+  `lib/`, `tests/`, `demos/`, `bench/` or `scripts/` file, except the
+  ids baseline under M1 (§6). In a tidy-up chunk it edits only the
+  unit's files that the tidy-up plan's boundary names. A change in a
+  file inside an active implementation stream's boundary is ruled by
+  the maintainer case by case (R32). It never edits another stream's
+  backlog items, lane row, manifest row or changelog section.
 - The orchestrating session never edits `docs/book/**`,
   `docs/reading-order.json`, `docs/records/book-pass/**`, this plan or
   the tidy-up plan, except `units.md` status cells under §2.4; never
