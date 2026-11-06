@@ -20,7 +20,7 @@ const MAX_DEPTH = 10000;
 // stack only names the evaluator). B-151 D1 found a cross-module pattern
 // capture this way.
 const TRACE_DEPTH = typeof process !== "undefined" && !!process.env?.ALLEGRO_TRACE_DEPTH;
-const TRACE_STEP = Math.max(1, Number(process.env?.ALLEGRO_TRACE_DEPTH) || 500);
+const TRACE_STEP = Math.max(1, (typeof process !== "undefined" && Number(process.env?.ALLEGRO_TRACE_DEPTH)) || 500);
 let traceWaterline = TRACE_STEP;
 
 // B-018 T-R6 (broadened): the recursion inlining cutoff hook. Injected

@@ -645,6 +645,27 @@ name.
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
+### 2026-11 — Rung 3 on the site; the web bundle loads in a browser and the registry is in the gate (B-151 E2, B-093 slice 2, B-176 items 1 and 2)
+
+B-176 (the host chapter's findings), items 1 and 2: line 23 of
+`src/evaluator.ts` now guards its `process.env` read, so the web bundle
+loads in a page; the suite builds the bundle with esbuild, loads it in a
+`node:vm` context with no `process` or `Buffer` global and runs a `use`
+through it (`src/test/tooling.ts`). The three pages' copy of
+`lib/units.alg` is re-synced, and `scripts/sync-web-libs.ts --check`
+runs in the suite; its verifier ended a literal at the first "`);" and
+so failed a correct sync of the current `lib/units.alg`, which is fixed.
+B-151 (the planning pilot) E2, B-093 (rung-3 packaging) slice 2:
+`totality` and `planning` join the web library registry, and
+`web/allegro-web.ts` resolves a registered library's own `use` header
+through the registry, one extension per library per evaluation.
+`use planning` plus the sandbox plan takes 0.62 to 0.73 s in the vm.
+`website/index.html` gains the section "A domain model the kernel
+checks and searches" (a sandbox plan, a captured halt, what the rung
+does and does not show), and both sandbox pages the preset
+"Walkthrough 6 — A domain model (planning)". The deploy is the
+maintainer's.
+
 ### 2026-11 — The root README's corrections (B-184): the taste parses, and lane S holds the two READMEs
 
 B-184 (the root README's corrections), lane S, filed by the book pass
