@@ -967,7 +967,7 @@ table and the stream plans.
   37-example site sweep clean. Residue routed: B-081 (refinement-
   failure domain detail), B-089 (record-domain law sampling flips the
   DSL's pending laws with zero DSL changes)
-- [ ] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
+- [x] **B-093** · Rung 3 Vivace pilot packaging: when the B-079/B-080
   pilot exists, derive the public story (stakeholder-readable failures,
   solution finding over one domain model); re-grade the claims register;
   rung 4 remains internal direction until then
@@ -978,13 +978,22 @@ table and the stream plans.
     D6: model authoring + solution finding → demoable; units as
     refinements → delivered; §8 "rung 3 landed"); `docs/messaging.md`
     rung-3 story, claim row with receipts, the not-claimed line; README
-    and getting-started tour entries. Remaining (slice 2, the website
-    loop): landing section, sandbox preset, `planning` in
-    `scripts/sync-web-libs.ts`'s registry with its nested `use units`
-    and `use totality`; measure the browser load time first (the
-    library parses in about 40 s on node: B-153 (re-evaluation per
-    reference), B-155 (library load per module)); deploy is the
-    maintainer's.
+    and getting-started tour entries.
+  - **Progress. Slice 2 (2026-11-06, stage E2 of B-151)**: the website
+    loop. The browser load time first: `use planning` plus the landing
+    sandbox's plan runs in 0.62 to 0.73 s in the web bundle loaded in a
+    `node:vm` context (three runs), against the 40 s on node this item
+    once recorded (B-153 (re-evaluation per reference) and B-155
+    (library load per module) since fixed). `totality` and `planning` in
+    `scripts/sync-web-libs.ts`'s registry; `web/allegro-web.ts` resolves
+    a registered library's own `use` header through the registry; the
+    landing section "A domain model the kernel checks and searches" in
+    `website/index.html` (sandbox, captured halt, what the rung does not
+    show) and the sandbox preset in both sandbox pages; the suite runs
+    the plan in the bundle and pins it. Two blockers fixed on the way:
+    B-176 (the host chapter's findings) items 1 and 2. Nothing remains
+    but the owner-run deploy (`deploy.sh`), which is the maintainer's;
+    the item is closed on that understanding.
 - **See also B-177** (the demo ladder chapter's findings), filed after B-176: eight defects in the demos, their documentation and their pins, among them a rung 2 break-it comment that does not reproduce its transcript (B-093 packages rung 3).
 
 ### Track M — methodology (2026-08)
@@ -1223,6 +1232,13 @@ table and the stream plans.
     getting-started (B-093 progress above). Next: E2 (the website
     loop), then C2 or D3 as a pilot plan demands, for the maintainer to
     say
+  - **Progress.** E2 (2026-11-06): packaging slice 2, the website loop —
+    `planning` and `totality` in the web library registry, a library's
+    own `use` resolved by the browser runtime, the landing section and
+    the sandbox preset, `use planning` plus the plan in 0.62 to 0.73 s
+    in the vm-loaded bundle (B-093 progress above; plan §8). The deploy
+    is the maintainer's. Next: C2 or D3 as a pilot plan demands, for the
+    maintainer to say
 - [x] **B-153** (re-evaluation per reference) · L0 · **A top-level
   binding is re-evaluated at every reference.** Landed 2026-10-29 by
   B-157 P10 (a binding evaluated once): the re-evaluation was the
@@ -3135,13 +3151,20 @@ table and the stream plans.
      C111, C112, C113, C114, C115, C116, C117, C118; evidence E16, E23,
      E27, E28, E29. Fix: guard line 23 as line 22 is guarded, and add a
      gate check that builds and loads the bundle in a context with no
-     `process` global.
+     `process` global. Landed 2026-11-06 at PR #166: line 23 guarded as line 22 is; the suite
+     builds the bundle with esbuild and loads it in a `node:vm` context
+     with no `process` or `Buffer` global (`src/test/tooling.ts`).
   2. The three web pages' copy of `lib/units.alg` has drifted from the
      file since d73922c (2026-10-26): `scripts/sync-web-libs.ts --check`
      fails with "website/index.html: lib 'units' drifted from
      lib/units.alg", and the gate does not run it;
      `scripts/sync-web-libs.ts`, the three pages under `website/`;
-     claims C86, C87, C119; evidence E18, E28, E29.
+     claims C86, C87, C119; evidence E18, E28, E29. Landed 2026-11-06 at
+     PR #166: re-synced, and
+     the suite runs `scripts/sync-web-libs.ts --check`; the script's
+     verifier ended a literal at the first "`);", so it failed a correct
+     sync of the current `lib/units.alg`, and now ends it at the first
+     unescaped backtick.
   3. The browser-compatible-core rule (`TextEncoder`/`TextDecoder`, never
      `Buffer`) is stated only in `CLAUDE.md` (line 155); no chapter
      states it; the typecheck compiles `src/` against Node's declarations
