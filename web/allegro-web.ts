@@ -337,6 +337,11 @@ function inspectAllegro(source: string): { summary: string; grade: string; error
   }
 }
 
+// The bundle's own namespace (`AllegroBundle`, esbuild's global name): the
+// suite loads the built bundle in a context with no `process` global and
+// drives it through these (B-176 item 1).
+export { evalAllegro, evalAllegroAsync, inspectAllegro, registerLibrary, resetContext };
+
 // Expose to global scope for the HTML page
 (window as any).Allegro = {
   eval: evalAllegro,

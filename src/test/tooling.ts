@@ -19,6 +19,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "node:child_process";
 import * as nodePath from "path";
+import * as vm from "node:vm";
+import { build as esbuildBuild } from "esbuild";
 import type { LlmClient as BenchLlmClient } from "../../pcp/llm-worker.js";
 
 // --- PCP benchmark suite (bench/) ---
@@ -337,6 +339,77 @@ export function runLoadLintTests(): void {
     }
     eq(failed ? out.trim() : "", "", "load-lint violations");
   });
+}
+
+// --- B-176 items 1 and 2: the web bundle loads in a browser-shaped context ---
+//
+// The bundle is built the way `npm run build:web` builds it, in memory
+// (`write: false`), once per process however many tests use it, and loaded
+// in a `node:vm` context whose global carries what a browser page has and
+// nothing Node adds: no `process`, no `Buffer`. A module-level read of
+// `process.env` without the `typeof process` guard throws there at load,
+// which is what the site's sandbox would do.
+
+const webRepoRoot = nodePath.resolve(import.meta.dirname, "../..");
+let webBundleText: Promise<string> | null = null;
+
+/** The bundle's text, built with `package.json`'s `build:web` options. */
+function webBundle(): Promise<string> {
+  webBundleText ??= esbuildBuild({
+    absWorkingDir: webRepoRoot,
+    entryPoints: ["web/allegro-web.ts"],
+    bundle: true,
+    outfile: "web/dist/allegro.js",
+    format: "iife",
+    globalName: "AllegroBundle",
+    platform: "browser",
+    write: false,
+    logLevel: "silent",
+  }).then((r) => r.outputFiles[0].text);
+  return webBundleText;
+}
+
+interface WebAllegro {
+  evalAllegro(source: string, standard?: boolean): { output: string[]; result: string | null; error: string | null };
+  inspectAllegro(source: string): { summary: string; grade: string; error: string | null };
+  registerLibrary(name: string, source: string): void;
+  resetContext(): void;
+}
+
+/** Load the bundle in a fresh context with a browser's globals only. The
+ *  context's `window` is its global, as a page's is. */
+function loadWebBundle(code: string): { bundle: WebAllegro; global: Record<string, unknown> } {
+  const global: Record<string, unknown> = {
+    console: { log: () => {}, error: () => {}, warn: () => {}, info: () => {} },
+    TextEncoder, TextDecoder, setTimeout, clearTimeout, queueMicrotask, performance,
+  };
+  global.window = global;
+  vm.createContext(global);
+  try {
+    vm.runInContext(code, global, { filename: "allegro.js" });
+  } catch (e) {
+    const err = e as { name?: string; message?: string };
+    throw new Error(`the bundle failed to load: ${err.name}: ${err.message}`);
+  }
+  return { bundle: global.AllegroBundle as WebAllegro, global };
+}
+
+const libSource = (name: string): string => fs.readFileSync(nodePath.join(webRepoRoot, "lib", `${name}.alg`), "utf-8");
+
+export async function runWebBundleTests(): Promise<void> {
+  await asyncTest("web bundle (B-176 item 1): builds, loads with no process or Buffer global, and runs a use", async () => {
+    const { bundle, global } = loadWebBundle(await webBundle());
+    eq("process" in global || "Buffer" in global, false, "the context is browser-shaped");
+    for (const name of ["evalAllegro", "inspectAllegro", "registerLibrary"] as const) {
+      eq(typeof bundle[name], "function", `AllegroBundle.${name}`);
+    }
+    eq(typeof (global.Allegro as { eval?: unknown })?.eval, "function", "the page's window.Allegro is installed");
+    bundle.registerLibrary("contracts", libSource("contracts"));
+    const r = bundle.evalAllegro("use contracts\nprint(\"contracts in the browser\")\n");
+    eq(r.error, null, "no error");
+    eq(r.output.join("\n"), "contracts in the browser");
+  });
+
 }
 
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
