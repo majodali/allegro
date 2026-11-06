@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches no `src/`. Human-gated; run by its own review session (the plan's §8) |
+| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches `src/` only in a tidy-up chunk under the tidy-up stream's plan, in files no active implementation stream holds. Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream; **next: stream D, the planning loop** (B-187 (the planning loop, the next validating demo), plan `docs/plans/planning-loop.md`, drafted 2026-11-06, awaiting ratification; reserves B-188 (first out-of-scope finding of the planning-loop stream) and B-189 (second out-of-scope finding of the planning-loop stream); asks to widen lane D's globs by `pcp/**`, `demos/rung4/**` and `docs/plans/release-track.md`, the plan's ruling on the lane), after any lane D stream ruled ahead of it | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -3361,9 +3361,12 @@ table and the stream plans.
   the chapter, or dead code removed. Its oracle: every `tests/*.alg` and
   `demos/**/*.alg` run with `run` and `inspect` gives identical stdout,
   stderr and exit code; every pin and verdict is unchanged; every
-  ratchet only falls. The orchestrating session reads this item at its
-  check-ins and opens one tidy-up chunk per unit whose files no active
-  stream holds. Who edits it is ruling R2 (who edits B-182) of the plan;
+  ratchet only falls. Since amendment M3 (the review session runs the
+  tidy-up stream) of the plan, ruled 2026-11-06, the review session
+  reads this item when a chapter's edit merges and opens one tidy-up
+  chunk per unit whose files no active implementation stream of the
+  orchestrating session holds; the orchestrating session no longer
+  reads it. Who edits it is ruling R2 (who edits B-182) of the plan;
   as recommended, the book pass appends lines and never checks one off,
   and the tidy-up stream checks a line off when its chunk merges, adding
   only the PR, and never appends one. The tidy-up stream's own plan
