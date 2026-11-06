@@ -308,6 +308,56 @@ merges, this list is their text.
 12. **The code matches the book.** A decision lives in one unit where it
     can, so a reader can branch the code and try another design.
 
+### 2.7 The monotonic pass: how a decision is taken
+
+Proposed at the PR of chunk P1b (the decision types), under R28 (the monotonic pass), R29
+(capability and implementation decisions) and R30 (who makes a
+decision's code changes); accepted by the maintainer on PR #164,
+2026-11-06 (R31 in §6). The lane of item 3 is B-186 (a lane for the
+monotonic pass); until it lands, §3, §4 and §8 read as written, and a
+chapter whose decisions change code waits for it.
+
+1. **One PR per chapter of the inventory's contents.** Its decisions are
+   taken in inventory order. The PR opens with the chapter review (the
+   decisions as they stand, against the code; the changes proposed, each
+   a ruling). The maintainer rules each decision in PR comments. The PR
+   then carries, per decision in order: the decision's text in the
+   chapter's IR and prose, and its code and test changes. A decision
+   whose code change is large gets a PR of its own, in the same order.
+   A chapter is approved, and final under R28, when its PR merges.
+2. **Code changes are a decision's own.** A change implements the
+   decision as ruled and nothing else. A change that a later decision
+   needs waits for that decision. A finding about an earlier, approved
+   decision is a non-monotonicity: the pass stops, reports it, and goes
+   back as R28 says.
+3. **The lane.** Lane A holds no code, and the lane check
+   (`scripts/analyze/lane-lint.ts`) accepts one lane per PR, narrowed by
+   the plan's `boundary`. Options: (a) a new lane for this pass whose
+   globs cover the book's files and the code (`src/**`, `lib/**`,
+   `tests/**`, `demos/**`), with this plan's `boundary` widened per
+   chapter to that chapter's documents and unit files, as B-104 (retire
+   the dunder convention) widens its boundary per chunk; (b) lane A's
+   globs widened to the code; (c) two PRs per decision, documents in
+   lane A and code in the code's lane under a companion plan.
+   Recommended: (a). (b) makes lane A overlap every lane; (c) splits a
+   decision from its code, which R28 forbids. The lane is a lane-S
+   change to `scripts/analyze/lanes.json` and the lane table, made by
+   the orchestrating session.
+4. **Coordination.** A chapter's PR touches only files no other active
+   stream holds (stop condition 5 of §3). A chapter whose files another
+   stream holds waits, as a waiting chunk does. The orchestrating
+   session's streams in the same files wait for the chapter's PR in
+   turn; the lane table states the rule.
+5. **The oracle widens** with the code: `bash scripts/typecheck.sh`,
+   the full suite (`npm run test:shards`), `npm run lint:planes`,
+   `npm run lint:units` and `npm run lint:load`, beside the doc lints.
+   Every `// expect:` pin moves only by a decision that changes it,
+   named in the PR. Ratchet baselines fall only in their own commit
+   (B-164 (ratchet baselines under concurrent merges)).
+6. **Tidy-ups.** B-182 (unit tidy-ups from the book pass) stays for
+   changes no decision needs; a decision's own code change never goes
+   there.
+
 ## 3. Oracle and stop conditions
 
 **What decides a chunk.** Each command in the header, run on the branch
@@ -841,9 +891,48 @@ PR's six asks in a comment, and added two rules:
 
 **What R28 changes in this plan.** The unit of work becomes a decision,
 taken in inventory order, and a decision's code changes are part of
-its approval. This stream edits documents only (§4), so how code
-changes are made per decision is an open question, put to the
-maintainer with chunk P1b (the decision types).
+its approval.
+
+**Ruling taken 2026-11-05, after PR #163's merge.**
+
+- **R30 — Who makes a decision's code changes.** Options: (a) this
+  stream, per decision, its boundary widened to the decision's files;
+  (b) the orchestrating session, as a chunk through a hand-off item,
+  the next decision waiting for its merge; (c) one session runs both.
+  Taken: (a). The mechanics are proposed in §2.7 and put to the
+  maintainer at chunk P1b's PR.
+
+**Rulings taken 2026-11-06, on PR #164.**
+
+- **R31 — The decision types and how a decision is taken.** The ten hard
+  type calls stand as the classifier made them, except three put to
+  review: "Scope leaves the value universe" (capability only if read-site
+  forgery requires it, else the decision is reversed); "Effects describe
+  computations, refinements describe data" (one decision or two; a
+  decision or an observation); "One primer for human and machine
+  provers" (what the primer is). The incompleteness and future-cell
+  decisions merge. §2.7 is accepted.
+
+**Rulings taken 2026-11-07, after PR #165 (amendment M3) merged.**
+
+- **R32 — M3 reconciled with R30 and §2.7.** The maintainer took three
+  recommendations and one option of their own:
+  1. The review session edits code in a chapter chunk, for its
+     decisions' own changes under §2.7 once B-186 lands, and in a
+     tidy-up chunk for changes that alter no behaviour. §8 and lane A's
+     row say so.
+  2. The review session, not the orchestrating session, makes B-186's
+     lane change, as a lane-S PR titled under B-163 (the lane manifest
+     and its check), as PR #153 was.
+  3. When a decision's change touches files an implementation stream of
+     the orchestrating session holds, or code that stream's work rests
+     on, the maintainer rules case by case (option (c); the options not
+     taken: the pass waits; implementation plans name the decisions
+     they rely on). The review session puts each such case to the
+     maintainer as an ask in the chapter's PR before making the change.
+  4. A chapter's tidy-ups ride in its PR, as separate commits each
+     passing the outputs-identical oracle, when its decisions touch the
+     same unit; otherwise they are tidy-up chunks under B-182.
 
 ## 7. Record
 
@@ -942,6 +1031,25 @@ maintainer with chunk P1b (the decision types).
   mapped to the ten choices for the tour, and one decision (language
   extensions are declarative): 257 decisions. Chunk P1b (the decision
   types) added before the pilot.
+- **2026-11-05 — P1b, the decision types** (the review session). R30
+  recorded in §6; the monotonic pass proposed in §2.7. Every inventory
+  entry typed: 256 decisions, 202 capability and 54 implementation. 21
+  dependencies of a capability on an implementation decision found in
+  20 entries: 19 misread (redirected to the capability they rest on, or
+  reversed), 2 resolved by retyping one entry as implementation. Two
+  mutually defined capability decisions merged (incompleteness and
+  future cells). The three cycles of the merge re-examined. Ten types
+  hard to call, put to the maintainer. The type check is recorded in
+  the inventory.
+- **2026-11-06 — P1b's rulings** (the review session). R31 recorded in
+  §6; §2.7 accepted; B-186 (a lane for the monotonic pass) filed for the
+  orchestrating session; three types put to review, the review session's
+  findings recorded in the inventory's type check.
+- **2026-11-07 — M3 reconciled** (the review session). R32 recorded in
+  §6; §8 and lane A's row say where the review session edits code; B-186
+  moved to the review session. PR #166 (rung 3 on the site) reviewed:
+  its fixes leave twelve claims of `docs/book/platform/host.ir.md`
+  stale, for the maintainer to rule how they are re-proposed.
 
 ## 8. Sessions
 
@@ -965,12 +1073,16 @@ two sessions share. Neither reads the other's conversation.
 
 **What each session never does.**
 
-- The review session, in a chapter chunk, never edits `src/`, `lib/`,
-  `tests/`, `demos/`, `bench/` or `scripts/`, except the ids baseline
-  under M1 (§6); in a tidy-up chunk it edits only the unit's files that
-  the tidy-up plan's boundary names, and never a file inside an active
-  implementation stream's boundary (R1, M3); never edits another
-  stream's backlog items, lane row, manifest row or changelog section.
+- The review session edits code in two kinds of chunk only (R32, §6).
+  In a chapter chunk, once B-186 (a lane for the monotonic pass) lands,
+  it makes the chapter's decisions' own code and test changes under
+  §2.7, and nothing else; until then a chapter chunk edits no `src/`,
+  `lib/`, `tests/`, `demos/`, `bench/` or `scripts/` file, except the
+  ids baseline under M1 (§6). In a tidy-up chunk it edits only the
+  unit's files that the tidy-up plan's boundary names. A change in a
+  file inside an active implementation stream's boundary is ruled by
+  the maintainer case by case (R32). It never edits another stream's
+  backlog items, lane row, manifest row or changelog section.
 - The orchestrating session never edits `docs/book/**`,
   `docs/reading-order.json`, `docs/records/book-pass/**`, this plan or
   the tidy-up plan, except `units.md` status cells under §2.4; never
