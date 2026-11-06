@@ -404,3 +404,7 @@ against a private mental model.
   the website loop (landing section, sandbox preset, `planning` in
   the web library registry — the browser load time to be measured
   first); deploy pass is the maintainer's.
+- 2026-11-06: rung 3's website loop landed (B-093 slice 2, B-151 E2):
+  the landing section, the sandbox preset, `planning` in the web
+  library registry, 0.62 to 0.73 s in the vm-loaded bundle; no grade
+  changes; deploy pass is the maintainer's.

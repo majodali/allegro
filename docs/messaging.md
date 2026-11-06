@@ -154,7 +154,8 @@ them before we do or we lose them.
   prover-loop sections added; refinement syntax updated to `&`.
 - `demos/` — rung-1 runnable scripts + transcripts (this package);
   `demos/rung2/` (the provable DSL); `demos/rung3/` (the domain model,
-  slice 1 of B-093 (rung-3 packaging) — landing section and sandbox
-  preset are the next slice).
+  slice 1 of B-093 (rung-3 packaging); slice 2, 2026-11-06, derived the
+  landing section "A domain model the kernel checks and searches" and
+  the sandbox preset from it — deploy is the maintainer's).
 - `docs/book/proving-in-allegro.md` — audited as the public primer.
 - README / getting-started — next slice (B-091 step 4–5).
