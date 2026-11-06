@@ -2048,6 +2048,32 @@ theorem chain: q == q by proof_trans(proof_refl(q), proof_refl(q))
 p = proof_trans(proof_refl(q), proof_refl(q))
 print(p.lawTier)                 // admitted — nothing upgraded for free`,
 
+  "Walkthrough 6 — A domain model (planning)": `// A project plan as a graph of outcomes, in a pure Allegro library.
+use units
+use planning
+plan Release:
+  inputs:   SourceCommit, ReleaseApproval
+  outcomes: DeployedRelease
+  budget:   40 person-hours
+  Build:
+    inputs:   SourceCommit
+    outcomes: ValidatedBuild
+    estimate: 1 hour, 2 person-hours
+  Deploy:
+    inputs:   ValidatedBuild, ReleaseApproval
+    outcomes: DeployedRelease
+    options:
+      BlueGreen:
+        estimate: 1 hour, 3 person-hours
+      Direct:
+        estimate: 6 hours, 1.5 person-hours
+
+// solve picks the option that passes every check, cheapest by effort.
+print(solution_show(solve(Release)))
+// A deadline moves the answer; when nothing fits, the refusal says why.
+print(solution_show(solve(with_budget(Release, budget(3 h, person_hours(40), none)))))
+print(error of solve(with_budget(Release, budget(1 h, person_hours(40), none))))`,
+
   "Hello World": `print("Hello, Allegro!")`,
 
   "Fibonacci": `// Tail-recursive fibonacci

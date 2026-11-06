@@ -452,6 +452,22 @@ export async function runWebBundleTests(): Promise<void> {
     // extension: a second run on the same page answers the same.
     eq(bundle.evalAllegro(PLANNING_SANDBOX).output.join("\n"), PLANNING_SANDBOX_OUTPUT.join("\n"), "a second run");
   });
+
+  // The text the test runs is the text the site shows: the landing
+  // section's editor and the sandbox preset in both sandbox pages.
+  test("web pages (B-151 E2): the landing sandbox and both sandbox presets carry the pinned plan", () => {
+    const page = fs.readFileSync(nodePath.join(webRepoRoot, "website/index.html"), "utf-8");
+    const editor = /<div class="sandbox" id="s-planning">\s*<textarea[^>]*>([\s\S]*?)<\/textarea>/.exec(page);
+    eq(editor?.[1], PLANNING_SANDBOX, "website/index.html, the s-planning editor");
+    for (const file of ["website/sandbox.html", "web/sandbox.html"]) {
+      const html = fs.readFileSync(nodePath.join(webRepoRoot, file), "utf-8");
+      const anchor = "\"Walkthrough 6 — A domain model (planning)\": `";
+      const start = html.indexOf(anchor);
+      eq(start >= 0, true, `${file}: the planning preset`);
+      const body = start + anchor.length;
+      eq(html.slice(body, html.indexOf("`", body)), PLANNING_SANDBOX, `${file}: the planning preset's text`);
+    }
+  });
 }
 
 /** The landing page's planning sandbox, verbatim (B-151 E2). */

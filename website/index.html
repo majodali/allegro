@@ -152,6 +152,7 @@
     <a href="#laws">Laws</a>
     <a href="#prover">Prover Loop</a>
     <a href="#units-dsl">Units DSL</a>
+    <a href="#planning-dsl">Planning DSL</a>
     <a href="#basics">Basics</a>
     <a href="#types">Types</a>
     <a href="#patterns">Patterns</a>
@@ -511,6 +512,50 @@ print(p.lawTier)                 // admitted — nothing upgraded for free</text
     ! admitted 'trans' of 'Quantity' — backs: q_chain, p</pre>
 
 <p>What was written for physics: the dimension vectors, the unit table, the error messages. What was inherited free: the type checker, refinement discharge, the theorem machinery, the strict gate, the tier system, the ledger, the effects calculus, and the prover loop. Runnable scenes with break-it transcripts live in <code>demos/rung2/</code>.</p>
+
+<!-- ================================================ -->
+<h2 id="planning-dsl">A domain model the kernel checks and searches</h2>
+
+<p>The next test is a domain model, not a program: one model with rich structural constraints, solution finding over it, and failures a stakeholder can read. The model is a project plan as a graph of <em>outcomes</em>; the planning DSL is a pure Allegro library, <strong>zero host code</strong> (<code>lib/planning.alg</code>), with an offside-rule grammar block, so <code>plan NAME:</code> declares a value the kernel checks like any other, and a plan that does not check does not build. Dependencies are derived from the wiring, never written. A node with options makes the plan a template: <code>solve</code> picks the resolution that passes every check and is cheapest by effort, then duration, and a deadline moves the answer. When nothing fits, the counterexample names the cheapest candidate and the measure it misses.</p>
+
+<div class="sandbox" id="s-planning">
+<textarea class="sandbox-editor" rows="25">// A project plan as a graph of outcomes, in a pure Allegro library.
+use units
+use planning
+plan Release:
+  inputs:   SourceCommit, ReleaseApproval
+  outcomes: DeployedRelease
+  budget:   40 person-hours
+  Build:
+    inputs:   SourceCommit
+    outcomes: ValidatedBuild
+    estimate: 1 hour, 2 person-hours
+  Deploy:
+    inputs:   ValidatedBuild, ReleaseApproval
+    outcomes: DeployedRelease
+    options:
+      BlueGreen:
+        estimate: 1 hour, 3 person-hours
+      Direct:
+        estimate: 6 hours, 1.5 person-hours
+
+// solve picks the option that passes every check, cheapest by effort.
+print(solution_show(solve(Release)))
+// A deadline moves the answer; when nothing fits, the refusal says why.
+print(solution_show(solve(with_budget(Release, budget(3 h, person_hours(40), none)))))
+print(error of solve(with_budget(Release, budget(1 h, person_hours(40), none))))</textarea>
+<div class="sandbox-bar"><div class="btn-group"><button onclick="runSandbox('s-planning')">Run</button><button class="btn-inspect" onclick="inspectSandbox('s-planning')">Inspect</button></div><span class="timing"></span></div>
+<div class="sandbox-output"><span class="out-info">Click Run to evaluate</span></div>
+</div>
+
+<p>Give a step an input that nothing produces and the build <strong>halts</strong>: the refusal reads in planning vocabulary, because the model's own predicate says why it refused. From <code>demos/rung3/transcripts/01-halt.txt</code>:</p>
+
+<pre class="transcript">$ # 01-model.alg with Compile's input changed to one nothing produces:
+$ allegro demos/rung3/01-model.alg
+
+Error in demos/rung3/01-model.alg: Type error: refinement predicate failed for WellFormedPlan: BuildPipeline is not well-formed: input Missing of Compile is not produced by any node of BuildPipeline or by its inputs</pre>
+
+<p>What was built for planning: the plan and node records, the wiring derivation and the graph checks, the measures (effort and money; durations come from the units DSL), the rollup, the handler rules, the two searches, and the grammar block. What was inherited free: the type checker, refinement discharge (a <code>WellFormedPlan</code> is a refinement, and its predicate explains its own refusals), the module system, totality checking inside the library, and the error channel that carries every refusal. What this rung does not show: one model, at pilot scale, as specification and checking only (Shape 1). Nothing executes a plan; no second model is composed with this one; no AI agent runs the loop over the model. Runnable scenes with break-it transcripts live in <code>demos/rung3/</code>.</p>
 
 <!-- ================================================ -->
 <h2 id="basics">Basics</h2>
