@@ -3151,8 +3151,7 @@ table and the stream plans.
      C111, C112, C113, C114, C115, C116, C117, C118; evidence E16, E23,
      E27, E28, E29. Fix: guard line 23 as line 22 is guarded, and add a
      gate check that builds and loads the bundle in a context with no
-     `process` global. Landed 2026-11-06 at PR (number to be filled by the
-     orchestrating session): line 23 guarded as line 22 is; the suite
+     `process` global. Landed 2026-11-06 at PR #166: line 23 guarded as line 22 is; the suite
      builds the bundle with esbuild and loads it in a `node:vm` context
      with no `process` or `Buffer` global (`src/test/tooling.ts`).
   2. The three web pages' copy of `lib/units.alg` has drifted from the
@@ -3161,7 +3160,7 @@ table and the stream plans.
      lib/units.alg", and the gate does not run it;
      `scripts/sync-web-libs.ts`, the three pages under `website/`;
      claims C86, C87, C119; evidence E18, E28, E29. Landed 2026-11-06 at
-     PR (number to be filled by the orchestrating session): re-synced, and
+     PR #166: re-synced, and
      the suite runs `scripts/sync-web-libs.ts --check`; the script's
      verifier ended a literal at the first "`);", so it failed a correct
      sync of the current `lib/units.alg`, and now ends it at the first
