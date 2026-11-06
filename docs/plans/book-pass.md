@@ -90,15 +90,18 @@ vocabulary nor `docs/book/` defines it.
   session that runs this stream, in which the maintainer discusses each
   chapter.
 - <a id="def-orchestrating-session"></a>**Orchestrating session**: the
-  Claude Code session that runs every other stream, stream D (the
-  partial-evaluation rules) and the tidy-up stream among them, and keeps
-  the maintainer's status board.
+  Claude Code session that runs the implementation streams, the leading
+  edge of the language toward the next validating demo (stream D (the
+  partial-evaluation rules) was the first), and keeps the maintainer's
+  status board. Since amendment M3 (§6) it runs no tidy-up stream.
 - <a id="def-tidy-up"></a>**Tidy-up**: a change to one unit's files that
   changes no behaviour: a move, a rename, a comment pointer to the
   chapter, or dead code removed. Its oracle is in §2.3.
 - <a id="def-hand-off-item"></a>**Hand-off item**: B-182 (unit tidy-ups
-  from the book pass), the one backlog item through which the review
-  session passes tidy-up findings to the orchestrating session.
+  from the book pass), the one backlog item through which a chapter
+  review passes tidy-up findings to the tidy-up stream. Since amendment
+  M3 (§6) the review session runs both, and the item is the hand-off
+  between its chapter chunks and its tidy-up chunks.
 - <a id="def-waiting-chunk"></a>**Waiting chunk**: a chunk whose files,
   or part of them, another active stream's boundary holds. It does not
   start, or its edit does not start, until that stream releases them
@@ -174,12 +177,15 @@ Measured on `origin/main` at `58fe38a`, 2026-11-03, read-only.
 1. **The book pass** (this plan). Lane A, human-gated. It delivers
    B-174, widened from "every existing chapter gains its IR" to "one
    chapter at a time, in reading order, restructuring allowed, IR
-   first". The [review session](#def-review-session) runs it. It edits
-   documents only, the files of §4, and never `src/`.
+   first". The [review session](#def-review-session) runs it. In its
+   chapter chunks it edits documents only, the files of §4, and never
+   `src/`.
 2. **Unit tidy-ups from the book pass** (the tidy-up stream). The
-   [orchestrating session](#def-orchestrating-session) runs it, beside
-   stream D (B-172 (the partial-evaluation rules as implemented against
-   the spine), `docs/plans/pe-rules.md`). One chunk per unit, opened by a
+   review session runs it too, since amendment M3 (§6), under the
+   tidy-up stream's own plan, beside the
+   [orchestrating session](#def-orchestrating-session)'s implementation
+   streams, which hold precedence in the files their boundaries name
+   (R1). One chunk per unit, opened by a
    chapter's findings. A chunk's boundary is exactly that unit's files
    in `scripts/analyze/units.json`; a mixed file is touched only in the
    unit's own part. The lane follows the file: lane D or lane K for the
@@ -199,9 +205,10 @@ Measured on `origin/main` at `58fe38a`, 2026-11-03, read-only.
 **The hand-off.** It goes through one backlog item, B-182. Each chapter's
 edit PR appends that chapter's tidy-up findings to B-182 as numbered
 lines: the unit, the file, what to change, and the chapter review as the
-pointer. The orchestrating session reads B-182 at its check-ins. It
-opens a tidy-up chunk for the next unit whose files no active stream
-holds, and checks the line off when the chunk merges. Under the rule
+pointer. The review session reads B-182 when a chapter's edit merges
+(amendment M3, §6). It opens a tidy-up chunk for the next unit whose
+files no active stream of the orchestrating session holds, and checks
+the line off when the chunk merges. Under the rule
 of B-162 (conflict-free status documents), neither session edits the other's
 backlog items, lane row, manifest row or changelog section. B-182 is
 the one shared item, under R2.
@@ -604,6 +611,21 @@ amendments the same day, in the review session, both as recommended:
   how the reviews are listed. Each merged review gets one appendix row
   in `docs/reading-order.json`. One index record, option (c), is the
   fallback if the rows crowd the appendix.
+- **M3 — The review session runs the tidy-up stream.** Ruled by the
+  maintainer on 2026-11-06, in the orchestrating session: the book pass
+  will take a while and leads to no new functionality, so the
+  orchestrating session moves the leading edge of the language forward
+  toward the next validating demo, and the review session performs the
+  tidy-ups on the book and on already implemented code. The tidy-up
+  stream keeps its own plan (§2.3), lane by file, with the strict
+  definition of a tidy-up and the outputs-identical oracle; the review
+  session drafts that plan when B-182 first carries lines, and runs its
+  chunks beside its chapter chunks. R1 holds with the roles reversed:
+  a tidy-up chunk runs only in files disjoint from every active
+  implementation stream's boundary, and the lane check refuses the
+  overlap. R2 holds unchanged: a chapter chunk appends B-182 lines and a
+  tidy-up chunk checks them off, now in one session. The orchestrating
+  session no longer reads B-182 at its check-ins; §8 records the roles.
 
 **R1 — Tidy-ups beside stream D.** Lane D is internally serial (the lane
 table in `docs/backlog.md`, "Internally serial, permanently"). The
@@ -1010,29 +1032,35 @@ This section is self-contained.
 **Two sessions, one repository.** The repository is the only state the
 two sessions share. Neither reads the other's conversation.
 
-- **The review session** runs this stream. The maintainer discusses each
+- **The review session** runs this stream and, since amendment M3 (§6),
+  the tidy-up stream under its own plan. The maintainer discusses each
   chapter there. It works in worktrees under `.claude/worktrees/`, one
   single-use branch per PR, and opens each PR for the maintainer. It
   reports through this plan's §7 (one bullet per PR, dated, with counts
-  and lint lines) and through its PRs, whose bodies carry W-008's four
-  parts.
-- **The orchestrating session** runs stream D, the tidy-up stream and
-  every other stream, and keeps the maintainer's status board. The board
-  reads this plan's §7 and B-182. The orchestrating session reads B-182
-  at its check-ins and opens tidy-up chunks from it.
+  and lint lines), through the tidy-up plan's §7, and through its PRs,
+  whose bodies carry W-008's four parts. It reads B-182 when a chapter's
+  edit merges and opens tidy-up chunks from it.
+- **The orchestrating session** runs the implementation streams, the
+  leading edge of the language toward the next validating demo, and
+  keeps the maintainer's status board. The board reads this plan's §7
+  and the tidy-up plan's §7.
 
 **What each session never does.**
 
-- The review session never edits `src/`, `lib/`, `tests/`, `demos/`,
-  `bench/` or `scripts/`, except the ids baseline under M1 (§6); never edits a file inside stream D's or the
-  tidy-up stream's boundary; never checks off a B-182 line; never edits
-  another stream's backlog items, lane row, manifest row or changelog
-  section.
-- The orchestrating session never edits `docs/book/**`,
-  `docs/reading-order.json`, `docs/records/book-pass/**` or this plan,
-  except `units.md` status cells under §2.4; never appends a line to
-  B-182 or rewrites one the review session wrote; never edits this
+- The review session, in a chapter chunk, never edits `src/`, `lib/`,
+  `tests/`, `demos/`, `bench/` or `scripts/`, except the ids baseline
+  under M1 (§6); in a tidy-up chunk it edits only the unit's files that
+  the tidy-up plan's boundary names, and never a file inside an active
+  implementation stream's boundary (R1, M3); never edits another
   stream's backlog items, lane row, manifest row or changelog section.
+- The orchestrating session never edits `docs/book/**`,
+  `docs/reading-order.json`, `docs/records/book-pass/**`, this plan or
+  the tidy-up plan, except `units.md` status cells under §2.4; never
+  appends a line to B-182, checks one off or rewrites one; never edits
+  this stream's or the tidy-up stream's backlog items, lane row,
+  manifest row or changelog section. Its implementation streams declare
+  their boundaries in their plans' headers, which is how a tidy-up chunk
+  knows what to wait for.
 - Neither session lowers a ratchet baseline outside the B-164 rule, or
   merges a PR: both streams are human-gated.
 
