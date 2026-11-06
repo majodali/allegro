@@ -3404,8 +3404,16 @@ table and the stream plans.
   2026-11-03 at the review session's request, with B-186 (fourth
   out-of-scope finding of the book pass), once chunk F1 had used the
   first two.
-- [ ] **B-186** (fourth out-of-scope finding of the book pass) · T-docs
-  · As B-185 (third out-of-scope finding of the book pass).
+- [ ] **B-186** (a lane for the monotonic pass) · T-docs · Filed
+  2026-11-06 by the book pass: the maintainer accepted, on PR #164, how
+  a decision is taken (`docs/plans/book-pass.md` §2.7), with its lane
+  option (a). One lane-S PR, worked by the orchestrating session: a new
+  lane in `scripts/analyze/lanes.json` and the lane table of this file
+  whose globs cover the book's files and the code (`src/**`, `lib/**`,
+  `tests/**`, `demos/**`), named for the book pass, with the rule that
+  the pass's chapter PRs and the other streams wait for each other on a
+  shared file; and the book pass's plan header moved to that lane. Chunk
+  P2 (the pilot chapter) waits for it if its decisions change code.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

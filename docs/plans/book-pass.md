@@ -301,12 +301,14 @@ merges, this list is their text.
 12. **The code matches the book.** A decision lives in one unit where it
     can, so a reader can branch the code and try another design.
 
-### 2.7 The monotonic pass: how a decision is taken (proposed)
+### 2.7 The monotonic pass: how a decision is taken
 
 Proposed at the PR of chunk P1b (the decision types), under R28 (the monotonic pass), R29
 (capability and implementation decisions) and R30 (who makes a
-decision's code changes). Until the maintainer rules, §3, §4 and §8 read
-as written.
+decision's code changes); accepted by the maintainer on PR #164,
+2026-11-06 (R31 in §6). The lane of item 3 is B-186 (a lane for the
+monotonic pass); until it lands, §3, §4 and §8 read as written, and a
+chapter whose decisions change code waits for it.
 
 1. **One PR per chapter of the inventory's contents.** Its decisions are
    taken in inventory order. The PR opens with the chapter review (the
@@ -878,6 +880,17 @@ its approval.
   Taken: (a). The mechanics are proposed in §2.7 and put to the
   maintainer at chunk P1b's PR.
 
+**Rulings taken 2026-11-06, on PR #164.**
+
+- **R31 — The decision types and how a decision is taken.** The ten hard
+  type calls stand as the classifier made them, except three put to
+  review: "Scope leaves the value universe" (capability only if read-site
+  forgery requires it, else the decision is reversed); "Effects describe
+  computations, refinements describe data" (one decision or two; a
+  decision or an observation); "One primer for human and machine
+  provers" (what the primer is). The incompleteness and future-cell
+  decisions merge. §2.7 is accepted.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -985,6 +998,10 @@ its approval.
   future cells). The three cycles of the merge re-examined. Ten types
   hard to call, put to the maintainer. The type check is recorded in
   the inventory.
+- **2026-11-06 — P1b's rulings** (the review session). R31 recorded in
+  §6; §2.7 accepted; B-186 (a lane for the monotonic pass) filed for the
+  orchestrating session; three types put to review, the review session's
+  findings recorded in the inventory's type check.
 
 ## 8. Sessions
 
