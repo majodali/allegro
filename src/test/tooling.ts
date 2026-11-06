@@ -425,7 +425,67 @@ export async function runWebBundleTests(): Promise<void> {
     }
     eq(failed ? out.trim() : "", "", "sync-web-libs --check");
   });
+
+  // B-151 E2 (the website loop): `planning` in the browser. The page's own
+  // registry script runs in the vm, so the test registers exactly what a
+  // page registers; `lib/planning.alg` begins with `use totality` and `use
+  // units`, which the bundle resolves through the same registry.
+  await asyncTest("web bundle (B-151 E2): the page's registry loads planning, and the sandbox plan runs", async () => {
+    const { bundle, global } = loadWebBundle(await webBundle());
+    const html = fs.readFileSync(nodePath.join(webRepoRoot, "website/index.html"), "utf-8");
+    const begin = html.indexOf("// --- BEGIN LIB REGISTRY");
+    const end = html.indexOf("// --- END LIB REGISTRY ---");
+    eq(begin >= 0 && end > begin, true, "the registry region is in the page");
+    const registered = new Map<string, string>();
+    global.Allegro = { registerLibrary: (name: string, source: string) => { registered.set(name, source); bundle.registerLibrary(name, source); } };
+    vm.runInContext(html.slice(begin, end), global, { filename: "index.html registry" });
+    for (const name of ["units", "totality", "planning"]) {
+      eq(registered.get(name) === libSource(name), true, `the page registers lib/${name}.alg as it is on disk`);
+    }
+    const t0 = performance.now();
+    const r = bundle.evalAllegro(PLANNING_SANDBOX);
+    const ms = performance.now() - t0;
+    eq(r.error, null, "no error");
+    eq(r.output.join("\n"), PLANNING_SANDBOX_OUTPUT.join("\n"));
+    if (process.env.ALLEGRO_TEST_TRACE) console.error(`    use planning + the sandbox plan in the vm: ${(ms / 1000).toFixed(2)} s`);
+    // A library used by the program and by another library is one
+    // extension: a second run on the same page answers the same.
+    eq(bundle.evalAllegro(PLANNING_SANDBOX).output.join("\n"), PLANNING_SANDBOX_OUTPUT.join("\n"), "a second run");
+  });
 }
+
+/** The landing page's planning sandbox, verbatim (B-151 E2). */
+const PLANNING_SANDBOX = `// A project plan as a graph of outcomes, in a pure Allegro library.
+use units
+use planning
+plan Release:
+  inputs:   SourceCommit, ReleaseApproval
+  outcomes: DeployedRelease
+  budget:   40 person-hours
+  Build:
+    inputs:   SourceCommit
+    outcomes: ValidatedBuild
+    estimate: 1 hour, 2 person-hours
+  Deploy:
+    inputs:   ValidatedBuild, ReleaseApproval
+    outcomes: DeployedRelease
+    options:
+      BlueGreen:
+        estimate: 1 hour, 3 person-hours
+      Direct:
+        estimate: 6 hours, 1.5 person-hours
+
+// solve picks the option that passes every check, cheapest by effort.
+print(solution_show(solve(Release)))
+// A deadline moves the answer; when nothing fits, the refusal says why.
+print(solution_show(solve(with_budget(Release, budget(3 h, person_hours(40), none)))))
+print(error of solve(with_budget(Release, budget(1 h, person_hours(40), none))))`;
+
+const PLANNING_SANDBOX_OUTPUT = [
+  "Deploy via Direct; bound effort 3.5 person-hours, duration 7 h",
+  "Deploy via BlueGreen; bound effort 5 person-hours, duration 2 h",
+  "no choice of Deploy fits the budget of Release; the cheapest, Deploy via Direct, is duration 7 h against 1 h",
+];
 
 
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---

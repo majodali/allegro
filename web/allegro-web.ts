@@ -104,14 +104,42 @@ function scanUses(source: string): { directives: UseDirective[]; headerEnd: numb
 
 // Load registered library source as an extension: evaluate it (in a fresh ctx),
 // capture any grammar fragment, and collect its user-level bindings.
-function loadGrammarLibrary(name: string, memberFilter?: Set<string>): Extension {
+//
+// A library's own `use NAME` header resolves through the same registry, as
+// the CLI's module loader resolves it through the file system
+// (`src/modules.ts`, `loadModuleSync`): the named libraries load first and
+// become the library's extensions, and their names are not re-exported.
+// `loaded` holds the libraries one evaluation has loaded, so a library used
+// by the program and by another library is ONE extension — its types are
+// the same values on both sides (`lib/planning.alg` uses `units`, and so
+// does a plan written against it).
+type LoadedLibraries = Map<string, Extension>;
+
+function loadGrammarLibrary(name: string, loaded: LoadedLibraries, memberFilter?: Set<string>, loading: Set<string> = new Set()): Extension {
   const source = libraries.get(name);
   if (!source) throw new Error(`Grammar library '${name}' not registered (use Allegro.registerLibrary first)`);
-  const result = evalSource(source, undefined, [typeExt], undefined, true);
+  const cached = memberFilter ? undefined : loaded.get(name);
+  if (cached) return cached;
+  if (loading.has(name)) throw new Error(`Grammar library '${name}': circular use`);
+  loading.add(name);
+  const { directives, headerEnd } = scanUses(source);
+  const nested: Extension[] = [];
+  for (const d of directives) {
+    const useName = d.kind === "module" ? d.name! : d.kind === "member" ? d.moduleName! : undefined;
+    if (useName === undefined) {
+      throw new Error(`Grammar library '${name}': \`use grammar { … }\` blocks are not supported inside a library`);
+    }
+    const ext = loadGrammarLibrary(useName, loaded, undefined, loading);
+    if (!nested.includes(ext)) nested.push(ext);
+  }
+  loading.delete(name);
+  const result = evalSource(source.slice(headerEnd), undefined, [typeExt, ...nested], undefined, true);
   const frag = extractGrammarFragment(result.evalCtx);
+  const inherited = new Set<string>(nested.flatMap((ext) => Object.keys(ext.bindings)));
   const bindings: Record<string, Value> = {};
   for (const [key, b] of result.evalCtx.bindings) {
     if (b.value === undefined) continue;
+    if (inherited.has(key)) continue;
     bindings[key] = b.value;
   }
   // Narrow Grammar-valued bindings to `memberFilter` if a `use NAME.MEMBER`
@@ -121,7 +149,9 @@ function loadGrammarLibrary(name: string, memberFilter?: Set<string>): Extension
       if (asGrammarValue(bindings[k]) && !memberFilter.has(k)) delete bindings[k];
     }
   }
-  return { name, bindings, grammarFragment: frag };
+  const ext: Extension = { name, bindings, grammarFragment: frag };
+  if (!memberFilter) loaded.set(name, ext);
+  return ext;
 }
 
 interface EvalResult {
@@ -145,6 +175,7 @@ function evalAllegro(source: string, standard: boolean = true): EvalResult {
     if (standard) {
       const { directives, headerEnd } = scanUses(source);
       const moduleExts: Extension[] = [];
+      const loaded: LoadedLibraries = new Map();
       // Group member refs by module so we load each module once.
       const memberByModule = new Map<string, Set<string>>();
       for (const d of directives) {
@@ -154,10 +185,10 @@ function evalAllegro(source: string, standard: boolean = true): EvalResult {
         }
       }
       for (const d of directives) {
-        if (d.kind === "module")  moduleExts.push(loadGrammarLibrary(d.name!));
+        if (d.kind === "module")  moduleExts.push(loadGrammarLibrary(d.name!, loaded));
         if (d.kind === "member" && memberByModule.has(d.moduleName!)) {
           const members = memberByModule.get(d.moduleName!)!;
-          moduleExts.push(loadGrammarLibrary(d.moduleName!, members));
+          moduleExts.push(loadGrammarLibrary(d.moduleName!, loaded, members));
           memberByModule.delete(d.moduleName!);     // load once per module
         }
         if (d.kind === "literal") {
@@ -209,6 +240,7 @@ function evalAllegroAsync(
     if (standard) {
       const { directives, headerEnd } = scanUses(source);
       const moduleExts: Extension[] = [];
+      const loaded: LoadedLibraries = new Map();
       // Group member refs by module so we load each module once.
       const memberByModule = new Map<string, Set<string>>();
       for (const d of directives) {
@@ -218,10 +250,10 @@ function evalAllegroAsync(
         }
       }
       for (const d of directives) {
-        if (d.kind === "module")  moduleExts.push(loadGrammarLibrary(d.name!));
+        if (d.kind === "module")  moduleExts.push(loadGrammarLibrary(d.name!, loaded));
         if (d.kind === "member" && memberByModule.has(d.moduleName!)) {
           const members = memberByModule.get(d.moduleName!)!;
-          moduleExts.push(loadGrammarLibrary(d.moduleName!, members));
+          moduleExts.push(loadGrammarLibrary(d.moduleName!, loaded, members));
           memberByModule.delete(d.moduleName!);     // load once per module
         }
         if (d.kind === "literal") {
@@ -291,6 +323,7 @@ function inspectAllegro(source: string): { summary: string; grade: string; error
     let extensions: Extension[] = [typeExt];
     let effectiveSource = source;
     const { directives, headerEnd } = scanUses(source);
+    const loaded: LoadedLibraries = new Map();
     const memberByModule = new Map<string, Set<string>>();
     for (const d of directives) {
       if (d.kind === "member") {
@@ -299,9 +332,9 @@ function inspectAllegro(source: string): { summary: string; grade: string; error
       }
     }
     for (const d of directives) {
-      if (d.kind === "module") extensions.push(loadGrammarLibrary(d.name!));
+      if (d.kind === "module") extensions.push(loadGrammarLibrary(d.name!, loaded));
       if (d.kind === "member" && memberByModule.has(d.moduleName!)) {
-        extensions.push(loadGrammarLibrary(d.moduleName!, memberByModule.get(d.moduleName!)!));
+        extensions.push(loadGrammarLibrary(d.moduleName!, loaded, memberByModule.get(d.moduleName!)!));
         memberByModule.delete(d.moduleName!);
       }
       if (d.kind === "literal") {
