@@ -3434,7 +3434,7 @@ table and the stream plans.
   2026-11-06 by the book pass: the maintainer accepted, on PR #164, how
   a decision is taken (`docs/plans/book-pass.md` §2.7), with its lane
   option (a). One lane-S PR titled under B-163 (the lane manifest and
-  its check), worked by the review session (ruling R32 of the plan): a new
+  its check), worked by the review session (ruling R32 (M3 reconciled with the monotonic pass) of the plan): a new
   lane in `scripts/analyze/lanes.json` and the lane table of this file
   whose globs cover the book's files and the code (`src/**`, `lib/**`,
   `tests/**`, `demos/**`), named for the book pass, with the rule that
