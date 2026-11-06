@@ -45,7 +45,10 @@ function verifyRegion(html: string, file: string): void {
     const start = region.indexOf(anchor);
     if (start < 0) throw new Error(`${file}: lib '${name}' missing from registry region`);
     const bodyStart = start + anchor.length;
-    const bodyEnd = region.indexOf("`);", bodyStart);
+    // The literal ends at its first UNESCAPED backtick: a library whose
+    // comments quote code (`3 hours`) carries "\`);" inside the literal.
+    let bodyEnd = bodyStart;
+    while (bodyEnd < region.length && region[bodyEnd] !== "`") bodyEnd += region[bodyEnd] === "\\" ? 2 : 1;
     const decoded = decodeTemplateLiteral(region.slice(bodyStart, bodyEnd));
     const disk = fs.readFileSync(`lib/${name}.alg`, "utf-8");
     if (decoded !== disk) {

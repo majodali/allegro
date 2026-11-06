@@ -410,7 +410,23 @@ export async function runWebBundleTests(): Promise<void> {
     eq(r.output.join("\n"), "contracts in the browser");
   });
 
+  // B-176 item 2: the pages' library registry matches lib/ — the check the
+  // script carries, in the gate. A plain test: the name hash gives it one
+  // shard, so it runs once per gate run, sharded or not.
+  test("web library registry (B-176 item 2): sync-web-libs --check passes", () => {
+    let out = "";
+    let failed = false;
+    try {
+      out = execFileSync("npx", ["tsx", "scripts/sync-web-libs.ts", "--check"], { cwd: webRepoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      failed = true;
+      const err = e as { stdout?: string; stderr?: string };
+      out = `${err.stdout ?? ""}${err.stderr ?? String(e)}`;
+    }
+    eq(failed ? out.trim() : "", "", "sync-web-libs --check");
+  });
 }
+
 
 // --- B-096: deployed-version verification — pure verdict logic (no network) ---
 
