@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-07 — the host chapter's claims re-stated.** PR #166 fixed
+  the web bundle's load in a browser and the library sync, and the site
+  was redeployed; `docs/book/platform/host.ir.md` now states that
+  current state in thirteen claims, proposed for ratification, and cuts
+  three that were history. Ids 784.
+
 - **2026-11-07 — lane R, the book pass's own lane.** B-186 (a lane for
   the monotonic pass): `scripts/analyze/lanes.json` and the lane table
   gain lane R, whose globs cover the book, the pass's working files and
