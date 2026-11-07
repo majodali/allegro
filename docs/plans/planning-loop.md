@@ -724,3 +724,113 @@ R7 and R8 at their rows' time.
   `docs/plans/release-track.md` (PR #171, R5). The changelog section
   `## Stream D — the planning loop` opens; the manifest row and B-187
   say active.
+- **2026-11-07 — L1 landed.** The obligation surface, on
+  `origin/main` at `7cd2b72`. Four defaults were taken by the
+  orchestrating session when the chunk stopped. The maintainer rules on
+  each at L1's PR:
+  - **The library's name** is `lib/planning_loop.alg`, not R10's
+    `lib/planning-loop.alg`. The `use` scanner (`src/use-scanner.ts`)
+    accepts identifier names only, so `use planning-loop` is a parse
+    error ("Parse error at position 4"). The header's `boundary`, §4 and
+    R10's text now name the underscore.
+  - **`lib/planning.alg` is not edited.** The one-line classification
+    fix in `completions_from` (`lib/planning.alg:1049`) changes no
+    `// expect:` line, but it fails two gates. `npm run lint:load` puts
+    `lib/planning.alg` above its baseline (matchAttempts 650,711 against
+    649,616; memoWrites 990,471 against 988,794). The suite's web-bundle
+    test fails, because `website/index.html`, `website/sandbox.html` and
+    `web/sandbox.html` carry the library as it is on disk. The fix: at
+    depth 0 the dead end is `exhausted` only when a catalog node the
+    plan does not hold produces the port. It is a follow-up for L2 or
+    the stream's close, taken with lane P's baseline raise and the
+    pages' regeneration (R10 (b)). The new library derives the stop
+    itself instead (`stop_of`, `lib/planning_loop.alg:59`).
+  - **The catalog's name** is recovered by the protocol, not held by
+    the record. A grammar label hands a statement form either an
+    expression (`cn:ident`, the catalog's value) or the matched text (a
+    regex part), never both from one match. The engine offers no
+    lookahead, and no primitive names a symbol, so a rule that yields
+    both needs a `src/grammar2/` change outside the boundary.
+    `extractPlanObligations` names the catalog by the top-level binding
+    whose value is the open plan's catalog list, the same value by
+    reference (`src/pcp.ts:1172`). L2 reads `plan.catalog` from the
+    obligation.
+  - **The pilot-findings stream runs beside this one in lane D**, in
+    files this boundary excludes (`src/primitives.ts`, `lib/units.alg`).
+    The lane rule goes to the maintainer.
+
+  What landed:
+  - **The open-plan form** (R9 (a)) is `plan NAME from CATALOG:`
+    (`lib/planning_loop.alg:147` to `:150`). It takes the `plan` form's
+    body items (`node_items` of `planning_grammar`), with `CATALOG` a
+    binding that holds a list of nodes. It expands to
+    `binding_decl(pn, open_plan(build_plan(pn, pitems), cn))`, the
+    two-argument form, so no `WellFormedPlan` check halts on the gap.
+    The bound value is an `OpenPlan` record (`:124`) holding the plan,
+    the catalog list and the obligations. The library's queries are
+    `open_obligations`, `open_findings` (`check_plan`'s findings),
+    `with_entry` and `solve_open`. L2 reads the open plan back through
+    the same type: the plan, the catalog (by the binding's name in the
+    obligation) and the obligations.
+  - **The plan obligation** (R1 (a)) is the record `PlanObligation`
+    (`:44`), with the fields `plan`, `port`, `fixture`, `by`, `stop`,
+    `depth`, `steps`, `identity`, `gap` and `message`.
+    `plan_obligations` (`:93`) builds one per distinct gap across the
+    dead ends of `completions`, with the first dead end's steps as the
+    witness, and none when a completion closes. One per distinct gap:
+    two dead ends at the same port for the same consumer ask the same
+    question, and one catalog entry answers both. `stop` is "catalog"
+    when no catalog entry the plan lacks produces the port and "depth"
+    otherwise. At the default depth it is always "catalog";
+    `plan_obligations_within` bounds the depth. The renderings are
+    `obligation_gap_show` ("Shipped, which Depot needs") and
+    `obligation_show` ("nothing in the catalog produces Shipped, which
+    Depot needs" or "no completion within 1 step: the search stopped at
+    Sorted, which Van needs"). Each is stored in the record, so the
+    protocol reads it as data.
+  - **The identity hash** is `hashProposition` over the text
+    `plan_identity` builds (`:64`): the plan's name, its declared
+    inputs, outcomes and budget, and the gap's port (with its fixture)
+    and consumer. On the demo the text is "plan Fulfil; inputs Order;
+    outcomes Delivered; no budget; gap Shipped by Depot", hash
+    `421ea754`. An unrelated catalog entry leaves it; a changed declared
+    outcome moves it (`src/test/pcp.ts:451`).
+  - **The protocol** (`src/pcp.ts`). `Obligation` gains the optional
+    `kind` (`:61`, absent means a theorem) and `plan`
+    (`PlanObligationContent`, `:80`): `binding`, `plan`, `catalog`,
+    `port`, `fixture`, `consumer`, `stop`, `depth`, `steps`, `gap`,
+    `message`, `identity` and `hash`. The theorem slot carries the
+    identity as its proposition, so `propositionHash` equals `hash`.
+    `extractPlanObligations` (`:1172`) finds the open plans by the
+    registered `type` field against the library's `OpenPlan`; no new
+    slot was added. `extractObligations` appends them, last, only with
+    `plans: true`. `allegro obligations` asks for them
+    (`src/index.ts:523` to `:530`); `formatPlanObligation` (`:528`)
+    renders them.
+  - **`propose` and `verify` on a file with an open plan** run and exit
+    0. They do not list the plan obligation: on the demo, `propose`
+    prints "**5 pending** of 19 obligation(s)" (the units library's
+    laws), and `verify` prints "Verdict (verified): 0/0 discharged" with
+    the same five laws pending. The LLM worker is untouched.
+  - **The demo and the tests.** `tests/planning-loop-obligations.alg`
+    has 17 pinned lines, registered at `src/test/language.ts:689`. It
+    pins the open plan, its findings, the obligation and its renderings,
+    the depth stop, the plan closed by a hand-written entry and checked
+    as a `WellFormedPlan`, and a `plan NAME:` beside the open form.
+    `src/test/pcp.ts:394` to `:503` holds four tests: the extraction and
+    JSON round trip; the hash; theorem and law obligations unchanged;
+    and the CLI's `obligations --pending` in text and JSON, with
+    `propose` and `verify` on the demo.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (68 files) was run through the CLI as `run`,
+    `inspect`, `verify` and `obligations`, and compared on stdout,
+    stderr (stats lines stripped) and exit code. All 272 runs are
+    identical; the new demo is the only new file.
+  - **The counts.** `npm run lint:load` is at or below the baseline.
+    `demos/rung3/02-solve.alg` has 3,793,978 evaluates and 202,129
+    applyComposed, unchanged from before. The demo has 457,193
+    evaluates.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C111 becomes
+    C171 and C172 (proposed, ask A3, cluster G27). The chapter's §2.8
+    and §9 are updated; the chapter has no IR of its own. The oracle
+    lines are in L1's PR.
