@@ -1102,6 +1102,17 @@ its approval.
   `src/metadata.ts:331`), and `channel_register` accepts any rule string.
   B-183 and B-185 left this plan's reserves, which
   `docs/plans/pilot-findings.md` now holds.
+- **2026-11-07 — P2's dry run written** (the review session). R34
+  recorded in §6, its rule in part (a) of the briefs. The maintainer
+  took every default of the review. `docs/book/allegretto/metadata-and-capability.ir.md`
+  (224 claims, 65 clusters, 25 terms of which 3 proposed) written first,
+  then the chapter rewritten as eleven decision sections, the content
+  bound for chapters 8 and 10 held in a final section; no code changed.
+  Eight `book-changes.md` rows. Stale section-number citations of the
+  chapter fixed in `architecture-vocabulary.md`, `evaluator.ir.md` and
+  `build-pipeline.ir.md`. Lints: `lint:ir` 7 files clean, unratified
+  terms 3; `lint:docs:check` ids 783 (one below the baseline, not
+  lowered here).
 
 ## 8. Sessions
 
