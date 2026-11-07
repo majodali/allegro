@@ -138,4 +138,23 @@ chose the lane and the route, and its §2.4 measured the fix.
 
 ## 7. Record
 
-One entry, at TC1's landing.
+- **2026-11-07 — TC1 landed** (PR number to be filled), with this
+  plan; the plan closes at that PR's merge. `DEDENT` in
+  `src/grammar2/engine.ts` calls a new `skipTrailingComments`, which
+  skips the rest of the line when it holds only whitespace and a `//`
+  comment, and every following line holding only whitespace and a `//`
+  comment; if the line holds other content, the old measurement stands.
+  `skipToNextContent` is unchanged. 21 tests named "(B-183)" in
+  `src/test/grammar2-engine.ts`; 11 of them fail on `origin/main`, in
+  the pattern §2.4 of the pilot-findings plan measured (in a block
+  indented 2, gaps 2 to 4 fail; indented 4, gap 4 fails). The oracle:
+  204 of 204 CLI runs identical (`run`, `inspect` and `verify` over the
+  68 programs); `npm run lint:load` at the baseline, every parse count
+  unchanged; `npm run test:shards` 1,321 of 1,321 test runs, gate
+  passed; the lane check reports lane P via this plan.
+- **Differed from the plan.** The pilot-findings plan's §7 line
+  recording PF1's merge is not in this PR: the lane check refuses
+  `docs/plans/pilot-findings.md`, which is outside lane P, so lane D's
+  next PR (PF2's) writes it. Found and left: a trailing `/* … */` block
+  comment after a gap as wide as the block's indentation still fails
+  to parse; the chunk was measured for `//` only.
