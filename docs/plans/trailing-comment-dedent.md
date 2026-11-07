@@ -138,7 +138,7 @@ chose the lane and the route, and its §2.4 measured the fix.
 
 ## 7. Record
 
-- **2026-11-07 — TC1 landed** (PR number to be filled), with this
+- **2026-11-07 — TC1 landed** (PR #172), with this
   plan; the plan closes at that PR's merge. `DEDENT` in
   `src/grammar2/engine.ts` calls a new `skipTrailingComments`, which
   skips the rest of the line when it holds only whitespace and a `//`

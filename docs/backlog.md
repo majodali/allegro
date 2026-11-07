@@ -3401,7 +3401,7 @@ table and the stream plans.
   names this item as its `backlog` when it opens. Lines: none yet.
   **Pointer**: `docs/plans/book-pass.md` §2.3, §2.4 and §6 (R1, R2)
 - [x] **B-183** (a trailing comment breaks a contract body's parse) ·
-  L1 · LANDED 2026-11-07 at PR (number to be filled), chunk TC1 of the
+  L1 · LANDED 2026-11-07 at PR #172, chunk TC1 of the
   one-chunk lane P plan `docs/plans/trailing-comment-dedent.md`, which
   closes with it: `DEDENT` in `src/grammar2/engine.ts` now skips a
   trailing `//` comment and any comment-only lines before it measures
