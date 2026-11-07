@@ -20,6 +20,9 @@ import { makeExpr } from "../types.js";
 import { slotCount } from "../slot-accessors.js";
 import * as g2 from "../grammar2/types.js";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { runAlgFile } from "./alg-files.js";
 import { indexGet } from "../slot-accessors.js";
 
 // == Grammar 2 (Phase 1) — new formalism + engine ==
@@ -566,3 +569,75 @@ test("Phase 5: Allegro analyze() top-level returns unified report", () => {
   eq(leftRec.includes("lr"), true);
 });
 
+
+// == B-183: the dedent after a trailing comment ==
+//
+// `DEDENT` is tried right after a block's last statement, mid-line. It
+// used to measure the gap before a trailing `// c` as the next content's
+// indentation, so a gap as wide as the block's indentation refused the
+// dedent, and a comment-only line at the block's column counted as
+// content. The rows are those of `docs/plans/pilot-findings.md` §2.4;
+// the plan is `docs/plans/trailing-comment-dedent.md`.
+
+/** A two-statement body whose last line is `x + y` followed by `tail`,
+ *  in a block indented `ind`; the program's value is f(2), 4. */
+function b183Body(ind: string, tail: string): string {
+  return `f(x) =>\n${ind}y = x\n${ind}x + y${tail}\n\nf(2)\n`;
+}
+
+function b183Value(src: string): number {
+  const v = evalStd(src);
+  if (!v || v.kind !== ValueKind.Bits) throw new Error(`expected an Int, got ${v ? v.kind : "nothing"}`);
+  return Number(v.data);
+}
+
+for (const ind of ["  ", "    "]) {
+  const width = ind.length;
+  for (let gap = 0; gap <= 4; gap++) {
+    test(`grammar2/engine: dedent after a trailing comment, gap ${gap}, block indented ${width} (B-183)`, () => {
+      const src = b183Body(ind, " ".repeat(gap) + "// c");
+      g2ok(g2parse(buildBaseG2(), src));
+      eq(b183Value(src), 4);
+    });
+  }
+  test(`grammar2/engine: dedent after a trailing comment, two tabs, block indented ${width} (B-183)`, () => {
+    eq(b183Value(b183Body(ind, "\t\t// c")), 4);
+  });
+  test(`grammar2/engine: dedent after trailing whitespace, no comment, block indented ${width} (B-183)`, () => {
+    eq(b183Value(b183Body(ind, " ".repeat(width + 1))), 4);
+  });
+  test(`grammar2/engine: dedent after a comment-only line at the block's column, indented ${width} (B-183)`, () => {
+    const src = b183Body(ind, `\n${ind}// c`);
+    g2ok(g2parse(buildBaseG2(), src));
+    eq(b183Value(src), 4);
+  });
+  test(`grammar2/engine: dedent after several comment-only and blank lines, indented ${width} (B-183)`, () => {
+    eq(b183Value(b183Body(ind, `   // c\n${ind}// d\n\n${ind}  // e\n// f`)), 4);
+  });
+}
+
+test("grammar2/engine: a comment-only line inside a block still separates statements (B-183)", () => {
+  for (const ind of ["  ", "    "]) {
+    const src = `f(x) =>\n${ind}y = x\n${ind}// between\n${ind}x + y\n\nf(2)\n`;
+    g2ok(g2parse(buildBaseG2(), src));
+    eq(b183Value(src), 4, `block indented ${ind.length}`);
+  }
+});
+
+test("grammar2/engine: nested blocks each dedent past a trailing comment (B-183)", () => {
+  const src = "g(x) =>\n  h(y) =>\n    z = y\n    z + 1    // c\n  h(x)  // d\n\ng(1)\n";
+  eq(b183Value(src), 2);
+});
+
+test("grammar2/engine: the book pass's minimal contract case runs through the file runner (B-183)", () => {
+  // docs/records/book-pass/f1-readme.md §7, as recorded, plus its pin.
+  const src = "use contracts\nf(x: Int): Int =>\n  requires x > 0\n  x + x   // c\n\nprint(f(2))  // expect: 4\n";
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "b183-"));
+  const file = path.join(dir, "b183.alg");
+  try {
+    fs.writeFileSync(file, src);
+    runAlgFile(file);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
