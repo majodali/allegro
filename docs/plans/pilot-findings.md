@@ -22,6 +22,9 @@ boundary:
   - tests/**
   - src/test/**
   - docs/plans/pilot-findings.md
+  - website/index.html
+  - website/sandbox.html
+  - web/sandbox.html
 ---
 
 # The planning pilot's correctness findings closed — the pilot-findings stream
