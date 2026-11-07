@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-07 — lane R, the book pass's own lane.** B-186 (a lane for
+  the monotonic pass): `scripts/analyze/lanes.json` and the lane table
+  gain lane R, whose globs cover the book, the pass's working files and
+  the code, and the book pass's plan moves to it from lane A. The plan
+  records the maintainer's rulings at and after the merge of PR #164:
+  the ten type calls stand, and on PR #166 (rung 3 on the site) the
+  host chapter's stale claims are re-stated in their own PR, its code is
+  adopted, and the web host's module loader is a finding for the
+  modules chapter. Ids 784.
+
 - **2026-11-05 — the decision types, and how a decision is taken.**
   Every decision of `docs/plans/book-pass-inventory.md` is typed as
   capability or implementation (202 and 54), and no capability decision
