@@ -656,6 +656,30 @@ name.
   maintainer. Listed as an appendix record in `docs/reading-order.json`
   and `docs/book/README.md`. Ids 784, one below the 785 the plan measured.
 
+## Stream D — the pilot's findings
+
+Plan `docs/plans/pilot-findings.md`; lane D; human-gated (lane D keeps
+the per-chunk gate). Opened 2026-11-06 with the plan, active since its
+PR #168 merged on 2026-11-07; entries newest first, directly below this
+line. A second stream in lane D, told apart from the closed `## Stream
+D — the partial-evaluation rules` below by its name.
+
+### 2026-11 — A sampled induction reaches the verdict and the ledger (B-185, chunk PF2)
+
+B-185 (a sampled induction proof reported as discharged), chunk PF2 of
+`docs/plans/pilot-findings.md`, ruling R1 (a). `prove_induction_impl`
+in `src/primitives.ts` stamps the record `sampled 'induction' of
+'NonNeg'` on the transitive backing set of the proof it returns,
+unioned with the base proof's own set, and `proof_check_impl` carries
+the term's set through a `by` clause over a non-equality proposition.
+A theorem discharged by `prove_induction`, directly, through
+`tactics.by_induction` or by `by`, now reads `[resting on sampled
+'induction' of 'NonNeg']` in `verify` and appears in the assumption
+ledger; the verdict stays `verified`. The only outputs that move are
+the ratified lines of the plan's §3 on `tests/proofs-induction-demo.alg`
+(202 of 205 corpus runs identical). Five tests appended to
+`src/test/proofs.ts`. No new field and no new slot. The record is the
+plan's §7.
 ## Stream P — the trailing-comment dedent
 
 Plan `docs/plans/trailing-comment-dedent.md`; lane P; human-gated; one
