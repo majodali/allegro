@@ -56,7 +56,10 @@
         "docs/book/**",
         "scripts/analyze/units.json",
         "scripts/analyze/units-baseline.json",
-        "scripts/analyze/plane-baseline.json"
+        "scripts/analyze/plane-baseline.json",
+        "pcp/**",
+        "demos/rung4/**",
+        "docs/plans/release-track.md"
       ]
     },
     "K": {
