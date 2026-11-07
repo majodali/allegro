@@ -30,7 +30,7 @@ import {
   extractCodeBlocks, spliceProof, buildIterationMessage,
   classifyStrategy, loadPrimer, runLlmWorker, LlmClient,
 } from "../../pcp/llm-worker.js";
-import { testsDir } from "./alg-files.js";
+import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
   summarizeValue, summarizeModule, safetyGradeFor, renderModuleSummary,
@@ -389,6 +389,116 @@ test("Phase H2: CLI `obligations --json` emits one JSON per theorem", () => {
     eq(o.version, PCP_VERSION);
     eq(typeof o.theorem.name, "string");
   }
+});
+
+// --- B-187 L1: plan obligations (docs/plans/planning-loop.md) ---
+//
+// An open plan (`plan NAME from CATALOG:`, lib/planning_loop.alg) carries
+// the gaps completion from its catalog cannot fill; the protocol lists them
+// as obligations of kind "plan", after every theorem and law obligation,
+// with a hash over the plan's declared surface and the gap.
+
+const planLoopExts = (): Extension[] => [typeExt, ...libExtensions(["units", "planning", "planning_loop"])];
+
+const openPlanSource = (outcomes: string, catalog: string): string => [
+  `depot = with_estimate(leaf("Depot", [port("Shipped")], [port("Sorted")]), est(30 min, person_hours(0.25), none))`,
+  `van = with_estimate(leaf("Van", [port("Sorted")], [port("Delivered")]), est(60 min, person_hours(0.5), none))`,
+  `bin = leaf("Bin", [port("Receipt")], [port("Archived")])`,
+  `yard = ${catalog}`,
+  `plan Fulfil from yard:`,
+  `  inputs: Order`,
+  `  outcomes: ${outcomes}`,
+  `  Pack:`,
+  `    inputs: Order`,
+  `    outcomes: Packed`,
+  ``,
+].join("\n");
+
+const planObligationsOf = (src: string, pendingOnly = false): Obligation[] => {
+  const result = runtimeEval(src, undefined, planLoopExts(), undefined, true, undefined, /*softFail*/ true);
+  return extractObligations(result.evalCtx, result.compilationReport, { pendingOnly, plans: true })
+    .filter(o => o.kind === "plan");
+};
+
+test("B-187 L1: extractObligations collects an open plan's obligation in planning words", () => {
+  const obs = planObligationsOf(openPlanSource("Delivered", "[depot, van]"), true);
+  eq(obs.length, 1, "one distinct gap, one obligation");
+  const p = obs[0].plan!;
+  eq(p.binding, "Fulfil");
+  eq(p.plan, "Fulfil");
+  eq(p.catalog, "yard", "the catalog's binding is named");
+  eq(p.port, "Shipped");
+  eq(p.consumer, "Depot");
+  eq(p.fixture, undefined, "an unconstrained port has no fixture");
+  eq(p.stop, "catalog");
+  eq(p.depth, 2);
+  eq(p.steps.join(", "), "Delivered from Van, Sorted from Depot");
+  eq(p.gap, "Shipped, which Depot needs");
+  eq(p.message, "nothing in the catalog produces Shipped, which Depot needs");
+  eq(p.identity, "plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot");
+  eq(p.hash, hashProposition(p.identity));
+  eq(obs[0].theorem.propositionHash, p.hash, "the theorem slot carries the same identity");
+  // The JSON round-trips through the pcp/1 validator unchanged.
+  const back = parseObligation(serializeObligation(obs[0]));
+  eq(back.kind, "plan");
+  eq(back.plan?.hash, p.hash);
+  // The text rendering names the gap and the hash.
+  const text = formatObligation(obs[0]);
+  eq(text.includes("Obligation: plan `Fulfil`: Shipped, which Depot needs"), true, text);
+  eq(text.includes(`hash:        ${p.hash}`), true, text);
+});
+
+test("B-187 L1: the plan obligation's hash moves with the declared outcome, not with an unrelated catalog entry", () => {
+  const base = planObligationsOf(openPlanSource("Delivered", "[depot, van]"))[0].plan!;
+  const moreCatalog = planObligationsOf(openPlanSource("Delivered", "[depot, van, bin]"))[0].plan!;
+  eq(moreCatalog.gap, base.gap, "the unrelated entry leaves the gap");
+  eq(moreCatalog.hash, base.hash, "an added catalog entry does not change the identity");
+  const otherOutcome = planObligationsOf(openPlanSource("Delivered, Archived", "[depot, van, bin]"))[0].plan!;
+  eq(otherOutcome.gap, base.gap, "the first gap is the same");
+  eq(otherOutcome.hash !== base.hash, true, "a changed declared outcome changes the identity");
+});
+
+test("B-187 L1: theorem and law obligations are unchanged by the plan kind", () => {
+  // Opt-in: without `plans`, extractObligations answers what it did before;
+  // with it, a file without open plans answers the same list.
+  const src = `theorem a: 1 == 1\ntheorem b: 1 == 2\n`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, /*softFail*/ true);
+  const before = extractObligations(result.evalCtx, result.compilationReport);
+  const withPlans = extractObligations(result.evalCtx, result.compilationReport, { plans: true });
+  eq(JSON.stringify(withPlans), JSON.stringify(before));
+  eq(before.every(o => o.kind === undefined), true, "a theorem obligation carries no kind (pcp/1 unchanged)");
+  // An open plan's file: the plan obligation comes last, after the rest.
+  const plans = runtimeEval(openPlanSource("Delivered", "[depot, van]"), undefined, planLoopExts(), undefined, true, undefined, true);
+  const all = extractObligations(plans.evalCtx, plans.compilationReport, { plans: true });
+  const without = extractObligations(plans.evalCtx, plans.compilationReport);
+  eq(all.length, without.length + 1);
+  eq(JSON.stringify(all.slice(0, without.length)), JSON.stringify(without));
+  eq(all[all.length - 1].kind, "plan");
+});
+
+test("B-187 L1: CLI `obligations --pending` lists the demo's plan obligation with its hash, in text and JSON", () => {
+  const file = path.join(testsDir, "planning-loop-obligations.alg");
+  const text = spawnSync("npx", ["tsx", "src/index.ts", "obligations", file, "--pending"], { encoding: "utf-8" });
+  eq(text.status, 0, text.stderr);
+  const json = spawnSync("npx", ["tsx", "src/index.ts", "obligations", file, "--pending", "--json"], { encoding: "utf-8" });
+  eq(json.status, 0, json.stderr);
+  const lines = json.stdout.trim().split("\n").filter(l => l.length > 0).map(l => JSON.parse(l));
+  const plan = lines.filter(o => o.kind === "plan");
+  eq(plan.length, 1);
+  eq(plan[0].plan.gap, "Shipped, which Depot needs");
+  eq(plan[0].plan.catalog, "yard");
+  eq(plan[0].plan.stop, "catalog");
+  eq(plan[0].plan.hash, hashProposition("plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot"));
+  eq(lines.filter(o => o.kind === undefined).length, 5, "the units library's five pending laws, as before");
+  eq(text.stdout.includes("Obligation: plan `Fulfil`: Shipped, which Depot needs"), true, text.stdout);
+  eq(text.stdout.includes(`hash:        ${plan[0].plan.hash}`), true, text.stdout);
+  // `propose` and `verify` leave plan obligations to chunk L2: they run,
+  // and they list the theorem and law obligations only.
+  const propose = spawnSync("npx", ["tsx", "src/index.ts", "propose", file], { encoding: "utf-8" });
+  eq(propose.status, 0, propose.stderr);
+  eq(propose.stdout.includes("Shipped"), false, "propose does not render the plan obligation yet");
+  const verify = spawnSync("npx", ["tsx", "src/index.ts", "verify", file], { encoding: "utf-8" });
+  eq(verify.status, 0, verify.stderr);
 });
 
 // --- Phase H3: iteration hints ---
