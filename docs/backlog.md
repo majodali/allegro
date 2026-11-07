@@ -1286,7 +1286,7 @@ table and the stream plans.
   `src/test/alg-files.ts` (`libExtensions`), `src/index.ts` (the file
   runner's `import`), `docs/plans/planning-pilot.md` §8 (D2)
 - [x] **B-156** (short-circuit over an error value) · L2 · LANDED
-  2026-11-07 at PR #(number to be filled) by chunk PF3 of
+  2026-11-07 at PR #175 by chunk PF3 of
   `docs/plans/pilot-findings.md`, ruling R3 (a): `&&`, `||` and `!`
   return an operand carrying an error, left operand first, so `false ||
   error "why"`, `true && e`, `e || true`, `e && false` and `!e` are the
