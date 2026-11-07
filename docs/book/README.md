@@ -105,4 +105,4 @@ verbatim 2026-10-20; read for the argument, the outcomes are in
 `concepts.md` Part 0) · `../records/book-pass/f1-readme.md` (record: the
 book pass's review of the root `README.md`, chunk F1 of
 `../plans/book-pass.md`) · `../records/book-pass/p2-allegretto-metadata-and-capability.md`
-(record: the pilot chapter's review, chunk P2).
+(record: the review of the pilot chapter, metadata and the capability to write it).
