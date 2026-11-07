@@ -128,6 +128,22 @@
         "README.md",
         "demos/rung1/README.md"
       ]
+    },
+    "R": {
+      "name": "the book pass",
+      "globs": [
+        "docs/book/**",
+        "docs/reading-order.json",
+        "docs/documentation-census.md",
+        "docs/records/book-pass/**",
+        "docs/plans/book-pass-briefs.md",
+        "docs/plans/book-pass-inventory.md",
+        "scripts/doc-lint-baseline.json",
+        "src/**",
+        "lib/**",
+        "tests/**",
+        "demos/**"
+      ]
     }
   }
 }
