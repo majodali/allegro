@@ -951,6 +951,20 @@ its approval.
   now and recorded as a finding for the chapter on modules, the
   member-load path checked there.
 
+**Rulings taken 2026-11-07, on PR #174 (the pilot's review).**
+
+- **R34 — Recommend the right decision.** The maintainer took every
+  default of the pilot's review, R-P2-1 (b), the dry run, among them,
+  and added: "some of these decisions were based on reducing code and
+  documentation changes, which works for the pilot, but will not work
+  for the full decision reviews going forward." From chapter 1 on, a
+  review recommends the option that makes each decision right for the
+  language; the size of its code or document change is a stated cost,
+  never the reason. Part (a) of `docs/plans/book-pass-briefs.md` states
+  the rule. The pilot's rulings stand as taken for the dry run; when
+  the pass reaches chapter 7 in order, its decisions are reviewed again
+  under R34.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the

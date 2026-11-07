@@ -448,4 +448,15 @@ wrapper around a `Bits`", "is not cosmetic", "fixed rather than open".
 
 ## Rulings taken
 
-Added by one commit before the merge.
+The maintainer took every default on 2026-11-07, in a comment on
+PR #174: R-P2-1 (b), the dry run; R-P2-2 to R-P2-18 as recommended;
+R-P2-19, the five terms ratified. The maintainer added: "some of these
+decisions were based on reducing code and documentation changes, which
+works for the pilot, but will not work for the full decision reviews
+going forward."
+
+One consequence of the dry run, which the rulings did not state: chapters
+8 and 10 do not exist yet, so the content R-P2-17 sends to them, and the
+*channel* definition site R-P2-16 sends to chapter 8, stay in this
+chapter, in a final section held until those chapters are written. The
+other moves of R-P2-16 are made now.
