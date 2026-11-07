@@ -706,9 +706,11 @@ function matchTerminal(state: ParseState, rule: Terminal, pos: number): MatchRes
 //             stack. (Same-level statement boundary.)
 //   INDENT  : at \n; same consumption as NEWLINE. Succeeds iff next content
 //             col > top. Pushes new col onto stack.
-//   DEDENT  : zero-width. Succeeds iff the current pos's column is < top of
-//             stack. Pops stack by one. Users can iterate DEDENT via Rep to
-//             pop multiple levels.
+//   DEDENT  : zero-width. Succeeds iff the next content's column is < top of
+//             stack (or at EOF). A trailing `//` comment on the current line
+//             and lines holding only whitespace and a `//` comment are not
+//             content (B-183). Pops stack by one. Users can iterate DEDENT
+//             via Rep to pop multiple levels.
 //   SAMELINE: not implemented in Phase 2a; the grammar author should avoid it.
 
 /**
@@ -742,6 +744,41 @@ function skipToNextContent(input: string, start: number): { pos: number; col: nu
     return { pos: p, col };
   }
   return { pos: p, col: Infinity };
+}
+
+/**
+ * DEDENT's start for measuring (B-183, a trailing comment breaks a block
+ * body's parse). DEDENT is tried mid-line, right after a block's last
+ * statement, where `skipToNextContent` would count the gap before a
+ * trailing `// c` as leading indentation and stop at the comment. If the
+ * rest of the line from `pos` is horizontal whitespace and at most one
+ * `//` comment, skip it, then skip every following line that holds only
+ * whitespace and a `//` comment (a blank line counts), and return the
+ * position of the last newline reached, so `skipToNextContent` measures
+ * the next line with content. If the rest of the line holds anything
+ * else, return `pos` unchanged: the old measurement stands.
+ *
+ * `skipToNextContent` itself is not changed: it also serves NEWLINE,
+ * INDENT and CONT_NL, whose behaviour over comment-only lines was not
+ * probed (`docs/plans/trailing-comment-dedent.md` §4).
+ */
+function skipTrailingComments(input: string, pos: number): number {
+  const n = input.length;
+  // The rest of the line: whitespace and an optional `//` comment, ending
+  // at a newline or EOF. Returns that end, or -1 if other content follows.
+  const restOfLine = (p: number): number => {
+    while (p < n && (input[p] === " " || input[p] === "\t")) p++;
+    if (input.startsWith("//", p)) { while (p < n && input[p] !== "\n") p++; }
+    return p >= n || input[p] === "\n" ? p : -1;
+  };
+  let end = restOfLine(pos);
+  if (end < 0) return pos;
+  while (end < n) {
+    const next = restOfLine(end + 1);
+    if (next < 0) break;
+    end = next;
+  }
+  return end;
 }
 
 /**
@@ -797,7 +834,7 @@ function matchIndentDirective(state: ParseState, directive: "NEWLINE" | "INDENT"
       // (To pop multiple levels, grammar authors chain DEDENTs via Rep.)
       const newStack = state.indentStack.parent;
       if (newStack === null) return null;
-      const { col } = skipToNextContent(state.input, pos);
+      const { col } = skipToNextContent(state.input, skipTrailingComments(state.input, pos));
       // col === Infinity means EOF — treat as dedent for all levels.
       if (col !== Infinity && col >= top) return null;
       return {
