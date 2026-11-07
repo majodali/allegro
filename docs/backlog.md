@@ -74,7 +74,7 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches `src/` only in a tidy-up chunk under the tidy-up stream's plan, in files no active implementation stream holds. Human-gated; run by its own review session (the plan's §8) |
+| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches code in a chapter chunk only for its decisions' own changes (once B-186 (a lane for the monotonic pass) lands) and in a tidy-up chunk under the tidy-up stream's plan; a change in a file an active implementation stream holds is ruled by the maintainer case by case (the plan's R32 (M3 reconciled with the monotonic pass)). Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
 | **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream; **next: stream D, the planning loop** (B-187 (the planning loop, the next validating demo), plan `docs/plans/planning-loop.md`, drafted 2026-11-06, awaiting ratification; reserves B-188 (first out-of-scope finding of the planning-loop stream) and B-189 (second out-of-scope finding of the planning-loop stream); asks to widen lane D's globs by `pcp/**`, `demos/rung4/**` and `docs/plans/release-track.md`, the plan's ruling on the lane), after any lane D stream ruled ahead of it | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
@@ -3440,8 +3440,17 @@ table and the stream plans.
   2026-11-03 at the review session's request, with B-186 (fourth
   out-of-scope finding of the book pass), once chunk F1 had used the
   first two.
-- [ ] **B-186** (fourth out-of-scope finding of the book pass) · T-docs
-  · As B-185 (third out-of-scope finding of the book pass).
+- [ ] **B-186** (a lane for the monotonic pass) · T-docs · Filed
+  2026-11-06 by the book pass: the maintainer accepted, on PR #164, how
+  a decision is taken (`docs/plans/book-pass.md` §2.7), with its lane
+  option (a). One lane-S PR titled under B-163 (the lane manifest and
+  its check), worked by the review session (ruling R32 (M3 reconciled with the monotonic pass) of the plan): a new
+  lane in `scripts/analyze/lanes.json` and the lane table of this file
+  whose globs cover the book's files and the code (`src/**`, `lib/**`,
+  `tests/**`, `demos/**`), named for the book pass, with the rule that
+  a change in a file another active stream holds is ruled by the
+  maintainer case by case; and the book pass's plan header moved to that lane. Chunk
+  P2 (the pilot chapter) waits for it if its decisions change code.
 - [ ] **B-187** (the planning loop, the next validating demo) · L3 ·
   Track R · lane D · **The AI iteration loop over the rung 3 planning
   model, as the next rung's first demo; then the software system model
