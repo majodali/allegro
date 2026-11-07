@@ -2,7 +2,7 @@
 type: stream-plan
 status: active
 backlog: B-174
-lane: A
+lane: R
 merge: human-gated
 oracle:
   - npm run lint:docs:check
@@ -174,7 +174,7 @@ Measured on `origin/main` at `58fe38a`, 2026-11-03, read-only.
 
 ### 2.3 The two streams
 
-1. **The book pass** (this plan). Lane A, human-gated. It delivers
+1. **The book pass** (this plan). Lane R (lane A until 2026-11-07), human-gated. It delivers
    B-174, widened from "every existing chapter gains its IR" to "one
    chapter at a time, in reading order, restructuring allowed, IR
    first". The [review session](#def-review-session) runs it. In its
@@ -314,7 +314,7 @@ Proposed at the PR of chunk P1b (the decision types), under R28 (the monotonic p
 (capability and implementation decisions) and R30 (who makes a
 decision's code changes); accepted by the maintainer on PR #164,
 2026-11-06 (R31 in §6). The lane of item 3 is B-186 (a lane for the
-monotonic pass); until it lands, §3, §4 and §8 read as written, and a
+monotonic pass), landed 2026-11-07 as lane R; before it landed, §3, §4 and §8 read as written, and a
 chapter whose decisions change code waits for it.
 
 1. **One PR per chapter of the inventory's contents.** Its decisions are
@@ -370,7 +370,7 @@ after it is up to date with `origin/main`:
 | `npx tsx scripts/doc-ref-lint.ts` | "all markdown doc references resolve" |
 | `npm run lint:streams` | every stream plan's header well-formed, this plan's included |
 | `npm test` | green: the suite runs the same doc, IR, stream and lane checks, and every pinned demo that a chapter quotes |
-| lane check, `PR_TITLE="B-174: <title>" npx tsx scripts/analyze/lane-lint.ts --base origin/main` | lane A, 0 files outside |
+| lane check, `PR_TITLE="B-174: <title>" npx tsx scripts/analyze/lane-lint.ts --base origin/main` | lane R, 0 files outside |
 
 **Pins that must not move.** Every `// expect:` line: the stream edits
 no demo. The ids baseline may only fall. A fall is recorded in §7 and
@@ -414,25 +414,26 @@ five:
 
 ## 4. File boundary
 
-**Lane A (reval docs)**, narrowed by the header's `boundary`:
+**Lane R (the book pass)**, since 2026-11-07 (lane A before), narrowed by the header's `boundary`, which a chapter's PR widens to the files its decisions change (§2.7):
 
 - `docs/book/**`: the chapters, their IRs and their review records.
 - `docs/reading-order.json`, `docs/documentation-census.md`.
 - `docs/records/book-pass/**`: the chapter reviews.
 - `docs/plans/book-pass-briefs.md`: the stream's working briefs.
 - `docs/plans/book-pass-inventory.md`: the decision inventory, chunk
-  P1 (the decision inventory). Lane A's globs do not hold it yet; the
-  lane-S PR of B-184 (the root README's corrections) widens them.
+  P1 (the decision inventory).
 - This plan.
 - `scripts/doc-lint-baseline.json`, the ids baseline, in a lowering
-  commit only (§3; amendment M1 of §6). Lane A's manifest entry holds
+  commit only (§3; amendment M1 of §6). Lane R's manifest entry holds
   it; no other file under `scripts/` is in the boundary.
 - The status documents under B-162, which every lane edits: this
   stream's section of `docs/CHANGELOG.md`; in `docs/backlog.md` B-174,
-  B-183 to B-186, lane A's row, and B-182 as R2 rules; this plan's row of
+  B-183 to B-186, lane R's row, and B-182 as R2 rules; this plan's row of
   `docs/plans/README.md`; rows of `docs/book-changes.md`.
 
-Lane A's globs in `scripts/analyze/lanes.json` hold
+Lane R's globs in `scripts/analyze/lanes.json` hold every file above,
+and the code (`src/**`, `lib/**`, `tests/**`, `demos/**`) for a
+chapter's decisions under §2.7. Lane A held
 `docs/records/book-pass/**` and `docs/plans/book-pass-briefs.md` since
 PR #153 (B-163 (the lane manifest and its check)), merged 2026-11-03 as
 R8 asked.
@@ -934,6 +935,22 @@ its approval.
      passing the outputs-identical oracle, when its decisions touch the
      same unit; otherwise they are tidy-up chunks under B-182.
 
+**Rulings taken 2026-11-07, at and after the merge of PR #164.**
+
+- **R33 — The ten type calls, and PR #166.** The maintainer's merge
+  comment on PR #164: "After some clarifications on the previous
+  questions, I now agree with all ten decision classifications. ...
+  while the classifications are correct, all decisions will be reviewed
+  in turn and some may be changed." So the three types put to review
+  stand as classified; the review session's findings on them stay in
+  the inventory's type check, for their chapters. On PR #166 (rung 3 on
+  the site), the maintainer took the three recommendations: the twelve
+  claims of `docs/book/platform/host.ir.md` that PR #166 left stale are
+  re-stated as current state now, in their own PR; PR #166's code is
+  adopted as merged; the web host's own module loader is accepted for
+  now and recorded as a finding for the chapter on modules, the
+  member-load path checked there.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1050,6 +1067,10 @@ its approval.
   moved to the review session. PR #166 (rung 3 on the site) reviewed:
   its fixes leave twelve claims of `docs/book/platform/host.ir.md`
   stale, for the maintainer to rule how they are re-proposed.
+- **2026-11-07 — lane R** (the review session). R33 recorded in §6.
+  B-186 (a lane for the monotonic pass) landed as a lane-S PR: lane R in
+  `scripts/analyze/lanes.json` and the lane table, the plan's header
+  moved to it; lane A keeps its other items.
 
 ## 8. Sessions
 

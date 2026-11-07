@@ -74,10 +74,11 @@ The grouping below comes from co-change measurement over the last 40
 
 | Lane | Contents | Concurrency |
 |---|---|---|
-| **A — reval docs** (**stream A, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day) | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3); then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters and writes chapter reviews; touches code in a chapter chunk only for its decisions' own changes (once B-186 (a lane for the monotonic pass) lands) and in a tidy-up chunk under the tidy-up stream's plan; a change in a file an active implementation stream holds is ruled by the maintainer case by case (the plan's R32 (M3 reconciled with the monotonic pass)). Human-gated; run by its own review session (the plan's §8) |
+| **A — reval docs** | ~~B-014 contracts~~ (COMPLETE 2026-08); **stream A, the book chapters writable now** (plan `docs/plans/book-chapters-now.md`, 2026-10-30, **closed 2026-11-02**: five chapters, Part III complete in IR; ~~B-170 (the book, Part II and III chapters writable now)~~ closed with it); the book pass moved to lane R on 2026-11-07; then B-029 PCP; B-030/B-051 sweeps last | Runs anytime. Edits `docs/book/**` chapters; touches no `src/`. Human-gated |
+| **R — the book pass** (added 2026-11-07, B-186 (a lane for the monotonic pass); **stream R, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day, in lane A until 2026-11-07) | B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3) | **Runs alongside every lane.** Its globs cover the book, its working files and the code (`src/**`, `lib/**`, `tests/**`, `demos/**`); the plan's `boundary` narrows it per chapter to the chapter's documents and the files its decisions change. A chapter's code change in a file an active implementation stream holds, or in code that stream's work rests on, is ruled by the maintainer case by case (the plan's R32 (M3 reconciled with the monotonic pass)). Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
-| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream. **Next: stream D, the pilot's findings**, plan `docs/plans/pilot-findings.md`, proposed 2026-11-06 (draft): B-185 (a sampled induction proof reported as discharged) with B-154, B-156 and B-183 reserved, before the AI iteration loop over the planning model; B-183's chunk runs in lane P | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
+| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream. **Next: stream D, the pilot's findings**, plan `docs/plans/pilot-findings.md`, proposed 2026-11-06 (draft): B-185 (a sampled induction proof reported as discharged) with B-154, B-156 and B-183 reserved, before the AI iteration loop over the planning model; B-183's chunk runs in lane P. **Then stream D, the planning loop** (B-187 (the planning loop, the next validating demo), plan `docs/plans/planning-loop.md`, drafted 2026-11-06, awaiting ratification; reserves B-188 (first out-of-scope finding of the planning-loop stream) and B-189 (second out-of-scope finding of the planning-loop stream); asks to widen lane D's globs by `pcp/**`, `demos/rung4/**` and `docs/plans/release-track.md`, the plan's ruling on the lane), after the pilot's findings | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time |
 | **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **K — kernel hygiene** (added 2026-10-30, B-167 (lane K for kernel hygiene)) | The M1 residue, the L0 band that is ratchet and audit work: B-104 (retire the dunder convention), B-110, B-113, B-114, B-118, B-119, B-123, B-124, B-126, B-128 b onward, B-132, B-135/B-137 (the host-plane declaration), B-143, B-147. Each stream plan in K reserves the items it takes; none blocks a rung | **Runs alongside A, C, P and S.** The L0 unit files (`src/structure.ts`, `src/slot-accessors.ts`, `src/metadata.ts`, `src/symbols.ts`, `src/scope.ts`), the boundary battery and its baseline, `scripts/analyze/`, the Allegretto chapters and `docs/book/units.md`. Overlaps D in the evaluator, the primitives and the type files — taken only when D is not in them (the P rule), and a coordinating service refuses the overlap at dispatch. B-104 is the wide one: its stream plan's `boundary` widens per chunk and its PRs need D idle. Globs in `scripts/analyze/lanes.json`, declared from this band, refined when a stream plan opens |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29; **stream P, the recursion cutoff restored**, plan `docs/plans/recursive-precompile.md`, filed 2026-10-30, **closed 2026-11-01**) | The follow-ons of B-157 (the performance stream): ~~B-159 (precompile and termination analysis of recursive definitions)~~ closed 2026-11-01 by stream P, the gate's work down about 95%, with ~~B-087 (totality-analyzer performance)~~ closed as superseded; B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
@@ -1434,9 +1435,19 @@ table and the stream plans.
 - [ ] **B-082** · Model composition patterns (cross-domain predicates,
   arbitration, multi-domain [impl, proof] explosion risk), as described in
   Vision §4 (the Vivace hypothesis; one of the seven gaps)
+  - **Next slice.** The planning-loop stream (B-187, plan
+    `docs/plans/planning-loop.md`, draft 2026-11-06) stages the software
+    system model composed with the planning model (row SY1) and a
+    documentation model composed with both (row DC1), each admitted by a
+    ruling after the loop has run.
 - [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
   agent can't discharge; surfacing; time-boxing; shared artifact with
   B-081), as described in Vision §4 (one of the seven gaps)
+  - **Next slice.** The planning-loop stream (B-187, plan
+    `docs/plans/planning-loop.md`, draft 2026-11-06) takes the loop over
+    the planning model: plan obligations from the checks, proposals
+    verified by the kernel, an LLM-free path and the LLM worker,
+    authorship and the ledger.
 - [ ] **B-084** · Constraint-set completeness — organizational process
   research (external interviews; longest critical path), as described in
   Vision §4 (one of the seven gaps)
@@ -3438,7 +3449,9 @@ table and the stream plans.
   2026-11-03 at the review session's request, with B-186 (fourth
   out-of-scope finding of the book pass), once chunk F1 had used the
   first two.
-- [ ] **B-186** (a lane for the monotonic pass) · T-docs · Filed
+- [x] **B-186** (a lane for the monotonic pass) · T-docs · LANDED
+  2026-11-07: lane R in `scripts/analyze/lanes.json` and the lane table;
+  the book pass's plan moved to it. Filed
   2026-11-06 by the book pass: the maintainer accepted, on PR #164, how
   a decision is taken (`docs/plans/book-pass.md` §2.7), with its lane
   option (a). One lane-S PR titled under B-163 (the lane manifest and
@@ -3449,6 +3462,42 @@ table and the stream plans.
   a change in a file another active stream holds is ruled by the
   maintainer case by case; and the book pass's plan header moved to that lane. Chunk
   P2 (the pilot chapter) waits for it if its decisions change code.
+- [ ] **B-187** (the planning loop, the next validating demo) · L3 ·
+  Track R · lane D · **The AI iteration loop over the rung 3 planning
+  model, as the next rung's first demo; then the software system model
+  and a documentation or comprehension model composed with it, as the
+  multi-model test.** Filed 2026-11-06 on the maintainer's direction of
+  that day: "Next validating demo: let's start with the planning loop
+  (extending the last demo), and iterate then to include the software
+  system model, and then to include a documentation/comprehension model,
+  so it's a comprehensive test of multi-model operation. Once that's
+  demoed, we should apply it to Allegro development (less a demo and
+  more an enabler/accelerator)." Measured first: the prover protocol
+  sees nothing of a plan (the verdict of `demos/rung3/02-solve.alg`
+  lists only the units library's laws, and its ledger rests on 0
+  admitted where the plan rests on six fixture promises); a plan with
+  a gap halts every CLI command, the PCP ones included; completion's
+  dead end is a sentence in an error value, and the same facts are
+  records in `completions`; the LLM worker cannot open a file with a
+  `use` header (B-175 (the tooling chapter's findings) item 5); a turn of
+  the loop costs about 36,000 evaluations once the library is loaded.
+  Chunks L1 to L7 for the loop; the second and third models staged
+  (rows SY1 and DC1), each admitted by a ruling once the loop has run;
+  ten rulings in the plan's §6. Works the first slices of B-083 (the
+  AI iteration loop) and B-082 (model composition), which stay open.
+  Reserves B-188 (first out-of-scope finding of the planning-loop
+  stream) and B-189 (second out-of-scope finding of the planning-loop
+  stream). Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06, awaiting
+  ratification. **Pointer**: the plan's §2 (the probes) and §6 (the
+  rulings)
+- [ ] **B-188** (first out-of-scope finding of the planning-loop stream)
+  · L3 · Reserved by the planning-loop stream
+  (`docs/plans/planning-loop.md`) for a finding outside its boundary.
+  Placeholder until used; the stream rewrites this entry when it files
+  the finding, and closes it unused when the stream closes.
+- [ ] **B-189** (second out-of-scope finding of the planning-loop
+  stream) · L3 · As B-188 (first out-of-scope finding of the
+  planning-loop stream).
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
