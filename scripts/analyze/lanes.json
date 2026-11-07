@@ -1,5 +1,5 @@
 {
-  "_": "The lane manifest (B-163, docs/plans/parallel-streams.md S4): docs/backlog.md §'Parallel lanes' as data. `lanes` maps each lane letter of the lane table to the files it may edit, as globs (`**` spans directories, `*` one segment, `?` one character). `shared` lists the status documents every lane edits under the rule 'Status documents under streams' (B-162) — exempt from the check. A stream plan's `boundary` header narrows its lane; the plan's own file is always allowed. Lanes A, C and D were declared from the lane table's prose on 2026-10-30, K from the kernel-hygiene band of the backlog the same day; all four are refined when a stream plan opens in them; P and S come from their plans' headers. Two lanes may list the same file (P and D share the evaluator and the totality analyzer: the lane table says P takes them only when D is not in them) — the per-PR check sees one lane; overlap between ACTIVE streams is the coordinating service's check at dispatch. Edited by lane S or a maintainer decision.",
+  "_": "The lane manifest (B-163, docs/plans/parallel-streams.md S4): docs/backlog.md §'Parallel lanes' as data. `lanes` maps each lane letter of the lane table to the files it may edit, as globs (`**` spans directories, `*` one segment, `?` one character). `shared` lists the status documents every lane edits under the rule 'Status documents under streams' (B-162) — exempt from the check. A stream plan's `boundary` header narrows its lane; the plan's own file is always allowed. Lanes A, C and D were declared from the lane table's prose on 2026-10-30, K from the kernel-hygiene band of the backlog the same day; all four are refined when a stream plan opens in them; P and S come from their plans' headers. Two lanes may list the same file (P and D share the evaluator and the totality analyzer: the lane table says P takes them only when D is not in them) — the per-PR check sees one lane; overlap between ACTIVE streams is the coordinating service's check at dispatch. Edited by lane S or a maintainer decision. The three web pages carry a generated copy of every registered library (scripts/sync-web-libs.ts; the gate checks the copies against lib/ since B-176 item 2), so a lane that edits lib/** must regenerate them in the same PR: lane D lists them for that one purpose, lane C keeps them.",
   "shared": [
     "docs/CHANGELOG.md",
     "docs/backlog.md",
@@ -59,7 +59,10 @@
         "scripts/analyze/plane-baseline.json",
         "pcp/**",
         "demos/rung4/**",
-        "docs/plans/release-track.md"
+        "docs/plans/release-track.md",
+        "website/index.html",
+        "website/sandbox.html",
+        "web/sandbox.html"
       ]
     },
     "K": {
