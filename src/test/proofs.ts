@@ -979,3 +979,43 @@ theorem all: prove_induction(n => n == n, chain, (n, ih) => proof_refl(n + 1))
   eq(rendered.includes("! admitted 'trans' of 'Quantity' — backs: chain, all"), true);
   eq(rendered.includes("! sampled 'induction' of 'NonNeg' — backs: all"), true);
 });
+
+// --- B-154 (unit-name shadowing): shipped units resolve in the module first ---
+//
+// docs/plans/pilot-findings.md R2 (b). `unit_atom` in `units_grammar`
+// lists every shipped unit (a unit lib/units.alg binds by name) as a
+// labelled regex whose template is the name itself, so template hygiene
+// binds it in the module; `u:ident` comes last for a file's own units.
+// The shipped units are therefore listed twice in the module, and this
+// test holds the two lists in step: the names whose module value is a
+// `Unit` (read from the loaded module, so an alias such as `min = minute`
+// counts) are exactly the names of the `unit_atom` alternatives (read
+// from the module's text).
+
+fileTest(path.join(testsDir, "units-shadowing-demo.alg"));
+
+test("B-154: the unit_atom alternatives and the shipped Unit bindings are the same set", () => {
+  const UnitType = unitsBindings["Unit"];
+  eq(UnitType !== undefined, true);
+  const bound = Object.keys(unitsBindings)
+    .filter(k => metaReadRaw(unitsBindings[k], "type") === UnitType)
+    .sort();
+  eq(bound.includes("m") && bound.includes("s") && bound.includes("Pa"), true);
+  const alt = /^\s*rule unit_atom \+?= x:\/([A-Za-z_][A-Za-z0-9_]*)\(\?!\[A-Za-z0-9_\]\)\/ => x => ([A-Za-z_][A-Za-z0-9_]*)\s*$/;
+  const lines = unitsSource.split("\n").filter(l => /^\s*rule unit_atom \+?=/.test(l));
+  const listed: string[] = [];
+  lines.forEach((l, i) => {
+    if (i === lines.length - 1) {
+      // The fallback: any other identifier, in the consumer's scope.
+      eq(l.trim(), "rule unit_atom += u:ident => u => u");
+      return;
+    }
+    const mt = alt.exec(l);
+    eq(mt !== null, true);
+    // The template is the name the regex matches: hygiene makes it the module's unit.
+    eq(mt![1], mt![2]);
+    listed.push(mt![1]);
+  });
+  eq(new Set(listed).size, listed.length);
+  eq(JSON.stringify([...listed].sort()), JSON.stringify(bound));
+});
