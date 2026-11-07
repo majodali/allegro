@@ -1080,6 +1080,14 @@ its approval.
   with no `process` global, the suite's four web tests pass, the live
   bundle carries the guard. Lints: `lint:ir` clean, unratified terms 0;
   `lint:docs:check` ids 784.
+- **2026-11-07 — P2 opened: the pilot chapter's review** (the review
+  session). `docs/records/book-pass/p2-allegretto-metadata-and-capability.md`:
+  the thirteen decisions of chapter 7, one ruling each, R-P2-1 (taking
+  chapter 7 before chapters 1 to 6) first. Two code defects confirmed:
+  a second viral field erases the first (`viralOnto`,
+  `src/metadata.ts:331`), and `channel_register` accepts any rule string.
+  B-183 and B-185 left this plan's reserves, which
+  `docs/plans/pilot-findings.md` now holds.
 
 ## 8. Sessions
 
