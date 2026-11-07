@@ -20,7 +20,7 @@ reserves: [B-188, B-189]
 boundary:
   - docs/plans/planning-loop.md
   - lib/planning.alg
-  - lib/planning-loop.alg
+  - lib/planning_loop.alg
   - tests/planning-loop-*.alg
   - src/pcp.ts
   - src/index.ts
@@ -427,11 +427,14 @@ may list the same file (the manifest's note), so lane C keeps `pcp/**`.
 
 **What each file takes.**
 
-- `lib/planning.alg`: the dead-end wording of §2.2 (L1), and whatever
-  R10 lets it gain.
-- `lib/planning-loop.alg`: new under R10's recommendation; the plan
+- `lib/planning.alg`: the dead-end wording of §2.2 (deferred at L1 to
+  L2 or the stream's close, §7), and whatever R10 lets it gain.
+- `lib/planning_loop.alg`: new under R10's recommendation; the plan
   obligation records, the open-plan form of R9, and the catalog's
-  surface form of R2.
+  surface form of R2. The name takes an underscore, not the hyphen R10
+  was ruled with, because the `use` scanner (`src/use-scanner.ts`)
+  accepts identifier names only, so a hyphen cannot be a module name
+  (a default taken at L1; the maintainer rules on it at L1's PR).
 - `tests/planning-loop-*.alg`: new demo files only. An existing demo is
   an oracle and is never edited.
 - `src/pcp.ts`: the obligation kind and the plan obligation's
@@ -692,7 +695,7 @@ R7 and R8 at their rows' time.
 - **R10** — **How the planning library grows under the load ratchet.**
   `lib/planning.alg` is in the load corpus, and its parse counts are
   gated (§2.4).
-  - (a) The loop's code in a new library, `lib/planning-loop.alg`, that
+  - (a) The loop's code in a new library, `lib/planning_loop.alg`, that
     uses `planning`; `lib/planning.alg` takes only L1's wording fix.
     Lane P adds the new library to the load corpus in its own commit
     after L1, so its cost is gated from then on.

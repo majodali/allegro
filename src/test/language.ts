@@ -682,6 +682,11 @@ fileTest(path.join(testsDir, "planning-solve-demo.alg"));
 // under a deadline; refused at a dead end, at the depth, over the budget
 // and for an unsound completion; a gap on the input side.
 fileTest(path.join(testsDir, "planning-complete-demo.alg"));
+// B-187 chunk L1 (the planning loop): an open plan declared with `plan NAME
+// from CATALOG:`, its gap as a plan obligation in planning words, the
+// other stop at a bounded depth, and the plan closed by a hand-written
+// catalog entry and checked as a WellFormedPlan.
+fileTest(path.join(testsDir, "planning-loop-obligations.alg"));
 
 // B-093 (stage E): the public rung-3 demo scenes are suite-validated like
 // the rung-1 and rung-2 ones (src/test/proofs.ts), so they cannot rot.
