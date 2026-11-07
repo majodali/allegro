@@ -11,7 +11,7 @@ oracle:
   - npm run lint:streams
   - npm test
 chunks: [P0, P1, P1b, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
-reserves: [B-183, B-184, B-185, B-186]
+reserves: [B-184, B-186]
 boundary:
   - docs/book/**
   - docs/reading-order.json
