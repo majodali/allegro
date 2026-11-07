@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the T-host track: the Node CLI and the browser sandbox as host environments, the environment capabilities they supply, the browser-compatible core, and the environment-capability contract of `docs/book/allegretto/structures.md` §11, with asynchronous I/O capabilities and browser packaging stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #142, 2026-11-02; unratified terms 0; footprint: declared 6, changed 6, surprises 0, misses 0; claims C86–C87 and C110–C119 re-stated 2026-11-07 after PR #166 (ruling R33 of `docs/plans/book-pass.md`), with C83, C101 and C140, which PR #166 and its deploy also left stale, and C81; C87, C111 and C117 cut, clusters G16, G20, G21 re-formed; proposed until ratified, ask A3)
+Status: delivered IR-only (ratified at the merge of PR #142, 2026-11-02; unratified terms 0; footprint: declared 6, changed 6, surprises 0, misses 0; claims C86–C87 and C110–C119 re-stated 2026-11-07 after PR #166 (ruling R33 of `docs/plans/book-pass.md`), with C83, C101 and C140, which PR #166 and its deploy also left stale, and C81; C87, C111 and C117 cut, clusters G16, G20, G21 re-formed; ratified 2026-11-07 on PR #170, ask A3)
 Source: chunk A4 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts, web/allegro-web.ts and website/ as the host surfaces; docs/book/allegretto/structures.md §11 as the contract
 Footprint: docs/book/platform/host.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -212,19 +212,19 @@ C79. `web/allegro-web.ts` holds its own `scanUses`, a second implementation besi
 
 C80. The browser sandbox loads no module for an `import` statement, the web bundle holding no module loader. evidence: E13, E15. [decided: owner, 2026-11-02]
 
-C81. The source `import math` followed by `math` returns `<symbol:math>` in the browser sandbox with no error. evidence: E16. [proposed: this IR]
+C81. The source `import math` followed by `math` returns `<symbol:math>` in the browser sandbox with no error. evidence: E16. [decided: owner, 2026-11-07]
 
 C82. `Allegro.inspect` evaluates a source under Allegro Standard with its `print` output discarded, returning the summary that `summarizeModule` and `renderModuleSummary` build. evidence: E13, E16. [decided: owner, 2026-11-02]
 
 ### The pages and the deployed site [implemented]
 
-C83. The pages register eight of the sixteen libraries under `lib/`: `pow`, `match_expr`, `invariants`, `contracts`, `effects`, `units`, `totality`, `planning`. evidence: E17. [proposed: this IR]
+C83. The pages register eight of the sixteen libraries under `lib/`: `pow`, `match_expr`, `invariants`, `contracts`, `effects`, `units`, `totality`, `planning`. evidence: E17. [decided: owner, 2026-11-07]
 
 C84. `scripts/sync-web-libs.ts` copies each registered library's source from `lib/` into a marked region of `website/index.html`, `website/sandbox.html` and `web/sandbox.html`. evidence: E17. [decided: owner, 2026-11-02]
 
 C85. `npx tsx scripts/sync-web-libs.ts --check` compares the three regions with `lib/` without writing. evidence: E17. [decided: owner, 2026-11-02]
 
-C86. `npx tsx scripts/sync-web-libs.ts --check` passes: in each of the three pages, the copy of each registered library matches its file under `lib/`. evidence: E18. [proposed: this IR]
+C86. `npx tsx scripts/sync-web-libs.ts --check` passes: in each of the three pages, the copy of each registered library matches its file under `lib/`. evidence: E18. [decided: owner, 2026-11-07]
 
 C88. `web/sandbox.html` is the local sandbox page, loading the bundle from `dist/allegro.js` beside the page. evidence: E19. [decided: owner, 2026-11-02]
 
@@ -252,7 +252,7 @@ C99. `npm run check-deployed` compares the live `version.json` with `origin/main
 
 C100. `npm run check-deployed` runs `git fetch origin main` before comparing. evidence: E22. [decided: owner, 2026-11-02]
 
-C101. `npm run check-deployed` reports the live site at commit 52a34d2 of `main`, deployed from a clean tree on 2026-11-06, and stale against `origin/main`. evidence: E23. [proposed: this IR]
+C101. `npm run check-deployed` reports the live site at commit 52a34d2 of `main`, deployed from a clean tree on 2026-11-06, and stale against `origin/main`. evidence: E23. [decided: owner, 2026-11-07]
 
 ### The browser-compatible core [partial]
 
@@ -272,21 +272,21 @@ C108. `src/parser-helpers.ts` and the generated `src/parser.ts` each encode thro
 
 C109. `src/grammar2/engine.ts` and `src/evaluator.ts` test `typeof process` before reading `ALLEGRO_PARSE_STATS` or `ALLEGRO_EVAL_STATS`. evidence: E27. [decided: owner, 2026-11-02]
 
-C110. Line 23 of `src/evaluator.ts` reads `ALLEGRO_TRACE_DEPTH` only when `typeof process` is not `"undefined"`, as line 22 does. evidence: E27. [proposed: this IR]
+C110. Line 23 of `src/evaluator.ts` reads `ALLEGRO_TRACE_DEPTH` only when `typeof process` is not `"undefined"`, as line 22 does. evidence: E27. [decided: owner, 2026-11-07]
 
-C112. The web bundle built from this branch loads in a Node `vm` context whose global holds no `process` and no `Buffer`. evidence: E16. [proposed: this IR]
+C112. The web bundle built from this branch loads in a Node `vm` context whose global holds no `process` and no `Buffer`. evidence: E16. [decided: owner, 2026-11-07]
 
-C113. Loaded in that `vm` context, the web bundle evaluates sources, streams `print` output, resolves `delay` and resolves a stubbed `fetch`. evidence: E16. [proposed: this IR]
+C113. Loaded in that `vm` context, the web bundle evaluates sources, streams `print` output, resolves `delay` and resolves a stubbed `fetch`. evidence: E16. [decided: owner, 2026-11-07]
 
 C114. A browser, which defines no `process` global, loads the web bundle built from this branch. [inferred: R1]
 
-C115. Commit 52a34d2, the live site's stamp, holds line 23 of `src/evaluator.ts` as C110 states it. evidence: E23, E27. [proposed: this IR]
+C115. Commit 52a34d2, the live site's stamp, holds line 23 of `src/evaluator.ts` as C110 states it. evidence: E23, E27. [decided: owner, 2026-11-07]
 
-C116. The live site's `allegro.js` tests `typeof process` before reading `ALLEGRO_TRACE_DEPTH`, and loads in a Node `vm` context with no `process` global. evidence: E23. [proposed: this IR]
+C116. The live site's `allegro.js` tests `typeof process` before reading `ALLEGRO_TRACE_DEPTH`, and loads in a Node `vm` context with no `process` global. evidence: E23. [decided: owner, 2026-11-07]
 
-C118. The suite builds the web bundle with the options of `build:web` and loads it in a Node `vm` context with no `process` or `Buffer` global. evidence: E28, E29. [proposed: this IR]
+C118. The suite builds the web bundle with the options of `build:web` and loads it in a Node `vm` context with no `process` or `Buffer` global. evidence: E28, E29. [decided: owner, 2026-11-07]
 
-C119. The suite runs `npx tsx scripts/sync-web-libs.ts --check` as a test that fails when the check exits non-zero. evidence: E28, E29. [proposed: this IR]
+C119. The suite runs `npx tsx scripts/sync-web-libs.ts --check` as a test that fails when the check exits non-zero. evidence: E28, E29. [decided: owner, 2026-11-07]
 
 C120. `tsconfig.json` compiles `src/` against Node's type declarations, with no DOM library. evidence: E30. [decided: owner, 2026-11-02]
 
@@ -332,7 +332,7 @@ C138. `src/test/async-futures.ts` pins `delay`, the deferred `print`, the reject
 
 C139. `src/test/tooling.ts` pins the verdict logic of `scripts/check-deployed.ts`, not the network fetch. evidence: E22. [decided: owner, 2026-11-02]
 
-C140. Two tests of `src/test/tooling.ts` load the web bundle and call `registerLibrary` and `evalAllegro` of `web/allegro-web.ts` through its `AllegroBundle` global. evidence: E28. [proposed: this IR]
+C140. Two tests of `src/test/tooling.ts` load the web bundle and call `registerLibrary` and `evalAllegro` of `web/allegro-web.ts` through its `AllegroBundle` global. evidence: E28. [decided: owner, 2026-11-07]
 
 ### Clusters
 
@@ -366,7 +366,7 @@ G14. cluster: C69, C70, C71, C72, C73, C74, C75, C76 [decided: owner, 2026-11-02
 
 G15. cluster: C77, C78, C79, C80, C81, C82 [decided: owner, 2026-11-02]
 
-G16. cluster: C83, C84, C85, C86 [proposed: this IR]
+G16. cluster: C83, C84, C85, C86 [decided: owner, 2026-11-07]
 
 G17. cluster: C88, C89, C90, C91, C92, C93 [decided: owner, 2026-11-02]
 
@@ -374,9 +374,9 @@ G18. cluster: C94, C95, C96, C97, C98, C99, C100, C101 [decided: owner, 2026-11-
 
 G19. cluster: C102, C103, C104, C105 [decided: owner, 2026-11-02]
 
-G20. cluster: C106, C107, C108, C109, C110 [proposed: this IR]
+G20. cluster: C106, C107, C108, C109, C110 [decided: owner, 2026-11-07]
 
-G21. cluster: C112, C113, C114, C115, C116 [proposed: this IR]
+G21. cluster: C112, C113, C114, C115, C116 [decided: owner, 2026-11-07]
 
 G22. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
@@ -489,3 +489,5 @@ A2. No term is proposed: every term this chapter uses, environment capability an
 A2 resolved: confirmed at the merge of PR #142, 2026-11-02; no term is proposed.
 
 A3. Ratify in bulk the claims re-stated as current state after PR #166 (ruling R33 of `docs/plans/book-pass.md`), with their re-formed clusters G16, G20 and G21: C81, C83, C86, C101, C110, C112, C113, C115, C116, C118, C119, C140. C114 is inferred through R1. C87, C111 and C117 are cut. Depends: C81, C83, C86, C101, C110, C112, C113, C115, C116, C118, C119, C140.
+
+A3 resolved: ratified by the owner on PR #170, 2026-11-07, every recommendation confirmed (the nine re-stated claims, the four further claims C81, C83, C101 and C140, and the cuts of C87, C111, C117 and relation R3).
