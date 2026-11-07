@@ -664,6 +664,23 @@ PR #168 merged on 2026-11-07; entries newest first, directly below this
 line. A second stream in lane D, told apart from the closed `## Stream
 D — the partial-evaluation rules` below by its name.
 
+### 2026-11 — Logical operators propagate an error value (B-156, chunk PF3)
+
+B-156 (short-circuit over an error value), chunk PF3 of
+`docs/plans/pilot-findings.md`, ruling R3 (a). `typed_and_impl`,
+`typed_or_impl` and `typed_not_impl` in `src/primitives.ts` ask the
+propagation table, through `viralOnto` in `src/metadata.ts`, whether an
+evaluated operand carries a viral field, and return what the table gives
+before reading the operand's bits: the left operand first, then the
+right one when it is evaluated. `false || error "why"`, `true && e`, `e
+|| true`, `e && false` and `!e` are now the error, as `if e then 1 else
+2` and `1 + e` already were, and a refinement predicate written `x > 0
+|| error "{x} is not positive"` refuses with ": -1 is not positive".
+Speculation under an unresolved operand is unchanged. The new demo
+`tests/logical-error-demo.alg` pins the rows; one test appended to
+`src/test/types-core.ts` pins the annotation halt. No corpus output
+moves. The record is the plan's §7.
+
 ### 2026-11 — A sampled induction reaches the verdict and the ledger (B-185, chunk PF2)
 
 B-185 (a sampled induction proof reported as discharged), chunk PF2 of
