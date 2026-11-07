@@ -878,3 +878,104 @@ function evalStd2(src: string, ext: Extension): Value | undefined {
   return runtimeEval(src, undefined, [typeExt, ext], undefined, true).value ?? undefined;
 }
 
+
+// --- B-185 (a sampled induction proof reported as discharged), chunk PF2 ---
+//
+// `prove_induction` discharges on a base case and K sampled steps, so its
+// proof rests on the `sampled` tier: the record `sampled 'induction' of
+// 'NonNeg'` on the transitive backing set (B-091's D2 roll-up) reaches the
+// verdict's "[resting on …]" and the assumption ledger, directly, through
+// `tactics.by_induction`, and through a `by` clause. The verdict stays
+// `verified`: a sampled record does not fail it.
+
+const B185_SAMPLED = "[resting on sampled 'induction' of 'NonNeg']";
+function b185Sampled(t: { restsOn?: { equality: string; law: string; tier: string }[] } | undefined): boolean {
+  return !!t?.restsOn?.some(r => r.equality === "NonNeg" && r.law === "induction" && r.tier === "sampled");
+}
+
+test("B-185: a direct prove_induction theorem rests on sampled 'induction' of 'NonNeg'", () => {
+  const src = `
+theorem base: 0 + 0 == 0
+theorem all: prove_induction(n => n + 0 == n, base, (n, ih) => proof_refl(n + 1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.verified, true);
+  const t = v.theorems.find(x => x.name === "all");
+  eq(t?.status, "discharged");
+  eq(b185Sampled(t), true);
+  eq(t?.lawBacking, undefined); // E-R6 fields stay unset: not an equality proof
+  eq(b185Sampled(v.theorems.find(x => x.name === "base")), false);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes(`✓ all — by auto-PE ${B185_SAMPLED}`), true);
+  eq(rendered.includes("assumption ledger: rests on 0 admitted, 1 sampled"), true);
+  eq(rendered.includes("! sampled 'induction' of 'NonNeg' — backs: all"), true);
+});
+
+test("B-185: a tactics.by_induction theorem rests on sampled 'induction' of 'NonNeg'", () => {
+  const src = `import tactics
+theorem base: 0 == 0
+theorem all: tactics.by_induction(n => n == n, base, (n, ih) => proof_refl(n + 1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, tacticsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.verified, true);
+  eq(b185Sampled(v.theorems.find(x => x.name === "all")), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes(`✓ all — by auto-PE ${B185_SAMPLED}`), true);
+  eq(rendered.includes("! sampled 'induction' of 'NonNeg' — backs: all"), true);
+});
+
+test("B-185: a `by` theorem over an induction rests on what its term rests on", () => {
+  const src = `
+theorem base: 0 + 0 == 0
+theorem ind: prove_induction(n => n + 0 == n, base, (n, ih) => proof_refl(n + 1))
+theorem via_by: 2 > 1 by ind
+1`;
+  const result = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.verified, true);
+  eq(v.theorems.find(x => x.name === "via_by")?.status, "discharged");
+  eq(b185Sampled(v.theorems.find(x => x.name === "via_by")), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes(`✓ via_by — by auto-PE ${B185_SAMPLED}`), true);
+  eq(rendered.includes("! sampled 'induction' of 'NonNeg' — backs: ind, via_by"), true);
+});
+
+test("B-185: a `by` over a non-equality proposition keeps an admitted equality law's backing", () => {
+  const src = `
+Law.assume(Quantity, "trans")
+q = qty(5, m)
+theorem chain: q == q by proof_trans(proof_refl(q), proof_refl(q))
+theorem via_by: (2 > 1) by chain
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, unitsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.verified, true);
+  const t = v.theorems.find(x => x.name === "via_by");
+  eq(t?.status, "discharged");
+  eq(t?.restsOn?.some(r => r.equality === "Quantity" && r.law === "trans" && r.tier === "admitted"), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes("✓ via_by — by auto-PE [resting on admitted 'trans' of 'Quantity']"), true);
+  eq(rendered.includes("admitted 'trans' of 'Quantity' — backs: chain, via_by"), true);
+});
+
+test("B-185: an induction keeps its base proof's own backing in the union", () => {
+  const src = `
+Law.assume(Quantity, "trans")
+q = qty(5, m)
+theorem chain: q == q by proof_trans(proof_refl(q), proof_refl(q))
+theorem all: prove_induction(n => n == n, chain, (n, ih) => proof_refl(n + 1))
+1`;
+  const result = runtimeEval(src, undefined, [typeExt, unitsExt], undefined, true, undefined, true);
+  const v = buildVerdict(result.evalCtx, result.compilationReport);
+  eq(v.verified, true);
+  const t = v.theorems.find(x => x.name === "all");
+  eq(t?.status, "discharged");
+  eq(b185Sampled(t), true);
+  eq(t?.restsOn?.some(r => r.equality === "Quantity" && r.law === "trans" && r.tier === "admitted"), true);
+  const rendered = formatVerdict(v);
+  eq(rendered.includes("✓ all — by auto-PE [resting on sampled 'induction' of 'NonNeg', admitted 'trans' of 'Quantity']"), true);
+  eq(rendered.includes("! admitted 'trans' of 'Quantity' — backs: chain, all"), true);
+  eq(rendered.includes("! sampled 'induction' of 'NonNeg' — backs: all"), true);
+});
