@@ -1071,6 +1071,15 @@ its approval.
   B-186 (a lane for the monotonic pass) landed as a lane-S PR: lane R in
   `scripts/analyze/lanes.json` and the lane table, the plan's header
   moved to it; lane A keeps its other items.
+- **2026-11-07 — the host chapter's claims re-stated** (the review
+  session), under R33. `docs/book/platform/host.ir.md`: C86, C110, C112
+  to C116, C118 and C119 re-stated as current state; C87, C111 and C117
+  (history) and relation R3 cut; C81, C83, C101 and C140, also stale
+  after the site's redeploy at 52a34d2, re-stated; all proposed under the
+  IR's ask A3. Verified: `sync-web-libs --check` passes, the bundle loads
+  with no `process` global, the suite's four web tests pass, the live
+  bundle carries the guard. Lints: `lint:ir` clean, unratified terms 0;
+  `lint:docs:check` ids 784.
 
 ## 8. Sessions
 
