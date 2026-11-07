@@ -3434,8 +3434,13 @@ table and the stream plans.
   three with a "break it" block, here and at `demos/rung1/README.md:4`
   and `:21`. The book pass's chunk P1 (the decision inventory) waits for
   step 1.
-- [ ] **B-185** (a sampled induction proof reported as discharged) ·
-  L2 · Filed 2026-11-04 by the book pass, from chunk P1's decision
+- [x] **B-185** (a sampled induction proof reported as discharged) ·
+  L2 · LANDED 2026-11-07 at PR #<number> by chunk PF2 of
+  `docs/plans/pilot-findings.md`: `verify tests/proofs-induction-demo.alg`
+  reads `✓ add_zero_right — by auto-PE [resting on sampled 'induction'
+  of 'NonNeg']` (and the same for `add_zero_t`), and its ledger `!
+  sampled 'induction' of 'NonNeg' — backs: add_zero_right, add_zero_t`;
+  a `by` theorem rests on what its term rests on. Filed 2026-11-04 by the book pass, from chunk P1's decision
   inventory (`docs/plans/book-pass-inventory.md`, Open questions).
   `prove_induction` checks the base case and four sampled steps
   (`src/primitives.ts:4330`–`4377`) and returns a proof marked
@@ -3446,7 +3451,7 @@ table and the stream plans.
   claim states its discharge strength. Worked by the orchestrating
   session; the book pass only filed it. Stream plan:
   `docs/plans/pilot-findings.md`, proposed 2026-11-06, ratified
-  2026-11-07 at PR #168; PF2 in progress. Reserved
+  2026-11-07 at PR #168. Reserved
   2026-11-03 at the review session's request, with B-186 (fourth
   out-of-scope finding of the book pass), once chunk F1 had used the
   first two.

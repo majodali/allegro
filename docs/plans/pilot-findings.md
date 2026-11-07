@@ -681,3 +681,75 @@ maintainer asked for.
   `## Stream D — the pilot's findings`, and files the wider finding of
   R2 as B-190 (name capture), since PF1 runs in lane P under its own
   plan.
+- **2026-11-07 — PF2 landed.** B-185 (a sampled induction proof
+  reported as discharged), R1 (a), on branch
+  `majodali/b185-induction-tier` off `origin/main` at `b5eac65`.
+  - **The changes**, both in `src/primitives.ts`.
+    `prove_induction_impl` (`:4343`) builds its proof (`:4402`) and
+    stamps the record `{equality: "NonNeg", law: "induction", tier:
+    "sampled"}` through `stampBackings`, unioned (`unionBackings`) with
+    the base proof's own set (`:4390` to `:4408`). "NonNeg" is the
+    primitive's fixed domain, now the constant `_INDUCTION_DOMAIN`
+    (`:4315`), which the proposition text also prints; the comment at
+    the stamp site says the record's `equality` field holds a domain
+    here, not an equality. The proof's E-R6 fields stay unset.
+    `proof_check_impl` (`:4198`) carries the term's transitive set onto
+    the proof its two non-equality returns mint (`:4266` to `:4283`,
+    `withTermBackings`); the equality path is unchanged. No file outside
+    the boundary changed: the verdict (`buildVerdict`), the "[resting on
+    …]" rendering (`formatVerdict`), the ledger (`buildAssumptionLedger`)
+    and the `inspect` line "rests on:" (`src/introspect.ts:679`) already
+    read the set.
+  - **Probes**, before and after. `theorem ind: prove_induction(…)` then
+    `theorem via_by: 2 > 1 by ind`: before, both rest on nothing and the
+    ledger is clean; after, both rest on sampled 'induction' of 'NonNeg'
+    and the ledger reads `! sampled 'induction' of 'NonNeg' — backs: ind,
+    via_by`. A `by` over an admitted equality law, `theorem via_by: (2 >
+    1) by chain` with `chain` resting on admitted 'trans' of 'Quantity':
+    before, `via_by` rests on nothing; after, on the admitted law, and
+    the ledger names `chain, via_by`. Under `use units` the proposition
+    needs its parentheses: `1 by` reads as a quantity literal with the
+    unit `by` and the parse fails at `chain`.
+  - **Tests**, appended to `src/test/proofs.ts` (`:881` to `:981`): "B-185:
+    a direct prove_induction theorem rests on sampled 'induction' of
+    'NonNeg'", "B-185: a tactics.by_induction theorem rests on sampled
+    'induction' of 'NonNeg'", "B-185: a `by` theorem over an induction
+    rests on what its term rests on", "B-185: a `by` over a non-equality
+    proposition keeps an admitted equality law's backing", "B-185: an
+    induction keeps its base proof's own backing in the union". Each
+    asserts the verdict stays `verified` and the ledger names the backs.
+    All five fail on the unfixed tree. No existing assertion changed.
+  - **The outputs comparison** (§3 check 2): 205 runs, `run`, `inspect`
+    and `verify` over the 59 programs of `tests/*.alg` and the 9 of
+    `demos/**/*.alg`, and `verify --json` of the demo, stdout, stderr and
+    exit code each. 202 identical. The three that differ are the
+    ratified lines of §3 on `tests/proofs-induction-demo.alg` and
+    nothing else: `verify` (two theorem lines gain `[resting on sampled
+    'induction' of 'NonNeg']`, the ledger line becomes `assumption
+    ledger: rests on 0 admitted, 1 sampled` and `! sampled 'induction'
+    of 'NonNeg' — backs: add_zero_right, add_zero_t`; the first line
+    `Verdict (verified): 6/6 discharged` unchanged), `inspect` (one line
+    `rests on: sampled 'induction' of 'NonNeg'` under each of the two
+    theorems), `verify --json` (the two theorems gain `restsOn`, once
+    `verifiedAt` is normalised). The result matches the drafting
+    session's measured outputs line for line.
+  - **Claims for the book pass** (R5 (b)). PF2 stales none of E14 of
+    `docs/book/allegretto/evaluator.ir.md` (`typed_and_impl` and
+    `typed_or_impl`, lines PF2 does not move; PF3's) or C74, C142 and
+    E20 of `docs/book/demo-ladder.ir.md` (`lib/units.alg`; PF4's). PF2
+    moves the registry lines below `:4268` by 30: evidence E2 of
+    `docs/book/platform/host.ir.md` ("lines 4405–4408 (`print`) and
+    4531–4533 (`delay`, `fetch`)") was already stale on `origin/main`
+    (4495 and 4619 to 4620) and now reads 4525 and 4649 to 4650. The
+    primer `docs/book/proving-in-allegro.md` is incomplete, not false:
+    §4's paragraph on bounded sample verification does not say the
+    verdict marks the theorem `[resting on sampled 'induction' of
+    'NonNeg']`, and "Laws, discharge tiers, and the strict gate" says
+    that equality proofs carry the transitive backing set, where an
+    induction proof and a `by` theorem's proof now carry it too. The
+    description of the host-plane property `lawBackings`
+    (`docs/book/standard/type-system.md` §4) names it only, and the
+    record's `equality` field holding a domain is stated at the stamp
+    site; the interface `LawBackingRec` in `src/slot-accessors.ts`,
+    outside this boundary, could say the same.
+  - **Oracles**: in the PR body.
