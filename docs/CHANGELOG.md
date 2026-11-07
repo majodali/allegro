@@ -444,6 +444,12 @@ the IR's proposed claims and the term were ratified by the merge, and a
 follow-up flipped their statuses to decided and the IR's Status to
 delivered. Round 7's verdict was overturned on meta-review (the entry above).
 
+## Stream D — the planning loop
+
+Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
+2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
+entries newest first, directly below this line.
+
 ## Stream D — the partial-evaluation rules
 
 Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the

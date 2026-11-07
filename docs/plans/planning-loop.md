@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-187
 lane: D
 merge: human-gated
@@ -37,13 +37,13 @@ boundary:
 
 # The planning loop, the next validating demo — the planning-loop stream
 
-> **Status: draft** (K-007 (the plan lifecycle)) — drafted 2026-11-06
+> **Status: active** (K-007 (the plan lifecycle)) — drafted 2026-11-06
 > from the maintainer's direction of that day, on `origin/main` at
-> `a8e19c8`. Nothing is ratified. The plan asks for rulings R1 to R10
-> (§6) and expects to be discussed at its PR. The status line and the
-> header's `status` say the same thing.
+> `a8e19c8`; active since the merge of PR #167 on 2026-11-07, with
+> every recommendation taken (§6). The status line and the header's
+> `status` say the same thing.
 >
-> **Reader**: the maintainer, to rule on §6; the session that runs the
+> **Reader**: the maintainer, who ruled on §6 at PR #167; the session that runs the
 > [stream](parallel-streams.md#def-stream). Assumed known: the planning
 > model as built (`docs/book/vivace/planning-dsl.md`, in particular
 > [plan](../book/vivace/planning-dsl.md#def-plan),
@@ -549,7 +549,7 @@ R7 and R8 at their rows' time.
     (no host code per model, the rung 3 promise), and `src/pcp.ts`
     collects them from the top-level bindings as it collects Proof
     values, so the second and third models reuse the channel.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R2** — **What a proposal may be, and where it is spliced.**
   - (a) One catalog entry: a node block (leaf, composite, choice, or a
     borrowed plan by name), added to the open plan's catalog. The plan
@@ -569,7 +569,7 @@ R7 and R8 at their rows' time.
     whose plan changed. If the catalog's surface costs more than a
     chunk, the fallback is the library form (`leaf(…)` expressions in
     the catalog list), which is less readable to a stakeholder.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R3** — **One worker generalised, or a second worker.**
   - (a) Generalise `runLlmWorker` by obligation kind: each kind brings
     its request text, splice, success test and primer section (§2.3);
@@ -585,7 +585,7 @@ R7 and R8 at their rows' time.
     parts) and pinned. The primer section for plans goes in the
     planning chapter, and the worker sends the section of the
     obligation's kind.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R4** — **How a solved plan's assumptions reach the ledger.** The
   fixtures are `v => true` promises (§2.1, finding 2).
   - (a) Each fixture a solved plan relies on is an admitted entry
@@ -600,7 +600,7 @@ R7 and R8 at their rows' time.
     fixture carries a real predicate: in Shape 1 every fixture is a
     promise, so "admitted" is the tier, and the ledger must never call
     one discharged.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R5** — **The lane, and what the manifest gains.**
   - (a) Lane D, with lane D's globs in `scripts/analyze/lanes.json`
     widened by `pcp/**`, `demos/rung4/**` and
@@ -620,7 +620,7 @@ R7 and R8 at their rows' time.
     both every time.
   - **Recommended: (a)** for (1). Revisit (b) at R7: three models'
     worth of libraries is when a lane of their own earns its cost.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R6** — **The demo's home, and what the claims register may say.**
   - (a) `demos/rung4/`, scene 1 the loop; scenes for (2) and (3)
     follow in the same rung. The ladder's rung 4 story is "two+ coupled
@@ -639,7 +639,7 @@ R7 and R8 at their rows' time.
     delivered as a row; the scene is its receipt); D6 (models as live
     values)'s "to advance" line loses "the AI loop over a model (B-083)";
     the "cross-model ledger" row and D7 (the capstone) stay hypothesis.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R7** — **The software system model: the second pilot as written,
   and its first chunk.** Vision §4 names it "a software system model
   (several interconnected DSLs)"; the chapter's table says "data,
@@ -657,7 +657,7 @@ R7 and R8 at their rows' time.
     deferred. Cheaper; tests composition across two models but not
     within one.
   - **Recommended: (a)**, at L7's merge, on (1)'s evidence.
-  - **Taken:**
+  - **Taken:** at L7's merge.
 - **R8** — **What the documentation or comprehension model is for.** A
   question for the maintainer; no design is offered. Readings the raw
   material of §5 supports:
@@ -672,7 +672,7 @@ R7 and R8 at their rows' time.
     evidence as an obligation.
   - (a) and (c) have mechanical checks today. Each composes with the
     other two models differently.
-  - **Taken:**
+  - **Taken:** open, at DC1.
 - **R9** — **How an open plan is declared** (§2.1, finding 4). The
   `plan` statement halts on a gap, so a plan with a gap exists today
   only through the library's API.
@@ -688,7 +688,7 @@ R7 and R8 at their rows' time.
     notification. `src/runtime.ts`, and the plan form's halt then means
     different things in `run` and in `verify`.
   - **Recommended: (a)**, taken with R1.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R10** — **How the planning library grows under the load ratchet.**
   `lib/planning.alg` is in the load corpus, and its parse counts are
   gated (§2.4).
@@ -704,7 +704,7 @@ R7 and R8 at their rows' time.
     lane P left it, keeps the gate's meaning, and separates what rung 3
     delivered from what the loop adds. If the wording fix itself raises
     the counts, that one commit takes (b).
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 
 ## 7. Record
 
@@ -714,3 +714,10 @@ R7 and R8 at their rows' time.
   names the stream as next in lane D's row, and appends the manifest
   row. Rulings R1 to R10 await the maintainer. The changelog section
   waits for ratification.
+- **2026-11-07 — plan ratified.** PR #167 merged with every
+  recommendation taken: R1 to R6, R9 and R10 as (a); R7 waits for L7's
+  merge and R8 for DC1. The five terms of §1 are ratified. Lane D's
+  globs already hold `pcp/**`, `demos/rung4/**` and
+  `docs/plans/release-track.md` (PR #171, R5). The changelog section
+  `## Stream D — the planning loop` opens; the manifest row and B-187
+  say active.
