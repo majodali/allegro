@@ -4263,13 +4263,23 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // term is already known discharged (checked above); accept when the
   // proposition itself folds true, OR is itself a discharged Proof
   // (composition — e.g. `theorem p: proof_refines(5, T) by proof_refines(5, T)`).
+  //
+  // B-185 (a sampled induction proof reported as discharged): the fresh
+  // proof carries the term's TRANSITIVE backing set (B-091's D2 roll-up),
+  // as the equality path above does, so `theorem t: P by ind` rests on
+  // what `ind` rests on (a sampled induction, an admitted law).
   const propVal = evalFn!(args[1], ctx!);
   const pv = propVal;
+  const withTermBackings = (out: Value): Value => {
+    const pc = proofCtx(proof);
+    if (pc) stampBackings(out as StructureValue, backingsOf(pc));
+    return out;
+  };
   if (pv.kind === ValueKind.Bits && (pv as BitsValue).data === 1n) {
-    return _makeProof(propSrc);
+    return withTermBackings(_makeProof(propSrc));
   }
   if (isDischargedProofVal(propVal)) {
-    return _makeProof(propSrc);
+    return withTermBackings(_makeProof(propSrc));
   }
   return makeFailedProof(propSrc,
     `proposition not established`,
@@ -4300,6 +4310,9 @@ const proof_check_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 // Documented as such in the rendered counterexamples on failure.
 
 const _INDUCTION_SAMPLE_K = 4;
+/** The domain `prove_induction` quantifies over: fixed today, and the
+ *  same name its propositions print (`forall n: NonNeg, p(n)`). */
+const _INDUCTION_DOMAIN = "NonNeg";
 
 const prove_for_all_bool_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (args.length !== 1) {
@@ -4374,7 +4387,24 @@ const prove_induction_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     }
     ih = stepResult;
   }
-  return _makeProof(`forall n: NonNeg, p(n) [verified base + ${_INDUCTION_SAMPLE_K} inductive steps]`);
+  // B-185 (a sampled induction proof reported as discharged), ruling R1
+  // (a) of `docs/plans/pilot-findings.md`: the discharge rests on K
+  // sampled steps, so the proof's transitive backing set (B-091's D2
+  // roll-up, read by the verdict and the assumption ledger) records it
+  // in the existing tier vocabulary, unioned with the base proof's own
+  // set so an admitted law under the base case stays visible. The
+  // record's `equality` field holds the quantified domain here, not an
+  // equality: the set's records name what was assumed, and the ledger
+  // prints it as `sampled 'induction' of 'NonNeg'`. The proof's own
+  // E-R6 fields (`equality`, `lawName`, `lawTier`) stay unset, as on any
+  // proof that is not an equality. The proof is fresh and unshared, so
+  // the stamp writes in place.
+  const proof = _makeProof(`forall n: ${_INDUCTION_DOMAIN}, p(n) [verified base + ${_INDUCTION_SAMPLE_K} inductive steps]`);
+  const own: LawBackingRec[] = [{ equality: _INDUCTION_DOMAIN, law: "induction", tier: "sampled" }];
+  const baseCtx = proofCtx(baseProof);
+  stampBackings(proof as StructureValue,
+    unionBackings(own, baseCtx ? backingsOf(baseCtx) : []));
+  return proof;
 };
 
 // --- Typed binary operator helper ---

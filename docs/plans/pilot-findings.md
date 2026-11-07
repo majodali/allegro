@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-185
 lane: D
 merge: human-gated
@@ -26,10 +26,13 @@ boundary:
 
 # The planning pilot's correctness findings closed — the pilot-findings stream
 
-> **Status: draft** — drafted 2026-11-06 by the orchestrating session,
-> from the reading and probes of §2, for the maintainer to rule on at
-> this plan's PR. No code changed. The status line and the header's
-> `status` say the same thing.
+> **Status: active** — drafted 2026-11-06 by the orchestrating session,
+> from the reading and probes of §2; active since the merge of PR #168
+> on 2026-11-07, which took every recommendation of §6 (R1 (a), R2 (b),
+> R3 (a), R4 (a), R5 (b)) and ratified the output changes of §3 and the
+> terms of §1. The maintainer wrote "All defaults approved, terms and
+> changes ratified." The status line and the header's `status` say the
+> same thing.
 >
 > **Reader**: the session that runs lane D (L2 semantics), and the
 > maintainer ruling on §6. Assumed known: the layers
@@ -576,7 +579,7 @@ maintainer asked for.
   - **Recommended: (a).** It uses the carrier the ledger was built for,
     in the existing tier vocabulary, and changes one file. If a tier for
     every proof is wanted later, (c) is its own item.
-  - **Taken:**
+  - **Taken: (a)**, at the merge of PR #168, 2026-11-07.
 - **R2 — B-154: which fix, and the wider finding.**
   - (a) A units-vocabulary refusal: a literal whose unit is not a
     `Unit` halts with a message naming the value (§2.2). Leaves the
@@ -599,7 +602,10 @@ maintainer asked for.
     an ask: file it as a new backlog item, in lane D or K, with the
     probes of §2.2 as its evidence. This stream does not fix it, and
     filing it needs an id the header does not reserve.
-  - **Taken:**
+  - **Taken: (b)**, at the merge of PR #168, 2026-11-07. The wider
+    finding is filed as B-190 (name capture) in lane D, at the PR of
+    the lane D activation chunk (PF2's), not at PF1's: PF1 runs in
+    lane P under its own plan.
 - **R3 — B-156: the semantics of `&&`, `||` and `!` over an error
   value.** The maintainer asked to discuss this before a semantics is
   chosen (2026-10-27).
@@ -623,7 +629,7 @@ maintainer asked for.
     three are the only operators that drop it, and they drop it
     silently, which is the failure the viral rule exists to prevent.
     The measured cost is zero outputs. The chunk waits for this ruling.
-  - **Taken:**
+  - **Taken: (a)**, at the merge of PR #168, 2026-11-07.
 - **R4 — B-183: its lane.** The fault is in `src/grammar2/engine.ts`
   (§2.4), a lane P file.
   - (a) A one-chunk lane P plan under `docs/plans/`, named for its
@@ -641,7 +647,7 @@ maintainer asked for.
   - **Recommended: (a).** It is the route the lane check admits. The
     one-chunk plan is drafted in PF1's own PR, or before it at the
     maintainer's choice.
-  - **Taken:**
+  - **Taken: (a)**, at the merge of PR #168, 2026-11-07.
 - **R5 — Who re-syncs the IR claims these chunks stale.** The claims of
   §4 (E14 of the evaluator chapter's IR; C74, C142 and E20 of the demo
   ladder's IR), and, under R3 (b), the documentation of the boolean
@@ -655,7 +661,7 @@ maintainer asked for.
   - **Recommended: (b).** It keeps §8 as ratified. None of the stale
     claims is about behaviour these chunks change: E14 and E20 are
     evidence pointers, C74 and C142 are sizes.
-  - **Taken:**
+  - **Taken: (b)**, at the merge of PR #168, 2026-11-07.
 
 ## 7. Record
 
@@ -666,3 +672,84 @@ maintainer asked for.
   changelog section until the plan is ratified: as for stream D, the
   activation chunk writes it. Rulings R1 to R5 and one ask (a backlog
   item for name capture, R2) await the maintainer.
+- **2026-11-07 — plan ratified; the stream active.** Merged as PR #168.
+  The maintainer: "All defaults approved, terms and changes ratified."
+  Every recommendation of §6 taken (R1 (a), R2 (b), R3 (a), R4 (a),
+  R5 (b)), the output changes of §3 and the terms *shipped unit* and
+  *name capture* ratified. The lane D activation chunk (PF2's PR) sets
+  this plan and its manifest row to active, opens the changelog section
+  `## Stream D — the pilot's findings`, and files the wider finding of
+  R2 as B-190 (name capture), since PF1 runs in lane P under its own
+  plan.
+- **2026-11-07 — PF2 landed.** B-185 (a sampled induction proof
+  reported as discharged), R1 (a), on branch
+  `majodali/b185-induction-tier` off `origin/main` at `b5eac65`.
+  - **The changes**, both in `src/primitives.ts`.
+    `prove_induction_impl` (`:4343`) builds its proof (`:4402`) and
+    stamps the record `{equality: "NonNeg", law: "induction", tier:
+    "sampled"}` through `stampBackings`, unioned (`unionBackings`) with
+    the base proof's own set (`:4390` to `:4408`). "NonNeg" is the
+    primitive's fixed domain, now the constant `_INDUCTION_DOMAIN`
+    (`:4315`), which the proposition text also prints; the comment at
+    the stamp site says the record's `equality` field holds a domain
+    here, not an equality. The proof's E-R6 fields stay unset.
+    `proof_check_impl` (`:4198`) carries the term's transitive set onto
+    the proof its two non-equality returns mint (`:4266` to `:4283`,
+    `withTermBackings`); the equality path is unchanged. No file outside
+    the boundary changed: the verdict (`buildVerdict`), the "[resting on
+    …]" rendering (`formatVerdict`), the ledger (`buildAssumptionLedger`)
+    and the `inspect` line "rests on:" (`src/introspect.ts:679`) already
+    read the set.
+  - **Probes**, before and after. `theorem ind: prove_induction(…)` then
+    `theorem via_by: 2 > 1 by ind`: before, both rest on nothing and the
+    ledger is clean; after, both rest on sampled 'induction' of 'NonNeg'
+    and the ledger reads `! sampled 'induction' of 'NonNeg' — backs: ind,
+    via_by`. A `by` over an admitted equality law, `theorem via_by: (2 >
+    1) by chain` with `chain` resting on admitted 'trans' of 'Quantity':
+    before, `via_by` rests on nothing; after, on the admitted law, and
+    the ledger names `chain, via_by`. Under `use units` the proposition
+    needs its parentheses: `1 by` reads as a quantity literal with the
+    unit `by` and the parse fails at `chain`.
+  - **Tests**, appended to `src/test/proofs.ts` (`:881` to `:981`): "B-185:
+    a direct prove_induction theorem rests on sampled 'induction' of
+    'NonNeg'", "B-185: a tactics.by_induction theorem rests on sampled
+    'induction' of 'NonNeg'", "B-185: a `by` theorem over an induction
+    rests on what its term rests on", "B-185: a `by` over a non-equality
+    proposition keeps an admitted equality law's backing", "B-185: an
+    induction keeps its base proof's own backing in the union". Each
+    asserts the verdict stays `verified` and the ledger names the backs.
+    All five fail on the unfixed tree. No existing assertion changed.
+  - **The outputs comparison** (§3 check 2): 205 runs, `run`, `inspect`
+    and `verify` over the 59 programs of `tests/*.alg` and the 9 of
+    `demos/**/*.alg`, and `verify --json` of the demo, stdout, stderr and
+    exit code each. 202 identical. The three that differ are the
+    ratified lines of §3 on `tests/proofs-induction-demo.alg` and
+    nothing else: `verify` (two theorem lines gain `[resting on sampled
+    'induction' of 'NonNeg']`, the ledger line becomes `assumption
+    ledger: rests on 0 admitted, 1 sampled` and `! sampled 'induction'
+    of 'NonNeg' — backs: add_zero_right, add_zero_t`; the first line
+    `Verdict (verified): 6/6 discharged` unchanged), `inspect` (one line
+    `rests on: sampled 'induction' of 'NonNeg'` under each of the two
+    theorems), `verify --json` (the two theorems gain `restsOn`, once
+    `verifiedAt` is normalised). The result matches the drafting
+    session's measured outputs line for line.
+  - **Claims for the book pass** (R5 (b)). PF2 stales none of E14 of
+    `docs/book/allegretto/evaluator.ir.md` (`typed_and_impl` and
+    `typed_or_impl`, lines PF2 does not move; PF3's) or C74, C142 and
+    E20 of `docs/book/demo-ladder.ir.md` (`lib/units.alg`; PF4's). PF2
+    moves the registry lines below `:4268` by 30: evidence E2 of
+    `docs/book/platform/host.ir.md` ("lines 4405–4408 (`print`) and
+    4531–4533 (`delay`, `fetch`)") was already stale on `origin/main`
+    (4495 and 4619 to 4620) and now reads 4525 and 4649 to 4650. The
+    primer `docs/book/proving-in-allegro.md` is incomplete, not false:
+    §4's paragraph on bounded sample verification does not say the
+    verdict marks the theorem `[resting on sampled 'induction' of
+    'NonNeg']`, and "Laws, discharge tiers, and the strict gate" says
+    that equality proofs carry the transitive backing set, where an
+    induction proof and a `by` theorem's proof now carry it too. The
+    description of the host-plane property `lawBackings`
+    (`docs/book/standard/type-system.md` §4) names it only, and the
+    record's `equality` field holding a domain is stated at the stamp
+    site; the interface `LawBackingRec` in `src/slot-accessors.ts`,
+    outside this boundary, could say the same.
+  - **Oracles**: in the PR body.

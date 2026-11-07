@@ -656,6 +656,68 @@ name.
   maintainer. Listed as an appendix record in `docs/reading-order.json`
   and `docs/book/README.md`. Ids 784, one below the 785 the plan measured.
 
+## Stream D — the pilot's findings
+
+Plan `docs/plans/pilot-findings.md`; lane D; human-gated (lane D keeps
+the per-chunk gate). Opened 2026-11-06 with the plan, active since its
+PR #168 merged on 2026-11-07; entries newest first, directly below this
+line. A second stream in lane D, told apart from the closed `## Stream
+D — the partial-evaluation rules` below by its name.
+
+### 2026-11 — A sampled induction reaches the verdict and the ledger (B-185, chunk PF2)
+
+B-185 (a sampled induction proof reported as discharged), chunk PF2 of
+`docs/plans/pilot-findings.md`, ruling R1 (a). `prove_induction_impl`
+in `src/primitives.ts` stamps the record `sampled 'induction' of
+'NonNeg'` on the transitive backing set of the proof it returns,
+unioned with the base proof's own set, and `proof_check_impl` carries
+the term's set through a `by` clause over a non-equality proposition.
+A theorem discharged by `prove_induction`, directly, through
+`tactics.by_induction` or by `by`, now reads `[resting on sampled
+'induction' of 'NonNeg']` in `verify` and appears in the assumption
+ledger; the verdict stays `verified`. The only outputs that move are
+the ratified lines of the plan's §3 on `tests/proofs-induction-demo.alg`
+(202 of 205 corpus runs identical). Five tests appended to
+`src/test/proofs.ts`. No new field and no new slot. The record is the
+plan's §7.
+## Stream P — the trailing-comment dedent
+
+Plan `docs/plans/trailing-comment-dedent.md`; lane P; human-gated; one
+chunk, ratified and closed at the merge of its PR. Entries newest
+first, directly below this line.
+
+### 2026-11 — The dedent after a trailing comment (B-183, chunk TC1)
+
+B-183 (a trailing comment breaks a contract body's parse), chunk TC1 of
+`docs/plans/trailing-comment-dedent.md`, which is chunk PF1 (the dedent
+after a trailing comment) of `docs/plans/pilot-findings.md`, run in
+lane P under that plan's ruling R4 (B-183's lane). A block whose last
+line ends in a `//` comment now parses whatever gap precedes the
+comment, and so does a block followed by a comment-only line at its
+column. The README's taste as the book pass printed it, with the
+comment trailing `x + x`, runs and verifies "1/1 discharged".
+
+- `src/grammar2/engine.ts`: `DEDENT` is tried mid-line, right after a
+  block's last statement, and measured the gap before the comment as
+  indentation. A new `skipTrailingComments`, called by `DEDENT` only,
+  skips the rest of the line when it holds only whitespace and a `//`
+  comment, and every following line holding only whitespace and a `//`
+  comment; `DEDENT` then measures as before. `skipToNextContent` is
+  unchanged, since `NEWLINE`, `INDENT` and `CONT_NL` share it and were
+  not probed.
+- `src/test/grammar2-engine.ts`: 21 tests named "(B-183)", the rows of
+  the pilot-findings plan's §2.4 table in blocks indented 2 and 4, a
+  comment-only line between two statements, nested blocks, and the
+  book pass's minimal contract case through the file runner. 11 fail
+  on `origin/main`.
+- Oracle: 204 of 204 CLI runs identical (`run`, `inspect` and `verify`
+  over the 59 programs of `tests/*.alg` and the 9 of `demos/**/*.alg`:
+  stdout, stderr and exit code); `npm run lint:load` at the baseline,
+  every parse count unchanged; `npm run test:shards` 1,321 of 1,321
+  test runs (1,319 distinct tests), gate passed.
+- Not changed: a trailing `/* … */` block comment is still measured as
+  content by `DEDENT`; the chunk was measured for `//` only.
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
