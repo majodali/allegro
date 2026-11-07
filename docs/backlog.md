@@ -3435,7 +3435,7 @@ table and the stream plans.
   and `:21`. The book pass's chunk P1 (the decision inventory) waits for
   step 1.
 - [x] **B-185** (a sampled induction proof reported as discharged) ·
-  L2 · LANDED 2026-11-07 at PR #<number> by chunk PF2 of
+  L2 · LANDED 2026-11-07 at PR #173 by chunk PF2 of
   `docs/plans/pilot-findings.md`: `verify tests/proofs-induction-demo.alg`
   reads `✓ add_zero_right — by auto-PE [resting on sampled 'induction'
   of 'NonNeg']` (and the same for `add_zero_t`), and its ledger `!
