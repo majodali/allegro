@@ -444,6 +444,14 @@ the IR's proposed claims and the term were ratified by the merge, and a
 follow-up flipped their statuses to decided and the IR's Status to
 delivered. Round 7's verdict was overturned on meta-review (the entry above).
 
+## Stream D — the pilot's findings
+
+Plan `docs/plans/pilot-findings.md`; lane D; human-gated (lane D keeps
+the per-chunk gate). Opened 2026-11-06 with the plan, active since its
+PR #168 merged on 2026-11-07; entries newest first, directly below this
+line. A second stream in lane D, told apart from the closed `## Stream
+D — the partial-evaluation rules` below by its name.
+
 ## Stream D — the partial-evaluation rules
 
 Plan `docs/plans/pe-rules.md`; lane D; human-gated (lane D keeps the
