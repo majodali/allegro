@@ -1257,7 +1257,10 @@ table and the stream plans.
   demo. **Blocked-by**: nothing. **Pointer**: `src/runtime.ts`
   (`resolveSymbols`, the dependency registry);
   `docs/plans/planning-pilot.md` §8 (D1)
-- [ ] **B-154** (unit-name shadowing) · L2 · **A binding named like a
+- [x] **B-154** (unit-name shadowing) · L2 · LANDED 2026-11-07 at PR
+  (number to be filled) by chunk PF4 of `docs/plans/pilot-findings.md`:
+  shipped unit names resolve in the units module first, any other unit
+  name in the file (ruling R2 (b)). **A binding named like a
   unit silently rebinds the quantity literals of its file.** Found by B-151 D1: `s = solve(plan)`
   made the plan's `30s backoff` read as `30 × (solve(plan))`, and the
   recursion ran unbounded instead of failing. The units DSL resolves unit
