@@ -808,4 +808,6 @@ A1. Ratify in bulk the proposed claims about the code as it stands, the problems
 A2. Ratify or strike the proposed terms metadata field (T18), writer capability (T19) and propagation (T21), each defined here without the word "plane" under ruling R-P2-16 (a). Depends: C10, C54, C86.
 
 
-A1 and A2 resolved: ratified by the owner on PR #174, 2026-11-08, every default taken. The other rulings of the same comment: the held section stands until chapters 8 and 10 are written; the chapter carries no *organized* marker until it is approved in order under R28 (the monotonic pass); the demo excerpt's elision of its id-citing comment stands for the dry run, the demo's comment to be edited when the chapter is taken in order; the removal of the serialisation sentence stands.
+A1 resolved: ratified by the owner on PR #174, 2026-11-08, every default taken.
+
+A2 resolved: ratified by the owner on PR #174, 2026-11-08; the three terms stand. The same comment's other rulings: the held section stands until chapters 8 and 10 are written; the chapter carries no *organized* marker until it is approved in order under R28 (the monotonic pass); the demo excerpt's elision of its id-citing comment stands for the dry run, the demo's comment to be edited when the chapter is taken in order; the removal of the serialisation sentence stands.
