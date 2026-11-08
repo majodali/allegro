@@ -965,6 +965,21 @@ its approval.
   the pass reaches chapter 7 in order, its decisions are reviewed again
   under R34.
 
+**Rulings taken 2026-11-08, on PR #174 (the pilot's dry run).**
+
+- **R35 — The pilot's dry run, and two standing rules.** Every default:
+  the IR's claims and terms ratified; the held section stands until
+  chapters 8 and 10 are written; the chapter carries no *organized*
+  marker until approved in order; the demo excerpt's elision stands for
+  the dry run; the serialisation sentence's removal stands; the
+  review's findings are for the maintainer or the orchestrating session
+  to file, or for two more spare ids. Two rules follow for the full
+  pass: (1) content a review sends to a chapter that does not yet exist
+  stays in a held section of the chapter it leaves, with its definition
+  sites, until that chapter is written; (2) the *organized* marker means
+  approved in order under R28 (the monotonic pass), never merely
+  rewritten.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1113,6 +1128,12 @@ its approval.
   `build-pipeline.ir.md`. Lints: `lint:ir` 7 files clean, unratified
   terms 3; `lint:docs:check` ids 783 (one below the baseline, not
   lowered here).
+- **2026-11-08 — P2's rulings applied** (the review session). R35
+  recorded in §6. The IR's 205 proposed elements flipped to decided, 0
+  unratified terms; the *organized* marker struck from the chapter. The
+  ids baseline lowered to 783 in its own commit. The pilot is done; the
+  pass starts at chapter 1 of the inventory's contents under R34
+  (recommend the right decision).
 
 ## 8. Sessions
 
