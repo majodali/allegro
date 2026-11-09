@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-185
 lane: D
 merge: human-gated
@@ -29,13 +29,18 @@ boundary:
 
 # The planning pilot's correctness findings closed — the pilot-findings stream
 
-> **Status: active** — drafted 2026-11-06 by the orchestrating session,
+> **Status: closed** — drafted 2026-11-06 by the orchestrating session,
 > from the reading and probes of §2; active since the merge of PR #168
 > on 2026-11-07, which took every recommendation of §6 (R1 (a), R2 (b),
 > R3 (a), R4 (a), R5 (b)) and ratified the output changes of §3 and the
 > terms of §1. The maintainer wrote "All defaults approved, terms and
-> changes ratified." The status line and the header's `status` say the
-> same thing.
+> changes ratified." Closed 2026-11-09 at PR #(number), after the last
+> chunk, PF4, merged as PR #179: every clause of §1's outcome is met
+> (§7, the closing entry); B-190 (name capture) stays open, and the
+> carry-overs B-191 (a trailing block comment breaks the dedent), B-192
+> (the backing union of an induction and a `by` proof) and B-193 (`by`
+> read as a unit inside a proposition) are filed. The status line and
+> the header's `status` say the same thing.
 >
 > **Reader**: the session that runs lane D (L2 semantics), and the
 > maintainer ruling on §6. Assumed known: the layers
@@ -684,6 +689,17 @@ maintainer asked for.
   `## Stream D — the pilot's findings`, and files the wider finding of
   R2 as B-190 (name capture), since PF1 runs in lane P under its own
   plan.
+- **2026-11-07 — PF1 landed**, as PR #172, under the one-chunk lane P
+  plan `docs/plans/trailing-comment-dedent.md` (R4 (a)), whose §7 holds
+  the record: `DEDENT` in `src/grammar2/engine.ts` calls a new
+  `skipTrailingComments` before it measures the next content's column;
+  21 tests in `src/test/grammar2-engine.ts`; 204 of 204 CLI runs
+  identical and every parse count unchanged. Written here at the
+  stream's close: the lane check refused that lane D file in the lane P
+  PR, and PF2's and PF3's PRs did not carry the line. Found and left by
+  PF1: a trailing `/* … */` block comment after a gap as wide as the
+  block's indentation still fails to parse (filed at the close as
+  B-191 (a trailing block comment breaks the dedent)).
 - **2026-11-07 — PF2 landed.** B-185 (a sampled induction proof
   reported as discharged), R1 (a), on branch
   `majodali/b185-induction-tier` off `origin/main` at `b5eac65`.
@@ -894,3 +910,109 @@ maintainer asked for.
     `lint:streams` clean; the lane check lane D, 0 outside; `npm run
     lint:load` 12 counts above the baseline, as expected, until lane P's
     raise; `npm run test:shards` green but for the load lint.
+- **2026-11-09 — the stream closes.** PR #179 (PF4) merged on
+  2026-11-09 with no comment, after lane S's PR #176 (lane D's globs
+  gain the three web pages) and lane P's PR #178 (`bench/load-baseline.json`
+  raised to PF4's counts, measured on PF4's branch merged with main,
+  B-164 (ratchet baselines under concurrent merges)). The four chunks:
+  PF1 as PR #172 (lane P, under `docs/plans/trailing-comment-dedent.md`),
+  PF2 as PR #173, PF3 as PR #175, PF4 as PR #179. This entry is docs and
+  status documents only: no file under `src/`, `lib/`, `tests/` or
+  `demos/` changes in the closing PR, #(number).
+  - **The outcome of §1, clause by clause.** Each clause is quoted.
+    1. "B-185: a theorem discharged by `prove_induction`, directly,
+       through `tactics.by_induction`, or as the term of a `by` clause,
+       reaches the verdict as resting on the `sampled` tier and appears
+       in the assumption ledger." **Met** (PF2). `prove_induction_impl`
+       stamps `{equality: "NonNeg", law: "induction", tier: "sampled"}`
+       through `stampBackings`, unioned with the base proof's set
+       (`src/primitives.ts`, the PF2 entry's lines); `proof_check_impl`
+       carries the term's set onto the proof it mints for a
+       non-equality proposition. `verify tests/proofs-induction-demo.alg`
+       reads `✓ add_zero_right — by auto-PE [resting on sampled
+       'induction' of 'NonNeg']`, the same for `add_zero_t`, and `!
+       sampled 'induction' of 'NonNeg' — backs: add_zero_right,
+       add_zero_t`. Five tests in `src/test/proofs.ts` pin the three
+       forms, the `by` over an admitted law and the union.
+    2. "B-154: a quantity literal written with a unit the units module
+       ships means that unit, whatever the file binds under the same
+       name, and a file can still define its own units (as R2 rules)."
+       **Met** (PF4, R2 (b)). `unit_atom` in `lib/units.alg` names the
+       18 shipped units, each as a labelled regex whose template is the
+       name itself, then `u:ident`. `tests/units-shadowing-demo.alg`
+       pins `km = 42` then `30 km` printing `30 km`, `h` rebound to a
+       hand being the hour inside a literal and the hand outside one,
+       and a file-defined `furlong` converting (`603.504 m`). The
+       in-step test in `src/test/proofs.ts` holds the bindings and the
+       alternatives to the same set.
+    3. "B-156: `&&`, `||` and `!` treat an error value as R3 rules:
+       either the error propagates, or the boolean reading stands and is
+       documented." **Met** (PF3, R3 (a): the error propagates).
+       `viralOperand(v)`, which is `viralOnto([v], v)`, is asked of each
+       operand before its bits are read, the left one first
+       (`src/primitives.ts`, the PF3 entry's lines).
+       `tests/logical-error-demo.alg` pins the five rows of §2.3 as the
+       error with its reason and `pos_ok(-1)` refusing with ": -1 is
+       not positive". No operand of the three operators in `lib/`,
+       `tests/` or `demos/` carries an error, so no new halt.
+    4. "B-183: a block body whose last line ends in a `//` comment
+       parses, however many spaces precede the comment (as R4 rules, in
+       lane P)." **Met** (PF1, R4 (a)). `skipTrailingComments` in
+       `src/grammar2/engine.ts`, called by `DEDENT`; 21 tests in
+       `src/test/grammar2-engine.ts`, 11 of which fail on the unfixed
+       tree in §2.4's pattern; the README's taste example parses as
+       printed. The clause says `//`; a `/* … */` block comment in the
+       same place still fails and is B-191's.
+    5. "Every `// expect:` line is unchanged. Every `verify` verdict
+       over `tests/*.alg` and `demos/**/*.alg` is unchanged except the
+       lines §3 ratifies for the two induction theorems of
+       `tests/proofs-induction-demo.alg`." **Met.** No chunk changed an
+       `// expect:` line; the two new demos add theirs. Per chunk, the
+       comparison of §3 check 2 read 204 of 204 identical (PF1), 202 of
+       205 with the three ratified differences (PF2), 204 of 204 (PF3)
+       and 204 of 204 (PF4). Cumulatively, at the close: `run`,
+       `inspect` and `verify` over the 68 programs of `tests/*.alg` and
+       `demos/**/*.alg` on `a8e19c8` (the base §2 measured) and on
+       `origin/main` at `c6e2692` (PR #179's merge): CORPUS_RESULT
+  - **Carry-overs filed** in `docs/backlog.md`, each as the chunk's PR
+    asked and the merge defaulted: B-191 (a trailing block comment
+    breaks the dedent), lane P, from PF1; B-192 (the backing union of
+    an induction and a `by` proof), lane D, from PF2 (the union takes
+    the base proof's backings only, and a `by` whose proposition itself
+    evaluates to a proof carries the term's set only); B-193 (`by` read
+    as a unit inside a proposition), lane D, from PF2's side finding
+    (under `use units`, `theorem t: 2 > 1 by chain` fails to parse
+    because `1 by` reads as a quantity literal). B-190 (name capture)
+    stays open for lane D, a plan of its own, after the planning loop.
+  - **For the review session** (R5 (b)), the claims and sentences the
+    four chunks named, consolidated: `docs/book/grammar-formalism.md`
+    §5.1 lines 315 to 316 on `DEDENT` ("at or below", and comments as
+    content) (PF1); `docs/book/proving-in-allegro.md` §4 (the verdict's
+    `[resting on sampled 'induction' of 'NonNeg']`) and "Laws,
+    discharge tiers, and the strict gate" (induction and `by` proofs
+    carry the transitive set too), `docs/book/standard/type-system.md`
+    §4 (`lawBackings`'s description) (PF2); E14 of
+    `docs/book/allegretto/evaluator.ir.md` (ranges and the viral
+    evidence), a new chapter claim for the three operators,
+    `docs/book/allegretto/evaluator.md` §3, `docs/book/allegretto/metadata-and-capability.md`
+    §5 (a fourth `viralOnto` caller; the `error` paragraph),
+    `docs/book/concepts.md` SC-8, `docs/book/language-reference.md`
+    "Logical operators (short-circuiting)" (PF3); C74, C142 and E20 of
+    `docs/book/demo-ladder.ir.md` (PF4); E2 of
+    `docs/book/platform/host.ir.md` (line numbers, stale before PF2 and
+    moved by PF2 and PF3). No `docs/book/**` file changed in this
+    stream.
+  - **Status documents.** This header and status line read closed; the
+    manifest row in `docs/plans/README.md` closed; lane D's row in
+    `docs/backlog.md` closes the stream and names the planning loop as
+    the lane's current stream; B-185's entry names the close; the
+    changelog section's intro reads closed, with this entry under it.
+    `docs/plans/trailing-comment-dedent.md` still reads `status:
+    active` though it closed at PR #172's merge: that header is lane
+    P's file, so a lane P PR of its own (`B-183: …`) flips it.
+  - **Differed from the plan.** §5 says the stream closes in PF4's PR
+    or in the last chunk to land; it closes in a PR of its own, since
+    PF4's merge waited on the lane P baseline raise and its records were
+    written before the cumulative comparison above could be run. The
+    reserves B-154, B-156 and B-183 all landed; none closes unused.
+  - **Oracles**: in the PR body.

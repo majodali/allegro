@@ -670,9 +670,29 @@ name.
 
 Plan `docs/plans/pilot-findings.md`; lane D; human-gated (lane D keeps
 the per-chunk gate). Opened 2026-11-06 with the plan, active since its
-PR #168 merged on 2026-11-07; entries newest first, directly below this
-line. A second stream in lane D, told apart from the closed `## Stream
-D — the partial-evaluation rules` below by its name.
+PR #168 merged on 2026-11-07, closed 2026-11-09 at PR #(number);
+entries newest first, directly below this line. A second stream in
+lane D, told apart from the closed `## Stream D — the
+partial-evaluation rules` below by its name.
+
+### 2026-11 — The pilot's findings stream closes (B-185)
+
+B-185 (a sampled induction proof reported as discharged), the stream's
+item, closed with the stream on 2026-11-09 at PR #(number), after its
+last chunk, PF4 (B-154 (unit-name shadowing)), merged as PR #179. Every
+clause of the plan's outcome is met and quoted against the code in its
+§7 closing entry: the four findings landed as PR #172 (B-183 (a
+trailing comment breaks a contract body's parse), lane P), #173
+(B-185), #175 (B-156 (short-circuit over an error value)) and #179
+(B-154); no `// expect:` line moved, and the only `verify` verdict
+changes over `tests/*.alg` and `demos/**/*.alg` are the ratified lines
+on `tests/proofs-induction-demo.alg`. The close is status documents
+only. It files three carry-overs, B-191 (a trailing block comment
+breaks the dedent) for lane P, B-192 (the backing union of an
+induction and a `by` proof) and B-193 (`by` read as a unit inside a
+proposition) for lane D, and leaves B-190 (name capture) open for a
+plan of its own. The chapter and IR sentences the four chunks named
+for the book pass are consolidated in the closing entry.
 
 ### 2026-11 — Shipped units resolve in the module first (B-154, chunk PF4)
 
