@@ -674,6 +674,22 @@ PR #168 merged on 2026-11-07; entries newest first, directly below this
 line. A second stream in lane D, told apart from the closed `## Stream
 D — the partial-evaluation rules` below by its name.
 
+### 2026-11 — Shipped units resolve in the module first (B-154, chunk PF4)
+
+B-154 (unit-name shadowing), chunk PF4 of `docs/plans/pilot-findings.md`,
+under ruling R2 (B-154: which fix, and the wider finding) option (b).
+`units_grammar` in `lib/units.alg` gains `unit_atom`: one alternative
+per shipped unit name whose template is the module's own binding, then
+the identifier fallback, so a file that binds `s = 42` still reads
+`30 s` as thirty seconds and the pilot's cycle (`s = solve(plan)` under
+a `30s backoff`) no longer runs unbounded; any other unit name still
+resolves in the file, so a file can define units (U-R2 kept). A suite
+test holds the shipped bindings and the alternatives in step; a new demo
+pins the probes. 204 of 204 corpus outputs identical. The parse counts
+of six load-corpus sources rise (7.0% in `lib/units.alg`, under 4%
+elsewhere), raised by lane P in its own PR; the three web pages'
+generated copies of the library are regenerated, and lane D now holds
+them for that purpose (PR #176).
 ### 2026-11 — Logical operators propagate an error value (B-156, chunk PF3)
 
 B-156 (short-circuit over an error value), chunk PF3 of

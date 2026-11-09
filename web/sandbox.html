@@ -630,11 +630,36 @@ Pa = named(N.div(m.pow(2)), "Pa")
 // \`x = 3\` on one line never glues onto an identifier on the next).
 // Computed magnitudes use the ordinary algebra: \`qty(v, u)\`, \`q.mul(u)\`.
 // Unit expressions: idents, \`·\` or \`*\` products, ONE \`/\`, \`^\` integer
-// exponents. The matched unit idents resolve in the CONSUMER's scope —
-// \`use units\` provides them; a local rebinding of a unit name shadows it.
+// exponents. A shipped unit name (one the SI units section above binds)
+// resolves in THIS module: \`unit_atom\` lists each as a labelled regex
+// whose template is the name itself, and template hygiene binds that
+// name here (B-154 (unit-name shadowing), docs/plans/pilot-findings.md
+// R2 (b)). Any other identifier resolves in the CONSUMER's scope, so a
+// file can define its own units (U-R2); a file can no longer give a
+// shipped name its own meaning inside a literal. A suite test in
+// src/test/proofs.ts holds the alternatives and the bindings in step.
 units_grammar = grammar {
-  rule unit_pow = u:ident "^" e:number   => (u, e) => u.pow(e)
-  rule unit_pow += u:ident               => u => u
+  rule unit_atom = x:/km(?![A-Za-z0-9_])/ => x => km
+  rule unit_atom += x:/cm(?![A-Za-z0-9_])/ => x => cm
+  rule unit_atom += x:/mm(?![A-Za-z0-9_])/ => x => mm
+  rule unit_atom += x:/minutes(?![A-Za-z0-9_])/ => x => minutes
+  rule unit_atom += x:/minute(?![A-Za-z0-9_])/ => x => minute
+  rule unit_atom += x:/min(?![A-Za-z0-9_])/ => x => min
+  rule unit_atom += x:/hours(?![A-Za-z0-9_])/ => x => hours
+  rule unit_atom += x:/hour(?![A-Za-z0-9_])/ => x => hour
+  rule unit_atom += x:/seconds(?![A-Za-z0-9_])/ => x => seconds
+  rule unit_atom += x:/kg(?![A-Za-z0-9_])/ => x => kg
+  rule unit_atom += x:/Pa(?![A-Za-z0-9_])/ => x => Pa
+  rule unit_atom += x:/m(?![A-Za-z0-9_])/ => x => m
+  rule unit_atom += x:/s(?![A-Za-z0-9_])/ => x => s
+  rule unit_atom += x:/h(?![A-Za-z0-9_])/ => x => h
+  rule unit_atom += x:/g(?![A-Za-z0-9_])/ => x => g
+  rule unit_atom += x:/N(?![A-Za-z0-9_])/ => x => N
+  rule unit_atom += x:/J(?![A-Za-z0-9_])/ => x => J
+  rule unit_atom += x:/W(?![A-Za-z0-9_])/ => x => W
+  rule unit_atom += u:ident => u => u
+  rule unit_pow = u:unit_atom "^" e:number   => (u, e) => u.pow(e)
+  rule unit_pow += u:unit_atom               => u => u
   rule unit_prod = a:unit_pow "·" b:unit_prod  => (a, b) => a.mul(b)
   rule unit_prod += a:unit_pow "*" b:unit_prod => (a, b) => a.mul(b)
   rule unit_prod += a:unit_pow           => a => a
