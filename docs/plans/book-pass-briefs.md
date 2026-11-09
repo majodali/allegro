@@ -56,6 +56,14 @@ n. Ratify or strike each term under *Terms introduced*. Default: <...>.
 
 (State "No asks." when there are none.)
 
+**The right decision, not the cheapest change** (ruling R34 (recommend
+the right decision) of the plan, 2026-11-07). A recommendation names the
+option that makes the decision right for the language, judged on the
+decision's own merits and its dependants. The size of the code or
+document change it needs is stated as a cost beside each option, and is
+never itself the reason for a recommendation. A review that keeps a
+decision only because changing it is expensive says so as a finding.
+
 ## What is already covered
 
 <The parts of the chapter that encode decisions already settled, each
