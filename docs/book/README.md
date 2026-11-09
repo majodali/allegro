@@ -64,7 +64,7 @@ A term has one definition site, a heading preceded by
 | II.1 | `allegretto/README.md` | L0 boundary contract |
 | II.2 | `allegretto/structures.md` | Structures, scopes, channels, symbols, kinds: the v2 design |
 | II.3 | *planned* | The kinds and the assembly (units 1 to 9); written when the `Value` union splits (`units.md` §7); until then the spine's T0 and T1 entries are the text |
-| II.4 | `allegretto/metadata-and-capability.md` | The `metadata` and `capability` units: the metadata plane on every value, fields, channels, propagation, writer capabilities, installed meaning, the base's own fields. Definition site of *metadata field*, *channel*, *propagation* and *writer capability* |
+| II.4 | `allegretto/metadata-and-capability.md` | Metadata and the capability to write it, the `metadata` and `capability` units, as eleven decision sections (a dry run, not yet approved): fields are independent; metadata on every value; a field is a name and one propagation rule; origination needs the writer while reads and propagation are free; the fixed propagation vocabulary; writers are closures; trust without a seal; metadata at construction and the slot's owner; one-shot registration; refusal aborts. A final section holds propagation, the base's fields and the installs until their chapters are written. Definition site of *metadata field*, *writer capability*, *integrity field*, *propagation*, *fabricating rule*, *attenuation*, *abort* and, for now, *channel*. Beside it, `metadata-and-capability.ir.md` |
 | II.5 | *planned* | Scope (unit 12), at B-136 (scope leaves `Value`). Futures and the base primitives (units 14 and 15), which follow II.6 in the reading order, are planned too. Until then the spine's T2 entries and its §28 (future cell and completion) are the text |
 | II.6 | `allegretto/evaluator.md` | The `evaluator` unit (13): evaluation, partial evaluation as implemented, application and substitution, tail calls, the scope carve-out, the install surface, the edges the unit still owes. Definition site of *tail call* |
 | II.7 | `extension/README.md` | L1 boundary contract |
@@ -104,4 +104,5 @@ passes and measured rulings behind Part 0 of the spine, moved out
 verbatim 2026-10-20; read for the argument, the outcomes are in
 `concepts.md` Part 0) · `../records/book-pass/f1-readme.md` (record: the
 book pass's review of the root `README.md`, chunk F1 of
-`../plans/book-pass.md`).
+`../plans/book-pass.md`) · `../records/book-pass/p2-allegretto-metadata-and-capability.md`
+(record: the review of the pilot chapter, metadata and the capability to write it).

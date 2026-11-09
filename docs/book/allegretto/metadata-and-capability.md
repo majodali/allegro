@@ -1,479 +1,547 @@
-# Metadata and capability
+# Metadata and the capability to write it
 
-> **Reader.** Someone who has read the Part I chapters and
-> `structures.md`, and now wants to know what a value carries *about*
-> itself, who may put it there, and what evaluation does with it. The
-> chapter is the design truth for two [units](../units.md#def-unit),
-> `metadata` (unit 10) and `capability` (unit 11), and it is the
-> definition site of four terms the rest of the book uses: *metadata
-> field*, *channel*, *propagation* and *writer capability*. Terms used
-> without definition here are defined earlier: [value](../concepts.md#def-value),
-> [representation kind](../concepts.md#def-representation-kind),
-> [Structure](../concepts.md#def-structure), [binding](../concepts.md#def-binding),
-> [plane](../concepts.md#def-plane) and
-> [residual](../concepts.md#def-resolved-unresolved-residual).
+> **Reader.** This chapter is the design truth for two
+> [units](../units.md#def-unit), `metadata` and `capability`. You know
+> [values](../concepts.md#def-value),
+> [representation kinds](../concepts.md#def-representation-kind),
+> [Structures](../concepts.md#def-structure),
+> [bindings](../concepts.md#def-binding),
+> [residuals](../concepts.md#def-resolved-unresolved-residual) and
+> [partial evaluation](../concepts.md#def-partial-evaluation) from
+> earlier chapters.
 >
-> **Authority.** Tier 1. The decisions this chapter executes, all in
-> `docs/decisions.md`: D21 — constructor trust decomposes into write
-> authority, immutability and non-fabricating propagation; D23 — writes
-> are capability-gated, reads free; D24 — the capability is a delegable
-> closure; D47 — the source field; D48(b)(c) — metadata is a field on
-> every kind, supplied at construction. The requirements are
-> [R3](../concepts.md#def-r3) (metadata channels are independent) and
-> [R12](../concepts.md#def-r12) (metadata origination is
-> capability-controlled). Each section carries the status tag
-> `../README.md` defines. The examples are
-> `tests/metadata-channels-demo.alg`, pinned by the suite.
+> **Authority.** Tier 1. The chapter executes five decisions of the
+> register: annotation fields are extensible; writes are gated while reads
+> are free; the capability is a delegable closure; trust needs no seal;
+> metadata rides every kind. The examples are verbatim excerpts of
+> `tests/metadata-channels-demo.alg`, which the suite runs against the
+> demo's `// expect:` lines. The chapter presents ten decisions about
+> metadata in dependency order, each in a
+> [decision section](../preface.md#def-decision-section). A final section
+> holds the content of two chapters not yet written, on how metadata
+> propagates and on installing a layer into the base.
 
-## 1. The two units and the line between them [implemented]
+## Metadata fields are independent [partial]
 
-A value is what it is, and it may also carry named information about
-itself: that it has a type, that it is an error, that a proof discharged
-it, which expression produced it. [R3](../concepts.md#def-r3) requires
-that each such piece of information be handled independently of every
-other, by its own declaration rather than by the operation touching the
-value. [R12](../concepts.md#def-r12) requires that information carrying
-authority be unforgeable by code that does not hold the authority to
-write it.
+Each metadata field is handled by its own declaration, independently of
+every other field. No operation may disturb a metadata field the
+operation does not know about. The independence of metadata fields is a
+[foundational decision](../preface.md#def-foundational-decision) about
+language capability. A <a id="def-metadata-field"></a>**metadata field**
+is a named piece of information that a value may carry about itself,
+such as the value's type, an error, or a proof's discharge.
 
-Two units answer those two requirements, and the line between them is
-the line between a symbol and a meaning:
+The problem is how many [layers](../layers.md#def-layer) can each attach
+information to values without every operation knowing about every layer.
+Without independence, every layer would thread the layer's own
+information through every operation by hand. Layers compose only when an
+operation's treatment of one field does not depend on which other fields
+a value carries. The independence rests on the decision that
+[the base does not know about the layers](../concepts.md#def-r6).
 
-| Unit | File | Holds | Must not know |
-|---|---|---|---|
-| **`metadata`** (10) | `src/metadata.ts` | the field registry (name, rule, integrity), the propagation vocabulary, the free reads, the carry idioms, the base's `source` field, the table of installed merges | what any field *means*: it knows that `effects` merges by `union` and asks the installed merge; it does not know an effect set is a set |
-| **`capability`** (11) | `src/capability.ts` | the minting of writers, one-shot registration, the integrity gate, the gated installation of meaning into the base, the base's own field registrations | nothing about layers either; it is the mechanism by which a layer that owns a field proves it |
+Statements saying only which fields survive an operation were the
+alternative, and were merged into this decision. A survival-only
+statement cannot say what matters under a `drop` rule: no operation may
+drop a field the operation has never heard of. The reason for
+independence, that layers compose, holds for any evaluator, partial or
+not.
 
-`capability` imports `metadata`; `metadata` never imports `capability`.
-The registry is a table that `capability` mints into (`defineMetaField`
-is exported for that one caller), so authority is created in exactly one
-unit. Nothing below the base imports either unit, and every unit of
-Allegro Standard reaches the base through these two rather than through
-a kind's representation (`units.md` §5): that is
-[R6](../concepts.md#def-r6), the base does not know about the layers,
-stated as a graph property.
+As a consequence, a layer can register a new field without a change to
+any operation of the base. Where a value's fields are stored is a
+separate decision, the next one in this chapter.
 
-Both units sit above `kinds`, the assembly of the seven representation
-kinds, because the `meta` slot they manage is on every kind. D51 (`Value`
-is a contract, seven kind units and one assembly) says the slot is *not*
-part of the `Value` contract: the `metadata` unit mixes it
-in by declaration merging, and the kind units never name it. Today the
-slot is still declared in `src/types.ts` (`MetadataBearing`), which is
-the `types.ts` split that `units.md` §7 schedules; the representation is
-the same either way.
+As implemented, the `metadata` unit, in `src/metadata.ts`, holds the
+field registry and the generic propagation code that serves every field
+alike. Today `viralOnto` in `src/metadata.ts` carries only the first
+viral field found, on the first candidate value that carries one. A user
+field registered `viral` therefore erases `error` from a result whose
+earlier operand carries the user field. The decision requires `viralOnto`
+to carry every viral field, each field at the field's first occurrence.
 
-## 2. The metadata plane on every value [implemented]
+To try another independence rule, change the propagation functions in
+`src/metadata.ts`, through which every field's propagation passes.
 
-Every representation kind carries an optional `meta` slot, a map from
-field name to value (IC-3, implementation choice 3 in `concepts.md`
-Part 0; D48(b)). A typed `42` is a `Bits` with a `type` field in its
-`meta`, not a wrapper around a `Bits`. A value that carries nothing has
-the slot undefined, so plain contexts and scopes pay nothing.
+## Metadata is a field on every value [implemented]
 
-Metadata is supplied at construction, not attached afterwards (IC-3a,
-D48(c)). The factories take an optional metadata argument; `withMeta` in
-`src/types.ts` is the one attachment operation and yields a new value of
-the same kind, deriving a Structure and cloning a leaf; `carryMeta` in
-`src/metadata.ts` moves one value's metadata onto a value derived from
-it. Writing the slot in place is permitted only while the value is
-provably unshared, during construction and before it escapes; after
-that, derive. `src/structure.ts` states the rule and why. The one
-sanctioned in-place case on this plane is `writeShape` in
-`src/metadata.ts`, which stamps a type Context's `type` field on a
-Context that has just been minted and not yet escaped: type Contexts are
-identity-sensitive (memoised generics, law registries), so deriving a
-new one is not an option, and every call site stamps before anything
-else can hold the value.
+Every [representation kind](../concepts.md#def-representation-kind)
+carries an optional metadata map, so a typed `42` is a Bits value with a
+`type` field. Attaching metadata to a value yields a new value of the
+original value's kind. The field on every kind is a foundational decision
+about language capability, since every metadata read, every write and
+every [residual](../concepts.md#def-resolved-unresolved-residual)'s
+propagated fields rest on the field.
 
-Reads are free (D23). `metaReadRaw(v, name)` answers the field or
-`undefined` and demands nothing of the caller; `metaOf(v)` is the
-read-only view; `metaFieldList(v)` names the fields present. From
-Allegro, `channel_read(value, name)` and `channel_list(value)` are the
-same reads, answering `none` for an absent field:
+The problem is where a value's metadata lives, given that metadata
+belongs to one occurrence of a value. One option wraps a non-composite
+value in a transparent carrier [Structure](../concepts.md#def-structure)
+that holds the fields. A carrier is a second value, so every operation
+must tell the carrier from the value the carrier wraps. A side table
+keyed by the host object fails, because one object can occur at two
+positions with different metadata. The field on every kind was taken
+because metadata then rides each occurrence of a value with no wrapper
+to see through.
+
+One consequence: attaching metadata to an interned
+[Symbol](../concepts.md#def-symbol) clones the Symbol, which breaks the
+Symbol's identity by fully-qualified name. The host warns when metadata
+is attached to an interned Symbol, without refusing the attachment.
+
+As implemented, `MetadataBearing` in `src/types.ts` declares the optional
+`meta` slot, and all seven kind interfaces extend `MetadataBearing`.
+`withMeta` in `src/types.ts` returns a new value of the input's kind,
+deriving a Structure and cloning every other kind. A value that carries
+nothing leaves the slot undefined, so plain values pay nothing.
+
+To explore, note that replacing the slot with another storage changes
+`withMeta`, the free reads in `src/metadata.ts` and every factory that
+takes metadata.
+
+## A field is a name and one propagation rule [implemented]
+
+A field is declared by registering a name and one propagation rule. An
+extension registers the fields the extension needs, and the base fixes
+no set of fields. Registration by extensions is a foundational decision
+about language capability, since every field registers this way.
+
+The problem is who decides which fields exist. A fixed set of annotation
+fields in the base was the alternative. A fixed set would have the base
+know which layers exist, which the decision that the base does not know
+about the layers forbids.
+
+As implemented, `registerMetaField` in `src/capability.ts` takes a
+specification holding a name, a rule and an optional integrity flag.
+`MetaFieldSpec` in `src/metadata.ts` also holds an optional binding key,
+for the one field stored among a Structure's
+[bindings](../concepts.md#def-binding). Registrations sit in the modules
+that own the fields: `src/capability.ts`, `src/types-std.ts`,
+`src/effects.ts`, `src/refinements.ts`, and `channel_register` in
+`src/primitives.ts` for Allegro code.
+
+To explore, another registration surface, such as one registration for a
+group of fields, replaces `registerMetaField` and the calls of
+`registerMetaField`.
+
+## Originating a field value needs the writer; reads and propagation need nothing [partial]
+
+Allegro code originates a field value only through the field's writer.
+Authority is the writer held, not the field's name. Host kernel modules
+are trusted, and write fields through the accessor layer. Reading a field
+needs no authority, and neither does propagation. The origination rule
+and the free reads are foundational decisions about language capability.
+A <a id="def-writer-capability"></a>**writer capability**, or writer, is
+the closure, returned by a field's registration, that originates a value
+of the field on a value. An <a id="def-integrity-field"></a>**integrity
+field** is a field registered with `integrity`, whose origination
+requires the field's writer and whose rule may not fabricate.
+
+The problem is how a field can carry authority, such as a proof's
+discharge, when any code can name the field. Metadata that anything can
+write cannot be evidence. Introspection and the prover protocol need
+every field readable by any code. Which fields need protection is a
+layer's decision, so the base must not list the protected fields.
+
+Carrying trust by a field's name fails, because any code that names the
+field could then counterfeit the field's values. Authority carried by
+holding the writer closure needs no list of protected fields. As a
+consequence, a proof's `discharged` field is evidence, because only the
+holder of the field's writer can originate the field.
+
+As implemented, the battery in `src/boundary-tests.ts` refuses Allegro
+code that originates `discharged` without the writer, by an object
+literal or by re-registration. A free read cannot become a write: a
+writer for one field cannot reach `discharged`. `metaReadRaw` in
+`src/metadata.ts` and `channel_read` in `src/primitives.ts` read a field
+without demanding anything of the caller. `assertNotIntegrityKey` in
+`src/capability.ts` refuses, on user-reachable construction paths, the
+binding keys under which integrity fields are stored.
+
+The first example in `tests/metadata-channels-demo.alg` registers a field
+named `audit`, writes the field on `42` and reads the field back with no
+authority.
 
 ```
 audit = channel_register("audit", "union")
 v = audit(42, "checked")
-print(channel_read(v, "audit"))     // checked
-print(v)                            // 42
-print(channel_read(42, "audit"))    // none
-print(channel_list(42))             // [type]
+print(channel_read(v, "audit"))
+// expect: checked
+
+// The field rides on the value; the value is still 42.
+print(v)
+// expect: 42
+
+// A value that does not carry the field answers `none`.
+print(channel_read(42, "audit"))
+// expect: none
+
+// `channel_list` names the fields a value carries. A plain typed literal
+// carries only its `type`.
+print(channel_list(42))
+// expect: [type]
 ```
 
-Two reads are not plain lookups, and `metaReadRaw` serves both without
-naming a field. `shape` is a projection of `type` with the
-member-transparent refinement layers walked off, computed on read rather
-than stored twice: the type system installs it (§7) and the base serves
-the name. `discharged` is stored on the binding plane of a Structure
-under a registered slot key rather than in `meta`, because the proof
-kernel predates the universal `meta` slot: the base finds it through its
-registration's `bindingKey` and reads it through the accessor layer. The
-read order is the value's own `meta`, then a registered binding-plane
-slot, then an installed projection. The binding-plane storage itself is
-an item of B-104 (retiring the `__*` slot names).
+The kernel's trust is used widely. `withType` in `src/types-std.ts`
+writes `type` through `withMeta`, without the `type` writer. `writeShape`
+in `src/metadata.ts` writes `type` in place, from 23 call sites outside
+the `metadata` unit. `withSource` in `src/metadata.ts` writes `source`
+without a writer, while the writer minted for `source` is discarded at
+registration. Any module can take any field's writer from
+`metaFieldEntry` in `src/metadata.ts`. Only `discharged` is written
+through the field's writer, in `makeProof` in `src/types-std.ts` and in a
+failed proof's construction in `src/primitives.ts`. A boundary lint
+admits calls of `kernelFieldWriter`, the kernel's acquisition path in
+`src/capability.ts`, only in `src/types-std.ts`, `src/primitives.ts` and
+`src/runtime.ts`.
 
-<a id="def-metadata-field"></a>
-## 3. Metadata field [implemented]
+Whether kernel origination should also go through writers is an
+[open decision](../preface.md#def-open-decision). Routing kernel
+origination through writers has `withType` and `withSource` take their
+writers, with `metaFieldEntry` offering a check of possession instead of
+the writer. It also needs a writer for `writeShape` that stamps in place.
+The cost is about 190 call sites, most of them calls of `withType`, in
+five source files.
 
-**Definition.** A *metadata field* is one named slot of the metadata
-plane, with a **declared propagation rule** (§5) and a **writer
-capability** (§6). Registration is one-shot: the first registrant
-receives the writer and no one else can obtain it. Reads are free.
+Whether a field may restrict the field's reads is a second open decision.
+`readVisibility` on `MetaFieldSpec` in `src/metadata.ts` records a read
+policy that no code sets or enforces.
 
-**Rationale.** One-shot registration is what lets R12 hold without the
-base keeping a list of which fields matter. Authority is *the writer*,
-not the name, so "who may write `discharged`" is answered by possession
-rather than by a list the base would have to maintain, and would have to
-be told to maintain, which R6 forbids.
+To contribute an option to either open decision, branch
+`src/capability.ts` and `src/metadata.ts`, where registration, writers
+and reads live.
 
-**As implemented.** `MetaFieldSpec` in `src/metadata.ts` is the
-registration: `name`, `rule`, an optional `integrity` flag (origination
-requires the writer; §6), an optional `bindingKey` for the one field
-stored on the binding plane, and a recorded-but-unenforced
-`readVisibility`. `registerMetaField(spec)` in `src/capability.ts` mints
-the writer and inserts a `MetaFieldEntry` (spec, writer, registration
-epoch, whether Allegro minted it) into the table; `metaFieldSpec(name)`
-and `metaFieldEntry(name)` read it back. The epoch exists because the
-evaluation loop legitimately re-evaluates a top-level binding within one
-pass: re-registration from Allegro with the same rule in the same pass
-returns the held writer, and any later pass is refused. Kernel
-registrations use epoch −1 and never re-issue. `bumpMetaEpoch` is called
-at the start of each `evalSource` pass in `src/runtime.ts`.
+## A fixed vocabulary of propagation rules [partial]
 
-```
-again = channel_register("audit", "union")   // same pass, same rule
-print(channel_read(again(1, "x"), "audit"))  // x — the held writer came back
-```
+A field's rule is one of four: `viral`, `union`, `computed` and `drop`.
+Registration refuses any rule outside the four rules of the vocabulary.
+An [integrity field](#def-integrity-field) may register only `drop` or
+`computed`. The base applies a field's rule without knowing the field's
+meaning. The semantics a rule needs, such as the merge for `union`, are
+installed by the field's owner. The vocabulary is a foundational decision
+about language capability.
 
-**Who registers what.** The base owns the mechanism and each layer owns
-its fields (R6), so a field is registered where its concept lives:
+<a id="def-propagation"></a>**Propagation** is what an operation does
+with the metadata fields of the operation's operands when the operation
+produces a result, as each field's rule says. Under `viral`, a result
+carries the field when any operand carries the field, each viral field at
+the field's first occurrence. Under `union`, the operands' values of the
+field are combined by the merge the field's owner installed. Under
+`computed`, the field's owner derives the field at the sites the owner
+annotates. Under `drop`, a derived value never carries the field. A
+<a id="def-fabricating-rule"></a>**fabricating rule** is a propagation
+rule that places a field value on a result where no writer put the
+value: `viral` or `union`.
 
-| Field | Rule | Integrity | Registered by | Serves |
-|---|---|---|---|---|
-| `source` | `drop` | yes | `src/capability.ts` | provenance (§8) |
-| `error` | `viral` | | `src/capability.ts` | error propagation (§8) |
-| `type` | `computed` | yes | `src/types-std.ts` | typing |
-| `shape` | `computed` | | `src/types-std.ts` | typing, as an installed projection of `type` (§7); nothing stores it |
-| `discharged` | `drop` | yes | `src/types-std.ts`, stored under a binding-plane key | proof |
-| `effects` | `union` | | `src/effects.ts` | effect analysis; installs the merge |
-| `predicates` | `computed` | | `src/refinements.ts` | knowledge; installs the facts merge (§7) |
-| `domain` | `computed` | | `src/refinements.ts` | knowledge |
-| `bound` | `drop` | | `src/refinements.ts` | knowledge, the occurrence bound |
-| `knowledge` | `computed` | | `src/capability.ts`, no owner | nothing stores it; its storage *is* `predicates`, `domain` and the refinement layers |
-| `warnings` | `union` | | `src/capability.ts`, no owner | nothing writes it |
-| `exported` | `drop` | | `src/capability.ts`, no owner | nothing; visibility is a property of the binding |
+The problem is how a field declares what operations do with the field,
+in a form the base can check. Arbitrary propagation closures, one per
+field, were the alternative. A closure is not inspectable, so
+registration could not refuse a fabricating closure on an integrity
+field. Over a fixed vocabulary, refusing a fabricating rule is a check of
+one rule name against two names. A discipline the vocabulary cannot
+express extends the vocabulary instead of opening the vocabulary to
+closures.
 
-The boundary battery pins this table ("field ownership", in
-`src/boundary-tests.ts`) so that a field cannot drift back into the base
-without the move being a visible change.
+You can run the refusal. In the battery's forgery scenario C, registering
+an integrity field with `viral` is refused. The command
+`ALLEGRO_TEST_FILTER="forgery C" npm test` runs the scenario C experiment
+again. As a consequence, the integrity check stays decidable whatever
+fields the layers register.
 
-**Delta.** The last three rows are registrations without an owner, and
-each is a finding rather than a relocation: one is a capability with no
-storage, one is unused, one outlived its concept. **B-111** (field versus
-channel registration) says what they are before they can move. The
-`bindingKey` storage of `discharged` and the `shape` projection inside
-`metaReadRaw` are the two name-specific reads §2 records.
+As implemented, `registerMetaField` in `src/capability.ts` refuses a
+fabricating rule on an integrity field. `registerMetaField` does not
+check that a rule belongs to the vocabulary. `channel_register` in
+`src/primitives.ts` passes the rule string through unchecked, so
+`channel_register("x", "nonsense")` registers a field that behaves as
+`drop`. `PropagationRule` in `src/metadata.ts` still lists a fifth rule,
+`positional`, that no field registers and no code applies.
 
-<a id="def-channel"></a>
-## 4. Channel [implemented]
+To try an open vocabulary, accept a closure in `MetaFieldSpec` and apply
+the closure where `viralOnto` and `mergeOverMeta` apply the rules.
 
-**Definition.** A *channel* is the whole apparatus by which one
-capability of the language rides values through
-[partial evaluation](../concepts.md#def-partial-evaluation): **one or
-more metadata fields**, their propagation rules, their writer, and the
-layer-side code that interprets them. Typing is a channel. Effect
-analysis is a channel. Proof discharge is a channel. A field is
-storage; a channel is a feature built on storage.
+## A writer is a closure [implemented]
 
-**Rationale.** [R3](../concepts.md#def-r3) says a layer's information
-rides on values independently, and a channel is what one layer's
-participation actually consists of, which is more than a slot. The
-distinction is not cosmetic: a capability may need several fields
-(knowledge needs three), a field may be read through more than one
-projection (`shape` over `type`), and a channel may have no field of
-its own at all (`knowledge`).
+A [writer](#def-writer-capability) is a closure returned by
+registration. Delegation is passing the writer, and attenuation is
+wrapping the writer in a re-checking closure. A writer holds no data,
+prints as the writer's field's name, and cannot be compared from Allegro.
+The host's gates compare writers by identity. The writer's shape is a
+foundational decision about language capability, since every gated
+install checks a writer's identity.
+<a id="def-attenuation"></a>**Attenuation** is wrapping a writer in a
+closure that checks each write before passing the write on.
 
-**As implemented.** The table in §3, read by column: the *Serves*
-column names the channels, and a channel is the set of rows that name
-it plus the module that registers them. There is no channel-level
-registration in the code. Each layer registers its fields one by one at
-module init and installs its merges one by one; what makes those
-registrations one channel is that one module performs them.
+The problem is what form the authority to write a field takes. Authority
+ambient in a scope was rejected, because ambient authority is recoverable
+from tokens as a usage pattern, while a move from ambient authority to
+tokens would break programs. A separate `channel_write` primitive was
+rejected, because the writer is the write operation. A writer as a value
+can be tracked through
+[partial evaluation](../concepts.md#def-partial-evaluation) like any
+other value.
 
-**Delta.** The code has field registration and no channel registration.
-A registration that says *these fields, these rules, this semantics, this
-owner* is **B-111**'s shape, and it is also where the three ownerless
-rows of §3 are decided, since deciding what `knowledge` is means saying
-which channel it belongs to.
+Two consequences follow. An Allegro writer cannot install a merge, so a
+user `union` field never merges. Module-private authority is a usage
+pattern: a module keeps the writer in a private binding and never
+exports the writer.
 
-<a id="def-propagation"></a>
-## 5. Propagation [partial]
+As implemented, `channel_register` in `src/primitives.ts` returns the
+writer as a [primitive function](../concepts.md#def-primitivefunction)
+that closes over the host writer, branded with the field's name. A
+writer for a field named `audit` prints as
+`<primitive:<channel:audit writer>>`. `channel_attenuate` in
+`src/primitives.ts` wraps a held writer in a closure that evaluates a
+predicate on the field value before writing. `channel_attenuate` refuses
+a first argument that carries no writer's brand. Comparing two writers
+with `==` from Allegro fails, because equality expects Bits values.
+`holdsWriterFor` in `src/capability.ts` compares a writer with the
+registered writer by identity. The battery in `src/boundary-tests.ts`
+finds a module-private writer unreachable through every export surface.
 
-**Definition.** A field's *propagation rule* says what an operation does
-with that field, drawn from a **fixed, inspectable vocabulary** (SC-7,
-specification choice 7 in `concepts.md` Part 0):
-
-| Rule | Meaning |
-|---|---|
-| `viral` | present on any argument, present on the result; the first occurrence wins |
-| `union` | the arguments' values are combined by the merge the field's owner installed |
-| `computed` | the field's owner derives it at the sites it annotates; the generic table does nothing |
-| `positional` | reserved; no field registers it and no path applies it |
-| `drop` | never carried forward; a derived value does not have it |
-
-The base applies the rule without knowing what the field means. The
-semantics a rule needs, a merge for `union`, are installed by the field's
-owner (§7).
-
-**Rationale.** The vocabulary is fixed rather than open, and the reason
-is R12, not convenience. `registerMetaField` refuses a `viral` or `union`
-rule on an integrity field, because those rules **fabricate**: they
-place a value on a result that no holder of the writer put there. That
-refusal is decidable only over an inspectable symbol. Over a registered
-closure it is unwritable, and R12 degrades from enforced to hoped-for.
-The argument is in `docs/records/concepts-analyses.md` §4.2. `union` is
-in the vocabulary because effect sets union and knowledge meets; a
-discipline the vocabulary cannot express extends the vocabulary rather
-than opening it to closures.
-
-**As implemented.** `PropagationRule` in `src/metadata.ts`;
-`viralFields()` and `unionFields()` are cached filters over the registry,
-invalidated by registration. The two generic rules are this unit's,
-in `src/metadata.ts`, and the evaluator calls them at its three
-application sites: `viralOnto` carries the first viral field found on
-the callee or any argument onto the residual (and that candidate's
-`type` with it, a name B-145 (type vocabulary) owns);
-`mergeOverMeta` merges the fields a value carries onto the value it
-re-evaluates to, applying the installed merge where the rule is `union`
-and letting the inner value's field win otherwise. `drop` needs no code:
-nothing carries the field, and forgery scenario C in the boundary
-battery pins that `discharged` never propagates. `computed` fields are
-derived at annotated evaluator sites, which is what the word means.
-
-```
-e = make_error("boom")
-print(channel_read((e + 1) * 2, "error"))          // boom   — through primitives
-sq = x => x * x
-print(channel_read(sq(e), "error"))                // boom   — through a user function
-print(channel_read(if e then 1 else 2, "error"))   // boom   — through a conditional's test
-
-note = channel_register("note", "drop")
-n = note(7, 1)
-print(channel_read(n, "note"))                     // 1
-print(channel_read(n + 1, "note"))                 // none   — drop
-```
-
-**Delta.** Three gaps, one owner each.
-
-- The rule and the path are not yet one mechanism. `union` is applied
-  generically only when a field-carrying value re-evaluates
-  (`mergeOverMeta`); the `effects` field rides its own inference path
-  inside the evaluator (the primitive's static tags, a parameter's bound,
-  the precompile stash), so a user-registered `union` field written on a
-  leaf does not survive `v + 1` the way `effects` does, and the generic
-  rule cannot take the path over because the base cannot encode an
-  effect set. `assertPropagationTableLinkage` in the evaluator pins the
-  bespoke paths against the registry so the two cannot drift apart
-  silently. That path and the knowledge interpretation beside it are the
-  evaluator's two remaining imports from Allegro Standard, visible as
-  violations in the `units` report and owned by **B-146** (knowledge
-  propagation).
-- `positional` is vocabulary without a path. It stays until a field
-  needs it; the alternative, removing it, is a maintainer decision.
-- The `computed` rule's "annotated sites" are the evaluator's L2
-  imports (`units.md` misalignment M11 (the evaluator holds type-system activities)),
-  which B-112 chunks C2 to C4 replace with installed hooks.
-
-<a id="def-writer-capability"></a>
-## 6. Writer capability [implemented]
-
-**Definition.** The authority to *originate* a field value is a closure
-handed to whoever registered the field. Reads require nothing (D23).
-Origination on a user-reachable construction path is refused unless the
-writer is held. The capability is the closure itself (D24): delegable by
-passing it, attenuable by wrapping it, and unconstructible from
-Allegretto, which cannot make a host closure.
-
-**Rationale.** Metadata that anything can write cannot be evidence (R12).
-Trust is global and structural, with no per-value brand bit (D21): a
-value carrying `discharged` is trustworthy because nobody without the
-capability could have originated it, the data under it is immutable, and
-the field's rule is non-fabricating. Denial is an **abort, not an error
-value** (SC-8, specified aborts, class C): an error value would be
-forgeable, since the forger chooses what to do with it.
-
-**As implemented.** `MetaFieldWriter` in `src/metadata.ts` is the type:
-a `channel` name and a `write(target, fieldValue)` operation. The type
-lives in the `metadata` unit because the table stores it and the gated
-installs (§7) check it by identity; the minting is `buildWriter` in
-`src/capability.ts`. A writer for a metadata-plane field clones the
-target's `meta`, sets the field and derives a new value through
-`withMeta`; the writer for the one binding-plane field stamps the
-registered slot on a Structure in place, on a fresh kernel value.
-
-Four surfaces hand out or guard writers:
-
-- `registerMetaField(spec)` mints and returns one, once (§3).
-- `kernelFieldWriter(name)` is the host kernel's acquisition path; the
-  boundary lint fails any call site outside `src/types-std.ts` and
-  `src/primitives.ts`.
-- From Allegro, `channel_register(name, rule)` returns the writer as a
-  `PrimitiveFunction` branded with its field name, and
-  `channel_attenuate(writer, predicate)` wraps a held writer in one that
-  evaluates the predicate on the field value first and halts on
-  rejection. Writers are non-serialisable, print redacted and
-  identity-equal only, so cross-process trust bottoms out in
-  re-verification, never transported authority. Module-private authority
-  is a usage pattern: capture the writer in a private binding and never
-  export it.
-- `assertNotIntegrityKey(key, site)` guards the user-reachable
-  construction paths. It reads the registry, not a name list: the keys
-  it refuses are the binding-plane storage keys of fields registered
-  with `integrity`. An object literal writes the binding plane and
-  cannot originate a metadata field at all, so a record may freely name
-  a field `type`, `source` or `discharged`; what stays refused is the
-  storage key `__discharged`.
+The attenuation example in `tests/metadata-channels-demo.alg` writes
+through a writer that admits only `"ok"`.
 
 ```
 ok_only = channel_attenuate(audit, x => x == "ok")
 good = ok_only(5, "ok")
-print(channel_read(good, "audit"))   // ok
-ok_only(5, "nope")                   // halts: attenuation predicate rejected the write
+print(channel_read(good, "audit"))
+// expect: ok
 ```
 
-The soundness battery is forgery scenarios A to G in
-`src/boundary-tests.ts`, all live: (A) originating `discharged` without
-the writer is refused; (B) a proof's proposition cannot be swapped under
-`discharged`; (C) `discharged` never propagates; (D) a free read cannot
-be written back onto a fake; (E) a module-private writer is unreachable
-through every export surface; (F) the writer cannot be forged, by
-re-registration or by attenuating a look-alike; (G) the metadata write
-surface is exactly the minted writers, since the unguarded `mv_set` path
-was deleted (B-125).
+To try another shape for authority, replace `buildWriter` in
+`src/capability.ts` and the writer primitives in `src/primitives.ts`.
 
-**Delta.** `readVisibility` is recorded on the registration and
-enforced nowhere; reads are free for every field. Whether a field may
-restrict its reads is the question that ruling V-R7 (reflection: flags
-free, value-bearing reads need possession evidence) settled for
-reflection and no item owns for fields.
+## Trust without a seal [partial]
 
-## 7. Installing meaning into the base [implemented]
+No seal primitive or per-value brand marks a value as trusted. Trust in
+a constructed value decomposes into three legs: write authority over the
+value's [integrity field](#def-integrity-field), immutability of the
+value's data, and a non-fabricating rule. Trust in a constructed value is
+global and structural. Trust without a seal is a foundational decision
+about language capability.
 
-The base holds symbols; a layer installs what they mean. That is
-the plane-interfaces plan's principle P2 (the layer installs, the base
-never imports), and this unit holds its first six instances. All are
-gated by the same rule, its principle P4 (capability-gated
-registration): an install is authority, so the installer proves
-ownership by holding the field's writer. The gate is identity
-against the table, `metaFieldEntry(name).writer === writer`, so a
-structurally similar object is not the capability (D24).
+The problem is how a reader of a value knows the value came from a
+trusted constructor. A `seal` operation was superseded, because the
+operation was only ever conceptual. A provenance tag on each value was
+rejected. Each of the three legs is needed for the leg's own reason, so a
+seal would duplicate what the legs already give.
 
-- **`installFieldMerge(writer, merge)`** in `src/capability.ts` defines
-  how two values of the writer's field combine under `union`, by
-  writing into the `FIELD_MERGES` table that `fieldMerge(name)` serves to
-  the evaluator. `src/effects.ts` is the one caller and installs effect
-  union with the writer it minted. Before the gate, any module could
-  install a merge for any field by name, and so any module could decide
-  what merging `effects` meant.
-- **`installFieldCheck(writer, check)`** in `src/capability.ts` defines
-  how an argument is checked against a declared constraint that names the
-  writer's field. A check receives the expected type, the argument, a free
-  reader over every field (ruling 1 of the plan: checks are not
-  independent, so a check may consult other fields) and the site (the
-  argument's position, the parameter as an opaque handle, an evaluator
-  bound to the site's context). The evaluator runs every installed check
-  at a typed call site and throws if none is installed; it does not know
-  which field matters. `src/types-std.ts` installs the `type` check
-  (structure, generics, futures, refinement predicates); `src/effects.ts`
-  installs the `effects` check (the effect bound on an effect type or on
-  the parameter).
-- **`installDispatch(writer, dispatch)`** in `src/capability.ts` defines
-  how the evaluator dispatches on the writer's field: at a primitive
-  application (the dispatcher may type a residual whose operand is
-  unresolved, or answer instead of the primitive) and at a composed call
-  (the dispatcher binds the callee's declared constraints to the
-  arguments, running the base's check loop, and returns the context, the
-  substituted arguments and a result finisher). A dispatcher declines
-  with null and the base proceeds as Allegretto, so nothing installed is
-  not an error. `src/types-std.ts` installs both entry points: operator
-  and equality dispatch behind the member gates, and call-site
-  unification.
-- **`installProjection(writer, project)`** in `src/capability.ts` defines
-  how the writer's field is computed on read when nothing stores it. A
-  projection receives the value and the free reader, so it can be built
-  from any field. `src/types-std.ts` installs `shape` over `type`, using
-  the refinement-chain walk `typeShape` that lives in `src/refinements.ts`
-  (where knowledge ends and shape begins is that unit's line).
-- **`installAnalysis(writer, question, answer)`** in `src/capability.ts`
-  is the crossing in the other direction: a unit low in the dependency
-  order needs the result of an analysis only a higher unit can compute.
-  The producer installs the answer under a question about a field, and
-  the consumer reads it by name through `analysisOf`. Two questions exist,
-  both about `effects`: `inferred` (what effects does this function have),
-  installed by the type primitives, and `diverges` (may it diverge),
-  installed by the pipeline once per compilation, answering null until
-  its analysis has run. The equality-law and invariant gates in
-  `src/types-std.ts` read both and error if either is missing once a
-  compilation has begun.
-- **`installFactsMerge(writer, merge)`** in `src/scope.ts` is the same
-  gate guarding one install into the scope unit: how facts about a name
-  combine across scope layers. `src/refinements.ts` installs it with the
-  `predicates` writer. The facts plane itself belongs to the scope
-  chapter; what belongs here is that the gate is this unit's and the
-  check runs through `metaFieldEntry`, so the scope unit imports the
-  registry and never the owner.
+As a consequence, a value carrying `discharged` is trustworthy for three
+reasons: no code without the writer originated the field; the data under
+the field is immutable; `drop` never fabricates the field.
 
-The boundary battery pins the gates ("merge installation is
-capability-gated", "check installation is capability-gated", "dispatch
-installation is capability-gated", "projection installation is
-capability-gated", "analysis installation is capability-gated"): a
-foreign writer is refused by each installer, the holder's merge is the
-one served, the facts merge installs once, a check for a field the base
-has never heard of runs at a typed call site, a dispatcher for such a
-field answers an operator application, a projection for such fields
-reads through the free reader, and both `effects` analyses are present
-after a typed compilation.
+As implemented, forgery scenarios A, B and C in `src/boundary-tests.ts`
+test the three legs: the writer, immutability, and the non-fabricating
+rule. The immutability leg is declared, not enforced: no check stops an
+in-place write after a value escapes. The writer for `discharged`, the
+one field stored among a Structure's bindings, stamps the field in place
+on a fresh kernel value.
 
-**Delta.** A fact is a host `PredicateSet` object, not an encoded value,
-so the facts merge is a second function beside the `predicates` field's
-value-merge rather than the field merge read back through the
-propagation table. **B-146** (knowledge propagation) decides whether the
-two become one. The other installs the base owes, dispatch, check and
-projection, are **B-112** chunks C2 to C4.
+To try a seal, add a sealing primitive to `src/capability.ts` and a check
+of the seal where `discharged` is read.
 
-## 8. The base's own fields [implemented]
+## Metadata supplied at construction, in a slot the metadata unit owns [partial]
 
-The base registers a field only if the concept it serves survives in
-Allegretto, and that test was run rather than argued: `make_error` and
-`source of` both work under `--base`. Two fields pass.
+Factories take an optional metadata argument, so a value never exists
+without what the value must carry. `withMeta` is the one attachment
+operation. `carryMeta` moves metadata onto a value derived from the
+source value. The `meta` slot is not part of the contract every value
+meets: the `metadata` unit adds the slot to every kind, and no kind unit
+reads the slot. The construction surface and the slot's placement are
+[swappable decisions](../preface.md#def-swappable-decision) about
+implementation.
 
-**`error`** is `viral`, with a public writer: `make_error(text)`
-originates it, and §5's examples show it riding every derived result.
-That reproduces automatic error propagation without a special form; an
-error-carrying `if` condition propagates the error rather than taking a
-branch.
+The problem is when metadata reaches a value, and which unit owns the
+slot that holds the metadata. Constructing a value and then attaching
+metadata is the alternative, in which the value exists for a moment
+without the value's metadata. Four named operations, create, derive, map
+and stamp, are a second alternative to one operation with two
+conveniences. Supplying metadata at construction saves one allocation on
+the residual path of PE Rule 1. Writing the slot in place is permitted
+only while the value is provably unshared, during construction and before
+the value escapes.
 
-**`source`** carries the originating Expression of a value (D47;
-`structures.md` §3.1 is the design). It is `drop`, because a derived
-value was not produced by the recorded expression and propagating it
-would fabricate provenance. Its writer is kernel-private: `withSource` in
-`src/metadata.ts` is not a primitive, and only the evaluator attaches it,
-at call sites of source-aware primitives and on resolved top-level
-bindings. It is an integrity field so that no doctored source can make a
-verdict display a different proposition from the one checked. Reads are
-`sourceOf` in the kernel and `source of x` in the language, which is
-observe-tagged (D47(e)) and renders the expression as text.
+As implemented, `makeBits`, `makeInt`, `makeFloat`, `makeSymbol` and
+`makeExpr` in `src/types.ts` take metadata. `makePrimitive`, `makeParam`,
+`makeComposedFn` and `makeStructure` in `src/types.ts` take no metadata.
+`carryMeta` in `src/metadata.ts` shares the source value's map with the
+derived value, without copying the map. `writeShape` and
+`removeShapeSlot` in `src/metadata.ts` change a type's `type` field in
+place, on type Structures minted and not yet escaped. The slot is not yet
+mixed in: `MetadataBearing` and `withMeta` are declared in
+`src/types.ts`, which the unit manifest maps to ten units.
 
-## 9. Where the code is, and what pins it [implemented]
+To explore, splitting `src/types.ts` along the unit manifest moves the
+slot and `withMeta` into the `metadata` unit.
 
-| What | Where |
-|---|---|
-| The registry, the vocabulary, the free reads, the carry idioms, the merge table | `src/metadata.ts` |
-| Writers, registration, the integrity gate, `installFieldMerge`, `installFieldCheck`, `installDispatch`, `installProjection`, `installAnalysis`, the base's fields | `src/capability.ts` |
-| The `meta` slot and `withMeta` | `src/types.ts` (owed to this unit by the `types.ts` split) |
-| The two generic rules applied, `viralOnto` and `mergeOverMeta` | `src/metadata.ts` |
-| The linkage assertion; the check loop `checkArg`; the dispatcher loops; the bespoke `effects` and knowledge paths (B-146) | `src/evaluator.ts` |
-| The Allegro surface: `channel_register`, `channel_read`, `channel_list`, `channel_attenuate` | `src/primitives.ts`, "Channel plane" |
-| Forgery scenarios A to G, field ownership, the two gates, the differential propagation fixtures | `src/boundary-tests.ts` |
-| The examples above, pinned by `// expect:` | `tests/metadata-channels-demo.alg` |
-| The storage plane reached only through the accessor layer, which includes `src/metadata.ts` | `npm run lint:planes` |
+## Registration is one-shot within a pass [implemented]
+
+The first registrant of a field receives the field's
+[writer](#def-writer-capability), and no one else can obtain the writer.
+The exception to one-shot registration is Allegro re-registration with an
+identical rule within one evaluation pass, which returns the held writer.
+Kernel registrations never re-issue a writer. One-shot registration is a
+swappable decision about language capability, held inside the
+`capability` unit.
+
+The problem is who can obtain a field's writer. One-shot registration
+lets origination control hold without the base keeping a list of the
+fields that matter. Re-issue within a pass exists because the evaluation
+loop may re-evaluate a top-level binding within one pass. Any caller may
+receive the held writer within a pass, since one pass is one program's
+evaluation. Keying re-issue by registration site is the alternative, at
+the cost of changes to `src/capability.ts`, `src/primitives.ts` and the
+pinned demo.
+
+As implemented, `registerMetaField` re-issues a writer only when Allegro
+minted the field, the rule matches, and the field's epoch is the current
+pass. `bumpMetaEpoch` advances the epoch at the start of each
+`evalSource` pass, in `src/runtime.ts`. Kernel fields register at epoch
+−1, which no pass matches. Comments in `src/capability.ts` and in the
+pinned demo tie re-issue to the registration site, which re-issue does
+not check. The battery in `src/boundary-tests.ts` refuses a later program
+that re-registers a field an earlier program registered.
+
+The re-registration example in `tests/metadata-channels-demo.alg` gets
+the held writer back within one pass.
+
+```
+again = channel_register("audit", "union")
+print(channel_read(again(1, "x"), "audit"))
+// expect: x
+```
+
+To key re-issue by site, extend the re-issue condition in
+`registerMetaField` and pass a site from `channel_register`.
+
+## A refused write aborts [implemented]
+
+A refused write, install or [fabricating rule](#def-fabricating-rule)
+aborts evaluation instead of returning an error value. An
+<a id="def-abort"></a>**abort** is a refusal that stops the program's
+evaluation with no value returned. Denial as an abort is a swappable
+decision about language capability.
+
+The problem is what a refused write gives back to the code that
+attempted the write. An error value was rejected, because an error value
+would be forgeable: the forger chooses what to do with the error value.
+
+As implemented, every refusal in `src/capability.ts` and in the writer
+primitives of `src/primitives.ts` throws `AllegroError`. A rejected
+attenuated write halts the program before the program's next line. During
+[precompile](../layers.md#def-precompile) and inference, catch-alls in
+`src/runtime.ts`, `src/evaluator.ts` and `src/primitives.ts` record or
+swallow a denial before the program's own run halts.
+
+To try denial as a value, return an error value where `src/capability.ts`
+throws, then run the forgery battery.
+
+## Propagation and installs, held until their chapters are written [partial]
+
+This section is held in this chapter until the chapters on how metadata
+propagates and on installing a layer into the base are written.
+
+A <a id="def-channel"></a>**channel** is the apparatus by which one
+capability of the language rides values through partial evaluation: one
+or more [metadata fields](#def-metadata-field), the fields' rules, the
+fields' writers and the layer code that interprets the fields. Typing,
+effect analysis and proof discharge are channels. A channel may need
+several fields, as knowledge needs three. No channel-level registration
+exists: each layer registers the layer's fields one by one. Whether one
+channel-level registration replaces registration field by field is an
+open decision.
+
+The base registers two fields in `src/capability.ts`: `source`, an
+integrity field with rule `drop`, and `error`, with rule `viral`.
+`src/types-std.ts` registers three fields: `type`, `computed` and
+integrity; `shape`, `computed`; `discharged`, `drop` and integrity.
+`src/effects.ts` registers `effects` with rule `union`.
+`src/refinements.ts` registers three fields: `predicates` and `domain`,
+both `computed`, and `bound`, with rule `drop`. Three fields registered
+in `src/capability.ts` have no owner: `knowledge`, `warnings` and
+`exported`. Nothing stores `knowledge`, whose storage is `predicates`,
+`domain` and the refinement layers of a type. Nothing writes `warnings`.
+`exported` serves nothing, since visibility is a property of the
+binding. The ownership test in `src/boundary-tests.ts` pins each field's
+registration and integrity flag, without comparing the owners the test
+lists.
+
+The base registers a field only if the concept the field serves survives
+in Allegretto. `make_error` and `source of` both work under `--base`.
+`error` is a `viral` field with a public writer, `make_error`, so an
+error rides every result derived from an error-carrying value. An
+error-carrying `if` condition propagates the error instead of taking a
+branch. The error example in `tests/metadata-channels-demo.alg` carries
+an error through primitives, a user function and a conditional's test.
+
+```
+e = make_error("boom")
+print(channel_read((e + 1) * 2, "error"))
+// expect: boom
+
+sq = x => x * x
+print(channel_read(sq(e), "error"))
+// expect: boom
+
+print(channel_read(if e then 1 else 2, "error"))
+// expect: boom
+```
+
+`source` carries the
+[Expression](../concepts.md#def-expression) a value was evaluated from,
+with rule `drop`, because a derived value was not produced by the
+recorded Expression. Only the evaluator attaches `source`, at calls of
+source-aware primitives and on resolved top-level bindings. `source` is
+an integrity field, so no doctored source can make a verdict display a
+proposition other than the proposition checked. `source of x` reads the
+field under the `observe` effect, rendering the Expression as text.
+
+The generic half of [propagation](#def-propagation) lives in
+`src/metadata.ts`. `viralOnto` carries the first viral field found on the
+callee or an argument onto the residual, with the candidate's `type`. An
+application with a user viral operand is not computed: the evaluator
+returns the residual carrying the viral field. `mergeOverMeta` lays a
+value's fields under the fields of the value the first value
+re-evaluates to, merging `union` fields and letting the inner value win
+otherwise. `drop` needs no code, because nothing carries a `drop` field.
+The `drop` example in `tests/metadata-channels-demo.alg` reads a field on
+`n` and finds nothing on `n + 1`.
+
+```
+note = channel_register("note", "drop")
+n = note(7, 1)
+print(channel_read(n, "note"))
+// expect: 1
+
+print(channel_read(n + 1, "note"))
+// expect: none
+```
+
+A user `union` field written on a leaf does not survive `v + 1`, because
+`effects` rides a path of the evaluator's own and the generic rule
+applies only at re-evaluation. The `effects` path and the knowledge
+interpretation beside the path are the evaluator's two imports from
+Allegro Standard that the unit order forbids.
+
+A layer installs what a field means into the base, gated on the field's
+writer, because an install is authority. Each installer compares the
+installer's writer with the registered writer by identity.
+`installFieldMerge` in `src/capability.ts` installs how two values of a
+field combine under `union`. `src/effects.ts` is the one caller of
+`installFieldMerge`, installing effect union. `installFieldCheck`
+installs how an argument is checked against a declared constraint naming
+the field, a check the evaluator runs at every typed call site.
+`src/types-std.ts` installs the `type` check, and `src/effects.ts`
+installs the `effects` check. `installDispatch` installs how the
+evaluator dispatches on a field, at a primitive application and at a
+composed call, as `src/types-std.ts` does for `type`.
+`installProjection` installs how a field is computed on read when nothing
+stores the field, as `src/types-std.ts` computes `shape` from `type`.
+
+`installAnalysis` lets a producer high in the unit order answer a
+question about a field for a consumer lower in the order. Two questions
+about `effects` are installed: `inferred`, by the type primitives, and
+`diverges`, by the pipeline once per compilation. `installFactsMerge` in
+`src/scope.ts` gates one install into the scope unit: how facts about a
+name combine across scope layers. `src/refinements.ts` installs the facts
+merge with the `predicates` writer. The battery in `src/boundary-tests.ts`
+refuses a foreign writer at each installer.
+
+<!-- render map: C1→¶1 C2→¶1 C4→¶2 C5→¶2 C3→¶2 C6→¶2 C7→¶3 C8→¶3 C9→¶3 C10→¶3 C11→¶4 C12→¶4 C13→¶4 C14→¶4 C15→¶5 C16→¶5 C17→¶5 C18→¶6 C19→¶6 C20→¶7 C21→¶7 C22→¶7 C23→¶7 C24→¶8 C25→¶9 C26→¶9 C27→¶9 C28→¶10 C29→¶10 C30→¶10 C31→¶10 C32→¶10 C33→¶11 C34→¶11 C35→¶12 C36→¶12 C37→¶12 C38→¶13 C39→¶14 C40→¶14 C41→¶14 C42→¶15 C43→¶15 C44→¶15 C45→¶16 C46→¶16 C47→¶16 C48→¶17 C49→¶18 C50→¶18 C51→¶18 C52→¶18 C53→¶18 C54→¶18 C55→¶18 C56→¶19 C57→¶19 C58→¶19 C59→¶19 C60→¶20 C61→¶20 C62→¶20 C63→¶21 C64→¶21 C65→¶21 C66→¶21 C224→¶22 C67→¶23 C68→¶23 C69→¶23 C70→¶23 C71→¶23 C72→¶23 C73→¶24 C74→¶24 C75→¶24 C76→¶24 C77→¶25 C78→¶25 C79→¶26 C80→¶27 C81→¶27 C82→¶27 C83→¶27 C84→¶27 C85→¶27 C86→¶28 C87→¶28 C88→¶28 C89→¶28 C90→¶28 C91→¶28 C92→¶29 C93→¶29 C94→¶29 C95→¶29 C96→¶29 C97→¶30 C98→¶30 C99→¶30 C100→¶31 C101→¶31 C102→¶31 C103→¶31 C104→¶32 C105→¶33 C106→¶33 C107→¶33 C108→¶33 C109→¶33 C110→¶33 C111→¶34 C112→¶34 C113→¶34 C114→¶34 C115→¶35 C116→¶35 C117→¶36 C118→¶36 C119→¶36 C120→¶36 C121→¶36 C122→¶36 C123→¶36 C124→¶37 C125→¶38 C126→¶39 C127→¶39 C128→¶39 C129→¶39 C130→¶40 C131→¶40 C132→¶40 C133→¶40 C134→¶41 C135→¶42 C136→¶42 C137→¶42 C138→¶43 C139→¶44 C140→¶44 C141→¶44 C142→¶44 C143→¶44 C144→¶45 C145→¶45 C146→¶45 C147→¶45 C148→¶45 C149→¶46 C150→¶46 C151→¶46 C152→¶46 C153→¶46 C154→¶47 C155→¶48 C156→¶48 C157→¶48 C158→¶48 C159→¶49 C160→¶49 C161→¶49 C162→¶49 C163→¶49 C164→¶50 C165→¶50 C166→¶50 C167→¶50 C168→¶50 C169→¶51 C170→¶52 C171→¶53 C172→¶53 C173→¶53 C174→¶54 C175→¶54 C176→¶55 C177→¶55 C178→¶55 C179→¶56 C180→¶57 C181→¶58 C182→¶58 C183→¶58 C184→¶58 C185→¶58 C186→¶59 C187→¶59 C188→¶59 C189→¶59 C190→¶59 C191→¶59 C192→¶59 C193→¶59 C194→¶59 C195→¶60 C196→¶60 C197→¶60 C198→¶60 C199→¶60 C200→¶61 C201→¶61 C202→¶61 C203→¶61 C204→¶62 C205→¶62 C206→¶62 C207→¶62 C208→¶62 C209→¶63 C210→¶63 C211→¶64 C212→¶64 C213→¶64 C214→¶64 C215→¶64 C216→¶64 C217→¶64 C218→¶64 C219→¶65 C220→¶65 C221→¶65 C222→¶65 C223→¶65 -->

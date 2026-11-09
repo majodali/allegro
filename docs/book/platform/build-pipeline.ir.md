@@ -54,11 +54,11 @@ T22. Proof and discharge. defined-at: ../concepts.md#def-proof-and-discharge [de
 
 T23. Contract, an invariant included. defined-at: ../concepts.md#def-contract [decided: docs/book/concepts.md §46]
 
-T24. Channel. defined-at: ../allegretto/metadata-and-capability.md#def-channel [decided: docs/book/allegretto/metadata-and-capability.md §4]
+T24. Channel. defined-at: ../allegretto/metadata-and-capability.md#def-channel [decided: docs/book/allegretto/metadata-and-capability.md, section "Propagation and installs, held until their chapters are written"]
 
-T25. Metadata field. defined-at: ../allegretto/metadata-and-capability.md#def-metadata-field [decided: docs/book/allegretto/metadata-and-capability.md §3]
+T25. Metadata field. defined-at: ../allegretto/metadata-and-capability.md#def-metadata-field [decided: docs/book/allegretto/metadata-and-capability.md, section "Metadata fields are independent"]
 
-T26. Writer capability. defined-at: ../allegretto/metadata-and-capability.md#def-writer-capability [decided: docs/book/allegretto/metadata-and-capability.md §6]
+T26. Writer capability. defined-at: ../allegretto/metadata-and-capability.md#def-writer-capability [decided: docs/book/allegretto/metadata-and-capability.md, section "Originating a field value needs the writer"]
 
 T27. Tail call. defined-at: ../allegretto/evaluator.md#def-tail-call [decided: owner, 2026-11-01]
 
