@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-07 — the pilot chapter, as a dry run.** "Metadata and the
+  capability to write it" (`docs/book/allegretto/metadata-and-capability.md`)
+  is reviewed decision by decision, written IR first, and rewritten as
+  eleven decision sections; the content bound for the chapters on
+  propagation and installs is held in a final section until they are
+  written. No code changed; two defects the review found (a second viral
+  field erases the first; any rule string registers) are recorded. The
+  plan adds the rule that a review recommends the right decision, not
+  the cheapest change. Ids 783.
+
 - **2026-11-07 — the host chapter's claims re-stated.** PR #166 fixed
   the web bundle's load in a browser and the library sync, and the site
   was redeployed; `docs/book/platform/host.ir.md` now states that
