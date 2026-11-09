@@ -36,10 +36,10 @@ boundary:
 > terms of §1. The maintainer wrote "All defaults approved, terms and
 > changes ratified." Closed 2026-11-09 at PR #(number), after the last
 > chunk, PF4, merged as PR #179: every clause of §1's outcome is met
-> (§7, the closing entry); B-190 (name capture) stays open, and the
-> carry-overs B-191 (a trailing block comment breaks the dedent), B-192
-> (the backing union of an induction and a `by` proof) and B-193 (`by`
-> read as a unit inside a proposition) are filed. The status line and
+> (§7, the closing entry); B-190 (name capture) stays open, and three
+> carry-overs are filed: B-191 (a trailing block comment breaks the dedent),
+> B-192 (the backing union of an induction and a `by` proof) and
+> B-193 (`by` read as a unit inside a proposition). The status line and
 > the header's `status` say the same thing.
 >
 > **Reader**: the session that runs lane D (L2 semantics), and the
@@ -973,7 +973,18 @@ maintainer asked for.
        and 204 of 204 (PF4). Cumulatively, at the close: `run`,
        `inspect` and `verify` over the 68 programs of `tests/*.alg` and
        `demos/**/*.alg` on `a8e19c8` (the base §2 measured) and on
-       `origin/main` at `c6e2692` (PR #179's merge): CORPUS_RESULT
+       `origin/main` at `c6e2692` (PR #179's merge), stdout, stderr and
+       exit code each: 202 of 204 runs identical; the two that differ
+       are the `verify` and `inspect` of `tests/proofs-induction-demo.alg`,
+       and the differing lines are exactly the ratified ones (the two
+       theorem lines gain `[resting on sampled 'induction' of 'NonNeg']`;
+       the ledger line becomes `rests on 0 admitted, 1 sampled` with `!
+       sampled 'induction' of 'NonNeg' — backs: add_zero_right,
+       add_zero_t`; `inspect` gains one `rests on:` line under each
+       theorem). The six runs of the two new demos,
+       `tests/logical-error-demo.alg` and `tests/units-shadowing-demo.alg`,
+       have no base. Script and outputs under the orchestrating
+       session's scratchpad (`findings/close/compare.sh`).
   - **Carry-overs filed** in `docs/backlog.md`, each as the chunk's PR
     asked and the merge defaulted: B-191 (a trailing block comment
     breaks the dedent), lane P, from PF1; B-192 (the backing union of
