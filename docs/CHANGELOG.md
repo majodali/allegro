@@ -670,7 +670,7 @@ name.
 
 Plan `docs/plans/pilot-findings.md`; lane D; human-gated (lane D keeps
 the per-chunk gate). Opened 2026-11-06 with the plan, active since its
-PR #168 merged on 2026-11-07, closed 2026-11-09 at PR #(number);
+PR #168 merged on 2026-11-07, closed 2026-11-09 at PR #180;
 entries newest first, directly below this line. A second stream in
 lane D, told apart from the closed `## Stream D — the
 partial-evaluation rules` below by its name.
@@ -678,7 +678,7 @@ partial-evaluation rules` below by its name.
 ### 2026-11 — The pilot's findings stream closes (B-185)
 
 B-185 (a sampled induction proof reported as discharged), the stream's
-item, closed with the stream on 2026-11-09 at PR #(number), after its
+item, closed with the stream on 2026-11-09 at PR #180, after its
 last chunk, PF4 (B-154 (unit-name shadowing)), merged as PR #179. Every
 clause of the plan's outcome is met and quoted against the code in its
 §7 closing entry: the four findings landed as PR #172 (B-183 (a

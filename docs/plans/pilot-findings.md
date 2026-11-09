@@ -34,7 +34,7 @@ boundary:
 > on 2026-11-07, which took every recommendation of §6 (R1 (a), R2 (b),
 > R3 (a), R4 (a), R5 (b)) and ratified the output changes of §3 and the
 > terms of §1. The maintainer wrote "All defaults approved, terms and
-> changes ratified." Closed 2026-11-09 at PR #(number), after the last
+> changes ratified." Closed 2026-11-09 at PR #180, after the last
 > chunk, PF4, merged as PR #179: every clause of §1's outcome is met
 > (§7, the closing entry); B-190 (name capture) stays open, and three
 > carry-overs are filed: B-191 (a trailing block comment breaks the dedent),
@@ -918,7 +918,7 @@ maintainer asked for.
   PF1 as PR #172 (lane P, under `docs/plans/trailing-comment-dedent.md`),
   PF2 as PR #173, PF3 as PR #175, PF4 as PR #179. This entry is docs and
   status documents only: no file under `src/`, `lib/`, `tests/` or
-  `demos/` changes in the closing PR, #(number).
+  `demos/` changes in the closing PR, #180.
   - **The outcome of §1, clause by clause.** Each clause is quoted.
     1. "B-185: a theorem discharged by `prove_induction`, directly,
        through `tactics.by_induction`, or as the term of a `by` clause,
