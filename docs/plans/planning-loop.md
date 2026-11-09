@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-187
 lane: D
 merge: human-gated
@@ -20,7 +20,7 @@ reserves: [B-188, B-189]
 boundary:
   - docs/plans/planning-loop.md
   - lib/planning.alg
-  - lib/planning-loop.alg
+  - lib/planning_loop.alg
   - tests/planning-loop-*.alg
   - src/pcp.ts
   - src/index.ts
@@ -37,13 +37,13 @@ boundary:
 
 # The planning loop, the next validating demo — the planning-loop stream
 
-> **Status: draft** (K-007 (the plan lifecycle)) — drafted 2026-11-06
+> **Status: active** (K-007 (the plan lifecycle)) — drafted 2026-11-06
 > from the maintainer's direction of that day, on `origin/main` at
-> `a8e19c8`. Nothing is ratified. The plan asks for rulings R1 to R10
-> (§6) and expects to be discussed at its PR. The status line and the
-> header's `status` say the same thing.
+> `a8e19c8`; active since the merge of PR #167 on 2026-11-07, with
+> every recommendation taken (§6). The status line and the header's
+> `status` say the same thing.
 >
-> **Reader**: the maintainer, to rule on §6; the session that runs the
+> **Reader**: the maintainer, who ruled on §6 at PR #167; the session that runs the
 > [stream](parallel-streams.md#def-stream). Assumed known: the planning
 > model as built (`docs/book/vivace/planning-dsl.md`, in particular
 > [plan](../book/vivace/planning-dsl.md#def-plan),
@@ -427,11 +427,14 @@ may list the same file (the manifest's note), so lane C keeps `pcp/**`.
 
 **What each file takes.**
 
-- `lib/planning.alg`: the dead-end wording of §2.2 (L1), and whatever
-  R10 lets it gain.
-- `lib/planning-loop.alg`: new under R10's recommendation; the plan
+- `lib/planning.alg`: the dead-end wording of §2.2 (deferred at L1 to
+  L2 or the stream's close, §7), and whatever R10 lets it gain.
+- `lib/planning_loop.alg`: new under R10's recommendation; the plan
   obligation records, the open-plan form of R9, and the catalog's
-  surface form of R2.
+  surface form of R2. The name takes an underscore, not the hyphen R10
+  was ruled with, because the `use` scanner (`src/use-scanner.ts`)
+  accepts identifier names only, so a hyphen cannot be a module name
+  (a default taken at L1; the maintainer rules on it at L1's PR).
 - `tests/planning-loop-*.alg`: new demo files only. An existing demo is
   an oracle and is never edited.
 - `src/pcp.ts`: the obligation kind and the plan obligation's
@@ -549,7 +552,7 @@ R7 and R8 at their rows' time.
     (no host code per model, the rung 3 promise), and `src/pcp.ts`
     collects them from the top-level bindings as it collects Proof
     values, so the second and third models reuse the channel.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R2** — **What a proposal may be, and where it is spliced.**
   - (a) One catalog entry: a node block (leaf, composite, choice, or a
     borrowed plan by name), added to the open plan's catalog. The plan
@@ -569,7 +572,7 @@ R7 and R8 at their rows' time.
     whose plan changed. If the catalog's surface costs more than a
     chunk, the fallback is the library form (`leaf(…)` expressions in
     the catalog list), which is less readable to a stakeholder.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R3** — **One worker generalised, or a second worker.**
   - (a) Generalise `runLlmWorker` by obligation kind: each kind brings
     its request text, splice, success test and primer section (§2.3);
@@ -585,7 +588,7 @@ R7 and R8 at their rows' time.
     parts) and pinned. The primer section for plans goes in the
     planning chapter, and the worker sends the section of the
     obligation's kind.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R4** — **How a solved plan's assumptions reach the ledger.** The
   fixtures are `v => true` promises (§2.1, finding 2).
   - (a) Each fixture a solved plan relies on is an admitted entry
@@ -600,7 +603,7 @@ R7 and R8 at their rows' time.
     fixture carries a real predicate: in Shape 1 every fixture is a
     promise, so "admitted" is the tier, and the ledger must never call
     one discharged.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R5** — **The lane, and what the manifest gains.**
   - (a) Lane D, with lane D's globs in `scripts/analyze/lanes.json`
     widened by `pcp/**`, `demos/rung4/**` and
@@ -620,7 +623,7 @@ R7 and R8 at their rows' time.
     both every time.
   - **Recommended: (a)** for (1). Revisit (b) at R7: three models'
     worth of libraries is when a lane of their own earns its cost.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R6** — **The demo's home, and what the claims register may say.**
   - (a) `demos/rung4/`, scene 1 the loop; scenes for (2) and (3)
     follow in the same rung. The ladder's rung 4 story is "two+ coupled
@@ -639,7 +642,7 @@ R7 and R8 at their rows' time.
     delivered as a row; the scene is its receipt); D6 (models as live
     values)'s "to advance" line loses "the AI loop over a model (B-083)";
     the "cross-model ledger" row and D7 (the capstone) stay hypothesis.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R7** — **The software system model: the second pilot as written,
   and its first chunk.** Vision §4 names it "a software system model
   (several interconnected DSLs)"; the chapter's table says "data,
@@ -657,7 +660,7 @@ R7 and R8 at their rows' time.
     deferred. Cheaper; tests composition across two models but not
     within one.
   - **Recommended: (a)**, at L7's merge, on (1)'s evidence.
-  - **Taken:**
+  - **Taken:** at L7's merge.
 - **R8** — **What the documentation or comprehension model is for.** A
   question for the maintainer; no design is offered. Readings the raw
   material of §5 supports:
@@ -672,7 +675,7 @@ R7 and R8 at their rows' time.
     evidence as an obligation.
   - (a) and (c) have mechanical checks today. Each composes with the
     other two models differently.
-  - **Taken:**
+  - **Taken:** open, at DC1.
 - **R9** — **How an open plan is declared** (§2.1, finding 4). The
   `plan` statement halts on a gap, so a plan with a gap exists today
   only through the library's API.
@@ -688,11 +691,11 @@ R7 and R8 at their rows' time.
     notification. `src/runtime.ts`, and the plan form's halt then means
     different things in `run` and in `verify`.
   - **Recommended: (a)**, taken with R1.
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 - **R10** — **How the planning library grows under the load ratchet.**
   `lib/planning.alg` is in the load corpus, and its parse counts are
   gated (§2.4).
-  - (a) The loop's code in a new library, `lib/planning-loop.alg`, that
+  - (a) The loop's code in a new library, `lib/planning_loop.alg`, that
     uses `planning`; `lib/planning.alg` takes only L1's wording fix.
     Lane P adds the new library to the load corpus in its own commit
     after L1, so its cost is gated from then on.
@@ -704,7 +707,7 @@ R7 and R8 at their rows' time.
     lane P left it, keeps the gate's meaning, and separates what rung 3
     delivered from what the loop adds. If the wording fix itself raises
     the counts, that one commit takes (b).
-  - **Taken:**
+  - **Taken:** (a), at the merge of PR #167, 2026-11-07.
 
 ## 7. Record
 
@@ -714,3 +717,120 @@ R7 and R8 at their rows' time.
   names the stream as next in lane D's row, and appends the manifest
   row. Rulings R1 to R10 await the maintainer. The changelog section
   waits for ratification.
+- **2026-11-07 — plan ratified.** PR #167 merged with every
+  recommendation taken: R1 to R6, R9 and R10 as (a); R7 waits for L7's
+  merge and R8 for DC1. The five terms of §1 are ratified. Lane D's
+  globs already hold `pcp/**`, `demos/rung4/**` and
+  `docs/plans/release-track.md` (PR #171, R5). The changelog section
+  `## Stream D — the planning loop` opens; the manifest row and B-187
+  say active.
+- **2026-11-07 — L1 landed.** The obligation surface, on
+  `origin/main` at `7cd2b72`. Four defaults were taken by the
+  orchestrating session when the chunk stopped. The maintainer rules on
+  each at L1's PR:
+  - **The library's name** is `lib/planning_loop.alg`, not R10's
+    `lib/planning-loop.alg`. The `use` scanner (`src/use-scanner.ts`)
+    accepts identifier names only, so `use planning-loop` is a parse
+    error ("Parse error at position 4"). The header's `boundary`, §4 and
+    R10's text now name the underscore.
+  - **`lib/planning.alg` is not edited.** The one-line classification
+    fix in `completions_from` (`lib/planning.alg:1049`) changes no
+    `// expect:` line, but it fails two gates. `npm run lint:load` puts
+    `lib/planning.alg` above its baseline (matchAttempts 650,711 against
+    649,616; memoWrites 990,471 against 988,794). The suite's web-bundle
+    test fails, because `website/index.html`, `website/sandbox.html` and
+    `web/sandbox.html` carry the library as it is on disk. The fix: at
+    depth 0 the dead end is `exhausted` only when a catalog node the
+    plan does not hold produces the port. It is a follow-up for L2 or
+    the stream's close, taken with lane P's baseline raise and the
+    pages' regeneration (R10 (b)). The new library derives the stop
+    itself instead (`stop_of`, `lib/planning_loop.alg:59`).
+  - **The catalog's name** is recovered by the protocol, not held by
+    the record. A grammar label hands a statement form either an
+    expression (`cn:ident`, the catalog's value) or the matched text (a
+    regex part), never both from one match. The engine offers no
+    lookahead, and no primitive names a symbol, so a rule that yields
+    both needs a `src/grammar2/` change outside the boundary.
+    `extractPlanObligations` names the catalog by the top-level binding
+    whose value is the open plan's catalog list, the same value by
+    reference (`src/pcp.ts:1172`). L2 reads `plan.catalog` from the
+    obligation.
+  - **The pilot-findings stream runs beside this one in lane D**, in
+    files this boundary excludes (`src/primitives.ts`, `lib/units.alg`).
+    The lane rule goes to the maintainer.
+
+  What landed:
+  - **The open-plan form** (R9 (a)) is `plan NAME from CATALOG:`
+    (`lib/planning_loop.alg:147` to `:150`). It takes the `plan` form's
+    body items (`node_items` of `planning_grammar`), with `CATALOG` a
+    binding that holds a list of nodes. It expands to
+    `binding_decl(pn, open_plan(build_plan(pn, pitems), cn))`, the
+    two-argument form, so no `WellFormedPlan` check halts on the gap.
+    The bound value is an `OpenPlan` record (`:124`) holding the plan,
+    the catalog list and the obligations. The library's queries are
+    `open_obligations`, `open_findings` (`check_plan`'s findings),
+    `with_entry` and `solve_open`. L2 reads the open plan back through
+    the same type: the plan, the catalog (by the binding's name in the
+    obligation) and the obligations.
+  - **The plan obligation** (R1 (a)) is the record `PlanObligation`
+    (`:44`), with the fields `plan`, `port`, `fixture`, `by`, `stop`,
+    `depth`, `steps`, `identity`, `gap` and `message`.
+    `plan_obligations` (`:93`) builds one per distinct gap across the
+    dead ends of `completions`, with the first dead end's steps as the
+    witness, and none when a completion closes. One per distinct gap:
+    two dead ends at the same port for the same consumer ask the same
+    question, and one catalog entry answers both. `stop` is "catalog"
+    when no catalog entry the plan lacks produces the port and "depth"
+    otherwise. At the default depth it is always "catalog";
+    `plan_obligations_within` bounds the depth. The renderings are
+    `obligation_gap_show` ("Shipped, which Depot needs") and
+    `obligation_show` ("nothing in the catalog produces Shipped, which
+    Depot needs" or "no completion within 1 step: the search stopped at
+    Sorted, which Van needs"). Each is stored in the record, so the
+    protocol reads it as data.
+  - **The identity hash** is `hashProposition` over the text
+    `plan_identity` builds (`:64`): the plan's name, its declared
+    inputs, outcomes and budget, and the gap's port (with its fixture)
+    and consumer. On the demo the text is "plan Fulfil; inputs Order;
+    outcomes Delivered; no budget; gap Shipped by Depot", hash
+    `421ea754`. An unrelated catalog entry leaves it; a changed declared
+    outcome moves it (`src/test/pcp.ts:451`).
+  - **The protocol** (`src/pcp.ts`). `Obligation` gains the optional
+    `kind` (`:61`, absent means a theorem) and `plan`
+    (`PlanObligationContent`, `:80`): `binding`, `plan`, `catalog`,
+    `port`, `fixture`, `consumer`, `stop`, `depth`, `steps`, `gap`,
+    `message`, `identity` and `hash`. The theorem slot carries the
+    identity as its proposition, so `propositionHash` equals `hash`.
+    `extractPlanObligations` (`:1172`) finds the open plans by the
+    registered `type` field against the library's `OpenPlan`; no new
+    slot was added. `extractObligations` appends them, last, only with
+    `plans: true`. `allegro obligations` asks for them
+    (`src/index.ts:523` to `:530`); `formatPlanObligation` (`:528`)
+    renders them.
+  - **`propose` and `verify` on a file with an open plan** run and exit
+    0. They do not list the plan obligation: on the demo, `propose`
+    prints "**5 pending** of 19 obligation(s)" (the units library's
+    laws), and `verify` prints "Verdict (verified): 0/0 discharged" with
+    the same five laws pending. The LLM worker is untouched.
+  - **The demo and the tests.** `tests/planning-loop-obligations.alg`
+    has 17 pinned lines, registered at `src/test/language.ts:689`. It
+    pins the open plan, its findings, the obligation and its renderings,
+    the depth stop, the plan closed by a hand-written entry and checked
+    as a `WellFormedPlan`, and a `plan NAME:` beside the open form.
+    `src/test/pcp.ts:394` to `:503` holds four tests: the extraction and
+    JSON round trip; the hash; theorem and law obligations unchanged;
+    and the CLI's `obligations --pending` in text and JSON, with
+    `propose` and `verify` on the demo.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (68 files) was run through the CLI as `run`,
+    `inspect`, `verify` and `obligations`, and compared on stdout,
+    stderr (stats lines stripped) and exit code. All 272 runs are
+    identical; the new demo is the only new file.
+  - **The counts.** `npm run lint:load` is at or below the baseline.
+    `demos/rung3/02-solve.alg` has 3,793,978 evaluates and 202,129
+    applyComposed, unchanged from before. The demo has 457,193
+    evaluates.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C111 becomes
+    C171 and C172 (proposed, ask A3, cluster G27). The chapter's §2.8
+    and §9 are updated; the chapter has no IR of its own. The oracle
+    lines are in L1's PR.
