@@ -53,13 +53,13 @@ T21. Knowledge. defined-at: ../concepts.md#def-knowledge [decided: docs/book/con
 
 T22. Effect. defined-at: ../concepts.md#def-effect [decided: docs/book/concepts.md §40]
 
-T23. Metadata field. defined-at: metadata-and-capability.md#def-metadata-field [decided: docs/book/allegretto/metadata-and-capability.md §3]
+T23. Metadata field. defined-at: metadata-and-capability.md#def-metadata-field [decided: docs/book/allegretto/metadata-and-capability.md, section "Metadata fields are independent"]
 
-T24. Channel. defined-at: metadata-and-capability.md#def-channel [decided: docs/book/allegretto/metadata-and-capability.md §4]
+T24. Channel. defined-at: metadata-and-capability.md#def-channel [decided: docs/book/allegretto/metadata-and-capability.md, section "Propagation and installs, held until their chapters are written"]
 
-T25. Propagation. defined-at: metadata-and-capability.md#def-propagation [decided: docs/book/allegretto/metadata-and-capability.md §5]
+T25. Propagation. defined-at: metadata-and-capability.md#def-propagation [decided: docs/book/allegretto/metadata-and-capability.md, section "A fixed vocabulary of propagation rules"]
 
-T26. Writer capability. defined-at: metadata-and-capability.md#def-writer-capability [decided: docs/book/allegretto/metadata-and-capability.md §6]
+T26. Writer capability. defined-at: metadata-and-capability.md#def-writer-capability [decided: docs/book/allegretto/metadata-and-capability.md, section "Originating a field value needs the writer"]
 
 T27. Unit. defined-at: ../units.md#def-unit [decided: D50]
 
@@ -359,7 +359,7 @@ C92. B-113 (TailCall forwarding is convention-only) owns the missing check. evid
 
 C93. D22 (structures are immutable by default) makes a Structure immutable from birth. [decided: D22]
 
-C94. A value is written in place only while the value is provably unshared, during construction and before it escapes. [decided: docs/book/allegretto/metadata-and-capability.md §2]
+C94. A value is written in place only while the value is provably unshared, during construction and before it escapes. [decided: docs/book/allegretto/metadata-and-capability.md, section "Metadata supplied at construction"]
 
 C95. A scope is exempt from D22, because a scope is mutable evaluator state, not data. [decided: docs/book/concepts.md §15]
 

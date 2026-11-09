@@ -72,12 +72,11 @@ is a channel; effect analysis is a channel. A field is storage; a channel
 is a feature built on storage.
 
 Sources: [`concepts.md` §18 (plane)](concepts.md#def-plane); in
-`allegretto/metadata-and-capability.md`, [§3 (metadata
-field)](allegretto/metadata-and-capability.md#def-metadata-field), [§4
-(channel)](allegretto/metadata-and-capability.md#def-channel), [§5
-(propagation)](allegretto/metadata-and-capability.md#def-propagation) and
-[§6 (writer
-capability)](allegretto/metadata-and-capability.md#def-writer-capability).
+`allegretto/metadata-and-capability.md`, the definitions of
+[metadata field](allegretto/metadata-and-capability.md#def-metadata-field),
+[channel](allegretto/metadata-and-capability.md#def-channel),
+[propagation](allegretto/metadata-and-capability.md#def-propagation) and
+[writer capability](allegretto/metadata-and-capability.md#def-writer-capability).
 
 ### 2.4 Plane interface
 
