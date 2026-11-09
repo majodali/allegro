@@ -392,6 +392,20 @@ test("logical: != operator works", () => {
   eq(Number((evalStd("3 != 3")! as BitsValue).data), 0);
 });
 
+// B-156 (short-circuit over an error value), ruling R3 (a): a refinement
+// predicate written `ok || error "why"` halts an annotation with its reason,
+// as the `if … else error` form does. The guarded construction and the five
+// operator rows are pinned in tests/logical-error-demo.alg.
+test("logical: B-156 a refinement predicate written with || halts with its reason", () => {
+  throws(() => runtimeEval([
+    'pos_ok(x) => x > 0 || error "{x} is not positive"',
+    "Pos = Int & pos_ok(_)",
+    "f(x: Pos): Int => x",
+    "f(0 - 1)",
+  ].join("\n"), undefined, [typeExt], undefined, true),
+  "failed refinement predicate for Pos: -1 is not positive");
+});
+
 // == Array Higher-Order Methods ==
 
 test("array: map", () => {
@@ -430,6 +444,7 @@ fileTest(path.join(testsDir, "dot-access.alg"));
 fileTest(path.join(testsDir, "arrays.alg"));
 fileTest(path.join(testsDir, "objects.alg"));
 fileTest(path.join(testsDir, "logical.alg"));
+fileTest(path.join(testsDir, "logical-error-demo.alg"));
 fileTest(path.join(testsDir, "functions.alg"));
 
 // Module test needs a math extension
