@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -306,7 +306,9 @@ C109. `verify --obligation O.json` fails the verdict unless the obligation's the
 
 C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [decided: owner, 2026-11-02]
 
-C111. `obligations` lists one obligation per proof binding, per undischarged `div` entry and per law or coercion obligation of the types the evaluation scope binds. evidence: E14. [decided: owner, 2026-11-02]
+C171. `obligations` lists one obligation per proof binding, per undischarged `div` entry, per law or coercion obligation of the bound types, and per plan obligation of an open plan the file binds. evidence: E14, E38. [proposed: this IR]
+
+C172. `obligations` lists the plan obligations after every other obligation. evidence: E38. [proposed: this IR]
 
 C112. In a run on 2026-11-01, `obligations` over a two-line file with one theorem listed 15 obligations: the theorem, 12 laws of the core types, 2 coercion obligations. evidence: E24. [decided: owner, 2026-11-02]
 
@@ -470,7 +472,7 @@ G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
 G17. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110 [decided: owner, 2026-11-02]
 
-G18. cluster: C111, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-02]
+G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [proposed: this IR]
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
@@ -540,7 +542,7 @@ E12. `src/pcp.ts` lines 115–145 (the `Verdict` fields; pending law entries do 
 
 E13. `src/pcp.ts` lines 500–546 (`buildAssumptionLedger`: admitted and sampled backings with the proofs they back, the pending count) and 548–676 (`formatVerdict`: the ledger at 640–663, the hints after it at 664–675).
 
-E14. `src/index.ts` lines 514–541 (`runPcpObligations`: `--pending` passed as `pendingOnly`, one serialised obligation per line for `--json`, no exit call) and `src/pcp.ts` lines 968–1100 (`extractObligations`: proof bindings; the `proven` notifications skipped when `pendingOnly === false` at line 1029, with the comment "already covered via bindings"; undischarged `div` entries; law and coercion obligations of the bound types).
+E14. `src/index.ts` lines 514–545 (`runPcpObligations`: `--pending` passed as `pendingOnly`, one serialised obligation per line for `--json`, no exit call) and `src/pcp.ts` lines 1029–1163 (`extractObligations`: proof bindings; the `proven` notifications skipped when `pendingOnly === false` at line 1090, with the comment "already covered via bindings"; undischarged `div` entries; law and coercion obligations of the bound types).
 
 E15. `src/index.ts` lines 543–600 (`runPcpPropose`: `--all`, `--output`, no exit call) and `src/pcp.ts` lines 1153–1232 (`formatTodo`: the sections, the closing line naming `allegro verify`).
 
@@ -572,7 +574,7 @@ E28. A scratch script run on this branch on 2026-11-01: `evalSource("use contrac
 
 E29. Runs on this branch on 2026-11-01 of a scratch file with `use proven` and a function whose `proven` clause fails: `obligations` listed no obligation for the function; `obligations --pending` listed one; `verify` reported the clause as failed with a counterexample.
 
-E30. `src/test/pcp.ts` lines 360–377 (`verify` exit codes and JSON), 379–392 (`obligations --json`), 592–607 and 609–626 (`propose`, with and without `--output`), 636–730 and 732 (the worker's helpers and the mock-client loop), 800–815 (`prove` without a key), 817–878 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
+E30. `src/test/pcp.ts` lines 360–377 (`verify` exit codes and JSON), 379–392 (`obligations --json`), 394–503 (the plan obligations of B-187 (the planning loop, the next validating demo), chunk L1, `obligations --pending` among them), 702–717 and 719–736 (`propose`, with and without `--output`), 746–840 and 842 (the worker's helpers and the mock-client loop), 910–925 (`prove` without a key), 927–988 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
 
 E31. `src/test/base.ts` lines 234–250 (persistent context across two evaluations); `src/test/language.ts` lines 179–215 (binding evaluation counts through `setEvalStatsSink`); `src/test/alg-files.ts` lines 64–218 (`runAlgFile` over `evalSource`) and `src/test/proofs.ts` lines 547–551 and 657 (the demo run with the suite's `provenExt`).
 
@@ -588,12 +590,16 @@ E36. `docs/book/implementation-map.md` lines 35 and 40: `src/introspect.ts` in l
 
 E37. Search of `src/`, `pcp/` and `web/` on 2026-11-01, outside `src/test/`, for `tracer`, `step-through`, `stepper`, `breakpoint`, `language server`, `vscode` and `lsp`: no hit.
 
+E38. `src/pcp.ts` lines 1156–1160 (`extractObligations` appends the plan obligations when its `plans` option is set) and 1165–1238 (`extractPlanObligations`: a top-level binding whose registered `type` field is the `OpenPlan` type of `lib/planning_loop.alg`, its obligation records read as data, `kind` "plan" and the `plan` field); `src/index.ts` lines 523–530 (`runPcpObligations` passes `plans: true`); `src/test/pcp.ts` lines 394–503.
+
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C111, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
 
 A1 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the claims carry decided provenance from that date.
 
 A2. Ratify or strike the proposed term safety grade (T30); the evalSource pipeline (T27) and precompile (T28) have their definition sites in the spine's §29 and in `docs/book/layers.md` §2 since ruling R9 of 2026-11-01. Depends: C2, C86, C90, C93.
 
 A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term's definition site is this chapter's anchor. The PR's ask 2 (an owner for the chapter's findings) was answered on 2026-11-02 by the maintainer's instruction: the findings are filed as B-175 (the tooling chapter's findings), one line per defect.
+
+A3. Ratify the re-proposed claims about `obligations` as chunk L1 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G27: C171, which replaces C111 and adds the plan obligations of a file's open plans, and C172. Depends: C171, C172.

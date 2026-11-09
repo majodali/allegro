@@ -3510,8 +3510,9 @@ table and the stream plans.
   AI iteration loop) and B-082 (model composition), which stay open.
   Reserves B-188 (first out-of-scope finding of the planning-loop
   stream) and B-189 (second out-of-scope finding of the planning-loop
-  stream). Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06, awaiting
-  ratification. **Pointer**: the plan's §2 (the probes) and §6 (the
+  stream). Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06,
+  ratified 2026-11-07 at PR #167; L1 (the obligation surface) at
+  its PR, with four defaults for the maintainer in the plan's §7. **Pointer**: the plan's §2 (the probes) and §6 (the
   rulings)
 - [ ] **B-188** (first out-of-scope finding of the planning-loop stream)
   · L3 · Reserved by the planning-loop stream

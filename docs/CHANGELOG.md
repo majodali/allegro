@@ -781,6 +781,37 @@ comment trailing `x + x`, runs and verifies "1/1 discharged".
 - Not changed: a trailing `/* … */` block comment is still measured as
   content by `DEDENT`; the chunk was measured for `//` only.
 
+## Stream D — the planning loop
+
+Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
+2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
+entries newest first, directly below this line.
+
+### 2026-11 — Plan obligations reach the protocol; the open plan declared (B-187, chunk L1)
+
+B-187 (the planning loop, the next validating demo), chunk L1 of
+`docs/plans/planning-loop.md`. The new library `lib/planning_loop.alg`
+declares an open plan with `plan NAME from CATALOG:`. The form binds the
+plan and its catalog without the `WellFormedPlan` annotation, so a gap no
+longer halts the file. The library builds a plan obligation for each
+distinct gap that completion from the catalog cannot fill. Each
+obligation is worded in planning terms ("nothing in the catalog produces
+`Shipped`, which `Depot` needs") and says whether the catalog or the
+depth stopped the search. `allegro obligations` lists them after the
+theorem and law obligations, in text and JSON, as `pcp/1` obligations of
+kind "plan" with a hash over the plan's declared surface and the gap.
+`propose`, `verify` and the worker leave them to L2 and L3.
+`tests/planning-loop-obligations.alg` is the demo.
+
+`lib/planning.alg` is untouched. Its dead-end wording fix raises its load
+counts and needs the web pages regenerated, so it waits for L2 or the
+stream's close. Four defaults are recorded in the plan's §7 for the
+maintainer: the library's underscored name, the deferred fix, the
+catalog's name recovered by the protocol, and the concurrent stream.
+Every `tests/*.alg` and `demos/**/*.alg` run gives identical output
+before and after (272 runs). `docs/book/platform/tooling.ir.md`
+re-proposes C111 as C171 and C172 (ask A3).
+
 ## Unstreamed
 
 Work outside any stream: per-chunk gated lanes and one-off chunks.
