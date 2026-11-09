@@ -11,7 +11,7 @@ oracle:
   - npm run lint:streams
   - npm test
 chunks: [P0, P1, P1b, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
-reserves: [B-183, B-184, B-185, B-186]
+reserves: [B-184, B-186]
 boundary:
   - docs/book/**
   - docs/reading-order.json
@@ -951,6 +951,35 @@ its approval.
   now and recorded as a finding for the chapter on modules, the
   member-load path checked there.
 
+**Rulings taken 2026-11-07, on PR #174 (the pilot's review).**
+
+- **R34 — Recommend the right decision.** The maintainer took every
+  default of the pilot's review, R-P2-1 (b), the dry run, among them,
+  and added: "some of these decisions were based on reducing code and
+  documentation changes, which works for the pilot, but will not work
+  for the full decision reviews going forward." From chapter 1 on, a
+  review recommends the option that makes each decision right for the
+  language; the size of its code or document change is a stated cost,
+  never the reason. Part (a) of `docs/plans/book-pass-briefs.md` states
+  the rule. The pilot's rulings stand as taken for the dry run; when
+  the pass reaches chapter 7 in order, its decisions are reviewed again
+  under R34.
+
+**Rulings taken 2026-11-08, on PR #174 (the pilot's dry run).**
+
+- **R35 — The pilot's dry run, and two standing rules.** Every default:
+  the IR's claims and terms ratified; the held section stands until
+  chapters 8 and 10 are written; the chapter carries no *organized*
+  marker until approved in order; the demo excerpt's elision stands for
+  the dry run; the serialisation sentence's removal stands; the
+  review's findings are for the maintainer or the orchestrating session
+  to file, or for two more spare ids. Two rules follow for the full
+  pass: (1) content a review sends to a chapter that does not yet exist
+  stays in a held section of the chapter it leaves, with its definition
+  sites, until that chapter is written; (2) the *organized* marker means
+  approved in order under R28 (the monotonic pass), never merely
+  rewritten.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1080,6 +1109,31 @@ its approval.
   with no `process` global, the suite's four web tests pass, the live
   bundle carries the guard. Lints: `lint:ir` clean, unratified terms 0;
   `lint:docs:check` ids 784.
+- **2026-11-07 — P2 opened: the pilot chapter's review** (the review
+  session). `docs/records/book-pass/p2-allegretto-metadata-and-capability.md`:
+  the thirteen decisions of chapter 7, one ruling each, R-P2-1 (taking
+  chapter 7 before chapters 1 to 6) first. Two code defects confirmed:
+  a second viral field erases the first (`viralOnto`,
+  `src/metadata.ts:331`), and `channel_register` accepts any rule string.
+  B-183 and B-185 left this plan's reserves, which
+  `docs/plans/pilot-findings.md` now holds.
+- **2026-11-07 — P2's dry run written** (the review session). R34
+  recorded in §6, its rule in part (a) of the briefs. The maintainer
+  took every default of the review. `docs/book/allegretto/metadata-and-capability.ir.md`
+  (224 claims, 65 clusters, 25 terms of which 3 proposed) written first,
+  then the chapter rewritten as eleven decision sections, the content
+  bound for chapters 8 and 10 held in a final section; no code changed.
+  Eight `book-changes.md` rows. Stale section-number citations of the
+  chapter fixed in `architecture-vocabulary.md`, `evaluator.ir.md` and
+  `build-pipeline.ir.md`. Lints: `lint:ir` 7 files clean, unratified
+  terms 3; `lint:docs:check` ids 783 (one below the baseline, not
+  lowered here).
+- **2026-11-08 — P2's rulings applied** (the review session). R35
+  recorded in §6. The IR's 205 proposed elements flipped to decided, 0
+  unratified terms; the *organized* marker struck from the chapter. The
+  ids baseline lowered to 783 in its own commit. The pilot is done; the
+  pass starts at chapter 1 of the inventory's contents under R34
+  (recommend the right decision).
 
 ## 8. Sessions
 
