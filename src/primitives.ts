@@ -1,7 +1,7 @@
 // Allegretto - Primitive Functions
 
 import { getName, getMembers, slotCount, getRefines, getFallbackMember, getPredicate, getEqLhs, getEqRhs, getProofReason, getProofCounterexample, getAbstractDomain, getEffectBound, hasName, hasDischarged, stampProposition, stampProofReason, stampProofCounterexample, stampEqOperands, stampLawBacking, backingsOf, stampBackings, unionBackings, indexGet, HOST_KEYS } from "./slot-accessors.js";
-import { hasShapeSlot, metaReadRaw, metaOf, cloneMeta, metaFieldList, PRESERVED_FN_META_KEYS, viralFields, sourceOf, SOURCE_FIELD, carryMeta } from "./metadata.js";
+import { hasShapeSlot, metaReadRaw, metaOf, cloneMeta, metaFieldList, PRESERVED_FN_META_KEYS, viralFields, viralOnto, sourceOf, SOURCE_FIELD, carryMeta } from "./metadata.js";
 import { kernelFieldWriter, registerMetaField, assertNotIntegrityKey, installAnalysis, FIELD_WRITER_BRAND } from "./capability.js";
 import type { LawBackingRec } from "./slot-accessors.js";
 import {
@@ -2292,6 +2292,19 @@ const typed_function_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
 
 // --- Logical operators (short-circuiting) ---
 
+// B-156 (short-circuit over an error value), ruling R3 (a) of
+// `docs/plans/pilot-findings.md`: `&&`, `||` and `!` join the viral rule.
+// They are lazy, so the evaluator's viral check over an eager primitive's
+// evaluated arguments never sees their operands; each asks the propagation
+// table itself, through `viralOnto`, the entry point that check uses. A
+// resolved operand carrying a viral field yields what the table gives (the
+// operand, with the field and its `type` on it) before its bits are read:
+// the left operand first, then the right one when it is evaluated. An
+// unresolved operand is still speculated (B-172 C2), unchanged.
+function viralOperand(operand: Value): Value | null {
+  return viralOnto([operand], operand);
+}
+
 const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   // args[0] = left operand, args[1] = zero-param thunk wrapping right operand.
   // Pure logical AND with short-circuit. Type-axis conjunction is `&` →
@@ -2307,6 +2320,8 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const right = _evaluateSpeculatively(args[1], ctx!, evalFn!);
     return makeExpr(makePrimitive("typed_and", typed_and_impl, true), [left, makeComposedFn([], right)]);
   }
+  const leftViral = viralOperand(left);
+  if (leftViral) return leftViral;
   const leftP = left;
   if (leftP.kind === ValueKind.Bits && leftP.data === 0n) {
     return withType(makeInt(0), BoolType);
@@ -2324,6 +2339,8 @@ const typed_and_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
     rightVal = evalFn!(makeExpr(right, []), ctx!);
   }
+  const rightViral = viralOperand(rightVal);
+  if (rightViral) return rightViral;
   const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data === 0n) {
     return withType(makeInt(0), BoolType);
@@ -2404,6 +2421,8 @@ const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
     const right = _evaluateSpeculatively(args[1], ctx!, evalFn!);
     return makeExpr(makePrimitive("typed_or", typed_or_impl, true), [left, makeComposedFn([], right)]);
   }
+  const leftViral = viralOperand(left);
+  if (leftViral) return leftViral;
   // Short-circuit: if left is truthy, return true without evaluating right
   const leftP = left;
   if (leftP.kind === ValueKind.Bits && leftP.data !== 0n) {
@@ -2419,6 +2438,8 @@ const typed_or_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (right.kind === ValueKind.ComposedFunction && right.params.length === 0) {
     rightVal = evalFn!(makeExpr(right, []), ctx!);
   }
+  const rightViral = viralOperand(rightVal);
+  if (rightViral) return rightViral;
   const rightP = rightVal;
   if (rightP.kind === ValueKind.Bits && rightP.data !== 0n) {
     return withType(makeInt(1), BoolType);
@@ -2431,6 +2452,8 @@ const typed_not_impl: PrimitiveFnImpl = (args, ctx, evalFn) => {
   if (!isResolved(val)) {
     return makeExpr(makePrimitive("typed_not", typed_not_impl, true), [val]);
   }
+  const viral = viralOperand(val);
+  if (viral) return viral;
   const p = val;
   if (p.kind === ValueKind.Bits && p.data === 0n) {
     return withType(makeInt(1), BoolType);
