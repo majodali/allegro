@@ -11,9 +11,9 @@
   ],
   "sources": {
     "lib/units.alg": {
-      "chars": 9960,
-      "matchAttempts": 134246,
-      "memoWrites": 203463,
+      "chars": 11420,
+      "matchAttempts": 143630,
+      "memoWrites": 217004,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 119518
@@ -28,40 +28,40 @@
     },
     "lib/planning.alg": {
       "chars": 52260,
-      "matchAttempts": 649616,
-      "memoWrites": 988794,
+      "matchAttempts": 653908,
+      "memoWrites": 997378,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 576677
     },
     "tests/planning-solve-demo.alg": {
       "chars": 7317,
-      "matchAttempts": 50788,
-      "memoWrites": 75588,
+      "matchAttempts": 51379,
+      "memoWrites": 76738,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 45230
     },
     "tests/lib/build_pipeline.alg": {
       "chars": 1078,
-      "matchAttempts": 6033,
-      "memoWrites": 8675,
+      "matchAttempts": 6150,
+      "memoWrites": 8897,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 5555
     },
     "demos/rung3/01-model.alg": {
       "chars": 6902,
-      "matchAttempts": 33647,
-      "memoWrites": 49249,
+      "matchAttempts": 34103,
+      "memoWrites": 50127,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 30342
     },
     "demos/rung3/02-solve.alg": {
       "chars": 7999,
-      "matchAttempts": 60692,
-      "memoWrites": 89980,
+      "matchAttempts": 62175,
+      "memoWrites": 92892,
       "invalidationEntries": 0,
       "lrIterations": 0,
       "finalMemoSize": 54048
