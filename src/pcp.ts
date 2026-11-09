@@ -190,7 +190,37 @@ export interface Verdict {
   /** H3: structured guidance for the next attempt. Generated from the
    *  failure modes in this verdict + any priorAttempts metadata. */
   iterationHints?: IterationHints;
+  /** B-187 L2: the plan obligations judged, one per open plan's gap (with
+   *  `plans: true`) or the one supplied obligation of kind "plan".
+   *  Additive optional field; pcp/1 unchanged, and absent unless asked
+   *  for, so a verdict without plans reads as before. */
+  planObligations?: PlanObligationRecord[];
 }
+
+/** B-187 L2: a plan obligation as the verdict records it. `discharged`:
+ *  the open plan's obligations are empty and the plan is solved (the
+ *  library's state "solved"); `pending`: the gap, or the next dead end,
+ *  is still open, or every gap closes and no completion solves (state
+ *  "unsolved"); `refused`: the file no longer answers the obligation it
+ *  was asked (the plan edited, so the identity hash moved, or the open
+ *  plan gone). `message` is the library's answer, read as data; for
+ *  `refused` it is the protocol's reason. */
+export interface PlanObligationRecord {
+  /** The open plan's binding. */
+  binding: string;
+  /** The gap the obligation names, in planning words. */
+  gap: string;
+  /** The obligation's identity hash. */
+  hash: string;
+  status: "discharged" | "pending" | "refused";
+  /** The library's state for the open plan, when the plan was found. */
+  state?: PlanState;
+  message: string;
+}
+
+/** The kernel's answer for an open plan, as `lib/planning_loop.alg`
+ *  stores it in the `OpenPlan` record. */
+export type PlanState = "open" | "unsolved" | "solved";
 
 export interface LawObligationRecord {
   /** Implementing type's name (resolved after auto-naming). */
@@ -696,6 +726,21 @@ export function formatVerdict(v: Verdict): string {
       lines.push(`    ? ${o.from}->${o.to} ${o.obligation}`);
     }
   }
+  // B-187 L2: the plan obligations, after the laws and coercions, in the
+  // form of the laws' line; the ledger below is untouched (L5's).
+  if (v.planObligations && v.planObligations.length > 0) {
+    const discharged = v.planObligations.filter(o => o.status === "discharged");
+    const pending    = v.planObligations.filter(o => o.status === "pending");
+    const refused    = v.planObligations.filter(o => o.status === "refused");
+    lines.push(
+      `  plans: ${discharged.length}/${v.planObligations.length} discharged` +
+      (pending.length > 0 ? `, ${pending.length} pending` : "") +
+      (refused.length > 0 ? `, ${refused.length} REFUSED` : ""));
+    for (const o of v.planObligations) {
+      const mark = o.status === "discharged" ? "✓" : o.status === "pending" ? "?" : "✗";
+      lines.push(`    ${mark} ${o.binding}: ${o.gap} — ${o.message}`);
+    }
+  }
   // D2 roll-up (B-091): the assumption ledger — one place answering
   // "what does this module's verification rest on?". Admitted/sampled
   // assumptions in force, each mapped to the proofs resting on it;
@@ -766,6 +811,7 @@ export function buildVerdict(
   evalCtx: StructureValue,
   report: CompilationReport | undefined,
   obligation?: Obligation,
+  opts?: { plans?: boolean },
 ): Verdict {
   const theorems: TheoremResult[] = [];
   for (const [key, binding] of evalCtx.bindings) {
@@ -894,6 +940,20 @@ export function buildVerdict(
   }
   const liveness = livenessDispositions()
     .filter(d => d.tier === "admitted" && usedSources.has(d.source));
+  // B-187 L2: plan obligations, opt-in like `extractObligations`'s. A
+  // supplied obligation of kind "plan" is judged against this file; with
+  // `plans`, every open plan's own obligations (or, when it has none, its
+  // answer) are recorded. A pending plan obligation does not flip
+  // `verified` (as a pending law does not); a supplied one must be
+  // discharged, as a supplied theorem must (`checkObligationSatisfied`).
+  const planObligations: PlanObligationRecord[] = [];
+  if (opts?.plans) planObligations.push(...planObligationRecords(evalCtx));
+  if (obligation?.kind === "plan" && obligation.plan) {
+    const judged = judgePlanObligation(evalCtx, obligation.plan);
+    const i = planObligations.findIndex(r => r.binding === judged.binding);
+    if (i >= 0) planObligations.splice(i, planObligations.filter(r => r.binding === judged.binding).length, judged);
+    else planObligations.push(judged);
+  }
   return {
     version: PCP_VERSION,
     verified: !anyError && !hasFailedTheorem,
@@ -906,6 +966,7 @@ export function buildVerdict(
     ...(liveness.length > 0 ? { liveness } : {}),
     ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
         ? { iterationHints } : {}),
+    ...(planObligations.length > 0 ? { planObligations } : {}),
   };
 }
 
@@ -1237,6 +1298,268 @@ function planObligationContent(
   };
 }
 
+// =============================================================================
+// B-187 L2: the proposal protocol for plan obligations
+// =============================================================================
+//
+// A proposal (docs/plans/planning-loop.md, the term) answers a plan
+// obligation with ONE catalog entry, written as a node block (ruling R2
+// (a)). The protocol splices it into the open plan's `catalog NAME:` block,
+// never into the plan; the kernel re-evaluates the file; and the answer is
+// read from the `OpenPlan` record the planning loop library stored
+// (`surface`, `state`, `answer`), so no planning word is rendered here.
+// Everything below is pure over text and an evaluated file: the caller
+// evaluates (the CLI's `pcpLoadAndEval`, or chunk L3's in-process loop).
+
+/** Why a proposal was refused. The first three are the splice's, decided
+ *  on the text; the rest are the kernel's, decided on the evaluated file. */
+export type PlanRefusal =
+  | "not-a-node-block" // the text is not one node block
+  | "name-reused"      // the entry's name is a node of the plan or the catalog
+  | "no-catalog"       // the obligation's catalog is not a `catalog NAME:` block
+  | "halt"             // the kernel refused the spliced file (a parse error, say)
+  | "plan-missing"     // the open plan is not in the file
+  | "plan-edited"      // the identity hash moved: the plan was changed
+  | "open"             // a gap is still open: the next dead end
+  | "unsolved";        // every gap closed, and no completion solves
+
+export type PlanSplice =
+  | { ok: true; source: string; entry: string }
+  | { ok: false; refusal: "not-a-node-block" | "name-reused" | "no-catalog"; reason: string };
+
+const NODE_HEADER = /^([A-Z][A-Za-z0-9_]*)[ \t]*:(.*)$/;
+const NESTED_NODE_HEADER = /^[ \t]+([A-Z][A-Za-z0-9_]*)[ \t]*:/;
+
+function escapeRe(x: string): string {
+  return x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** The lines of the indented block opened by the line at `header`: every
+ *  following line until the first non-blank line at the margin. Returns
+ *  the index just past the block's last non-blank line. */
+function blockEnd(lines: string[], header: number): number {
+  let last = header;
+  for (let i = header + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.trim() === "") continue;
+    if (!/^[ \t]/.test(l)) break;
+    last = i;
+  }
+  return last + 1;
+}
+
+function nodeNamesIn(lines: string[], from: number, to: number): string[] {
+  const out: string[] = [];
+  for (let i = from; i < to; i++) {
+    const m = NESTED_NODE_HEADER.exec(lines[i]);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/** Splice a proposal into the open plan's catalog: the source with the
+ *  node block appended, at the catalog's indentation, as the last entry
+ *  of the `catalog NAME:` block the obligation names (`plan.catalog`).
+ *  The plan's block is never touched.
+ *
+ *  Refused, with the reason, when the text is not one node block (checked
+ *  on its layout only: a first line `Name:` or `Name: uses target`, every
+ *  further line indented under it; whether the items parse is the
+ *  kernel's, which refuses the spliced file with its parse error, refusal
+ *  "halt"), when the entry's name is already a node of the plan or the
+ *  catalog, or when the catalog is not found as a `catalog NAME:` block. */
+export function splicePlanProposal(
+  source: string,
+  obligation: PlanObligationContent,
+  proposal: string,
+): PlanSplice {
+  // The proposal, dedented, without leading and trailing blank lines.
+  let pl = proposal.replace(/\r\n/g, "\n").split("\n");
+  while (pl.length > 0 && pl[0].trim() === "") pl.shift();
+  while (pl.length > 0 && pl[pl.length - 1].trim() === "") pl.pop();
+  if (pl.length === 0) {
+    return { ok: false, refusal: "not-a-node-block", reason: "the proposal is empty: reply with one node block, as `Ship:` and its items" };
+  }
+  const margin = Math.min(...pl.filter(l => l.trim() !== "").map(l => /^[ \t]*/.exec(l)![0].length));
+  pl = pl.map(l => l.trim() === "" ? "" : l.slice(margin));
+  const first = pl[0];
+  const kw = /^(catalog|plan)\b/.exec(first);
+  if (kw) {
+    return { ok: false, refusal: "not-a-node-block",
+      reason: `the proposal starts with \`${kw[1]}\`: reply with the node block alone, without the \`catalog\` or \`plan\` keyword` };
+  }
+  const head = NODE_HEADER.exec(first);
+  if (!head) {
+    return { ok: false, refusal: "not-a-node-block",
+      reason: `the proposal is not a node block: its first line, \`${first.trim()}\`, must be a capitalised node name and a colon, as \`Ship:\`` };
+  }
+  const name = head[1];
+  const rest = head[2].trim();
+  if (rest !== "" && !/^uses\b/.test(rest)) {
+    return { ok: false, refusal: "not-a-node-block",
+      reason: `the proposal is not a node block: after \`${name}:\` comes \`${rest}\`; a node's items go on the lines below it, indented, and only \`uses\` follows the colon` };
+  }
+  if (rest === "" && pl.length < 2) {
+    return { ok: false, refusal: "not-a-node-block",
+      reason: `the proposal is not a node block: \`${name}:\` has no items under it` };
+  }
+  for (let i = 1; i < pl.length; i++) {
+    const l = pl[i];
+    if (l !== "" && !/^[ \t]/.test(l)) {
+      return { ok: false, refusal: "not-a-node-block",
+        reason: `the proposal is more than one node block: line ${i + 1}, \`${l.trim()}\`, starts another statement at the margin` };
+    }
+    if (rest !== "" && l !== "") {
+      return { ok: false, refusal: "not-a-node-block",
+        reason: `the proposal is not a node block: \`${name}: ${rest}\` borrows a plan and takes no items under it` };
+    }
+  }
+
+  const catalog = obligation.catalog;
+  const lines = source.replace(/\r\n/g, "\n").split("\n");
+  if (!catalog) {
+    return { ok: false, refusal: "no-catalog",
+      reason: `the open plan \`${obligation.binding}\` has no catalog binding the protocol can name: its catalog is not a top-level binding` };
+  }
+  const header = lines.findIndex(l => new RegExp(`^catalog[ \\t]+${escapeRe(catalog)}[ \\t]*:[ \\t]*$`).test(l));
+  if (header < 0) {
+    const asList = lines.some(l => new RegExp(`^${escapeRe(catalog)}[ \\t]*=`).test(l));
+    return { ok: false, refusal: "no-catalog",
+      reason: asList
+        ? `the catalog \`${catalog}\` is written as an expression, not as a \`catalog ${catalog}:\` block: a node block is spliced into the block form only`
+        : `the catalog \`${catalog}\` is not found in the source as a \`catalog ${catalog}:\` block` };
+  }
+  const end = blockEnd(lines, header);
+  const held = nodeNamesIn(lines, header + 1, end);
+  const planHeader = lines.findIndex(l =>
+    new RegExp(`^plan[ \\t]+${escapeRe(obligation.binding)}[ \\t]+from[ \\t]+${escapeRe(catalog)}[ \\t]*:`).test(l));
+  if (planHeader >= 0) held.push(...nodeNamesIn(lines, planHeader + 1, blockEnd(lines, planHeader)));
+  if (held.includes(name)) {
+    return { ok: false, refusal: "name-reused",
+      reason: `the proposal's node \`${name}\` reuses a name the plan or the catalog \`${catalog}\` already has: name the new entry differently` };
+  }
+  const firstEntry = lines.slice(header + 1, end).find(l => l.trim() !== "");
+  const indent = firstEntry ? /^[ \t]*/.exec(firstEntry)![0] : "  ";
+  const spliced = pl.map(l => l === "" ? "" : indent + l);
+  const out = [...lines.slice(0, end), ...spliced, ...lines.slice(end)];
+  return { ok: true, source: out.join("\n"), entry: name };
+}
+
+/** The open plan bound as `binding`, read from the `OpenPlan` record. */
+function openPlanRecord(evalCtx: StructureValue, binding: string): {
+  surface: string; state: PlanState; answer: string; obligations: PlanObligationContent[];
+} | null {
+  const openPlanType = scopeAllBindings(evalCtx).get("OpenPlan")?.value;
+  const v = evalCtx.bindings.get(binding)?.value;
+  if (!openPlanType || !v || !isStructure(v) || metaReadRaw(v, "type") !== openPlanType) return null;
+  const surface = _ctxString(v, "surface"), state = _ctxString(v, "state"), answer = _ctxString(v, "answer");
+  if (surface === undefined || answer === undefined) return null;
+  if (state !== "open" && state !== "unsolved" && state !== "solved") return null;
+  const obligations = extractPlanObligations(evalCtx)
+    .filter(o => o.plan?.binding === binding).map(o => o.plan!);
+  return { surface, state, answer, obligations };
+}
+
+/** Judge a plan obligation against an evaluated file: discharged when the
+ *  open plan's obligations are empty and the plan is solved; pending, with
+ *  the library's answer (the next dead end, or the budget missed, or the
+ *  finding the completed plan fails); refused when the open plan is gone
+ *  or the plan was edited. The identity is the file's `plan_surface` with
+ *  the obligation's gap, hashed as `plan_identity` is: a catalog entry
+ *  leaves it, a change to the plan's name, inputs, outcomes or budget
+ *  moves it. */
+export function judgePlanObligation(
+  evalCtx: StructureValue,
+  p: PlanObligationContent,
+): PlanObligationRecord {
+  const base = { binding: p.binding, gap: p.gap, hash: p.hash };
+  const op = openPlanRecord(evalCtx, p.binding);
+  if (!op) {
+    return { ...base, status: "refused", message: `the open plan \`${p.binding}\` is not in the file` };
+  }
+  const at = p.identity.lastIndexOf("; gap ");
+  const identity = op.surface + (at >= 0 ? p.identity.slice(at) : "");
+  const fileHash = hashProposition(identity);
+  if (fileHash !== p.hash) {
+    return { ...base, status: "refused", state: op.state,
+      message: `the plan was edited: the obligation's hash is ${p.hash}, the file's is ${fileHash}; a proposal adds a catalog entry and leaves the plan as written` };
+  }
+  return { ...base, status: op.state === "solved" ? "discharged" : "pending", state: op.state, message: op.answer };
+}
+
+/** Every open plan's record in the verdict (`buildVerdict` with `plans`):
+ *  each obligation it still carries as pending with its message, or, when
+ *  it carries none, one record of its answer (discharged when solved). */
+function planObligationRecords(evalCtx: StructureValue): PlanObligationRecord[] {
+  const out: PlanObligationRecord[] = [];
+  const openPlanType = scopeAllBindings(evalCtx).get("OpenPlan")?.value;
+  if (!openPlanType) return out;
+  for (const [key] of evalCtx.bindings) {
+    const op = openPlanRecord(evalCtx, key);
+    if (!op) continue;
+    if (op.obligations.length > 0) {
+      for (const o of op.obligations) {
+        out.push({ binding: key, gap: o.gap, hash: o.hash, status: "pending", state: op.state, message: o.message });
+      }
+    } else {
+      out.push({ binding: key, gap: "every gap closed", hash: hashProposition(op.surface),
+        status: op.state === "solved" ? "discharged" : "pending", state: op.state, message: op.answer });
+    }
+  }
+  return out;
+}
+
+/** The kernel's answer to one proposal. */
+export interface PlanProposalAnswer {
+  accepted: boolean;
+  /** Absent when accepted. */
+  refusal?: PlanRefusal;
+  /** In planning words: the solution when accepted; the library's answer
+   *  for "open" and "unsolved"; the protocol's reason otherwise. */
+  message: string;
+  /** The spliced source, when the splice succeeded. */
+  source?: string;
+  /** The entry's node name, when the splice succeeded. */
+  entry?: string;
+}
+
+/** Splice, evaluate, judge: the protocol's whole turn for one proposal.
+ *  `evaluate` is the caller's (it loads the file's `use` header as the CLI
+ *  does); a throw from it is the kernel refusing the spliced file. */
+export function answerPlanProposal(args: {
+  source: string;
+  obligation: Obligation;
+  proposal: string;
+  evaluate: (source: string) => { evalCtx: StructureValue };
+}): PlanProposalAnswer {
+  const p = args.obligation.plan;
+  if (args.obligation.kind !== "plan" || !p) {
+    return { accepted: false, refusal: "plan-missing", message: "the obligation is not a plan obligation" };
+  }
+  const sp = splicePlanProposal(args.source, p, args.proposal);
+  if (!sp.ok) return { accepted: false, refusal: sp.refusal, message: sp.reason };
+  let evalCtx: StructureValue;
+  try {
+    evalCtx = args.evaluate(sp.source).evalCtx;
+  } catch (e: any) {
+    return { accepted: false, refusal: "halt", source: sp.source, entry: sp.entry,
+      message: `the kernel refused the file with the entry spliced: ${String(e?.message ?? e).split("\n")[0]}` };
+  }
+  const r = judgePlanObligation(evalCtx, p);
+  const more = { source: sp.source, entry: sp.entry };
+  if (r.status === "discharged") return { accepted: true, message: r.message, ...more };
+  if (r.status === "refused") {
+    return { accepted: false, refusal: r.state === undefined ? "plan-missing" : "plan-edited", message: r.message, ...more };
+  }
+  return { accepted: false, refusal: r.state === "unsolved" ? "unsolved" : "open", message: r.message, ...more };
+}
+
+/** One line per answer, for the CLI and the worker's feedback. */
+export function formatPlanProposalAnswer(a: PlanProposalAnswer): string {
+  if (a.accepted) return `accepted: the gap is closed and the plan solved: ${a.message}`;
+  return `refused (${a.refusal}): ${a.message}`;
+}
+
 /** Did the candidate satisfy the obligation? Used by `allegro verify
  *  --obligation O.json`: the obligation's theorem must appear in the
  *  verdict as discharged, with matching propositionHash. Returns null
@@ -1245,6 +1568,15 @@ export function checkObligationSatisfied(
   obligation: Obligation,
   verdict: Verdict,
 ): string | null {
+  // B-187 L2: a plan obligation is judged by `buildVerdict` (given the
+  // obligation) into `planObligations`; satisfied when discharged there.
+  if (obligation.kind === "plan" && obligation.plan) {
+    const p = obligation.plan;
+    const r = (verdict.planObligations ?? []).find(r => r.binding === p.binding && r.hash === p.hash);
+    if (!r) return `plan obligation \`${p.binding}\` (${p.gap}) was not judged: pass the obligation to buildVerdict`;
+    if (r.status !== "discharged") return `plan obligation \`${p.binding}\` (${p.gap}) is ${r.status}: ${r.message}`;
+    return null;
+  }
   const t = verdict.theorems.find(t => t.name === obligation.theorem.name);
   if (!t) {
     return `obligation theorem \`${obligation.theorem.name}\` not present in candidate`;
@@ -1322,6 +1654,14 @@ export function formatTodo(args: {
     const ob = s.obligation;
     lines.push(`## \`${ob.theorem.name}\``);
     lines.push("");
+    // B-187 L2: a plan obligation's section, in planning words: the gap,
+    // the search that reached it, the catalog to extend and the hash.
+    if (ob.kind === "plan" && ob.plan) {
+      lines.push(...formatPlanTodo(ob.plan));
+      lines.push("---");
+      lines.push("");
+      continue;
+    }
     lines.push("**Proposition:**");
     lines.push("");
     lines.push("```allegro");
@@ -1371,4 +1711,24 @@ export function formatTodo(args: {
 
   lines.push("_When done, run `allegro verify` on the source file to confirm._");
   return lines.join("\n");
+}
+
+/** B-187 L2: the TODO section of a plan obligation, in the form of a
+ *  theorem's: what is missing, where the answer goes, and the hash that
+ *  refuses an answer which edits the plan instead. */
+function formatPlanTodo(p: PlanObligationContent): string[] {
+  const lines: string[] = [];
+  lines.push(`**Gap:** ${p.message}`);
+  lines.push("");
+  if (p.steps.length > 0) {
+    lines.push(`**Search so far:** ${p.steps.join(", ")}`);
+    lines.push("");
+  }
+  lines.push(p.catalog
+    ? `**Catalog to extend:** \`${p.catalog}\`: add one node block that produces \`${p.port}\`; leave the plan \`${p.binding}\` as written.`
+    : `**Catalog to extend:** the catalog of \`${p.binding}\` (not a top-level binding): add one node block that produces \`${p.port}\`; leave the plan as written.`);
+  lines.push("");
+  lines.push(`**Hash:** \`${p.hash}\` (over: ${p.identity})`);
+  lines.push("");
+  return lines;
 }

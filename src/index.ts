@@ -491,7 +491,10 @@ async function runPcpVerify(
   const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation);
 
   // Cross-check the obligation: the candidate must satisfy the named
-  // theorem with a matching propositionHash (blocks trivial-pass).
+  // theorem with a matching propositionHash (blocks trivial-pass). B-187
+  // L2: an obligation of kind "plan" (from `obligations --json`) is judged
+  // by buildVerdict into the verdict's `planObligations`, and satisfied
+  // when discharged there with a matching identity hash.
   if (obligation) {
     const err = checkObligationSatisfied(obligation, verdict);
     if (err) {

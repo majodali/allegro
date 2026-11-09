@@ -27,6 +27,10 @@ import {
   buildVerdict, extractObligations, checkObligationSatisfied,
 } from "../pcp.js";
 import {
+  splicePlanProposal, judgePlanObligation, answerPlanProposal, formatPlanProposalAnswer,
+} from "../pcp.js";
+import * as os from "os";
+import {
   extractCodeBlocks, spliceProof, buildIterationMessage,
   classifyStrategy, loadPrimer, runLlmWorker, LlmClient,
 } from "../../pcp/llm-worker.js";
@@ -499,6 +503,226 @@ test("B-187 L1: CLI `obligations --pending` lists the demo's plan obligation wit
   eq(propose.stdout.includes("Shipped"), false, "propose does not render the plan obligation yet");
   const verify = spawnSync("npx", ["tsx", "src/index.ts", "verify", file], { encoding: "utf-8" });
   eq(verify.status, 0, verify.stderr);
+});
+
+// --- B-187 L2: the proposal protocol (docs/plans/planning-loop.md) ---
+//
+// A proposal is one node block, spliced as one more entry of the open
+// plan's `catalog NAME:` block; the plan never changes. The kernel's answer
+// is read from the `OpenPlan` record the library stores (`surface`,
+// `state`, `answer`): the plan solved, or the refusal in planning words.
+
+const proposalSource = (planOutcomes = "Delivered"): string => [
+  `catalog yard:`,
+  `  Depot:`,
+  `    inputs: Shipped`,
+  `    outcomes: Sorted`,
+  `    estimate: 30 min, 0.25 person-hours`,
+  `  Van:`,
+  `    inputs: Sorted`,
+  `    outcomes: Delivered`,
+  `    estimate: 60 min, 0.5 person-hours`,
+  ``,
+  `plan Fulfil from yard:`,
+  `  inputs: Order`,
+  `  outcomes: ${planOutcomes}`,
+  `  budget: 160 min`,
+  `  Pack:`,
+  `    inputs: Order`,
+  `    outcomes: Packed`,
+  `    estimate: 20 min, 0.5 person-hours`,
+  ``,
+].join("\n");
+
+const evalPlanFile = (src: string) =>
+  runtimeEval(src, undefined, planLoopExts(), undefined, true, undefined, /*softFail*/ true);
+
+const planObligationOfSource = (src: string): Obligation =>
+  extractObligations(evalPlanFile(src).evalCtx, undefined, { plans: true }).filter(o => o.kind === "plan")[0];
+
+const SHIP = "Ship:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours\n";
+const FREIGHT = "Freight:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 90 min, 0.25 person-hours\n";
+const COURIER = "Courier:\n  inputs: Labelled\n  outcomes: Shipped\n  estimate: 40 min, 0.25 person-hours\n";
+
+test("B-187 L2: splicePlanProposal appends one node block to the named catalog and leaves the plan", () => {
+  const src = proposalSource();
+  const ob = planObligationOfSource(src);
+  eq(ob.plan!.catalog, "yard");
+  eq(ob.plan!.identity, "plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot");
+  const sp = splicePlanProposal(src, ob.plan!, SHIP);
+  eq(sp.ok, true);
+  if (!sp.ok) return;
+  eq(sp.entry, "Ship");
+  const lines = sp.source.split("\n");
+  eq(lines.slice(9, 13).join("\n"), "  Ship:\n    inputs: Packed\n    outcomes: Shipped\n    estimate: 45 min, 0.25 person-hours",
+     "the entry follows the catalog's last entry, at its indentation");
+  eq(sp.source.includes(src.split("\n").slice(10).join("\n")), true, "the plan's block is unchanged");
+  // An indented reply is dedented first.
+  const indented = splicePlanProposal(src, ob.plan!, "    Ship:\n      inputs: Packed\n      outcomes: Shipped\n");
+  eq(indented.ok && indented.source.includes("\n  Ship:\n    inputs: Packed\n"), true);
+});
+
+test("B-187 L2: the kernel's answer per proposal: closed and solved, the next dead end, the budget missed", () => {
+  const src = proposalSource();
+  const obligation = planObligationOfSource(src);
+  const answer = (proposal: string) => answerPlanProposal({ source: src, obligation, proposal, evaluate: evalPlanFile });
+  const closing = answer(SHIP);
+  eq(closing.accepted, true, closing.message);
+  eq(closing.message, "Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+  eq(formatPlanProposalAnswer(closing),
+     "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+  const open = answer(COURIER);
+  eq(open.accepted, false);
+  eq(open.refusal, "open");
+  eq(open.message, "nothing in the catalog produces Labelled, which Courier needs", "the next dead end, the new obligation's message");
+  const over = answer(FREIGHT);
+  eq(over.accepted, false);
+  eq(over.refusal, "unsolved");
+  eq(over.message, "no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min");
+  eq(formatPlanProposalAnswer(over), `refused (unsolved): ${over.message}`);
+});
+
+test("B-187 L2: a plan edit is refused by the identity hash; a second statement by the splice", () => {
+  const src = proposalSource();
+  const ob = planObligationOfSource(src);
+  // A reply that would also redeclare the plan is not one node block.
+  const redeclare = splicePlanProposal(src, ob.plan!,
+    SHIP + "plan Fulfil from yard:\n  inputs: Order\n  outcomes: Packed\n");
+  eq(redeclare.ok, false);
+  eq(!redeclare.ok && redeclare.refusal, "not-a-node-block");
+  eq(!redeclare.ok && redeclare.reason, "the proposal is more than one node block: line 5, `plan Fulfil from yard:`, starts another statement at the margin");
+  // A file whose plan was edited (as a human might, beside the entry): the
+  // plan solves, but the obligation's hash no longer matches the file's.
+  const sp = splicePlanProposal(src, ob.plan!, SHIP);
+  if (!sp.ok) throw new Error(sp.reason);
+  const edited = sp.source.replace("  outcomes: Delivered\n  budget:", "  outcomes: Sorted\n  budget:");
+  eq(edited !== sp.source, true);
+  const judged = judgePlanObligation(evalPlanFile(edited).evalCtx, ob.plan!);
+  eq(judged.status, "refused");
+  const editedHash = hashProposition("plan Fulfil; inputs Order; outcomes Sorted; budget duration 160 min, effort none, money none; gap Shipped by Depot");
+  eq(judged.message, `the plan was edited: the obligation's hash is ${ob.plan!.hash}, the file's is ${editedHash}; a proposal adds a catalog entry and leaves the plan as written`);
+  // The same file with the plan as written is discharged.
+  eq(judgePlanObligation(evalPlanFile(sp.source).evalCtx, ob.plan!).status, "discharged");
+});
+
+test("B-187 L2: the splice's other refusals: a keyword, a reused name, a list catalog, a parse the kernel refuses", () => {
+  const src = proposalSource();
+  const ob = planObligationOfSource(src);
+  const refuse = (text: string, source = src) => {
+    const r = splicePlanProposal(source, ob.plan!, text);
+    return r.ok ? "spliced" : `${r.refusal}: ${r.reason}`;
+  };
+  eq(refuse("catalog more:\n  " + SHIP.replace(/\n/g, "\n  ")),
+     "not-a-node-block: the proposal starts with `catalog`: reply with the node block alone, without the `catalog` or `plan` keyword");
+  eq(refuse("ship = leaf(\"Ship\", [port(\"Packed\")], [port(\"Shipped\")])"),
+     "not-a-node-block: the proposal is not a node block: its first line, `ship = leaf(\"Ship\", [port(\"Packed\")], [port(\"Shipped\")])`, must be a capitalised node name and a colon, as `Ship:`");
+  eq(refuse("Van:\n  inputs: Packed\n  outcomes: Shipped\n"),
+     "name-reused: the proposal's node `Van` reuses a name the plan or the catalog `yard` already has: name the new entry differently");
+  eq(refuse("Pack:\n  inputs: Packed\n  outcomes: Shipped\n"),
+     "name-reused: the proposal's node `Pack` reuses a name the plan or the catalog `yard` already has: name the new entry differently");
+  // L1's demo writes its catalog as a list expression: nothing to splice into.
+  const listSource = openPlanSource("Delivered", "[depot, van]");
+  const listOb = planObligationsOf(listSource)[0];
+  eq(splicePlanProposal(listSource, listOb.plan!, SHIP).ok, false);
+  const r = splicePlanProposal(listSource, listOb.plan!, SHIP);
+  eq(!r.ok && r.reason, "the catalog `yard` is written as an expression, not as a `catalog yard:` block: a node block is spliced into the block form only");
+  // Items that do not parse: the splice passes the layout check, and the
+  // kernel's parse refuses the file.
+  const bad = answerPlanProposal({ source: src, obligation: ob, proposal: "Ship:\n  inputz: Packed\n", evaluate: evalPlanFile });
+  eq(bad.accepted, false);
+  eq(bad.refusal, "halt");
+  eq(bad.message.startsWith("the kernel refused the file with the entry spliced: Parse error"), true, bad.message);
+});
+
+test("B-187 L2: buildVerdict records plan obligations only when asked; a verdict without them is unchanged", () => {
+  const src = proposalSource();
+  const ob = planObligationOfSource(src);
+  const res = evalPlanFile(src);
+  const plain = buildVerdict(res.evalCtx, res.compilationReport);
+  eq(plain.planObligations, undefined, "absent unless asked for");
+  const theorems = runtimeEval(`theorem a: 1 == 1\n`, undefined, [typeExt], undefined, true, undefined, true);
+  const stamp = (v: Verdict) => JSON.stringify(v).replace(/"verifiedAt":"[^"]*"/g, `"verifiedAt":"-"`);
+  eq(stamp(buildVerdict(theorems.evalCtx, theorems.compilationReport, undefined, { plans: true })),
+     stamp(buildVerdict(theorems.evalCtx, theorems.compilationReport)), "a file without open plans: the same verdict");
+  const withPlans = buildVerdict(res.evalCtx, res.compilationReport, undefined, { plans: true });
+  eq(withPlans.planObligations!.length, 1);
+  eq(withPlans.planObligations![0].status, "pending");
+  eq(withPlans.verified, true, "a pending plan obligation does not flip verified, as a pending law does not");
+  const text = formatVerdict(withPlans);
+  eq(text.includes("  plans: 0/1 discharged, 1 pending\n    ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs"), true, text);
+  // Supplied, the obligation must be discharged.
+  const supplied = buildVerdict(res.evalCtx, res.compilationReport, ob);
+  eq(checkObligationSatisfied(ob, supplied), "plan obligation `Fulfil` (Shipped, which Depot needs) is pending: nothing in the catalog produces Shipped, which Depot needs");
+  const sp = splicePlanProposal(src, ob.plan!, SHIP);
+  if (!sp.ok) throw new Error(sp.reason);
+  const closed = evalPlanFile(sp.source);
+  const done = buildVerdict(closed.evalCtx, closed.compilationReport, ob, { plans: true });
+  eq(checkObligationSatisfied(ob, done), null);
+  eq(done.planObligations!.length, 1, "the supplied obligation replaces the open plan's own record");
+  eq(formatVerdict(done).includes("  plans: 1/1 discharged\n    ✓ Fulfil: Shipped, which Depot needs — Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min"), true);
+  // The JSON round-trips through the pcp/1 validator.
+  eq(parseVerdict(serializeVerdict(done)).planObligations![0].status, "discharged");
+});
+
+test("B-187 L2: formatTodo renders a plan obligation in planning words, with the catalog to extend and the hash", () => {
+  const ob = planObligationOfSource(proposalSource());
+  const md = formatTodo({ filename: "fulfil.alg", totalObligations: 1, sections: [{ obligation: ob }] });
+  eq(md, [
+    "# Proof TODO — `fulfil.alg`",
+    "",
+    "**1 pending** of 1 obligation(s).",
+    "",
+    "## `Fulfil: Shipped, which Depot needs`",
+    "",
+    "**Gap:** nothing in the catalog produces Shipped, which Depot needs",
+    "",
+    "**Search so far:** Delivered from Van, Sorted from Depot",
+    "",
+    "**Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.",
+    "",
+    `**Hash:** \`${ob.plan!.hash}\` (over: plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot)`,
+    "",
+    "---",
+    "",
+    "_When done, run `allegro verify` on the source file to confirm._",
+  ].join("\n"));
+});
+
+test("B-187 L2: the human path on L1's open plan through the CLI: obligations, edit, verify --obligation", () => {
+  // L1's demo, its open plan only (the demo's later lines read the open
+  // obligation and would halt once it closes), in a scratch directory.
+  const l1 = fs.readFileSync(path.join(testsDir, "planning-loop-obligations.alg"), "utf-8").split("\n").slice(0, 23).join("\n") + "\n";
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l2-"));
+  try {
+    const file = path.join(dir, "fulfil.alg");
+    fs.writeFileSync(file, l1);
+    const obs = spawnSync("npx", ["tsx", "src/index.ts", "obligations", file, "--pending", "--json"], { encoding: "utf-8" });
+    eq(obs.status, 0, obs.stderr);
+    const planLine = obs.stdout.trim().split("\n").find(l => JSON.parse(l).kind === "plan")!;
+    const obPath = path.join(dir, "O.json");
+    fs.writeFileSync(obPath, planLine);
+    const verify = (f: string) => spawnSync("npx", ["tsx", "src/index.ts", "verify", f, "--obligation", obPath], { encoding: "utf-8" });
+    const before = verify(file);
+    eq(before.status, 1, "the obligation is open");
+    eq(before.stdout.includes("  plans: 0/1 discharged, 1 pending\n    ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs\n"), true, before.stdout);
+    // The edit: the hand-written entry of L1's demo, added to the catalog.
+    const ship = `ship  = with_estimate(leaf("Ship", [port("Packed")], [port("Shipped")]), est(45 min, person_hours(0.25), none))\n`;
+    const editedFile = path.join(dir, "edited.alg");
+    fs.writeFileSync(editedFile, l1.replace("yard  = [depot, van]\n", ship + "yard  = [depot, van, ship]\n"));
+    const after = verify(editedFile);
+    eq(after.status, 0, after.stdout + after.stderr);
+    eq(after.stdout.startsWith("Verdict (verified): 0/0 discharged\n"), true, after.stdout);
+    eq(after.stdout.includes("  plans: 1/1 discharged\n    ✓ Fulfil: Shipped, which Depot needs — Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min\n"), true, after.stdout);
+    eq(after.stdout.includes("obligation mismatch"), false);
+    // The plan edited as well: refused by the hash.
+    const planEdit = path.join(dir, "plan-edit.alg");
+    fs.writeFileSync(planEdit, fs.readFileSync(editedFile, "utf-8").replace("  outcomes: Delivered\n  Pack:", "  outcomes: Sorted\n  Pack:"));
+    const refused = verify(planEdit);
+    eq(refused.status, 1);
+    eq(refused.stdout.includes("1 REFUSED\n    ✗ Fulfil: Shipped, which Depot needs — the plan was edited: the obligation's hash is 421ea754"), true, refused.stdout);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // --- Phase H3: iteration hints ---
