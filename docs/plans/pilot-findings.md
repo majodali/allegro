@@ -22,6 +22,9 @@ boundary:
   - tests/**
   - src/test/**
   - docs/plans/pilot-findings.md
+  - website/index.html
+  - website/sandbox.html
+  - web/sandbox.html
 ---
 
 # The planning pilot's correctness findings closed — the pilot-findings stream
@@ -831,3 +834,63 @@ maintainer asked for.
     `:2294` moves by 13 to 23 lines; E2 of
     `docs/book/platform/host.ir.md` now reads 4548 and 4672 to 4673.
   - **Oracles**: in the PR body.
+- **2026-11-07 — PF4 landed.** B-154 (unit-name shadowing), R2 (b), on
+  branch `majodali/b154-unit-shadowing` off `origin/main` at `7cd2b72`.
+  - **The change**, in `lib/units.alg` (`:242` to `:262`): `unit_atom`,
+    one labelled regex alternative per shipped unit name (18: km, cm, mm,
+    minutes, minute, min, hours, hour, seconds, kg, Pa, m, s, h, g, N, J,
+    W), each followed by no identifier character, with the name itself
+    as the template, then `u:ident` last; the two `unit_pow`
+    alternatives read `unit_atom`. Template hygiene makes each
+    template's name the module's unit. The comment at `:233` to `:240`
+    restates the rule: shipped names resolve in the module; any other
+    identifier in the consumer's scope, so a file can define units
+    (U-R2 kept) and can no longer give a shipped name its own meaning
+    inside a literal.
+  - **The in-step test**, in `src/test/proofs.ts`: every module binding
+    whose type is the module's `Unit` (aliases such as `min = minute`
+    included) against every `unit_atom` alternative but the last, with
+    the regex name equal to the template name, no duplicates, and the
+    last alternative exactly `u:ident`; a scratch run with one
+    alternative removed fails it (18 against 17).
+  - **The demo** `tests/units-shadowing-demo.alg`, suite-pinned: the
+    cycle `d = 30 s`, `s = d.mag` prints `30` and `30 s`; a
+    function-local `s = 42` leaves `30 s` a quantity; `km = 42` then
+    `30 km` prints `30 km` and converts; a file-defined `furlong`
+    still converts (`603.504 m`); `h` rebound to a hand is the hour
+    inside a literal and the hand by name outside one.
+  - **The outputs comparison** (§3 check 2): 204 of 204 runs identical
+    (`run`, `inspect` and `verify` over 68 programs); the `inspect` of
+    `tests/planning-handlers-demo.alg` unchanged, which the table
+    variant had moved. No new halt.
+  - **The counts** (`npm run lint:load`, matchAttempts / memoWrites,
+    before and after): `lib/units.alg` 134,246 / 203,463 to 143,630 /
+    217,004 (+7.0%, +6.7%; 90 and 138 above the plan's figures, from the
+    longer comment); `lib/planning.alg` 649,616 / 988,794 to 653,908 /
+    997,378; `tests/planning-solve-demo.alg` 50,788 / 75,588 to 51,379 /
+    76,738; `tests/lib/build_pipeline.alg` 6,033 / 8,675 to 6,150 /
+    8,897; `demos/rung3/01-model.alg` 33,647 / 49,249 to 34,103 /
+    50,127; `demos/rung3/02-solve.alg` 60,692 / 89,980 to 62,175 /
+    92,892. The precompile counts are unchanged. The raise is lane P's
+    one-file PR, measured on this branch merged with main, which merges
+    before this chunk (B-164 (ratchet baselines under concurrent
+    merges)).
+  - **A stop met and resolved.** The three web pages carry a generated
+    copy of `lib/units.alg`, and the gate checks the copy against the
+    file since PR #166 (B-176 (the host chapter's findings) item 2), so
+    the change turned two suite tests red. The pages were lane C's only.
+    Resolved by the orchestrating session: lane D's globs gain the three
+    pages in a lane S PR (PR #176), this plan's header boundary names
+    them, and `scripts/sync-web-libs.ts` regenerated them in this
+    chunk. The plan's §2.2 measurement could not see this, since its
+    scratch copy was not a checkout.
+  - **Claims to re-propose** (R5 (b)), all in `docs/book/demo-ladder.ir.md`:
+    C74 ("a twelve-line grammar block": now 31 lines, `lib/units.alg:241`
+    to `:271`), C142 ("246 lines": now 265), E20 (the ranges 235 to 246
+    and the two counts). No book or rung 2 material states "a local
+    rebinding shadows"; that wording was the library comment's only.
+  - **Oracles**: typecheck clean; `npm run lint:units`, `lint:planes`,
+    `lint:docs:check` (ids 784), `lint:ir`, `doc-ref-lint`,
+    `lint:streams` clean; the lane check lane D, 0 outside; `npm run
+    lint:load` 12 counts above the baseline, as expected, until lane P's
+    raise; `npm run test:shards` green but for the load lint.
