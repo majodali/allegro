@@ -29,7 +29,7 @@ boundary:
 > #172, on 2026-11-07, under ruling R4 (B-183's lane) of
 > `docs/plans/pilot-findings.md` §6, which ruled the route and measured
 > the fix. The plan closed at that merge; this header records it at PR
-> #(number), once the pilot-findings stream had closed and filed the
+> #181, once the pilot-findings stream had closed and filed the
 > case TC1 left, B-191 (a trailing block comment breaks the dedent). The
 > status line and the header's `status` say the same thing.
 >
@@ -161,7 +161,7 @@ chose the lane and the route, and its §2.4 measured the fix.
   next PR (PF2's) writes it. Found and left: a trailing `/* … */` block
   comment after a gap as wide as the block's indentation still fails
   to parse; the chunk was measured for `//` only.
-- **2026-11-09 — the header reads closed** (PR #(number)). The stream
+- **2026-11-09 — the header reads closed** (PR #181). The stream
   closed at PR #172's merge, as the status line said; this lane P PR
   flips the header and the manifest row, which no lane D PR may edit.
   The pilot-findings plan's §7 line recording PF1's merge was written
