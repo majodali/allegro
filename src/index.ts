@@ -520,9 +520,13 @@ async function runPcpObligations(
   const { extractObligations, serializeObligation, formatObligation } =
     await import("./pcp.js");
   const result = await pcpLoadAndEval(filename, isStandard);
+  // B-187 L1: `obligations` also lists the plan obligations of the file's
+  // open plans (`plan NAME from CATALOG:`); `propose` and `verify` leave
+  // them to chunk L2.
   const obligations = extractObligations(result.evalCtx, result.compilationReport, {
     pendingOnly,
     sourceFile: filename,
+    plans: true,
   });
 
   if (asJson) {

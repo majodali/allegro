@@ -185,6 +185,23 @@ and the checks say what still misses. Only the plan's own scope is
 completed; a gap inside a composite stays a finding, because the
 composite is the author's unit of design. Ruled 2026-10-27 at stage D2.
 
+**The open plan and the plan obligation.** An *open plan* is declared
+with `plan NAME from CATALOG:` (`lib/planning_loop.alg`, chunk L1 of
+B-187 (the planning loop, the next validating demo)): the `plan` form's
+body, bound without the `WellFormedPlan` annotation, so a gap does not
+halt the file. Its record holds the plan, the catalog's value and the
+obligations, and the plan is checked by the annotation once a catalog
+entry closes it; the catalog's binding name is not in the record,
+because a grammar label hands the form either the value or the matched
+text, and the protocol recovers the name. A
+[plan obligation](../../plans/planning-loop.md#def-plan-obligation) is
+a gap that completion from the open plan's catalog cannot fill: one per
+distinct gap across the dead ends, with the first dead end's steps as
+its witness and whether the catalog or the depth stopped the search.
+`allegro obligations` lists it in planning words ("`Shipped`, which
+`Depot` needs") with a hash over the plan's name, its declared inputs,
+outcomes and budget, and the gap.
+
 ## 3. The conventions [designed]
 
 Twelve decisions, settled iteratively in the archived design and
@@ -755,6 +772,14 @@ holds two suite-validated scenes with their break-it halts, and the
 public story is `docs/messaging.md`'s rung-3 section. Not yet built: the rest of B-081
 (counterexample legibility) beyond the refusal sites, branch-and-bound
 when a template outgrows enumeration, a surface form for catalogs.
+The planning loop (B-187 (the planning loop, the next validating demo),
+plan `docs/plans/planning-loop.md`) began at its chunk L1:
+`lib/planning_loop.alg` declares the open plan and builds its plan
+obligations (§2.8), `src/pcp.ts` lists them through `allegro
+obligations`, and `tests/planning-loop-obligations.alg` pins an open
+plan, its obligation, the depth stop and the plan closed by a
+hand-written catalog entry. The proposal protocol, the worker and the
+ledger entries are the stream's later chunks.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

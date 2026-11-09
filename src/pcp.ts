@@ -23,7 +23,9 @@
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
 import type { StructureValue, BitsValue } from "./types.js";
-import { SLOT_KEYS, backingsOf } from "./slot-accessors.js";
+import { SLOT_KEYS, backingsOf, elementsOf } from "./slot-accessors.js";
+import { isStructure } from "./structure.js";
+import { metaReadRaw } from "./metadata.js";
 import type { LawBackingRec } from "./slot-accessors.js";
 import { ValueKind, bitsToString } from "./types.js";
 import { isDischargedProof, isFailedProof } from "./proofs.js";
@@ -53,12 +55,59 @@ export const PCP_VERSION = "pcp/1" as const;
 /** A proof burden the compiler describes to a prover. */
 export interface Obligation {
   version: typeof PCP_VERSION;
+  /** B-187 L1: what kind of burden this is. Absent means `"theorem"`, so
+   *  every pcp/1 obligation written before the field reads unchanged.
+   *  Additive optional field; pcp/1 unchanged. */
+  kind?: ObligationKind;
+  /** For `kind: "plan"` only: the plan obligation's content, as the
+   *  planning library built it (`lib/planning_loop.alg`). The `theorem`
+   *  slot still carries a name, the identity text as its proposition and
+   *  the identity's hash, so a pcp/1 reader that ignores `kind` sees a
+   *  well-formed obligation. */
+  plan?: PlanObligationContent;
   theorem: TheoremStatement;
   /** Set when the obligation is attached to a function via `proven`. */
   function?: FunctionSignature;
   context: ObligationContext;
   /** Empty on first try; populated by the worker across iterations. */
   priorAttempts?: PriorAttempt[];
+}
+
+export type ObligationKind = "theorem" | "plan";
+
+/** B-187 L1: a plan obligation (docs/plans/planning-loop.md, the term): a
+ *  gap that completion from an open plan's catalog cannot fill. */
+export interface PlanObligationContent {
+  /** The top-level binding the open plan is declared as. */
+  binding: string;
+  /** The plan's name. */
+  plan: string;
+  /** The top-level binding holding the catalog, when one holds exactly
+   *  the open plan's catalog list; absent otherwise. */
+  catalog?: string;
+  /** The port's type name. */
+  port: string;
+  /** The port's fixture name; absent when the port is unconstrained. */
+  fixture?: string;
+  /** The node that needs the port; absent for a declared outcome. */
+  consumer?: string;
+  /** Why the search stopped: nothing in the catalog produces the port,
+   *  or the depth ran out with a producer still in the catalog. */
+  stop: "catalog" | "depth";
+  /** The depth the search was given. */
+  depth: number;
+  /** The completion steps that reached the gap, e.g. `"Delivered from Van"`. */
+  steps: string[];
+  /** The gap in planning words: `"Shipped, which Depot needs"`. */
+  gap: string;
+  /** The obligation with its stop, in planning words. */
+  message: string;
+  /** The text the identity hash is taken over: the plan's name, declared
+   *  inputs, outcomes and budget, and the gap. */
+  identity: string;
+  /** `hashProposition(identity)`: a proposal that edits the plan instead
+   *  of answering the gap changes it (chunk L2 refuses on a mismatch). */
+  hash: string;
 }
 
 export interface TheoremStatement {
@@ -452,6 +501,7 @@ export const AUTO_PE_AUTHORSHIP = (): Authorship =>
 // should consume the JSON and render to users themselves.
 
 export function formatObligation(o: Obligation): string {
+  if (o.kind === "plan" && o.plan) return formatPlanObligation(o.plan);
   const lines: string[] = [];
   lines.push(`Obligation: theorem \`${o.theorem.name}\``);
   lines.push(`  proposition: ${o.theorem.proposition}`);
@@ -471,6 +521,17 @@ export function formatObligation(o: Obligation): string {
       lines.push(`    #${pa.attemptNumber}: verified=${pa.verdict.verified}`);
     }
   }
+  return lines.join("\n");
+}
+
+/** B-187 L1: a plan obligation in planning words, the gap first. */
+function formatPlanObligation(p: PlanObligationContent): string {
+  const lines: string[] = [];
+  lines.push(`Obligation: plan \`${p.binding}\`: ${p.gap}`);
+  lines.push(`  stop:        ${p.message}`);
+  if (p.steps.length > 0) lines.push(`  steps:       ${p.steps.join(", ")}`);
+  if (p.catalog) lines.push(`  catalog:     ${p.catalog}`);
+  lines.push(`  hash:        ${p.hash}`);
   return lines.join("\n");
 }
 
@@ -968,7 +1029,7 @@ export function generateHints(
 export function extractObligations(
   evalCtx: StructureValue,
   report: CompilationReport | undefined,
-  opts?: { pendingOnly?: boolean; sourceFile?: string },
+  opts?: { pendingOnly?: boolean; sourceFile?: string; plans?: boolean },
 ): Obligation[] {
   const obligations: Obligation[] = [];
   // Collect the lemma names (discharged proof bindings) for context.
@@ -1092,7 +1153,88 @@ export function extractObligations(
     }));
   }
 
+  // B-187 L1: the plan obligations of the file's open plans, last, so the
+  // theorem and law obligations above keep their order. Opt-in: `allegro
+  // obligations` asks for them; `propose`, `verify` and the LLM worker
+  // leave plan obligations to chunk L2 and L3.
+  if (opts?.plans) obligations.push(...extractPlanObligations(evalCtx, opts));
+
   return obligations;
+}
+
+/** B-187 L1: the plan obligations of the file's open plans. An open plan is
+ *  a top-level binding whose value is an instance of the planning loop
+ *  library's `OpenPlan` type (`lib/planning_loop.alg`), found by the
+ *  value's registered `type` field; the obligations are the records the
+ *  library built when the plan was declared, read as data. A file that
+ *  does not `use planning_loop` has none. Plan obligations are open by
+ *  construction, so `pendingOnly` keeps them all. */
+export function extractPlanObligations(
+  evalCtx: StructureValue,
+  opts?: { sourceFile?: string },
+): Obligation[] {
+  const openPlanType = scopeAllBindings(evalCtx).get("OpenPlan")?.value;
+  if (!openPlanType) return [];
+  const out: Obligation[] = [];
+  for (const [key, binding] of evalCtx.bindings) {
+    const v = binding.value;
+    if (!v || !isStructure(v) || metaReadRaw(v, "type") !== openPlanType) continue;
+    const catalogValue = v.bindings.get("catalog")?.value;
+    let catalogName: string | undefined;
+    for (const [ck, cb] of evalCtx.bindings) {
+      if (ck !== key && catalogValue !== undefined && cb.value === catalogValue) { catalogName = ck; break; }
+    }
+    const records = v.bindings.get("obligations")?.value;
+    if (!records || !isStructure(records)) continue;
+    for (const rec of elementsOf(records)) {
+      if (!isStructure(rec)) continue;
+      const content = planObligationContent(key, catalogName, rec);
+      if (!content) continue;
+      out.push({
+        ...makeObligation({
+          theoremName: `${key}: ${content.gap}`,
+          proposition: content.identity,
+          ...(opts?.sourceFile ? { location: { file: opts.sourceFile } } : {}),
+        }),
+        kind: "plan",
+        plan: content,
+      });
+    }
+  }
+  return out;
+}
+
+function planObligationContent(
+  binding: string,
+  catalog: string | undefined,
+  rec: StructureValue,
+): PlanObligationContent | null {
+  const str = (k: string) => _ctxString(rec, k);
+  const plan = str("plan"), port = str("port"), stop = str("stop"), identity = str("identity");
+  const gap = str("gap"), message = str("message");
+  if (plan === undefined || port === undefined || identity === undefined || gap === undefined || message === undefined) return null;
+  if (stop !== "catalog" && stop !== "depth") return null;
+  const fixture = str("fixture"), consumer = str("by");
+  const depthV = rec.bindings.get("depth")?.value as BitsValue | undefined;
+  const stepsV = rec.bindings.get("steps")?.value;
+  const steps = stepsV && isStructure(stepsV)
+    ? elementsOf(stepsV).map(s => isStructure(s) ? "" : bitsToString(s as BitsValue))
+    : [];
+  return {
+    binding,
+    plan,
+    ...(catalog ? { catalog } : {}),
+    port,
+    ...(fixture ? { fixture } : {}),
+    ...(consumer ? { consumer } : {}),
+    stop,
+    depth: depthV ? Number(depthV.data) : 0,
+    steps,
+    gap,
+    message,
+    identity,
+    hash: hashProposition(identity),
+  };
 }
 
 /** Did the candidate satisfy the obligation? Used by `allegro verify
