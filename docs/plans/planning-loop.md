@@ -140,6 +140,11 @@ before it.
   with the refusal's text, up to an attempt limit; on success the
   proposal's authorship recorded. It is the prover loop of rung 1 scene
   5 with the plan obligation in place of the theorem.
+- <a id="def-open-plan"></a>**Open plan**: a plan declared with `plan
+  NAME from CATALOG:`, bound with its catalog and its
+  [plan obligations](#def-plan-obligation) and without the
+  `WellFormedPlan` annotation, so its gaps are obligations rather than
+  halts. Ratified at the merge of PR #177, 2026-11-09.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -834,3 +839,14 @@ R7 and R8 at their rows' time.
     C171 and C172 (proposed, ask A3, cluster G27). The chapter's §2.8
     and §9 are updated; the chapter has no IR of its own. The oracle
     lines are in L1's PR.
+- **2026-11-09 — L1's defaults, C171, C172 and *open plan* ratified at
+  PR #177's merge; the lane D rule recorded.** The maintainer wrote on
+  PR #177: "All decisions, claims and terms ratified." The four defaults
+  above stand. Claims C171 and C172 and cluster G27 of
+  `docs/book/platform/tooling.ir.md` are decided, ask A3 resolved. Plan
+  obligations stay opt-in in `extractObligations` (its `plans` option);
+  L2 makes `propose` and `verify` ask for them. The term
+  [open plan](#def-open-plan) joins §1. Lane D's row in
+  `docs/backlog.md` gains the rule: concurrent streams in lane D need
+  disjoint boundaries, as R1 (tidy-ups beside stream D) of
+  `docs/plans/book-pass.md` has it.

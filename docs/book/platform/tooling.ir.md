@@ -306,9 +306,9 @@ C109. `verify --obligation O.json` fails the verdict unless the obligation's the
 
 C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [decided: owner, 2026-11-02]
 
-C171. `obligations` lists one obligation per proof binding, per undischarged `div` entry, per law or coercion obligation of the bound types, and per plan obligation of an open plan the file binds. evidence: E14, E38. [proposed: this IR]
+C171. `obligations` lists one obligation per proof binding, per undischarged `div` entry, per law or coercion obligation of the bound types, and per plan obligation of an open plan the file binds. evidence: E14, E38. [decided: owner, 2026-11-09]
 
-C172. `obligations` lists the plan obligations after every other obligation. evidence: E38. [proposed: this IR]
+C172. `obligations` lists the plan obligations after every other obligation. evidence: E38. [decided: owner, 2026-11-09]
 
 C112. In a run on 2026-11-01, `obligations` over a two-line file with one theorem listed 15 obligations: the theorem, 12 laws of the core types, 2 coercion obligations. evidence: E24. [decided: owner, 2026-11-02]
 
@@ -472,7 +472,7 @@ G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
 G17. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110 [decided: owner, 2026-11-02]
 
-G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [proposed: this IR]
+G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-09]
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
@@ -603,3 +603,5 @@ A2. Ratify or strike the proposed term safety grade (T30); the evalSource pipeli
 A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term's definition site is this chapter's anchor. The PR's ask 2 (an owner for the chapter's findings) was answered on 2026-11-02 by the maintainer's instruction: the findings are filed as B-175 (the tooling chapter's findings), one line per defect.
 
 A3. Ratify the re-proposed claims about `obligations` as chunk L1 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G27: C171, which replaces C111 and adds the plan obligations of a file's open plans, and C172. Depends: C171, C172.
+
+A3 resolved: ratified by the owner at the merge of PR #177, 2026-11-09; the statuses are flipped.
