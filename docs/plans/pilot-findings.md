@@ -753,3 +753,81 @@ maintainer asked for.
     site; the interface `LawBackingRec` in `src/slot-accessors.ts`,
     outside this boundary, could say the same.
   - **Oracles**: in the PR body.
+- **2026-11-07 — PF3 landed.** B-156 (short-circuit over an error
+  value), R3 (a), on branch `majodali/b156-error-shortcircuit` off
+  `origin/main` at `7cd2b72`.
+  - **The changes**, all in `src/primitives.ts`. A helper
+    `viralOperand(v)` (`:2304` to `:2306`, its comment `:2295` to
+    `:2303`) is `viralOnto([v], v)`; the import at `:4` gains
+    `viralOnto`. `typed_and_impl` (`:2308` to `:2349`) asks it of the
+    left operand (`:2323` to `:2324`) and of the applied right operand
+    (`:2342` to `:2343`), `typed_or_impl` (`:2417` to `:2448`) the same
+    (`:2424` to `:2425`, `:2441` to `:2442`), `typed_not_impl` (`:2450`
+    to `:2462`) of its operand (`:2455` to `:2456`). Each returns the
+    table's answer before reading the operand's bits. The speculation
+    branches under an unresolved left operand (`:2320`, `:2421`) and the
+    residuals under an unresolved operand are unchanged. The registration
+    (`:4600` to `:4603`) is unchanged.
+  - **The table entry point.** `viralOnto` (`src/metadata.ts:331`), the
+    `viral` rule applied, which the evaluator's eager path calls over an
+    eager primitive's evaluated arguments (`src/evaluator.ts:745`). It
+    walks `viralFields()`, so the `error` field is not named in the
+    impls, and a field registered `viral` later gets the same path. It
+    gives a propagated result, not the operand: the residual handed to
+    it, with the first viral field and the candidate's `type`. With the
+    operand as both candidate and residual, the result is the operand
+    with its viral field and its `type`, which is what the eager path
+    gives its own residual. `eval_if_impl` still reads `error` by name
+    (`:575`); this chunk does not touch it.
+  - **The demo** `tests/logical-error-demo.alg`, registered by one
+    `fileTest` line in `src/test/types-core.ts` beside
+    `tests/logical.alg`. It pins `false || e`, `true && e`, `e || true`,
+    `e && false` and `!e` as `error(why)` with `error of` reading `why`;
+    `if e then 1 else 2` (`error(why)`, `why`) and `error of (1 + e)`
+    (`why`) for comparison; the left operand first (`error of (error
+    "left" || error "right")` reads `left`, `error of (false || error
+    "right")` reads `right`); the predicate `pos_ok(x) => x > 0 || error
+    "{x} is not positive"`: `pos_ok(3)` is `true`, `error of pos_ok(0 -
+    1)` and `error of Pos(0 - 1)` read `-1 is not positive`, `Pos(3)` is
+    `3`; and `true && false`, `false || true`, `!false`. The annotation
+    path halts the program, which an `// expect:` line cannot pin, so a
+    test appended to `src/test/types-core.ts`, "logical: B-156 a
+    refinement predicate written with || halts with its reason", pins the
+    halt "failed refinement predicate for Pos: -1 is not positive". The
+    demo's rows and the test fail on the unfixed tree; on it the
+    guarded construction reads "refinement check failed (got -1)".
+    `tests/logical.alg` is unchanged.
+  - **The outputs comparison** (§3 check 2): `run`, `inspect` and
+    `verify` over the 59 programs of `tests/*.alg` and the 9 of
+    `demos/**/*.alg`, stdout, stderr and exit code each, on `7cd2b72`
+    and on the chunk's tree: 204 of 204 identical. The new demo's three
+    runs exit 0. **The halt check**: `lib/` holds 23 uses of `&&` or `||`
+    and 13 of `!`, `tests/` and `demos/` outside the new demo 20 of `&&`
+    or `||` and 3 of `!`. A scratch copy of the chunk's tree that writes
+    a line to stderr whenever `viralOperand` answers ran the same 207
+    runs: no line outside the new demo's runs. No operand of the three
+    operators in the corpus carries an error, so no new halt.
+    `lib/planning.alg`'s `well_formed` keeps its `if` form.
+  - **Claims for the book pass** (R5 (b)). E14 of
+    `docs/book/allegretto/evaluator.ir.md`: the ranges become
+    `:2308` to `:2349` and `:2417` to `:2448`, the speculation lines
+    2320 and 2421; the evidence should add that a resolved operand
+    carrying a viral field is returned through `viralOnto` before its
+    bits are read. Its claims C89, C179 and C185 stay true. The chapter
+    gains a claim: `&&`, `||` and `!` return an operand carrying a viral
+    field, the left one first. `docs/book/allegretto/evaluator.md` §3
+    says `src/evaluator.ts` leaves PE Rule 2 to each lazy primitive; the
+    viral rule is left to them the same way, and `eval_if`, `&&`, `||`
+    and `!` apply it. `docs/book/allegretto/metadata-and-capability.md`
+    §5 says the evaluator calls `viralOnto` at its three application
+    sites; `src/primitives.ts` is now a fourth caller. Its paragraph on
+    the field `error` says "an error-carrying `if` condition propagates
+    the error rather than taking a branch"; the three operators do the
+    same. `docs/book/concepts.md`'s "errors are viral" (SC-8) becomes
+    true of the three operators. `docs/book/language-reference.md`,
+    "Logical operators (short-circuiting)", could add `false || error
+    "why"` reading as the error. No chapter states the boolean reading,
+    so no sentence becomes false. Every `src/primitives.ts` pointer past
+    `:2294` moves by 13 to 23 lines; E2 of
+    `docs/book/platform/host.ir.md` now reads 4548 and 4672 to 4673.
+  - **Oracles**: in the PR body.

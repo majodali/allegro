@@ -1285,7 +1285,13 @@ table and the stream plans.
   across the importing scopes. **Blocked-by**: nothing. **Pointer**:
   `src/test/alg-files.ts` (`libExtensions`), `src/index.ts` (the file
   runner's `import`), `docs/plans/planning-pilot.md` §8 (D2)
-- [ ] **B-156** (short-circuit over an error value) · L2 · **`false ||
+- [x] **B-156** (short-circuit over an error value) · L2 · LANDED
+  2026-11-07 at PR #175 by chunk PF3 of
+  `docs/plans/pilot-findings.md`, ruling R3 (a): `&&`, `||` and `!`
+  return an operand carrying an error, left operand first, so `false ||
+  error "why"`, `true && e`, `e || true`, `e && false` and `!e` are the
+  error and a refinement predicate written `ok || error "why"` refuses
+  with its reason (`tests/logical-error-demo.alg`). As filed: **`false ||
   error "x"` yields `false`, not the error value.** Found by B-151 C1:
   a refinement predicate written `ok || error "why"` refuses without
   its explanation, so a predicate explains itself with `if … else error`
