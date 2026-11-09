@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -302,7 +302,9 @@ C107. The assumption ledger lists the admitted and sampled backings, each with t
 
 C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [decided: owner, 2026-11-02]
 
-C109. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash. evidence: E11, E12. [decided: owner, 2026-11-02]
+C173. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash, for an obligation without a kind. evidence: E11, E12. [proposed: this IR]
+
+C174. `verify --obligation O.json` with a plan obligation fails the verdict unless the open plan it names is solved with an identity hash equal to the obligation's. evidence: E11, E39. [proposed: this IR]
 
 C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [decided: owner, 2026-11-02]
 
@@ -470,7 +472,7 @@ G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [decided: owner, 
 
 G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
-G17. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110 [decided: owner, 2026-11-02]
+G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C173, C174, C110 [proposed: this IR]
 
 G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-09]
 
@@ -536,9 +538,9 @@ E9. Search of `src/`, `pcp/`, `web/` and `scripts/` on 2026-11-01 for `has-warni
 
 E10. `src/index.ts` lines 442–473 (`pcpLoadAndEval`): module directives and imports as in `runInspect`, `console.log` silenced at 462–463, `evalSource` with `softFail` true at 468.
 
-E11. `src/index.ts` lines 475–512 (`runPcpVerify`): `--obligation` parsed and checked with `checkObligationSatisfied`, `serializeVerdict` for `--json`, `formatVerdict` otherwise, exit 0 when verified and 1 otherwise.
+E11. `src/index.ts` lines 475–515 (`runPcpVerify`): `--obligation` parsed, passed to `buildVerdict` and checked with `checkObligationSatisfied`, `serializeVerdict` for `--json`, `formatVerdict` otherwise, exit 0 when verified and 1 otherwise.
 
-E12. `src/pcp.ts` lines 115–145 (the `Verdict` fields; pending law entries do not flip `verified`, lines 133–136), 704–851 (`buildVerdict`: theorems from proof bindings and from `proof-failure`, `proven-failed` and `proven-skipped` notifications; `div` obligations other than `auto`; admitted liveness; `verified` at line 838), 1102–1118 (`checkObligationSatisfied`: theorem present, discharged, proposition hash equal).
+E12. `src/pcp.ts` lines 164–223 (the `Verdict` fields, with `planObligations`, `PlanObligationRecord` and `PlanState`; pending law entries do not flip `verified`, lines 183–186), 810–971 (`buildVerdict`: theorems from proof bindings and from `proof-failure`, `proven-failed` and `proven-skipped` notifications; `div` obligations other than `auto`; admitted liveness; plan obligations at 943–954; `verified` at line 959), 1567–1592 (`checkObligationSatisfied`: a plan obligation by its record at 1571–1579; a theorem present, discharged, proposition hash equal).
 
 E13. `src/pcp.ts` lines 500–546 (`buildAssumptionLedger`: admitted and sampled backings with the proofs they back, the pending count) and 548–676 (`formatVerdict`: the ledger at 640–663, the hints after it at 664–675).
 
@@ -574,7 +576,7 @@ E28. A scratch script run on this branch on 2026-11-01: `evalSource("use contrac
 
 E29. Runs on this branch on 2026-11-01 of a scratch file with `use proven` and a function whose `proven` clause fails: `obligations` listed no obligation for the function; `obligations --pending` listed one; `verify` reported the clause as failed with a counterexample.
 
-E30. `src/test/pcp.ts` lines 360–377 (`verify` exit codes and JSON), 379–392 (`obligations --json`), 394–503 (the plan obligations of B-187 (the planning loop, the next validating demo), chunk L1, `obligations --pending` among them), 702–717 and 719–736 (`propose`, with and without `--output`), 746–840 and 842 (the worker's helpers and the mock-client loop), 910–925 (`prove` without a key), 927–988 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
+E30. `src/test/pcp.ts` lines 364–381 (`verify` exit codes and JSON), 383–396 (`obligations --json`), 398–507 (the plan obligations of B-187 (the planning loop, the next validating demo), chunk L1, `obligations --pending` among them), 508–727 (its chunk L2: the proposal protocol, and `verify --obligation` with a plan obligation), 926–941 and 943–960 (`propose`, with and without `--output`), 970–1064 and 1066 (the worker's helpers and the mock-client loop), 1134–1149 (`prove` without a key), 1151–1212 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
 
 E31. `src/test/base.ts` lines 234–250 (persistent context across two evaluations); `src/test/language.ts` lines 179–215 (binding evaluation counts through `setEvalStatsSink`); `src/test/alg-files.ts` lines 64–218 (`runAlgFile` over `evalSource`) and `src/test/proofs.ts` lines 547–551 and 657 (the demo run with the suite's `provenExt`).
 
@@ -590,11 +592,13 @@ E36. `docs/book/implementation-map.md` lines 35 and 40: `src/introspect.ts` in l
 
 E37. Search of `src/`, `pcp/` and `web/` on 2026-11-01, outside `src/test/`, for `tracer`, `step-through`, `stepper`, `breakpoint`, `language server`, `vscode` and `lsp`: no hit.
 
-E38. `src/pcp.ts` lines 1156–1160 (`extractObligations` appends the plan obligations when its `plans` option is set) and 1165–1238 (`extractPlanObligations`: a top-level binding whose registered `type` field is the `OpenPlan` type of `lib/planning_loop.alg`, its obligation records read as data, `kind` "plan" and the `plan` field); `src/index.ts` lines 523–530 (`runPcpObligations` passes `plans: true`); `src/test/pcp.ts` lines 394–503.
+E38. `src/pcp.ts` lines 1217–1221 (`extractObligations` appends the plan obligations when its `plans` option is set) and 1226–1299 (`extractPlanObligations`: a top-level binding whose registered `type` field is the `OpenPlan` type of `lib/planning_loop.alg`, its obligation records read as data, `kind` "plan" and the `plan` field); `src/index.ts` lines 526–533 (`runPcpObligations` passes `plans: true`); `src/test/pcp.ts` lines 398–507.
+
+E39. `src/pcp.ts` lines 1301–1561 (the proposal protocol of B-187, chunk L2: `splicePlanProposal`; `judgePlanObligation`, which hashes the `surface` of the file's `OpenPlan` record with the obligation's gap and reads its `state` and `answer`; `planObligationRecords`; `answerPlanProposal`; `formatPlanProposalAnswer`), 729–743 (`formatVerdict`'s `plans` line) and 1719–1734 (`formatPlanTodo`); `lib/planning_loop.alg` lines 131–184 (the `OpenPlan` record's `surface`, `state` and `answer`); `src/test/pcp.ts` lines 691–726 (`verify --obligation` on L1's open plan, before and after the edit, and with the plan edited).
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C109, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
 
 A1 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the claims carry decided provenance from that date.
 
@@ -605,3 +609,5 @@ A2 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the term
 A3. Ratify the re-proposed claims about `obligations` as chunk L1 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G27: C171, which replaces C111 and adds the plan obligations of a file's open plans, and C172. Depends: C171, C172.
 
 A3 resolved: ratified by the owner at the merge of PR #177, 2026-11-09; the statuses are flipped.
+
+A4. Ratify the re-proposed claims about `verify --obligation` as chunk L2 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G28: C173, which replaces C109 for an obligation without a kind, and C174, for a plan obligation. Depends: C173, C174.

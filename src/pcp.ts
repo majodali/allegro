@@ -1216,8 +1216,8 @@ export function extractObligations(
 
   // B-187 L1: the plan obligations of the file's open plans, last, so the
   // theorem and law obligations above keep their order. Opt-in: `allegro
-  // obligations` asks for them; `propose`, `verify` and the LLM worker
-  // leave plan obligations to chunk L2 and L3.
+  // obligations` asks for them; `propose` and `verify` do not yet (chunk
+  // L2 stopped there, plan §7), nor does the LLM worker (chunk L3).
   if (opts?.plans) obligations.push(...extractPlanObligations(evalCtx, opts));
 
   return obligations;

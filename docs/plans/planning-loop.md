@@ -850,3 +850,163 @@ R7 and R8 at their rows' time.
   `docs/backlog.md` gains the rule: concurrent streams in lane D need
   disjoint boundaries, as R1 (tidy-ups beside stream D) of
   `docs/plans/book-pass.md` has it.
+- **2026-11-09 — L2 landed, stopped at deliverable 4.** The proposal
+  protocol, on `origin/main` at `57c534c` (the merge of PR #177). One
+  stop: `propose` and `verify` are not yet changed to ask for plan
+  obligations, because doing so moves a pin. L1's CLI test asserts that
+  `propose` on `tests/planning-loop-obligations.alg` does not mention
+  `Shipped` (`src/test/pcp.ts:503`, "propose does not render the plan
+  obligation yet"), and that file holds an open plan, so its `verify`
+  output would gain the plan line in the outputs comparison. Everything
+  the two commands need is built and pinned beside the CLI; the
+  maintainer rules whether L2's PR may replace that assertion and move
+  that file's `verify` output (the ask of L2's PR).
+
+  What landed:
+  - **The catalog's surface form** (R2 (a), the pilot's D3 row) is
+    `catalog NAME:` (`lib/planning_loop.alg:211`), a statement form in
+    the register of `plan`. Its block holds node blocks only, parsed by
+    `cat_node` (`:206` to `:207`), the two node alternatives of
+    `planning_grammar`'s `node_item` (`Name:` with its items, and
+    `Name: uses target`), so a choice and a composite parse as in a
+    plan's body and an `inputs:` line directly under `catalog` is a
+    parse error. `NAME` is bound to the list of nodes, the value
+    `plan NAME from CATALOG:` expects; a list expression is a catalog
+    still (L1's demo is unchanged). No grammar engine change. Example:
+
+    ```allegro
+    catalog yard:
+      Depot:
+        inputs: Shipped
+        outcomes: Sorted
+        estimate: 30 min, 0.25 person-hours
+      Van:
+        inputs: Sorted
+        outcomes: Delivered
+        estimate: 60 min, 0.5 person-hours
+    ```
+  - **The kernel's answer in the library.** `OpenPlan` (`:143`) gains
+    `surface` (`plan_surface`, `:69`: the identity's declared part, which
+    `plan_identity` at `:72` now reads; its text is unchanged), `state`
+    and `answer`, computed when the open plan is built (`open_plan`,
+    `:145` to `:167`): "open" with the first obligation's message (the
+    next dead end); "unsolved" with `solve_from`'s counterexample (the
+    budget missed, or the finding the completed plan fails) or, if the
+    solution fails `plan_errors` (the `WellFormedPlan` predicate), that
+    text; "solved" with `solution_show`. `open_state` and `open_answer`
+    (`:183` to `:184`) read them.
+  - **The splice** is `splicePlanProposal(source, PlanObligationContent,
+    proposal)` (`src/pcp.ts:1371`): the node block, dedented, appended as
+    the last entry of the `catalog NAME:` block the obligation's
+    `catalog` names, at that block's indentation; the plan's block is
+    never touched. Its refusals: `not-a-node-block` (a first line that
+    is not `Name:` or `Name: uses target`, a line at the margin after
+    it, a `catalog` or `plan` keyword, an empty reply), `name-reused`
+    (the entry's name is a node of the plan's or the catalog's block),
+    `no-catalog` (no catalog binding; a catalog written as a list
+    expression, as L1's demo writes it; or no such block). The splice
+    checks layout only: whether the items parse is the kernel's, and
+    `answerPlanProposal` (`:1529`) reports a throw from the caller's
+    evaluation as refusal `halt` with the parse error's text.
+  - **The kernel's answers** are `judgePlanObligation(evalCtx, content)`
+    (`:1471`), pure over an evaluated file: `refused` when the open plan
+    is gone or the identity hash moved (the file's `surface` with the
+    obligation's gap, hashed as `plan_identity` is), else `discharged`
+    when the state is "solved" and `pending` with the library's answer.
+    `answerPlanProposal` maps them to `open`, `unsolved`, `plan-edited`
+    and `plan-missing`. On `tests/planning-loop-proposals.alg`'s plan,
+    through `formatPlanProposalAnswer` (`:1558`):
+
+    ```
+    refused (open): nothing in the catalog produces Labelled, which Courier needs
+    refused (unsolved): no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min
+    accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min
+    refused (name-reused): the proposal's node `Van` reuses a name the plan or the catalog `yard` already has: name the new entry differently
+    ```
+
+    A plan edit beside the entry: "the plan was edited: the obligation's
+    hash is 421ea754, the file's is 93279451; a proposal adds a catalog
+    entry and leaves the plan as written" (L1's plan with its outcome
+    changed to `Sorted`).
+  - **The verdict.** `Verdict` gains the optional `planObligations`
+    (`PlanObligationRecord`, `:197` to `:223`; pcp/1 unchanged).
+    `buildVerdict` takes a `plans` option (every open plan's record) and
+    judges a supplied obligation of kind "plan" (`:943` to `:954`); a
+    pending one leaves the verdict verified, as a pending law does.
+    `formatVerdict` prints, after the coercions and before the ledger
+    (`:729` to `:743`), `  plans: 0/1 discharged, 1 pending` and one
+    line per record. The count line `Verdict (...): N/M discharged`
+    still counts theorems only; the ledger is untouched (L5's).
+    `checkObligationSatisfied` (`:1567`) judges a plan obligation by its
+    record. So `allegro verify FILE --obligation O.json`, with O the plan
+    line of `obligations --json`, judges the edited file (`src/index.ts`
+    is unchanged in behaviour; its comment at `:493`). On L1's open plan
+    (the demo's first 23 lines), before and after the edit that adds
+    L1's hand-written `ship` to `yard`:
+
+    ```
+    Verdict (FAILED): 0/0 discharged
+      ...
+      plans: 0/1 discharged, 1 pending
+        ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs
+      ...
+      obligation mismatch: plan obligation `Fulfil` (Shipped, which Depot needs) is pending: nothing in the catalog produces Shipped, which Depot needs
+
+    Verdict (verified): 0/0 discharged
+      ...
+      plans: 1/1 discharged
+        ✓ Fulfil: Shipped, which Depot needs — Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min
+    ```
+  - **The TODO.** `formatTodo` renders a plan obligation's section
+    (`formatPlanTodo`, `:1719`); `propose` does not reach it yet (the
+    stop). On the new demo's plan:
+
+    ```
+    ## `Fulfil: Shipped, which Depot needs`
+
+    **Gap:** nothing in the catalog produces Shipped, which Depot needs
+
+    **Search so far:** Delivered from Van, Sorted from Depot
+
+    **Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.
+
+    **Hash:** `5444505e` (over: plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot)
+    ```
+  - **The primer section** for plan obligations is
+    `docs/book/vivace/planning-dsl.md` §2.9, "Output contract for a plan
+    proposer": what the obligation says, the reply (ONE fenced
+    ```allegro block holding one node block, no `catalog` or `plan`
+    keyword), and the six refusals. L3's worker sends it for the plan
+    kind.
+  - **The demo and the tests.** `tests/planning-loop-proposals.alg` has
+    15 pinned lines, registered at `src/test/language.ts:694`: the
+    catalog form, the answer stored in the open plan, and three
+    proposals through `with_entry` (the next dead end, the budget
+    missed, the plan solved and checked as a `WellFormedPlan`).
+    `src/test/pcp.ts:508` to `:727` holds seven tests: the splice; the
+    answers on a closing, a non-closing and an over-budget proposal; the
+    plan edit refused by the hash and a second statement by the splice;
+    the other refusals; the verdict field opt-in (a verdict without it is
+    unchanged); the TODO section; the human path on L1's open plan
+    through the CLI (`obligations --json`, the edit, `verify
+    --obligation`, and the plan edited).
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (71 files) was run through the CLI as `run`,
+    `inspect`, `verify` and `obligations`, before and after, and compared
+    on stdout, stderr (stats lines stripped) and exit code. All 284 runs
+    are identical; the new demo's four runs exit 0.
+  - **The counts.** `npm run lint:load` is at or below the baseline
+    (`lib/planning_loop.alg` is not in the load corpus).
+    `demos/rung3/02-solve.alg` has 3,794,320 evaluates and 202,129
+    applyComposed before and after. L1's demo rises from 457,535 to
+    1,033,607 evaluates, because `closed` is now solved when it is
+    built; the new demo has 1,491,712. Neither is gated.
+  - **`completions_from`'s fix was not needed**: the obligation's
+    `stop` and `message` come from `lib/planning_loop.alg`, and the
+    budget answer from `solve_from`'s budget branch, which the fix does
+    not touch. It stays deferred.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C109 becomes
+    C173 (an obligation without a kind) and C174 (a plan obligation),
+    proposed, ask A4, cluster G28 in place of G17; evidence E39 added,
+    E11, E12, E30 and E38 re-synced. The chapter's §2.8, §2.9 and §9 are
+    updated. The oracle lines are in L2's PR.

@@ -524,8 +524,8 @@ async function runPcpObligations(
     await import("./pcp.js");
   const result = await pcpLoadAndEval(filename, isStandard);
   // B-187 L1: `obligations` also lists the plan obligations of the file's
-  // open plans (`plan NAME from CATALOG:`); `propose` and `verify` leave
-  // them to chunk L2.
+  // open plans (`plan NAME from CATALOG:`); `propose` and `verify` do not
+  // ask for them yet (chunk L2 stopped there, plan §7).
   const obligations = extractObligations(result.evalCtx, result.compilationReport, {
     pendingOnly,
     sourceFile: filename,
