@@ -1226,6 +1226,13 @@ its approval.
 - **2026-11-10 — two phases** (the review session). R37 recorded in §6;
   §2.8 states the phases; §5 gains the phase chunks; the header's
   `chunks` lists them; part (e) of the briefs is the phase-1 brief.
+- **2026-11-10 — DR1 opened: the decision review of Part I** (the review
+  session). `docs/records/book-pass/dr1-part-1-the-bet.md`: the 23
+  decisions of chapters 1 to 3 ruled, eight new decisions proposed from
+  the maintainer's motivations, 13 held findings. Reproduced: `--base`
+  loads no extension (`use` is a parse error); a return-type mismatch
+  reports after the program has run and exits 0; a failed proof halts
+  only after the program has run.
 
 ## 8. Sessions
 
