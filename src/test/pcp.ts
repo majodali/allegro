@@ -496,13 +496,46 @@ test("B-187 L1: CLI `obligations --pending` lists the demo's plan obligation wit
   eq(lines.filter(o => o.kind === undefined).length, 5, "the units library's five pending laws, as before");
   eq(text.stdout.includes("Obligation: plan `Fulfil`: Shipped, which Depot needs"), true, text.stdout);
   eq(text.stdout.includes(`hash:        ${plan[0].plan.hash}`), true, text.stdout);
-  // `propose` and `verify` leave plan obligations to chunk L2: they run,
-  // and they list the theorem and law obligations only.
+  // Since chunk L2 (its PR #182, ask 1), `propose` renders the plan
+  // obligation's TODO; `verify` is pinned on this file below.
   const propose = spawnSync("npx", ["tsx", "src/index.ts", "propose", file], { encoding: "utf-8" });
   eq(propose.status, 0, propose.stderr);
-  eq(propose.stdout.includes("Shipped"), false, "propose does not render the plan obligation yet");
+  eq(propose.stdout.includes("## `Fulfil: Shipped, which Depot needs`\n\n**Gap:** nothing in the catalog produces Shipped, which Depot needs"), true,
+     "propose renders the plan obligation's TODO");
   const verify = spawnSync("npx", ["tsx", "src/index.ts", "verify", file], { encoding: "utf-8" });
   eq(verify.status, 0, verify.stderr);
+});
+
+test("B-187 L2: CLI `propose` and `verify` on L1's demo list its plan obligation by default", () => {
+  const file = path.join(testsDir, "planning-loop-obligations.alg");
+  const propose = spawnSync("npx", ["tsx", "src/index.ts", "propose", file], { encoding: "utf-8" });
+  eq(propose.status, 0, propose.stderr);
+  eq(propose.stdout.includes("**6 pending** of 20 obligation(s).\n"), true, "the five laws and the plan obligation");
+  eq(propose.stdout.includes([
+    "## `Fulfil: Shipped, which Depot needs`",
+    "",
+    "**Gap:** nothing in the catalog produces Shipped, which Depot needs",
+    "",
+    "**Search so far:** Delivered from Van, Sorted from Depot",
+    "",
+    "**Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.",
+    "",
+    "**Hash:** `421ea754` (over: plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot)",
+    "",
+    "---",
+    "",
+    "_When done, run `allegro verify` on the source file to confirm._",
+  ].join("\n")), true, propose.stdout);
+  const verify = spawnSync("npx", ["tsx", "src/index.ts", "verify", file], { encoding: "utf-8" });
+  eq(verify.status, 0, "a pending plan obligation leaves the verdict verified");
+  eq(verify.stdout.includes([
+    "  coercions: 2/2 obligations discharged",
+    "  plans: 1/2 discharged, 1 pending",
+    "    ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs",
+    "    ✓ closed: every gap closed — Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min",
+    "  assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending",
+  ].join("\n")), true, verify.stdout);
+  eq(verify.stdout.startsWith("Verdict (verified): 0/0 discharged\n"), true, "the count line still counts theorems only");
 });
 
 // --- B-187 L2: the proposal protocol (docs/plans/planning-loop.md) ---
