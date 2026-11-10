@@ -1111,7 +1111,7 @@ R7 and R8 at their rows' time.
   - **The transcript.** The scripted loop on L1's open plan, the catalog
     as a block (`src/test/pcp.ts:1192` pins it with a test client and the
     answers in the test; the run below read them from a file named
-    `proposals.md`). The units library's five laws were skipped. The two
+    `proposals.md`). The units library's pending laws were skipped (five in a fresh process). The two
     requests, the replies and the kernel's answers, verbatim:
 
     ````
@@ -1176,19 +1176,23 @@ R7 and R8 at their rows' time.
     Freight, is duration 200 min against 160 min", attempt 2 accepted,
     authored by "scripted:P.md" in 2 attempts; six obligations skipped,
     the five laws and the demo's second open plan `courier`
-    (`src/test/pcp.ts:1326`).
-  - **The tests**, appended to `src/test/pcp.ts`: at `:1169` to `:1284`,
+    (`src/test/pcp.ts:1333`).
+  - **The tests**, appended to `src/test/pcp.ts`: at `:1169` to `:1291`,
     inside `runH4aAsyncTests`, the scripted loop on L1's open plan (the
     authorship, both request texts, the system prompt and the verdict on
     the source the loop left); a theorem through the same loop, a
     prepared proof term accepted at the second attempt; and the worker on
     `demos/rung3/02-solve.alg`, which threw at position 546 before; at
-    `:1300` to `:1370`, the proposals file's format and `prove --proposals`
-    in JSON and text.
+    `:1307` to `:1377`, the proposals file's format and `prove --proposals`
+    in JSON and text. The in-process tests pin the skipped laws by kind,
+    not by number: under `npm run test:shards`, shard 1 of 3 saw four
+    pending laws of `Quantity` where a fresh process sees five
+    (`Quantity.law_trans` was already discharged by an earlier test of
+    that shard), so law state is shared across the tests of one process.
   - **No network in the suite.** No test constructs
     `createAnthropicClient`. `src/test/` names `ANTHROPIC_API_KEY` only
-    to set it empty for a CLI run (`src/test/pcp.ts:1291`, `:1339`,
-    `:1358`); without `--proposals` the CLI fails on the empty key
+    to set it empty for a CLI run (`src/test/pcp.ts:1298`, `:1346`,
+    `:1365`); without `--proposals` the CLI fails on the empty key
     before the SDK is imported, and with it no client of the SDK is made.
   - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
     on `origin/main` (72 files) was run through the CLI as `run`,
