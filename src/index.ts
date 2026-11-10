@@ -488,10 +488,15 @@ async function runPcpVerify(
     const obligationText = fs.readFileSync(obligationPath, "utf-8");
     obligation = parseObligation(obligationText);
   }
-  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation);
+  // B-187 L2: the verdict also records the plan obligations of the file's
+  // open plans (its `plans` line), as `obligations` lists them.
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation, { plans: true });
 
   // Cross-check the obligation: the candidate must satisfy the named
-  // theorem with a matching propositionHash (blocks trivial-pass).
+  // theorem with a matching propositionHash (blocks trivial-pass). B-187
+  // L2: an obligation of kind "plan" (from `obligations --json`) is judged
+  // by buildVerdict into the verdict's `planObligations`, and satisfied
+  // when discharged there with a matching identity hash.
   if (obligation) {
     const err = checkObligationSatisfied(obligation, verdict);
     if (err) {
@@ -521,8 +526,8 @@ async function runPcpObligations(
     await import("./pcp.js");
   const result = await pcpLoadAndEval(filename, isStandard);
   // B-187 L1: `obligations` also lists the plan obligations of the file's
-  // open plans (`plan NAME from CATALOG:`); `propose` and `verify` leave
-  // them to chunk L2.
+  // open plans (`plan NAME from CATALOG:`); since chunk L2, `propose` and
+  // `verify` ask for them too.
   const obligations = extractObligations(result.evalCtx, result.compilationReport, {
     pendingOnly,
     sourceFile: filename,
@@ -562,13 +567,15 @@ async function runPcpPropose(
   const verdict = buildVerdict(result.evalCtx, result.compilationReport);
 
   // Total = ALL obligations (the denominator). Sections = pending only,
-  // unless --all was supplied (then everything goes into the TODO).
+  // unless --all was supplied (then everything goes into the TODO). B-187
+  // L2: the plan obligations of the file's open plans are included, last,
+  // each rendered as a plan section (`formatTodo`).
   const allObligations = extractObligations(result.evalCtx, result.compilationReport,
-                                            { sourceFile: filename });
+                                            { sourceFile: filename, plans: true });
   const sectionObligations = includeAll
     ? allObligations
     : extractObligations(result.evalCtx, result.compilationReport,
-                          { pendingOnly: true, sourceFile: filename });
+                          { pendingOnly: true, sourceFile: filename, plans: true });
 
   // Group hints by theorem name so each section sees only its own.
   const hintsByName = new Map<string, any[]>();
