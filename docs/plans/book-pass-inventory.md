@@ -134,6 +134,19 @@ The order binds by dependency: every decision comes after the decisions it depen
 
 **The recommended pilot.** The plan names `metadata-and-capability.md` as the pilot. That chapter becomes chapter 7 of these contents, "Metadata and the capability to write it", with its propagation sections moving to chapter 8 and its install section to chapter 10. Chapter 7 is the recommended pilot. Of its thirteen decisions, eleven are settled and two partly built (the metadata slot as a mixin, and the fixed propagation vocabulary, whose `positional` rule has no path); none is open, so the review rules on presentation rather than on open design. It sits early, after only the thesis and three short kernel chapters, so the concepts it needs (value, kind, structure, immutability) come from chapters the pilot's author can point to without rewriting them. It holds both labels (foundational channels and origination; swappable registration and denial details), so the swappable and foundational marks get tested. Its present text is one chapter already organized by unit, which keeps the rewrite to one source file.
 
+## Findings held for their decisions
+
+A **held finding** is a defect a review finds in a decision the pass has not reached in order. It is recorded on the decision's entry below, as a "Held finding" note, and fixed in the chapter PR that takes the decision (`book-pass.md` §2.7), not handed to another stream; ruled 2026-11-10. A finding that cannot wait for its chapter goes to the maintainer as an ask.
+
+| Finding | Decision | Chapter | Source |
+|---|---|---|---|
+| A second viral field erases the first | Metadata channels are independent | Metadata and the capability to write it | the pilot's review, §7 item 1 |
+| `channel_register` accepts any rule string | Fixed propagation vocabulary | Metadata and the capability to write it | the pilot's review, §7 item 2 |
+| A user-registered viral field stops computation | How the base applies propagation | How metadata propagates | the pilot's review, §7 item 3 |
+| The ownership test never checks owners | Each layer registers its own fields | How metadata propagates | the pilot's review, §7 item 4 |
+
+The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
+
 ## Rulings on the inventory, 2026-11-05
 
 The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pass.md](book-pass.md) §6, "Rulings taken 2026-11-05", as the record:
@@ -942,6 +955,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md R3; docs/records/concepts-analyses.md §4.1 (not read)
 - Book home (fragments' proposal): concepts.md Part 0 (R3) / allegretto/metadata-and-capability.md §1
 - Notes: Significance calibrated from 5.
+- Held finding (2026-11-10, from the pilot's review, ../records/book-pass/p2-allegretto-metadata-and-capability.md §7 item 1): a second viral field erases the first: `viralOnto` returns at the first viral field it finds (`src/metadata.ts:331`–`347`), so `t + e` loses `e`'s `error` field. Fixed when the pass takes this decision in order.
 - Chapter: Metadata and the capability to write it
 
 #### Metadata is a field on every value
@@ -1001,6 +1015,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-7; docs/decisions.md D2; docs/book/allegretto/metadata-and-capability.md §5; docs/records/concepts-analyses.md §4.2 (not read)
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §5
 - Notes: `positional` is vocabulary without a path; removing it is an open maintainer decision. The `union` rule and the `effects` path are not one mechanism (B-146).
+- Held finding (2026-11-10, from the pilot's review §7 item 2): `channel_register` accepts any rule string; `channel_register("xq", "nonsense")` returns a writer and the field then behaves as `drop` (`src/capability.ts:56`). Fixed when the pass takes this decision in order.
 - Chapter: Metadata and the capability to write it
 
 #### Writes gated by a capability, reads free
@@ -1147,6 +1162,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/allegretto/metadata-and-capability.md §5; docs/decisions.md C4.3-R3; docs/plans/structures-implementation.md §6 (C4.3 rulings R3)
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §5
 - Notes: `viralOnto` also carries that candidate's `type` by name (B-145). units.md row 10 names `viralScan` and `mergeOverMeta` as still in `evaluator.ts`; metadata-and-capability.md §5 and §9 place both in `src/metadata.ts`.
+- Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation: `print(t + 1)` prints nothing when `t` carries one (`src/evaluator.ts:745`–`746`). Fixed when the pass takes this decision in order.
 - Chapter: How metadata propagates
 
 #### Errors as a viral metadata field
@@ -1191,6 +1207,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/allegretto/metadata-and-capability.md §3, §8; docs/book/concepts.md R6 delta
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §8
 - Notes: `knowledge`, `warnings` and `exported` are still registered by the base with no owner (B-111).
+- Held finding (2026-11-10, from the pilot's review §7 item 4): the ownership test names an owner file per field but only checks that each field is registered, never which file registered it (`src/boundary-tests.ts:924`–`936`). The fix is a test change in `src/boundary-tests.ts`; ruled case by case under R32 (M3 reconciled with the monotonic pass) if an implementation stream then holds the file.
 - Chapter: How metadata propagates
 
 #### Field versus channel, and channel registration

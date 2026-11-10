@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-10 — the pilot's findings placed.** Four code defects the
+  pilot's review found are held on their decisions in
+  `docs/plans/book-pass-inventory.md`, to be fixed when the pass takes
+  each decision; `docs/decisions.md` now records that the carrier's
+  deletion superseded D10's representation clause, D15 and D17, and that
+  D48 is executed, with its correction of one operation, not four. Ids
+  783.
+
 - **2026-11-07 — the pilot chapter, as a dry run.** "Metadata and the
   capability to write it" (`docs/book/allegretto/metadata-and-capability.md`)
   is reviewed decision by decision, written IR first, and rewritten as

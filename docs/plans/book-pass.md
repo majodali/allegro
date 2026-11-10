@@ -980,6 +980,18 @@ its approval.
   approved in order under R28 (the monotonic pass), never merely
   rewritten.
 
+**Rulings taken 2026-11-10, after PR #174's merge.**
+
+- **R36 — Held findings.** A defect a review finds in a decision the
+  pass has not reached stays with the pass: it is recorded on the
+  decision's inventory entry as a held finding and fixed in the chapter
+  PR that takes the decision. A finding that cannot wait goes to the
+  maintainer as an ask; the route for it then is a standing hand-off
+  item modelled on B-182 (unit tidy-ups from the book pass), opened only
+  when a finding needs it. The pilot's four code findings are held; the
+  fifth, four stale entries of `docs/decisions.md`, is fixed directly,
+  since that register is a shared status document.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1134,6 +1146,10 @@ its approval.
   ids baseline lowered to 783 in its own commit. The pilot is done; the
   pass starts at chapter 1 of the inventory's contents under R34
   (recommend the right decision).
+- **2026-11-10 — the pilot's findings placed** (the review session). R36
+  recorded in §6. The inventory gains "Findings held for their
+  decisions" and four held-finding notes; `docs/decisions.md` D10, D15,
+  D17 and D48 corrected (the carrier's deletion and D48's execution).
 
 ## 8. Sessions
 
