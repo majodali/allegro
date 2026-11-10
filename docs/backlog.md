@@ -3512,9 +3512,11 @@ table and the stream plans.
   stream) and B-189 (second out-of-scope finding of the planning-loop
   stream). Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06,
   ratified 2026-11-07 at PR #167; L1 (the obligation surface) merged
-  at PR #177 with its four defaults ratified; L2 at its PR, stopped
-  before `propose` and `verify` list plan obligations (a pin of L1's
-  test moves; the plan's §7). **Pointer**: the plan's §2 (the probes) and §6 (the
+  at PR #177 with its four defaults ratified; L2 (the proposal
+  protocol) at its PR, where the maintainer ruled on 2026-11-10 that
+  `propose` and `verify` list plan obligations by default (a pin of
+  L1's test replaced; the plan's §7) and ratified A4 and three terms.
+  **Pointer**: the plan's §2 (the probes) and §6 (the
   rulings)
 - [ ] **B-188** (first out-of-scope finding of the planning-loop stream)
   · L3 · Reserved by the planning-loop stream

@@ -802,9 +802,13 @@ a plan edit, the last by the identity hash. `allegro verify
 optional `planObligations` field. `docs/book/vivace/planning-dsl.md`
 §2.9 is the proposer's output contract. `tests/planning-loop-proposals.alg`
 is the demo. The chunk stopped before `propose` and `verify` list plan
-obligations by default: that moves a pin of L1's test, for the
-maintainer. `docs/book/platform/tooling.ir.md` re-proposes C109 as C173
-and C174 (ask A4).
+obligations by default, since that moves a pin of L1's test; the
+maintainer ruled yes on 2026-11-10 at the PR, so both list them (the
+pin replaced; `verify` prints a `plans: N/M discharged` line after the
+coercions, `propose` a TODO section per plan obligation).
+`docs/book/platform/tooling.ir.md` replaces C109 by C173 and C174
+(ask A4, ratified at the PR); the terms *plan state*, *plan surface*
+and *refusal kinds* ratified there too.
 
 ### 2026-11 — Plan obligations reach the protocol; the open plan declared (B-187, chunk L1)
 
