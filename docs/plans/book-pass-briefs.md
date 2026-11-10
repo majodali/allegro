@@ -13,7 +13,9 @@
 > - **(c)** the reasoning-role brief, count-2 version, for steps 2 to 4;
 > - **(d)** the human-reader stranger brief, for prose whose reader is
 >   the curious programmer (`docs/plans/book-pass.md` §1, ruling R14 (the
->   human reader)).
+>   human reader));
+> - **(e)** the decision-review brief, for a phase-1 chunk (the plan's
+>   §2.8, ruling R37 (two phases)).
 >
 > The phrasing patterns of the plan's §2.6, principle 8 (ruling R16 (the
 > phrasing patterns)), are checked in all four: the review's §8, and the
@@ -328,3 +330,43 @@ Do not ask for content the chapter does not need. A finding that proposes fewer 
 The prose's word count (excluding the final render-map comment), then the verdict, `readable` or `not readable`, by four conditions: (1) no restatement mismatch you attribute to the prose; (2) no contradiction; (3) no undefined term and no jargon; (4) no lost thread. State the counts by kind.
 
 Reply in this order: step A, the mismatches, the findings table, the word count and verdict. Nothing else. You will be asked afterwards to confirm each fix; keep your findings numbered.
+
+## (e) The decision-review brief (phase 1)
+
+# Chunk {CHUNK} — the decision review of {PART} (phase 1)
+
+You write the decision review of one part of the book's contents (or one slice of a part) for the book pass of majodali/allegro. Work in the git worktree and branch named in the chunk's brief. Write ONE file: `docs/records/book-pass/{chunk-slug}.md`. Do not edit anything else; do not commit, push or rebase.
+
+## Read first
+1. `CLAUDE.md`; `docs/plans/book-pass.md` §2.6 (the principles), §2.7, §2.8 (the two phases), §3, and §6, the rulings from R22 (structure and correctness first) to R37 (two phases), R34 (recommend the right decision) and R36 (held findings) among them.
+2. `docs/book/preface.md`.
+3. `docs/plans/book-pass-inventory.md`: the contents, "Findings held for their decisions", the entries of {CHAPTERS} and every decision they depend on, the type check, Open questions.
+4. Every source the entries cite: chapters, the spine (`docs/book/concepts.md`), `docs/decisions.md`, plan rulings, archived plans for options and rationale.
+5. The code each decision describes: its units in `scripts/analyze/units.json` and their files; run the code where a claim is doubtful (scratch files under the session's scratchpad, never in the repository).
+6. The pilot's review, `docs/records/book-pass/p2-allegretto-metadata-and-capability.md`, as the model of a per-decision ruling.
+
+## The record
+Header: chunk {CHUNK} of `docs/plans/book-pass.md`, phase 1, the decisions of {CHAPTERS}, read on `origin/main` at `{commit}`, {date}. Reader RD-2. Form W-008 (reports map their deliverables).
+
+**Asks**, numbered `R-{CHUNK}-<n>`, one per decision in inventory order, each with options, a recommendation and a default. For each decision:
+- the decision as the inventory states it: short name, Decides, type, label, dependencies;
+- whether the code does it: a checked pointer and a verdict (holds / partly / wrong / not built), and any held finding already on the entry;
+- the recommendation: keep, restate (give the new Decides sentence), split, merge, move to another chapter, or remove, with the options there are and the cost of each;
+- whether the type, label or a dependency is wrong, and the fix;
+- the code and test changes the ruling needs, with files, named not made, and whether a changed file lies in an active implementation stream's boundary (read the headers of the active plans under `docs/plans/`), in which case the maintainer rules it case by case (R32 (M3 reconciled with the monotonic pass));
+- new decisions the review finds missing, as their own asks, placed in order.
+
+Then one ask per placement question (a decision that belongs to another chapter or part), and last, the terms introduced.
+
+**The right decision, not the cheapest change** (R34 (recommend the right decision)): recommend the option that makes the decision right for the language; state the size of each option's change as a cost, never as the reason.
+
+**What is already covered**: decisions already ruled, with their sources. **What changed**: §1 the decisions against the code (a table: decision, what the code does, pointer, verdict); §2 new held findings (defects in these decisions, for R36); §3 other findings (defects no decision in this part holds, for the maintainer to file); §4 order and dependency findings (a decision out of order, a capability depending on an implementation decision, a cycle). **Terms introduced**. **Rulings taken** (placeholder).
+
+No IR and no prose: phase 1 writes no chapter content. Short direct sentences, the recommendation first in each ask, every identifier named at its first use on the same line. Aim at about 12,000 words at most; if the part needs more, stop at a decision boundary and report where the next slice starts.
+
+## Oracles
+`npm run lint:docs:check` (anchors 0, order 0, ids at or below the baseline); `npx tsx scripts/doc-ref-lint.ts`.
+
+## Report back (under 300 words)
+The file and word count; one line per decision: name → recommendation and whether code changes; new decisions proposed; held findings; other findings; order findings; lint lines.
+

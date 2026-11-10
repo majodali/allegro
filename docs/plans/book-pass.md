@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U20, U21, T1, T2]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -317,7 +317,8 @@ decision's code changes); accepted by the maintainer on PR #164,
 monotonic pass), landed 2026-11-07 as lane R; before it landed, §3, §4 and §8 read as written, and a
 chapter whose decisions change code waits for it.
 
-1. **One PR per chapter of the inventory's contents.** Its decisions are
+1. **One PR per chapter of the inventory's contents, in phase 2 (§2.8,
+   ruling R37 (two phases)).** Its decisions, ruled in phase 1, are
    taken in inventory order. The PR opens with the chapter review (the
    decisions as they stand, against the code; the changes proposed, each
    a ruling). The maintainer rules each decision in PR comments. The PR
@@ -357,6 +358,43 @@ chapter whose decisions change code waits for it.
 6. **Tidy-ups.** B-182 (unit tidy-ups from the book pass) stays for
    changes no decision needs; a decision's own code change never goes
    there.
+
+### 2.8 The two phases
+
+Ruled 2026-11-10 (R37 (two phases), §6). The pass runs in two phases so
+that every decision is sanity-checked before any chapter content is
+written.
+
+1. **Phase 1, the decision review.** Every decision of the inventory, in
+   its order, by part: one PR per part of the contents (six PRs, a part
+   split across two or three PRs where its review would run past about
+   12,000 words). Each review rules every decision of its part under R34
+   (recommend the right decision): the decision as stated; its type,
+   label and dependencies; whether the code does it, checked against the
+   code with a pointer; keep, restate, split, merge, move or remove,
+   with options; and the code and test changes the ruling needs, named
+   but not made. No IR and no prose. The maintainer rules each decision
+   in PR comments; the ruled decision is recorded in
+   `docs/plans/book-pass-inventory.md`, which becomes the ruled list.
+   The brief is part (e) of `docs/plans/book-pass-briefs.md`.
+2. **Phase 2, the content.** Chapter by chapter, in order: the IR, the
+   prose, and the code changes the phase-1 rulings named, under §2.7. A
+   chapter is final when its PR merges.
+3. **What approval means under R28 (the monotonic pass).** A phase-1
+   ruling settles a decision; the decision with its code becomes final
+   in phase 2. A phase-2 finding that a ruled decision is wrong is the
+   non-monotonic failure R28 names: the pass goes back to phase 1 for
+   that decision and every decision after it that rests on it. A code
+   fix that cannot wait for phase 2 goes to the maintainer as an ask,
+   as a held finding does (R36 (held findings)).
+4. **The code is checked, not changed, in phase 1.** The pilot's review
+   found its two defects by testing the code against each decision.
+   Each phase-1 review does the same, so a decision's code is known
+   when it is ruled.
+
+The pilot (P2 (the pilot chapter)) stands as a phase-2 dry run of
+chapter 7; chapter 7 is reviewed again in phase 1 under R34, in its
+part.
 
 ## 3. Oracle and stop conditions
 
@@ -484,6 +522,25 @@ further chapter, each one PR, human-gated:
 F1's review stands: its findings are factual. The tables below list the
 present chapters, the work the pass must cover. Their order and their
 chunk ids are superseded by P1's table of contents when it merges.
+
+**The two phases (§2.8, R37 (two phases)).** After the front, the chunks
+are:
+
+| Chunk | Phase | Covers | Deliverable |
+|---|---|---|---|
+| DR1 (the decision review, Part I) | 1 | Part I, The bet: chapters 1 to 3 | the part's decisions ruled; the inventory updated |
+| DR2 (the decision review, Part II) | 1 | Part II, Allegretto, the kernel: chapters 4 to 12 | as DR1; likely two or three PRs |
+| DR3 (the decision review, Part III) | 1 | Part III, Syntax and modules: chapters 13 to 15 | as DR1 |
+| DR4 (the decision review, Part IV) | 1 | Part IV, Allegro Standard: chapters 16 to 25 | as DR1; likely two or three PRs |
+| DR5 (the decision review, Part V) | 1 | Part V, Domains built on the kernel: chapters 26 to 29 | as DR1 |
+| DR6 (the decision review, Part VI) | 1 | Part VI, Building and running programs: chapters 30 to 33 | as DR1 |
+| CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
+| CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
+
+The oracle of a phase-1 chunk is the doc lints of §3 and the lane
+check; a phase-2 chunk adds the code oracle of §2.7 item 5. The
+per-chapter procedure below and the F, U and T tables are superseded by
+these chunks, and are kept as the record of the pass's first shape.
 
 **The per-chapter procedure.** Each chunk is one chapter, in two PRs,
 both human-gated and titled `B-174: …`.
@@ -980,6 +1037,33 @@ its approval.
   approved in order under R28 (the monotonic pass), never merely
   rewritten.
 
+**Rulings taken 2026-11-10, after PR #174's merge.**
+
+- **R36 — Held findings.** A defect a review finds in a decision the
+  pass has not reached stays with the pass: it is recorded on the
+  decision's inventory entry as a held finding and fixed in the chapter
+  PR that takes the decision. A finding that cannot wait goes to the
+  maintainer as an ask; the route for it then is a standing hand-off
+  item modelled on B-182 (unit tidy-ups from the book pass), opened only
+  when a finding needs it. The pilot's four code findings are held; the
+  fifth, four stale entries of `docs/decisions.md`, is fixed directly,
+  since that register is a shared status document.
+
+**Rulings taken 2026-11-10, in the review session.**
+
+- **R37 — Two phases.** The maintainer's proposal, taken with the review
+  session's four recommendations: a decision-review phase over every
+  decision by part, then a content phase chapter by chapter (§2.8);
+  approval under R28 split as §2.8 item 3 says (option (a); the option
+  not taken: phase 1 also makes the code changes); the code checked
+  against each decision in phase 1; reviews of about 12,000 words, a
+  part split where larger. The chunk sequence of §5 gains DR1 to DR6
+  and CH0 to CH33.
+- **Ratified 2026-11-11, on PR #183.** The maintainer reviewed the PR and
+  ratified every change: the four corrected entries of
+  `docs/decisions.md`, R36, R37 and §2.8 as written, part (e) of the
+  briefs, and the terms *held finding* and *decision review*.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1134,6 +1218,14 @@ its approval.
   ids baseline lowered to 783 in its own commit. The pilot is done; the
   pass starts at chapter 1 of the inventory's contents under R34
   (recommend the right decision).
+- **2026-11-10 — the pilot's findings placed** (the review session). R36
+  recorded in §6. The inventory gains "Findings held for their
+  decisions" and four held-finding notes; `docs/decisions.md` corrected
+  in four entries: three superseded by the carrier's deletion, and the
+  composite ruling marked executed.
+- **2026-11-10 — two phases** (the review session). R37 recorded in §6;
+  §2.8 states the phases; §5 gains the phase chunks; the header's
+  `chunks` lists them; part (e) of the briefs is the phase-1 brief.
 
 ## 8. Sessions
 
