@@ -687,6 +687,11 @@ fileTest(path.join(testsDir, "planning-complete-demo.alg"));
 // other stop at a bounded depth, and the plan closed by a hand-written
 // catalog entry and checked as a WellFormedPlan.
 fileTest(path.join(testsDir, "planning-loop-obligations.alg"));
+// B-187 chunk L2 (the planning loop): the catalog written as `catalog
+// NAME:`, the kernel's answer stored in the open plan, and three proposals
+// through `with_entry`: one leaving the next dead end, one over the
+// budget, one closing the gap with the plan solved.
+fileTest(path.join(testsDir, "planning-loop-proposals.alg"));
 
 // B-093 (stage E): the public rung-3 demo scenes are suite-validated like
 // the rung-1 and rung-2 ones (src/test/proofs.ts), so they cannot rot.

@@ -787,6 +787,29 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — The proposal protocol (B-187, chunk L2)
+
+B-187 (the planning loop, the next validating demo), chunk L2 of
+`docs/plans/planning-loop.md`. A catalog can now be written as
+`catalog NAME:` holding node blocks, in `lib/planning_loop.alg`. The
+open plan stores the kernel's answer: open with the next dead end,
+unsolved with the budget missed or the failing finding, or solved.
+`src/pcp.ts` splices a proposal, one node block, into the named catalog
+and never into the plan, and judges the re-evaluated file. It refuses a
+reply that is not one node block, a reused node name, a parse error and
+a plan edit, the last by the identity hash. `allegro verify
+--obligation` judges a plan obligation, and the verdict gains an
+optional `planObligations` field. `docs/book/vivace/planning-dsl.md`
+§2.9 is the proposer's output contract. `tests/planning-loop-proposals.alg`
+is the demo. The chunk stopped before `propose` and `verify` list plan
+obligations by default, since that moves a pin of L1's test; the
+maintainer ruled yes on 2026-11-10 at the PR, so both list them (the
+pin replaced; `verify` prints a `plans: N/M discharged` line after the
+coercions, `propose` a TODO section per plan obligation).
+`docs/book/platform/tooling.ir.md` replaces C109 by C173 and C174
+(ask A4, ratified at the PR); the terms *plan state*, *plan surface*
+and *refusal kinds* ratified there too.
+
 ### 2026-11 — Plan obligations reach the protocol; the open plan declared (B-187, chunk L1)
 
 B-187 (the planning loop, the next validating demo), chunk L1 of

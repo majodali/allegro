@@ -1,10 +1,11 @@
 // planning_loop.alg — the planning loop's library (B-187, the planning-loop
-// stream, chunk L1).
+// stream, chunks L1 and L2).
 //
 // The loop of docs/plans/planning-loop.md asks a proposer to answer what a
 // plan cannot yet do, and has the kernel check the answer. This library
 // holds the model side of it, on top of `use planning` (ruling R10 (a):
-// `lib/planning.alg` stays as rung 3 left it). Chunk L1 builds two things:
+// `lib/planning.alg` stays as rung 3 left it). Chunk L1 built the first two
+// of these three things, chunk L2 the third:
 //
 //   - the PLAN OBLIGATION (ruling R1 (a)): a gap that completion from the
 //     plan's catalog cannot fill, at the dead end. It is built from the
@@ -14,10 +15,12 @@
 //     CATALOG:`, which binds a plan and its catalog without the
 //     `WellFormedPlan` annotation, so a plan with a gap does not halt the
 //     file. The plan is checked by `WellFormedPlan` once a catalog entry
-//     closes it (chunk L2).
+//     closes it (chunk L2);
+//   - the CATALOG's surface form, `catalog NAME:` (ruling R2 (a)), and the
+//     kernel's answer to a catalog entry, stored in the open plan.
 //
-// The prover protocol (`src/pcp.ts`) reads the obligations an open plan
-// carries; it computes nothing about plans itself.
+// The prover protocol (`src/pcp.ts`) reads the obligations and the answer
+// an open plan carries; it computes nothing about plans itself.
 use units
 use planning
 
@@ -61,8 +64,12 @@ stop_of(p, cat, g) =>
 
 step_line(a) => "{a.gap.port.type} from {a.node}"
 
-plan_identity(p, g) =>
-  "plan {p.name}; inputs {ports_show(p.inputs)}; outcomes {ports_show(p.outcomes)}; {budget_show(p.budget)}; gap {port_show(g.port)} by {g.by}"
+// The plan's declared surface, the first part of the identity: what the
+// author wrote and a proposal must leave as it is (chunk L2 compares it).
+plan_surface(p) =>
+  "plan {p.name}; inputs {ports_show(p.inputs)}; outcomes {ports_show(p.outcomes)}; {budget_show(p.budget)}"
+
+plan_identity(p, g) => "{plan_surface(p)}; gap {port_show(g.port)} by {g.by}"
 
 // The renderings below read the fields by name, so the record carries its
 // own: built once from a plain record of the same fields, then stored, so
@@ -120,10 +127,44 @@ obligation_steps_show(o) => join(o.steps, ", ")
 // record: the statement form receives the catalog's value from its `ident`
 // capture, and the engine hands a label its value or its matched text, not
 // both (chapter §2.8). The protocol names the binding (`src/pcp.ts`).
+//
+// Chunk L2 adds the kernel's answer, also computed when the open plan is
+// built and stored, so the protocol reads it as data:
+//
+//   - `surface`: `plan_surface` of the plan, which the protocol hashes
+//     with the obligation's gap to refuse a proposal that edits the plan;
+//   - `state`: "open" while an obligation remains, "unsolved" when every
+//     gap closes but no completion solves (a budget missed, or a finding
+//     the completed plan fails), "solved" when one does;
+//   - `answer`: the planning words for that state: the first obligation's
+//     message (the next dead end), the counterexample `solve_from`
+//     answers, or the solution as `solution_show` renders it.
 
-OpenPlan = Type.define({ plan: Any, catalog: Array, obligations: Array })
+OpenPlan = Type.define({ plan: Any, catalog: Array, obligations: Array, surface: String, state: String, answer: String })
 
-open_plan(p, cat) => OpenPlan(p, cat, plan_obligations(p, cat))
+open_plan(p, cat) =>
+  obs = plan_obligations(p, cat)
+  a = open_answer_of(p, cat, obs)
+  OpenPlan(p, cat, obs, plan_surface(p), a.state, a.answer)
+
+open_answer_of(p, cat, obs) =>
+  if obs.length > 0
+    then {state: "open", answer: obs[0].message}
+    else solved_answer(p, cat)
+
+// The completed plan must pass what the `WellFormedPlan` annotation checks
+// (`plan_errors`, the predicate of `well_formed`), so "solved" never names
+// a plan the annotation would refuse.
+solved_answer(p, cat) =>
+  s = solve_from(p, cat)
+  if s instanceof Error
+    then {state: "unsolved", answer: error of s}
+    else solution_answer(s, plan_errors(s.plan))
+
+solution_answer(s, errs) =>
+  if errs.length == 0
+    then {state: "solved", answer: solution_show(s)}
+    else {state: "unsolved", answer: "{s.plan.name} is not well-formed: {join(errs, "; ")}"}
 
 // The library's queries over an open plan.
 open_obligations(op) => op.obligations
@@ -138,13 +179,38 @@ with_entry(op, n) => open_plan(op.plan, op.catalog.concat([n]))
 // `solve_from` answers.
 solve_open(op) => solve_from(op.plan, op.catalog)
 
-// --- The surface: `plan NAME from CATALOG:` ---------------------------------------
+// The kernel's answer, as the open plan stores it.
+open_state(op) => op.state
+open_answer(op) => op.answer
+
+// --- The surface: `catalog NAME:` and `plan NAME from CATALOG:` ---------------------
 //
-// The `plan` form's body items (`node_items`, from `planning_grammar`),
-// with `from` and the catalog's binding after the name. The expansion is
-// `binding_decl` without the type, so the binding is not annotated with
-// `WellFormedPlan` and a gap does not halt compilation.
+// `catalog NAME:` (R2 (a), the pilot's D3 row "a surface form for
+// catalogs", chunk L2) is a statement form in the register of `plan`: an
+// indented block of node blocks, each written as in a plan's body, bound
+// to `NAME` as the list of nodes `plan NAME from CATALOG:` expects. A node
+// block is a leaf or a composite (`Name:` and its items), a choice (a node
+// with `options:`) or a borrowed plan (`Name: uses target`); the entries
+// are parsed by the two node alternatives of `planning_grammar`'s
+// `node_item`, rewritten here so that only node blocks parse: an `inputs:`
+// or `budget:` line directly under `catalog` is a parse error, not an
+// item silently dropped. A list expression of nodes (`yard = [depot, van]`)
+// is a catalog too; the form is the readable spelling of the same list.
+//
+// `plan NAME from CATALOG:` takes the `plan` form's body items
+// (`node_items`), with `from` and the catalog's binding after the name.
+// The expansion is `binding_decl` without the type, so the binding is not
+// annotated with `WellFormedPlan` and a gap does not halt compilation.
 planning_loop_grammar = grammar {
+  rule cname = txt:/[a-z_][A-Za-z0-9_]*/ => txt => txt
+  rule cat_node = un:pname hws ":" hws "uses" hws target:expr => (un, target) => uses(un, target)
+  rule cat_node += nn:pname hws ":" hws INDENT nitems:node_items DEDENT => (nn, nitems) => build_node(nn, nitems)
+  rule cat_nodes = n:cat_node hws NEWLINE rest:cat_nodes => (n, rest) => [n].concat(rest)
+  rule cat_nodes += n:cat_node => n => [n]
+
+  stmt_form "catalog" hws cn:cname hws ":" hws INDENT ns:cat_nodes DEDENT
+    => (cn, ns) => binding_decl(cn, ns)
+
   stmt_form "plan" hws pn:pname hws "from" hws cn:ident hws ":" hws INDENT pitems:node_items DEDENT
     => (pn, cn, pitems) => binding_decl(pn, open_plan(build_plan(pn, pitems), cn))
 }

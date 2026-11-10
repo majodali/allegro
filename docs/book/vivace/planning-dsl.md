@@ -202,6 +202,66 @@ its witness and whether the catalog or the depth stopped the search.
 `Depot` needs") with a hash over the plan's name, its declared inputs,
 outcomes and budget, and the gap.
 
+**The catalog form and the proposal.** `catalog NAME:` (chunk L2 of
+B-187) writes a catalog as node blocks, in the register of `plan`, and
+binds `NAME` to the list of nodes the open plan is completed from; a
+list expression of nodes is a catalog too. A
+[proposal](../../plans/planning-loop.md#def-proposal) is one more entry
+of that block: the protocol appends the node block to the catalog the
+obligation names and never edits the plan. The open plan's record also
+holds the kernel's answer, computed when the plan is built: its state
+("open" while an obligation remains, "unsolved" when every gap closes
+and no completion solves, "solved") and the planning words for it (the
+next dead end, the counterexample of `solve_from`, or the solution). A
+solved plan passes what the `WellFormedPlan` annotation checks.
+
+### 2.9 Output contract for a plan proposer
+
+This section is what a worker sends a proposer with a
+[plan obligation](../../plans/planning-loop.md#def-plan-obligation), as
+`docs/book/proving-in-allegro.md` "Output contract for an LLM prover" is
+for a theorem.
+
+**What the obligation says.** A gap the catalog cannot fill: a port
+("`Shipped`, which `Depot` needs"), the search that reached it
+("Delivered from Van, Sorted from Depot"), the catalog to extend
+(`yard`) and a hash over the plan's name, declared inputs, outcomes and
+budget, and the gap.
+
+**What to reply.** ONE fenced ```allegro code block holding ONE node
+block, as it would appear in a plan's body, with no `catalog` and no
+`plan` keyword:
+
+```allegro
+Ship:
+  inputs: Packed
+  outcomes: Shipped
+  estimate: 45 min, 0.25 person-hours
+```
+
+The node must produce the missing port. It may be a leaf, a composite
+(nodes under it), a choice (`options:`) or a borrowed plan
+(`Name: uses Courier`). A fixture is named in brackets after a port
+(`Shipped [labelled]`) and must already be in scope: a node block
+cannot define one.
+
+**What is refused, and why.** Each refusal comes back as text, and the
+next attempt gets it:
+
+- not one node block: a first line that is not `Name:` (or
+  `Name: uses target`), a line at the margin after it, or a `catalog`
+  or `plan` keyword;
+- a reused name: the entry's name is already a node of the plan or the
+  catalog, and completion draws only on names the plan lacks;
+- a parse error: the kernel could not read the spliced file;
+- a plan edit: the hash moved, because the plan's name, inputs,
+  outcomes or budget changed;
+- the gap still open: the reply's own inputs open a gap nothing fills,
+  named as the next dead end ("nothing in the catalog produces
+  `Labelled`, which `Courier` needs");
+- unsolved: every gap closes and no completion fits the budget, or the
+  completed plan fails a check, with the cheapest completion named.
+
 ## 3. The conventions [designed]
 
 Twelve decisions, settled iteratively in the archived design and
@@ -771,14 +831,19 @@ statement's halt carries it (§7; the halt test in
 holds two suite-validated scenes with their break-it halts, and the
 public story is `docs/messaging.md`'s rung-3 section. Not yet built: the rest of B-081
 (counterexample legibility) beyond the refusal sites, branch-and-bound
-when a template outgrows enumeration, a surface form for catalogs.
+when a template outgrows enumeration.
 The planning loop (B-187 (the planning loop, the next validating demo),
 plan `docs/plans/planning-loop.md`) began at its chunk L1:
 `lib/planning_loop.alg` declares the open plan and builds its plan
 obligations (§2.8), `src/pcp.ts` lists them through `allegro
 obligations`, and `tests/planning-loop-obligations.alg` pins an open
 plan, its obligation, the depth stop and the plan closed by a
-hand-written catalog entry. The proposal protocol, the worker and the
+hand-written catalog entry. Chunk L2 added the catalog's surface form,
+`catalog NAME:`, and the kernel's answer in the open plan (§2.8);
+`src/pcp.ts` splices a proposal into the catalog and judges it, and
+`allegro verify --obligation` judges a plan obligation;
+`tests/planning-loop-proposals.alg` pins three proposals and their
+answers; §2.9 is the proposer's output contract. The worker and the
 ledger entries are the stream's later chunks.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
