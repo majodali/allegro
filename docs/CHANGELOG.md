@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-10 — the book pass in two phases.** The plan now reviews
+  every decision of the inventory first, part by part, ruling each and
+  checking it against the code, before any chapter content is written;
+  the chapters follow, each with its IR, prose and the code changes its
+  rulings named. A ruled decision becomes final with its code in the
+  second phase. The briefs gain the decision-review brief. Ids 783.
+
 - **2026-11-10 — the pilot's findings placed.** Four code defects the
   pilot's review found are held on their decisions in
   `docs/plans/book-pass-inventory.md`, to be fixed when the pass takes
