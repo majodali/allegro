@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-183
 lane: P
 merge: human-gated
@@ -24,11 +24,14 @@ boundary:
 
 # The dedent after a trailing comment — the trailing-comment-dedent stream
 
-> **Status: active** — drafted 2026-11-07 in the PR of its one chunk,
-> TC1, and ratified together with that chunk at the merge of the PR,
-> under ruling R4 (B-183's lane) of `docs/plans/pilot-findings.md` §6,
-> which ruled the route and measured the fix. The plan closes at that
-> merge. The status line and the header's `status` say the same thing.
+> **Status: closed** — drafted 2026-11-07 in the PR of its one chunk,
+> TC1, and ratified together with that chunk at the merge of that PR,
+> #172, on 2026-11-07, under ruling R4 (B-183's lane) of
+> `docs/plans/pilot-findings.md` §6, which ruled the route and measured
+> the fix. The plan closed at that merge; this header records it at PR
+> #181, once the pilot-findings stream had closed and filed the
+> case TC1 left, B-191 (a trailing block comment breaks the dedent). The
+> status line and the header's `status` say the same thing.
 >
 > **Merge policy.** Lane P's streams merge on green where the
 > maintainer so ratified (deviation D-2 (merge-on-green streams) of
@@ -158,3 +161,13 @@ chose the lane and the route, and its §2.4 measured the fix.
   next PR (PF2's) writes it. Found and left: a trailing `/* … */` block
   comment after a gap as wide as the block's indentation still fails
   to parse; the chunk was measured for `//` only.
+- **2026-11-09 — the header reads closed** (PR #181). The stream
+  closed at PR #172's merge, as the status line said; this lane P PR
+  flips the header and the manifest row, which no lane D PR may edit.
+  The pilot-findings plan's §7 line recording PF1's merge was written
+  at that stream's close, and the block-comment case above is filed
+  there as B-191 (a trailing block comment breaks the dedent), owner
+  lane P, with this plan's §7 as its pointer. The outcome of §1 is met
+  as TC1's entry states it: the README's taste parses as printed, every
+  row of the pilot-findings plan's §2.4 table parses, no output and no
+  count moved. No code changes here.
