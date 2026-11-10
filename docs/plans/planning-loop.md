@@ -1027,3 +1027,196 @@ R7 and R8 at their rows' time.
 - **2026-11-10 — ask 1 of L2's PR taken as recommended, A4 ratified,
   the three terms ratified, at PR #182's comment; `propose` and `verify`
   list plan obligations by default, the L1 pin replaced.**
+- **2026-11-10 — L3 landed, stopped at deliverable 4.** The LLM-free
+  worker and the scripted proposer, on `origin/main` at `9e018ad` (the
+  merge of PR #182). One stop: the scripted loop cannot run on L1's demo,
+  `tests/planning-loop-obligations.alg`, as the file stands. Its catalog
+  is a list expression (`yard  = [depot, van]`), and L2's splice refuses
+  a list catalog by design, pinned at `src/test/pcp.ts:664` ("a node
+  block is spliced into the block form only"). Through `prove --proposals`
+  the loop on that file ends after one attempt, refused as `no-catalog`,
+  exit 1. Making it converge needs one of three things, each a stop of
+  §3: edit the demo (an oracle, never edited), change L2's pinned splice
+  to accept a list catalog, or add a new `tests/planning-loop-*.alg`
+  file. The default taken: the convergence is pinned on L1's open plan
+  with its catalog written as a `catalog yard:` block, in the test's temp
+  directory. It is the same plan, the same obligation and the same hash
+  (`421ea754`), because the identity hash does not cover the catalog's
+  form. The CLI path is pinned on L2's demo,
+  `tests/planning-loop-proposals.alg`, whose catalog is a block. The
+  maintainer rules at L3's PR whether that stands.
+
+  What landed:
+  - **The kind registry** (R3 (a)) is `OBLIGATION_KINDS`
+    (`pcp/llm-worker.ts:566`), a `Record<ObligationKind,
+    ObligationKindSpec>` with two entries, `theorem` and `plan`. An
+    `ObligationKindSpec` (`:462`) has four parts: `request(ob,
+    attemptNumber, attemptsSoFar)` answers the request text;
+    `splice(source, ob, candidate)` answers the spliced source, or a
+    reason and whether a later attempt can splice at all; `judge(…)` is
+    the success test, over one `evaluate` of the spliced source; and
+    `primer(repoRoot?)` answers the system prompt. `theoremKind` (`:475`)
+    holds the H4a parts unchanged: `buildIterationMessage`, `spliceProof`,
+    the verdict listing the theorem as discharged, and `loadPrimer` (the
+    whole primer, as before). `planKind` (`:543`) holds
+    `buildPlanIterationMessage` (`:517`: the TODO section's words from
+    `formatPlanTodo`, now exported at `src/pcp.ts:1721`, then the last
+    refusal, the attempts so far and the contract), `splicePlanProposal`
+    (a `no-catalog` refusal is final), the success test, and
+    `loadPlanPrimer` (`:713`: §2.9 of the planning chapter, from its
+    heading to the next heading of its level). The success test is
+    `answerPlanProposal` accepted, because it is the kernel's own answer
+    to a proposal: it maps the evaluation's throw to `halt` and the
+    judgement to `open`, `unsolved`, `plan-edited` and `plan-missing`,
+    which `judgePlanObligation` alone does not. `runLlmWorker` (`:578`) is
+    the one loop: one client shim, one authorship path, the primer of
+    each kind loaded once per run. The theorem path keeps its behaviour:
+    the three H4a loop tests and every other assertion of
+    `src/test/pcp.ts` pass unchanged.
+  - **B-175 item 5 closed.** `loadForLoop` (`:404`) loads the file as
+    `pcpLoadAndEval` does: the `use` header's modules, the header
+    stripped, the body's `import`ed modules, prints silenced, `softFail`
+    set. The modules load once per run, through the loader's process
+    cache, and each turn is one `evalSource` over the spliced body. The
+    CLI cannot lend its own loader (`src/index.ts` runs its command line
+    on import), so the steps are mirrored. The worker lists plan
+    obligations (`plans: true`) after the rest, as `obligations` does.
+  - **The client shim.** `LlmClient.send` (`:179`) also receives the
+    obligation's name; the optional `LlmClient.answers` lets a client
+    decline an obligation, which the loop skips (`WorkerResult.skipped`,
+    and the summary's `skipped` count, zero until now). An accepted
+    attempt carries the kernel's answer when the kind gives one
+    (`AttemptRecord.answer`, a plan obligation's solution).
+  - **The scripted proposer.** `createScriptedClient` (`:281`) answers
+    each request with the next prepared proposal for the obligation it
+    names, as one fenced block; `parseProposals` (`:249`) and
+    `loadProposalsFile` (`:272`) read the file. The format is Markdown
+    in the shape of `propose`'s TODO: a section per obligation, headed
+    "## `NAME`" with the obligation's name as the TODO heads it, and
+    under it one fenced ```allegro (or untagged) block per attempt, in
+    the order the loop asks. Prose between the blocks is ignored, and
+    blocks before the first section answer any obligation without one.
+    An obligation without answers is declined, so the units library's
+    laws are skipped rather than attempted. `prove FILE --proposals
+    FILE.md` (`src/index.ts:362` to `:366`, `runPcpProve` at `:626`) uses
+    it: no key is read, no network is reached. Its JSON gains each
+    obligation's `kind` (plan obligations only), its `history` and the
+    `skipped` names; the text form prints a plan obligation's turns.
+  - **Authorship.** The authorship of an accepted proposal comes from
+    `makeAuthorship` with its fields as for a theorem: `prover` is the
+    client's `modelId()`, "scripted" for a test's client and
+    "scripted:FILE" (the proposals file's base name) from the CLI;
+    `attemptsUsed` and `effortBudgetUsed.attempts` are the attempt that
+    was accepted; `role` is "primary". No field was added.
+  - **The transcript.** The scripted loop on L1's open plan, the catalog
+    as a block (`src/test/pcp.ts:1192` pins it with a test client and the
+    answers in the test; the run below read them from a file named
+    `proposals.md`). The units library's five laws were skipped. The two
+    requests, the replies and the kernel's answers, verbatim:
+
+    ````
+    --- request ---
+    Attempt 1 for plan obligation `Fulfil: Shipped, which Depot needs`.
+
+    **Gap:** nothing in the catalog produces Shipped, which Depot needs
+
+    **Search so far:** Delivered from Van, Sorted from Depot
+
+    **Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.
+
+    **Hash:** `421ea754` (over: plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot)
+
+    Reply with ONE fenced ```allegro code block holding ONE node block that produces `Shipped`, as it would appear in a plan's body, with no `catalog` and no `plan` keyword. The kernel will add it to the catalog `yard` and check the plan again.
+    --- reply ---
+    ```allegro
+    Courier:
+      inputs: Labelled
+      outcomes: Shipped
+      estimate: 40 min, 0.25 person-hours
+    ```
+    --- request ---
+    Attempt 2 for plan obligation `Fulfil: Shipped, which Depot needs`.
+
+    **Gap:** nothing in the catalog produces Shipped, which Depot needs
+
+    **Search so far:** Delivered from Van, Sorted from Depot
+
+    **Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.
+
+    **Hash:** `421ea754` (over: plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot)
+
+    Last attempt's refusal:
+    - refused (open): nothing in the catalog produces Labelled, which Courier needs
+
+    Attempts so far: 1
+    - 1: `Courier`, refused (open): nothing in the catalog produces Labelled, which Courier needs
+
+    Reply with ONE fenced ```allegro code block holding ONE node block that produces `Shipped`, as it would appear in a plan's body, with no `catalog` and no `plan` keyword. The kernel will add it to the catalog `yard` and check the plan again.
+    --- reply ---
+    ```allegro
+    Ship:
+      inputs: Packed
+      outcomes: Shipped
+      estimate: 45 min, 0.25 person-hours
+    ```
+    --- kernel, attempt 1 ---
+    refused (open): nothing in the catalog produces Labelled, which Courier needs
+    --- kernel, attempt 2 ---
+    accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min
+    --- authorship ---
+    {"provers":[{"prover":"scripted:proposals.md","attemptsUsed":2,"effortBudgetUsed":{"attempts":2},"role":"primary"}],"verifiedAt":"2026-11-10T19:26:14.029Z"}
+    ````
+
+    The system prompt of both requests is §2.9 of
+    `docs/book/vivace/planning-dsl.md`. Through the CLI, `prove
+    tests/planning-loop-proposals.alg --proposals P.md --json`, with P.md
+    holding `Freight` and `Ship`, exits 0: attempt 1 "refused (unsolved):
+    no completion of Fulfil from the catalog fits the budget of Fulfil;
+    the cheapest, Delivered from Van, Sorted from Depot, Shipped from
+    Freight, is duration 200 min against 160 min", attempt 2 accepted,
+    authored by "scripted:P.md" in 2 attempts; six obligations skipped,
+    the five laws and the demo's second open plan `courier`
+    (`src/test/pcp.ts:1326`).
+  - **The tests**, appended to `src/test/pcp.ts`: at `:1169` to `:1284`,
+    inside `runH4aAsyncTests`, the scripted loop on L1's open plan (the
+    authorship, both request texts, the system prompt and the verdict on
+    the source the loop left); a theorem through the same loop, a
+    prepared proof term accepted at the second attempt; and the worker on
+    `demos/rung3/02-solve.alg`, which threw at position 546 before; at
+    `:1300` to `:1370`, the proposals file's format and `prove --proposals`
+    in JSON and text.
+  - **No network in the suite.** No test constructs
+    `createAnthropicClient`. `src/test/` names `ANTHROPIC_API_KEY` only
+    to set it empty for a CLI run (`src/test/pcp.ts:1291`, `:1339`,
+    `:1358`); without `--proposals` the CLI fails on the empty key
+    before the SDK is imported, and with it no client of the SDK is made.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (72 files) was run through the CLI as `run`,
+    `inspect`, `verify`, `obligations` and `propose`, before and after,
+    and compared on stdout, stderr (stats lines stripped) and exit code.
+    All 360 runs are identical; the chunk adds no file under `tests/` or
+    `demos/`.
+  - **The counts.** `npm run lint:load` is at or below the baseline.
+    `demos/rung3/02-solve.alg` has 3,794,320 evaluates and 202,129
+    applyComposed before and after. One turn of the loop on L1's open
+    plan, measured through `setEvalStatsSink` in process: the four
+    libraries load once (`lib/units.alg` 171,152 evaluates,
+    `lib/totality.alg` 74, `lib/planning.alg` 63,422,
+    `lib/planning_loop.alg` 115,966); the first evaluation of the file
+    costs 87,139, the refused turn 150,573 and the accepted turn 447,758;
+    the whole loop took 1.7 s of wall clock. A turn costs four to twelve
+    times §2.4's figure of about 36,000 evaluations, because since L2 the
+    open plan computes its answer when it is built: the search, and on
+    the accepted turn the solve. Neither count is gated.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C123 becomes
+    C175 and C176 (the client without and with `--proposals`); C127 to
+    C130 become C177, C184, C178, C179 and C180 (the request, the
+    splice, the success test, the primer section, the authorship); C132
+    becomes C181 and C185 (the exit code, and a declined obligation
+    skipped); C133 becomes C182 (the file loaded as the CLI loads it);
+    the inferred C135 and its relation R4 become C183 (a run with a `use`
+    header); clusters G29 and G30 in place of G20 and G21, all proposed,
+    ask A5; evidence E40 added; E3, E16, E17, E18, E30 and E39
+    re-synced. C124 (the phantom `--api-key`, B-175 item 6) is L4's and
+    stays. The chapter's §9 is updated. B-175 item 5 says L3 closed it.
+    The oracle lines are in L3's PR.

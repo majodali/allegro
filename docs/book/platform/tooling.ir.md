@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0; edited 2026-11-10: the worker generalised by obligation kind and the scripted proposer by B-187, chunk L3 (claims C175 to C185 and clusters G29 and G30, ask A5; C123, C127, C128, C129, C130, C132, C133 and C135, relation R4 and clusters G20 and G21 removed; the seven decided ones also dropped from ask A1; evidence E40 added; E3, E16, E17, E18, E30 and E39 re-synced), unratified terms 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -338,7 +338,9 @@ C122. `propose` exits with code 0 whatever the obligations' state. evidence: E15
 
 ### The `prove` subcommand [implemented]
 
-C123. `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [decided: owner, 2026-11-02]
+C175. Without `--proposals`, `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [proposed: this IR]
+
+C176. With `--proposals FILE.md`, `prove` answers from the file through the scripted proposer of `pcp/llm-worker.ts`, reading no key. evidence: E3, E40. [proposed: this IR]
 
 C124. The missing-key message offers a `--api-key` flag that `src/index.ts` does not parse. evidence: E3, E16. [decided: owner, 2026-11-02]
 
@@ -346,23 +348,27 @@ C125. `prove` runs `runLlmWorker` in `pcp/llm-worker.ts` with at most `--max-att
 
 C126. `runLlmWorker` takes the pending obligations from one run of `evalSource` with the `softFail` flag set. evidence: E17. [decided: owner, 2026-11-02]
 
-C127. Per attempt, `runLlmWorker` sends the primer and an iteration message to the client, then splices the answer's first `allegro` code block, or else its first fenced block, into the theorem's `by` slot. evidence: E17. [decided: owner, 2026-11-02]
+C177. Per attempt, `runLlmWorker` sends the client the primer section and the request text of the obligation's kind. evidence: E17. [proposed: this IR]
 
-C128. `runLlmWorker` re-evaluates the spliced source through `evalSource`, keeping the proof term when the new verdict lists the theorem as discharged. evidence: E17. [decided: owner, 2026-11-02]
+C184. `runLlmWorker` splices the answer's first `allegro` code block, or else its first fenced block, into a theorem's `by` slot, or into the open plan's `catalog NAME:` block as its last entry. evidence: E17. [proposed: this IR]
 
-C129. The primer is `docs/book/proving-in-allegro.md`, read relative to the current working directory. evidence: E18. [decided: owner, 2026-11-02]
+C178. `runLlmWorker` evaluates the spliced source once through `evalSource`, keeping a proof term when the new verdict lists the theorem as discharged and a catalog entry when `answerPlanProposal` accepts it. evidence: E17. [proposed: this IR]
 
-C130. A discharged obligation's authorship names the client's model as the prover, with the attempts used. evidence: E17. [decided: owner, 2026-11-02]
+C179. The system prompt is `docs/book/proving-in-allegro.md` for a theorem and section 2.9 of `docs/book/vivace/planning-dsl.md` for a plan obligation, each read relative to the current working directory. evidence: E18. [proposed: this IR]
+
+C180. A discharged obligation's authorship names the client's `modelId()` as the prover, the model or `scripted:FILE` for the scripted proposer, with the attempts used. evidence: E17, E40. [proposed: this IR]
 
 C131. `prove --output FILE.alg` writes the source with every kept proof term spliced in. evidence: E3. [decided: owner, 2026-11-02]
 
-C132. `prove` exits with code 0 when every pending obligation discharged, code 1 otherwise. evidence: E3. [decided: owner, 2026-11-02]
+C181. `prove` exits with code 0 when every obligation the loop attempted discharged, code 1 otherwise. evidence: E3, E17. [proposed: this IR]
 
-C133. `runLlmWorker` passes the file's text to `evalSource` with the type system as the one extension, the `use` header unstripped. evidence: E17. [decided: owner, 2026-11-02]
+C185. `runLlmWorker` skips an obligation the client declines, as the scripted proposer declines one its file holds no answer for, attempting it never. evidence: E17, E40. [proposed: this IR]
+
+C182. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once per run, and evaluates each turn's source with its `use` header stripped. evidence: E17. [proposed: this IR]
 
 C134. In a run on 2026-11-01, `evalSource` over a source opening with `use contracts`, the type system the one extension, threw a parse error. evidence: E28. [decided: owner, 2026-11-02]
 
-C135. With an API key set, `prove` fails on a file whose header holds a `use` directive. [inferred: R4]
+C183. In a run on 2026-11-10, `prove --proposals` over `tests/planning-loop-proposals.alg`, whose header holds three `use` directives, discharged its plan obligation in two attempts. evidence: E40. [proposed: this IR]
 
 C136. `src/test/pcp.ts` pins the worker's helpers, one loop of `runLlmWorker` with a mock client, and the missing-key failure of `prove`. evidence: E30. [decided: owner, 2026-11-02]
 
@@ -478,9 +484,9 @@ G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: own
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G20. cluster: C123, C124, C125, C126, C127, C128, C129, C130, C131, C132 [decided: owner, 2026-11-02]
+G29. cluster: C175, C176, C124, C125, C126, C177, C184, C178, C179, C180, C131, C181, C185 [proposed: this IR]
 
-G21. cluster: C133, C134, C135, C136 [decided: owner, 2026-11-02]
+G30. cluster: C182, C134, C183, C136 [proposed: this IR]
 
 G22. cluster: C137, C138, C139 [decided: owner, 2026-11-02]
 
@@ -499,8 +505,6 @@ R1. C48 depends-on C47 because a halting post-pass throws out of `evalSource`, a
 R2. C95 depends-on C72 because, with the `softFail` flag unset, each of the three failures halts the evaluation before `summarizeModule` runs (C73).
 
 R3. C96 depends-on C95 because the halting failures never reach a grade, which leaves the non-halting error notifications (C88) and the `Error`-typed bindings (C91).
-
-R4. C135 depends-on C133 because the `use` header that `runLlmWorker` leaves in place fails to parse (C134).
 
 R5. C143 contradicts C141 because the variable's value is the step itself, which makes a value of 1 print at nearly every application (C144).
 
@@ -522,7 +526,7 @@ E1. `scripts/analyze/units.json` line 2 (each unit lists its direct dependencies
 
 E2. `npx tsx scripts/analyze/index.ts units` and `units --json`, run on this branch on 2026-11-01: five mixed files (`src/types.ts`, `src/primitives.ts`, `src/runtime.ts`, `src/modules.ts`, `src/types-std.ts`); discriminator count 458, of which 19 in `src/introspect.ts`; from `src/index.ts`, edges to `src/futures.ts` and `src/use-scanner.ts` ok and to `src/primitives.ts`, `src/runtime.ts`, `src/types.ts`, `src/types-std.ts`, `src/modules.ts` unresolved; no edge from `src/index.ts` to `src/introspect.ts` or `src/pcp.ts`.
 
-E3. `src/index.ts` lines 283–375: `--base` read anywhere in the arguments, the subcommand chosen by the first positional argument, each usage line followed by exit code 1, a file run otherwise, the REPL with no positional argument; dynamic imports at lines 419, 427, 481–482, 520–521, 556 and 615; `prove`'s flags parsed at lines 355–361 (`--max-attempts` defaulting to 5, `--model`, `--output`, `--json`, no `--api-key`), `runPcpProve` called without the `standard` flag at line 362; `runPcpProve` at lines 608–653 writing `--output` and exiting 0 only when every obligation discharged.
+E3. `src/index.ts` lines 283–379: `--base` read anywhere in the arguments, the subcommand chosen by the first positional argument, each usage line followed by exit code 1, a file run otherwise, the REPL with no positional argument; dynamic imports at lines 423, 431, 485–486, 529–530, 569 and 634–635; `prove`'s flags parsed at lines 355–365 (`--max-attempts` defaulting to 5, `--model`, `--output`, `--json`, `--proposals`, no `--api-key`), `runPcpProve` called without the `standard` flag at line 366; `runPcpProve` at lines 626–686 writing `--output`, printing each plan obligation's turns and the skipped obligations, and exiting 0 only when every attempted obligation discharged.
 
 E4. `src/index.ts` lines 39–78 (`loadImportedModules`: `scanImports`, names an extension provides skipped, the local `lib/` then the system `lib/` beside `src/`), lines 84–111 (`loadGrammarModules`), lines 115–225 (`runFile`: Allegretto at 117–120; the future manager at 127; `scanUses` at 131; the member filter and its two throws at 146–175; inline grammar literals evaluated over `getStdExtensions()` at 183–204; the header stripped at 208; imports loaded at 213; `evalSource` with `typed` true at 216; the wait at 217–219; `Error in`, `ALLEGRO_STACK` and exit 1 at 220–224).
 
@@ -548,11 +552,11 @@ E14. `src/index.ts` lines 514–545 (`runPcpObligations`: `--pending` passed as 
 
 E15. `src/index.ts` lines 543–600 (`runPcpPropose`: `--all`, `--output`, no exit call) and `src/pcp.ts` lines 1153–1232 (`formatTodo`: the sections, the closing line naming `allegro verify`).
 
-E16. `pcp/llm-worker.ts` lines 182–209 (`createAnthropicClient`: the key check and the message "Set the environment variable or pass --api-key, or use `allegro propose`"); `src/index.ts` lines 615–616 (the client created before `runLlmWorker`).
+E16. `pcp/llm-worker.ts` lines 197–224 (`createAnthropicClient`: the key check and the message "Set the environment variable or pass --api-key, or use `allegro propose`"); `src/index.ts` lines 636–638 (without `--proposals`, the client created before `runLlmWorker`).
 
-E17. `pcp/llm-worker.ts` lines 226–392 (`runLlmWorker` from line 264: the file read and evaluated with `createTypeSystem()` alone and `softFail` true at 266–271, pending obligations at 272–273, the attempt loop from line 290, `extractCodeBlocks` and `spliceProof`, the re-evaluation and `buildVerdict` at 340–342, the authorship with `client.modelId()` at 349–354).
+E17. `pcp/llm-worker.ts` lines 179–192 (`LlmClient`, its `send` with the obligation's name and its optional `answers`), 226–298 (the scripted proposer: `parseProposals`, `loadProposalsFile`, `createScriptedClient`), 367–431 (`loadForLoop`: the `use` header's modules and the `import`ed ones loaded once over the type system, each turn's body evaluated with prints silenced and `softFail` true), 433–569 (the kind registry `OBLIGATION_KINDS`: `theoremKind` with `buildIterationMessage`, `spliceProof` and the verdict's discharged theorem; `planKind` with `buildPlanIterationMessage`, `splicePlanProposal` and `answerPlanProposal`), 578–695 (`runLlmWorker`: pending obligations with `plans: true` at 586–588, a declined obligation skipped at 607–610, the attempt loop from line 617, `extractCodeBlocks`, the kind's splice and judgement at 645–651, the authorship with `client.modelId()` at 657–662).
 
-E18. `pcp/llm-worker.ts` lines 397–406 (`loadPrimer`: an explicit root or the current working directory) and `src/index.ts` lines 617–622 (no root passed).
+E18. `pcp/llm-worker.ts` lines 698–707 (`loadPrimer`: an explicit root or the current working directory), 709–731 (`loadPlanPrimer`: section 2.9 of `docs/book/vivace/planning-dsl.md` from its heading to the next of its level, looked up the same way) and 594–599 (`runLlmWorker` takes each kind's primer with no root).
 
 E19. `src/index.ts` line 222; search of `src/` on 2026-11-01 for `ALLEGRO_STACK`: that line only.
 
@@ -576,7 +580,7 @@ E28. A scratch script run on this branch on 2026-11-01: `evalSource("use contrac
 
 E29. Runs on this branch on 2026-11-01 of a scratch file with `use proven` and a function whose `proven` clause fails: `obligations` listed no obligation for the function; `obligations --pending` listed one; `verify` reported the clause as failed with a counterexample.
 
-E30. `src/test/pcp.ts` lines 364–381 (`verify` exit codes and JSON), 383–396 (`obligations --json`), 398–507 (the plan obligations of B-187 (the planning loop, the next validating demo), chunk L1, `obligations --pending` among them), 508–727 (its chunk L2: the proposal protocol, and `verify --obligation` with a plan obligation), 926–941 and 943–960 (`propose`, with and without `--output`), 970–1064 and 1066 (the worker's helpers and the mock-client loop), 1134–1149 (`prove` without a key), 1151–1212 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
+E30. `src/test/pcp.ts` lines 367–384 (`verify` exit codes and JSON), 386–399 (`obligations --json`), 401–510 (the plan obligations of B-187 (the planning loop, the next validating demo), chunk L1, `obligations --pending` among them), 512–762 (its chunk L2: `propose` and `verify` on L1's demo, the proposal protocol, and `verify --obligation` with a plan obligation), 962–977 and 979–996 (`propose`, with and without `--output`), 998–1091 and 1093–1167 (the worker's helpers and the mock-client loop), 1169–1284 (its chunk L3: the scripted loop on L1's open plan, a theorem through the same loop, and the worker on a file with a `use` header), 1286–1298 (`prove` without a key), 1300–1370 (the proposals file and `prove --proposals`), 1372–1436 (the summaries and the four `safetyGradeFor` rules); summaries also in `src/test/effects.ts` lines 125 and 1252, `src/test/refinements.ts` lines 417 and 433, `src/test/totality.ts` lines 703–704, `src/test/equality-laws.ts` line 660.
 
 E31. `src/test/base.ts` lines 234–250 (persistent context across two evaluations); `src/test/language.ts` lines 179–215 (binding evaluation counts through `setEvalStatsSink`); `src/test/alg-files.ts` lines 64–218 (`runAlgFile` over `evalSource`) and `src/test/proofs.ts` lines 547–551 and 657 (the demo run with the suite's `provenExt`).
 
@@ -594,11 +598,13 @@ E37. Search of `src/`, `pcp/` and `web/` on 2026-11-01, outside `src/test/`, for
 
 E38. `src/pcp.ts` lines 1217–1221 (`extractObligations` appends the plan obligations when its `plans` option is set) and 1226–1299 (`extractPlanObligations`: a top-level binding whose registered `type` field is the `OpenPlan` type of `lib/planning_loop.alg`, its obligation records read as data, `kind` "plan" and the `plan` field); `src/index.ts` lines 526–533 (`runPcpObligations` passes `plans: true`); `src/test/pcp.ts` lines 398–507.
 
-E39. `src/pcp.ts` lines 1301–1561 (the proposal protocol of B-187, chunk L2: `splicePlanProposal`; `judgePlanObligation`, which hashes the `surface` of the file's `OpenPlan` record with the obligation's gap and reads its `state` and `answer`; `planObligationRecords`; `answerPlanProposal`; `formatPlanProposalAnswer`), 729–743 (`formatVerdict`'s `plans` line) and 1719–1734 (`formatPlanTodo`); `lib/planning_loop.alg` lines 131–184 (the `OpenPlan` record's `surface`, `state` and `answer`); `src/test/pcp.ts` lines 691–726 (`verify --obligation` on L1's open plan, before and after the edit, and with the plan edited).
+E39. `src/pcp.ts` lines 1301–1561 (the proposal protocol of B-187, chunk L2: `splicePlanProposal`; `judgePlanObligation`, which hashes the `surface` of the file's `OpenPlan` record with the obligation's gap and reads its `state` and `answer`; `planObligationRecords`; `answerPlanProposal`; `formatPlanProposalAnswer`), 729–743 (`formatVerdict`'s `plans` line) and 1716–1736 (`formatPlanTodo`, exported since chunk L3); `lib/planning_loop.alg` lines 131–184 (the `OpenPlan` record's `surface`, `state` and `answer`); `src/test/pcp.ts` lines 691–726 (`verify --obligation` on L1's open plan, before and after the edit, and with the plan edited).
+
+E40. Runs on this branch on 2026-11-10 of `npx tsx src/index.ts prove tests/planning-loop-proposals.alg --proposals P.md --json` with `ANTHROPIC_API_KEY` empty, P.md holding the `Freight` and the `Ship` node blocks under the heading of the obligation `Fulfil: Shipped, which Depot needs`: exit 0; the first attempt refused as `unsolved` with the budget missed, the second accepted; the authorship's prover `scripted:P.md` with 2 attempts used; the units library's five laws and the demo's second open plan `courier` skipped; pinned at `src/test/pcp.ts` lines 1326–1370.
 
 ## Asks
 
-A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C123, C124, C125, C126, C127, C128, C129, C130, C131, C132, C133, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
+A1. Ratify in bulk the proposed claims, every claim about the code as implemented and the four about the chapter's own reader, terms and examples: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C124, C125, C126, C131, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170. Depends: C2, C4, C5, C8, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30, C31, C32, C33, C34, C35, C36, C37, C38, C39, C40, C41, C42, C43, C44, C45, C46, C47, C48, C49, C50, C51, C52, C53, C54, C55, C56, C57, C58, C59, C60, C61, C62, C63, C64, C65, C66, C67, C68, C69, C70, C71, C72, C73, C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84, C86, C87, C88, C89, C90, C91, C92, C93, C94, C97, C98, C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C110, C112, C113, C114, C115, C116, C117, C118, C119, C120, C121, C122, C124, C125, C126, C131, C134, C136, C137, C138, C139, C140, C141, C142, C143, C144, C145, C146, C147, C148, C149, C150, C151, C152, C153, C154, C156, C157, C158, C159, C160, C161, C162, C163, C164, C165, C166, C167, C168, C169, C170.
 
 A1 resolved: ratified by the owner at the merge of PR #137, 2026-11-02; the claims carry decided provenance from that date.
 
@@ -613,3 +619,5 @@ A3 resolved: ratified by the owner at the merge of PR #177, 2026-11-09; the stat
 A4. Ratify the re-proposed claims about `verify --obligation` as chunk L2 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G28: C173, which replaces C109 for an obligation without a kind, and C174, for a plan obligation. Depends: C173, C174.
 
 A4 resolved: ratified by the owner at PR #182's comment, 2026-11-10; the statuses are flipped.
+
+A5. Ratify the re-proposed claims about `prove` and the worker as chunk L3 of B-187 (the planning loop, the next validating demo) left the code, with their clusters G29 and G30: C175 and C176 (the client, without and with `--proposals`), which replace C123; C177, C184, C178, C179 and C180 (the request, the splice, the success test, the primer section and the authorship per obligation kind), which replace C127, C128, C129 and C130; C181 and C185 (the exit code, and a declined obligation skipped), which replace C132; C182, which replaces C133; and C183, which replaces the inferred C135 and its relation R4. Depends: C175, C176, C177, C178, C179, C180, C181, C182, C183, C184, C185.
