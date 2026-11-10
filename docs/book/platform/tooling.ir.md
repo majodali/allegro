@@ -302,9 +302,9 @@ C107. The assumption ledger lists the admitted and sampled backings, each with t
 
 C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [decided: owner, 2026-11-02]
 
-C173. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash, for an obligation without a kind. evidence: E11, E12. [proposed: this IR]
+C173. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash, for an obligation without a kind. evidence: E11, E12. [decided: owner, 2026-11-10]
 
-C174. `verify --obligation O.json` with a plan obligation fails the verdict unless the open plan it names is solved with an identity hash equal to the obligation's. evidence: E11, E39. [proposed: this IR]
+C174. `verify --obligation O.json` with a plan obligation fails the verdict unless the open plan it names is solved with an identity hash equal to the obligation's. evidence: E11, E39. [decided: owner, 2026-11-10]
 
 C110. `verify` exits with code 0 for a verified verdict and code 1 otherwise. evidence: E11, E24. [decided: owner, 2026-11-02]
 
@@ -472,7 +472,7 @@ G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [decided: owner, 
 
 G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
-G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C173, C174, C110 [proposed: this IR]
+G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C108, C173, C174, C110 [decided: owner, 2026-11-10]
 
 G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-09]
 
@@ -611,3 +611,5 @@ A3. Ratify the re-proposed claims about `obligations` as chunk L1 of B-187 (the 
 A3 resolved: ratified by the owner at the merge of PR #177, 2026-11-09; the statuses are flipped.
 
 A4. Ratify the re-proposed claims about `verify --obligation` as chunk L2 of B-187 (the planning loop, the next validating demo) left the code, with their cluster G28: C173, which replaces C109 for an obligation without a kind, and C174, for a plan obligation. Depends: C173, C174.
+
+A4 resolved: ratified by the owner at PR #182's comment, 2026-11-10; the statuses are flipped.

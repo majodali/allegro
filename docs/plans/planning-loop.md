@@ -145,6 +145,20 @@ before it.
   [plan obligations](#def-plan-obligation) and without the
   `WellFormedPlan` annotation, so its gaps are obligations rather than
   halts. Ratified at the merge of PR #177, 2026-11-09.
+- <a id="def-plan-state"></a>**Plan state** ("open", "unsolved",
+  "solved"): the kernel's answer stored in an
+  [open plan](#def-open-plan): open means an obligation remains,
+  unsolved means every gap closes but no completion solves, solved
+  means one does. Ratified at PR #182's comment, 2026-11-10.
+- <a id="def-plan-surface"></a>**Plan surface**: the plan's name,
+  declared inputs, outcomes and budget as `plan_surface` renders them,
+  the part of the identity hash a [proposal](#def-proposal) must leave
+  unchanged. Ratified at PR #182's comment, 2026-11-10.
+- <a id="def-refusal-kinds"></a>**Refusal kinds** (`not-a-node-block`,
+  `name-reused`, `no-catalog`, `halt`, `plan-missing`, `plan-edited`,
+  `open`, `unsolved`): the names the protocol gives each reason a
+  [proposal](#def-proposal) is refused. Ratified at PR #182's comment,
+  2026-11-10.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -1010,3 +1024,6 @@ R7 and R8 at their rows' time.
     proposed, ask A4, cluster G28 in place of G17; evidence E39 added,
     E11, E12, E30 and E38 re-synced. The chapter's §2.8, §2.9 and §9 are
     updated. The oracle lines are in L2's PR.
+- **2026-11-10 — ask 1 of L2's PR taken as recommended, A4 ratified,
+  the three terms ratified, at PR #182's comment; `propose` and `verify`
+  list plan obligations by default, the L1 pin replaced.**
