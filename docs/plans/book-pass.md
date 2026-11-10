@@ -1059,7 +1059,7 @@ its approval.
   against each decision in phase 1; reviews of about 12,000 words, a
   part split where larger. The chunk sequence of §5 gains DR1 to DR6
   and CH0 to CH33.
-- **Ratified 2026-11-11, on PR #183.** The maintainer reviewed the PR and
+- **Ratified 2026-11-10, on PR #183.** The maintainer reviewed the PR and
   ratified every change: the four corrected entries of
   `docs/decisions.md`, R36, R37 and §2.8 as written, part (e) of the
   briefs, and the terms *held finding* and *decision review*.
