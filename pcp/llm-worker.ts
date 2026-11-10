@@ -224,6 +224,80 @@ export async function createAnthropicClient(opts: LlmClientOptions = {}): Promis
 }
 
 // -----------------------------------------------------------------------------
+// The scripted proposer (B-187 L3)
+// -----------------------------------------------------------------------------
+//
+// A client that answers from prepared proposals, so the loop runs without a
+// key and without the network (docs/plans/planning-loop.md, §1's
+// done-condition). The proposals file is Markdown in the shape of the TODO
+// `allegro propose` prints: a section per obligation, headed
+// "## `NAME`" with the obligation's name as the TODO heads it, and under it
+// one fenced ```allegro block per attempt, in the order the loop asks.
+// Prose between the blocks is ignored, so a human can note why each answer
+// is there. Blocks before the first such heading answer any obligation
+// without a section of its own, in order.
+
+/** Prepared proposals: the answers per obligation, in attempt order, and
+ *  the answers for any obligation without a section. */
+export interface ProposalScript {
+  byObligation: Map<string, string[]>;
+  unnamed:      string[];
+}
+
+/** Parse a proposals file (the format above). A fenced block tagged
+ *  `allegro`, or untagged, is an answer; a block with another tag is not. */
+export function parseProposals(text: string): ProposalScript {
+  const byObligation = new Map<string, string[]>();
+  const unnamed: string[] = [];
+  let current: string[] = unnamed;
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const head = /^##[ \t]+`([^`]+)`[ \t]*$/.exec(lines[i]);
+    if (head) {
+      current = byObligation.get(head[1]) ?? [];
+      byObligation.set(head[1], current);
+      continue;
+    }
+    const fence = /^```([A-Za-z]*)[ \t]*$/.exec(lines[i]);
+    if (!fence) continue;
+    const body: string[] = [];
+    let j = i + 1;
+    while (j < lines.length && !/^```[ \t]*$/.test(lines[j])) body.push(lines[j++]);
+    if (fence[1] === "" || fence[1] === "allegro") current.push(body.join("\n").trim());
+    i = j;
+  }
+  return { byObligation, unnamed };
+}
+
+export function loadProposalsFile(file: string): ProposalScript {
+  return parseProposals(fs.readFileSync(file, "utf-8"));
+}
+
+/** A client that answers each request with the next prepared proposal for
+ *  the obligation it names, as one fenced ```allegro block. The prover the
+ *  authorship names is `prover` ("scripted" by default; the CLI passes
+ *  "scripted:FILE"). It declines an obligation it has no answer for, and
+ *  throws when an obligation's answers run out. */
+export function createScriptedClient(script: ProposalScript, opts: { prover?: string } = {}): LlmClient {
+  const queues = new Map<string, string[]>();
+  for (const [k, v] of script.byObligation) queues.set(k, [...v]);
+  const unnamed = [...script.unnamed];
+  const prover = opts.prover ?? "scripted";
+  return {
+    modelId: () => prover,
+    answers: (obligation) => queues.has(obligation) || unnamed.length > 0,
+    async send({ obligation }) {
+      const queue = (obligation !== undefined ? queues.get(obligation) : undefined) ?? unnamed;
+      const next = queue.shift();
+      if (next === undefined) {
+        throw new Error(`the proposals file holds no answer left for \`${obligation ?? "?"}\``);
+      }
+      return "```allegro\n" + next + "\n```";
+    },
+  };
+}
+
+// -----------------------------------------------------------------------------
 // Orchestration
 // -----------------------------------------------------------------------------
 

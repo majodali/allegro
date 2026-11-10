@@ -34,6 +34,9 @@ import {
   extractCodeBlocks, spliceProof, buildIterationMessage,
   classifyStrategy, loadPrimer, runLlmWorker, LlmClient,
 } from "../../pcp/llm-worker.js";
+import {
+  createScriptedClient, parseProposals, loadPlanPrimer, OBLIGATION_KINDS,
+} from "../../pcp/llm-worker.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
@@ -1162,6 +1165,120 @@ export async function runH4aAsyncTests(): Promise<void> {
       fs.unlinkSync(tmp);
     }
   });
+
+  // --- B-187 L3: the LLM-free loop (docs/plans/planning-loop.md) ---
+  //
+  // One loop for every obligation kind (ruling R3 (a)); the client here is
+  // the scripted proposer with its answers in the test, so no file, no key
+  // and no network. The file is L1's open plan (the plan of
+  // `tests/planning-loop-obligations.alg`, the same obligation and hash),
+  // with its catalog written as a `catalog yard:` block, the form a
+  // proposal is spliced into.
+  const L1_OPEN_PLAN = [
+    "use units", "use planning", "use planning_loop", "",
+    "catalog yard:",
+    "  Depot:", "    inputs: Shipped", "    outcomes: Sorted", "    estimate: 30 min, 0.25 person-hours",
+    "  Van:", "    inputs: Sorted", "    outcomes: Delivered", "    estimate: 60 min, 0.5 person-hours",
+    "",
+    "plan Fulfil from yard:",
+    "  inputs: Order", "  outcomes: Delivered",
+    "  Pack:", "    inputs: Order", "    outcomes: Packed", "    estimate: 20 min, 0.5 person-hours",
+    "",
+  ].join("\n");
+  const COURIER_ENTRY = "Courier:\n  inputs: Labelled\n  outcomes: Shipped\n  estimate: 40 min, 0.25 person-hours";
+  const SHIP_ENTRY = "Ship:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours";
+  const GAP = "Fulfil: Shipped, which Depot needs";
+
+  await asyncTest("B-187 L3: the worker's scripted loop on L1's open plan converges in two attempts, one refused with its reason", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l3-"));
+    try {
+      const file = path.join(dir, "fulfil.alg");
+      fs.writeFileSync(file, L1_OPEN_PLAN);
+      const scripted = createScriptedClient({ byObligation: new Map([[GAP, [COURIER_ENTRY, SHIP_ENTRY]]]), unnamed: [] });
+      const asked: Array<{ systemPrompt: string; userMessage: string; obligation?: string }> = [];
+      const client: LlmClient = {
+        modelId: scripted.modelId, answers: scripted.answers,
+        async send(args) { asked.push(args); return scripted.send(args); },
+      };
+      const result = await runLlmWorker({ filename: file, maxAttempts: 5, client, extensions: [typeExt] });
+      eq(JSON.stringify(result.summary), JSON.stringify({ discharged: 1, pending: 0, skipped: 5 }),
+         "the plan obligation discharged; the units library's five laws have no prepared proposal");
+      eq(result.allDischarged, true);
+      eq(result.skipped!.join(", "), "Quantity.law_mul_comm, Quantity.law_conv_roundtrip, Quantity.law_refl, Quantity.law_sym, Quantity.law_trans");
+      const ob = result.perObligation[0];
+      eq(ob.name, GAP);
+      eq(ob.kind, "plan");
+      eq(ob.attempts, 2);
+      eq(ob.history[0].proofTerm, COURIER_ENTRY);
+      eq(ob.history[0].verified, false);
+      eq(ob.history[0].reason, "refused (open): nothing in the catalog produces Labelled, which Courier needs");
+      eq(ob.history[1].verified, true);
+      eq(ob.finalTerm, SHIP_ENTRY);
+      const p = ob.authorship!.provers[0];
+      eq(JSON.stringify(p), JSON.stringify({ prover: "scripted", attemptsUsed: 2, effortBudgetUsed: { attempts: 2 }, role: "primary" }),
+         "the authorship names the scripted proposer and the attempts");
+      // The entry is in the catalog; the plan is as written.
+      eq(result.sourceAfter.includes("    estimate: 60 min, 0.5 person-hours\n  Ship:\n    inputs: Packed\n"), true, result.sourceAfter);
+      eq(result.sourceAfter.includes(L1_OPEN_PLAN.slice(L1_OPEN_PLAN.indexOf("plan Fulfil"))), true, "the plan's block unchanged");
+      // The requests: the plan kind's words, the refusal fed back, its primer section.
+      eq(asked.length, 2);
+      eq(asked.every(a => a.obligation === GAP), true);
+      eq(asked[0].userMessage.startsWith("Attempt 1 for plan obligation `Fulfil: Shipped, which Depot needs`.\n\n**Gap:** nothing in the catalog produces Shipped, which Depot needs\n"), true, asked[0].userMessage);
+      eq(asked[0].userMessage.includes("**Hash:** `421ea754` (over: plan Fulfil; inputs Order; outcomes Delivered; no budget; gap Shipped by Depot)"), true,
+         "L1's obligation, its hash unchanged by the catalog's form");
+      eq(asked[0].userMessage.includes("Last attempt's refusal"), false);
+      eq(asked[1].userMessage.includes("Last attempt's refusal:\n- refused (open): nothing in the catalog produces Labelled, which Courier needs\n\nAttempts so far: 1\n- 1: `Courier`, refused (open): nothing in the catalog produces Labelled, which Courier needs\n"), true, asked[1].userMessage);
+      eq(asked[1].userMessage.endsWith("The kernel will add it to the catalog `yard` and check the plan again."), true);
+      eq(asked[0].systemPrompt, loadPlanPrimer(), "the system prompt is the plan kind's primer section");
+      eq(asked[0].systemPrompt.startsWith("### 2.9 Output contract for a plan proposer\n"), true);
+      eq(asked[0].systemPrompt.includes("## 3."), false, "the section alone");
+      // The kernel agrees on the result: the file as the loop left it is discharged.
+      const after = runtimeEval(result.sourceAfter.slice(result.sourceAfter.indexOf("catalog yard")), undefined, planLoopExts(), undefined, true, undefined, true);
+      const v = buildVerdict(after.evalCtx, after.compilationReport, undefined, { plans: true });
+      eq(v.planObligations!.map(r => `${r.status} ${r.message}`).join(" | "),
+         "discharged Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await asyncTest("B-187 L3: the one loop serves a theorem through the scripted proposer, with a prepared proof term", async () => {
+    const tmp = path.join(os.tmpdir(), `pcp-l3-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      const client = createScriptedClient({ byObligation: new Map([["t", ["proof_refl(99)", "proof_refl(2)"]]]), unnamed: [] },
+                                          { prover: "scripted:test" });
+      const result = await runLlmWorker({ filename: tmp, maxAttempts: 3, client, primer: "(mock primer)" });
+      eq(result.allDischarged, true);
+      const ob = result.perObligation[0];
+      eq(ob.name, "t");
+      eq(ob.kind, undefined, "a theorem carries no kind");
+      eq(ob.attempts, 2);
+      eq(ob.history[0].verified, false);
+      eq(ob.finalTerm, "proof_refl(2)");
+      eq(ob.authorship!.provers[0].prover, "scripted:test");
+      eq(ob.authorship!.provers[0].attemptsUsed, 2);
+      eq(result.sourceAfter.includes("by proof_refl(2)"), true);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  await asyncTest("B-187 L3: the worker opens a file with a `use` header (B-175 item 5)", async () => {
+    // Before chunk L3 the worker evaluated the header unstripped and threw
+    // a parse error at position 546 (`use units`) on this file.
+    const seen: string[] = [];
+    const client: LlmClient = {
+      modelId: () => "mock-model",
+      answers: (name) => { seen.push(name); return false; },
+      async send() { throw new Error("not asked"); },
+    };
+    const result = await runLlmWorker({ filename: path.resolve("demos/rung3/02-solve.alg"), client, extensions: [typeExt] });
+    eq(seen.join(", "), "Quantity.law_mul_comm, Quantity.law_conv_roundtrip, Quantity.law_refl, Quantity.law_sym, Quantity.law_trans",
+       "the units library's laws, as `obligations --pending` lists them");
+    eq(result.summary.skipped, 5);
+    eq(result.perObligation.length, 0);
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1175,6 +1292,77 @@ test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
     eq(r.stderr.includes("propose"), true, "should mention the human-worker fallback");
   } finally {
     fs.unlinkSync(tmp);
+  }
+});
+
+// --- B-187 L3: the scripted proposer, its file and its CLI option ---
+
+test("B-187 L3: parseProposals reads a proposals file for the worker: sections by obligation, one block per attempt", () => {
+  const md = [
+    "# Proposals", "",
+    "```allegro", "Any:", "  inputs: X", "```", "",
+    "## `Fulfil: Shipped, which Depot needs`", "",
+    "First, a courier (it needs a label):", "",
+    "```allegro", "Courier:", "  inputs: Labelled", "  outcomes: Shipped", "```", "",
+    "```text", "a note, not an answer", "```", "",
+    "```", "Ship:", "  inputs: Packed", "  outcomes: Shipped", "```", "",
+    "## `t`", "", "```allegro", "proof_refl(2)", "```", "",
+  ].join("\n");
+  const script = parseProposals(md);
+  eq(JSON.stringify([...script.byObligation.entries()]), JSON.stringify([
+    ["Fulfil: Shipped, which Depot needs", ["Courier:\n  inputs: Labelled\n  outcomes: Shipped", "Ship:\n  inputs: Packed\n  outcomes: Shipped"]],
+    ["t", ["proof_refl(2)"]],
+  ]));
+  eq(JSON.stringify(script.unnamed), JSON.stringify(["Any:\n  inputs: X"]), "a block before any section answers any obligation");
+  const client = createScriptedClient({ byObligation: new Map([["t", ["proof_refl(2)"]]]), unnamed: [] });
+  eq(client.modelId(), "scripted");
+  eq(client.answers!("t"), true);
+  eq(client.answers!("u"), false, "an obligation without a section is declined, so the loop skips it");
+  eq(Object.keys(OBLIGATION_KINDS).join(", "), "theorem, plan", "the kind registry");
+});
+
+test("B-187 L3: CLI `prove --proposals` runs the loop without a key: the budget missed, then accepted", () => {
+  // The L2 demo's plan has a budget, so the first proposal is refused as
+  // unsolved; the proposals file lives in the test's temp directory.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l3-cli-"));
+  try {
+    const proposals = path.join(dir, "proposals.md");
+    fs.writeFileSync(proposals, [
+      "## `Fulfil: Shipped, which Depot needs`", "",
+      "```allegro", FREIGHT.trimEnd(), "```", "",
+      "```allegro", SHIP.trimEnd(), "```", "",
+    ].join("\n"));
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposals", proposals, "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    eq(out.allDischarged, true);
+    eq(JSON.stringify(out.summary), JSON.stringify({ discharged: 1, pending: 0, skipped: 6 }));
+    eq(out.skipped[5], "courier: Labelled, which Courier needs",
+       "the demo's `courier` is an open plan too; the file has no answer for it");
+    const ob = out.perObligation[0];
+    eq(ob.name, "Fulfil: Shipped, which Depot needs");
+    eq(ob.kind, "plan");
+    eq(ob.attempts, 2);
+    eq(ob.history[0].reason, "refused (unsolved): no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min");
+    eq(ob.history[1].verified, true);
+    eq(ob.finalTerm, SHIP.trimEnd());
+    eq(ob.authorship.provers[0].prover, "scripted:proposals.md");
+    eq(ob.authorship.provers[0].attemptsUsed, 2);
+    // The text form names each turn and the proposer.
+    const text = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposals", proposals],
+                           { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(text.status, 0, text.stderr);
+    eq(text.stdout.includes([
+      "  ✓ Fulfil: Shipped, which Depot needs (2 attempt(s))",
+      `      attempt 1: ${ob.history[0].reason}`,
+      "      attempt 2: accepted",
+      "      entry: Ship:",
+      "      by scripted:proposals.md in 2 attempt(s)",
+    ].join("\n")), true, text.stdout);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
