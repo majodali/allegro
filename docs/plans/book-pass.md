@@ -1148,8 +1148,9 @@ its approval.
   (recommend the right decision).
 - **2026-11-10 — the pilot's findings placed** (the review session). R36
   recorded in §6. The inventory gains "Findings held for their
-  decisions" and four held-finding notes; `docs/decisions.md` D10, D15,
-  D17 and D48 corrected (the carrier's deletion and D48's execution).
+  decisions" and four held-finding notes; `docs/decisions.md` corrected
+  in four entries: three superseded by the carrier's deletion, and the
+  composite ruling marked executed.
 
 ## 8. Sessions
 
