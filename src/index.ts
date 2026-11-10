@@ -668,7 +668,7 @@ async function runPcpProve(
       console.log(`  ${mark} ${o.name} (${o.attempts} attempt(s))`);
       if (o.kind === "plan") {
         // B-187 L3: a plan obligation's turns, each with the kernel's answer.
-        o.history.forEach((h, i) => console.log(`      attempt ${i + 1}: ${h.verified ? "accepted" : h.reason}`));
+        o.history.forEach((h, i) => console.log(`      attempt ${i + 1}: ${h.verified ? (h.answer ?? "accepted") : h.reason}`));
         if (o.finalTerm) console.log(`      entry: ${o.finalTerm.split("\n")[0]}`);
         if (o.authorship) console.log(`      by ${o.authorship.provers[0].prover} in ${o.authorship.provers[0].attemptsUsed} attempt(s)`);
         continue;

@@ -1213,6 +1213,7 @@ export async function runH4aAsyncTests(): Promise<void> {
       eq(ob.history[0].verified, false);
       eq(ob.history[0].reason, "refused (open): nothing in the catalog produces Labelled, which Courier needs");
       eq(ob.history[1].verified, true);
+      eq(ob.history[1].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
       eq(ob.finalTerm, SHIP_ENTRY);
       const p = ob.authorship!.provers[0];
       eq(JSON.stringify(p), JSON.stringify({ prover: "scripted", attemptsUsed: 2, effortBudgetUsed: { attempts: 2 }, role: "primary" }),
@@ -1255,6 +1256,7 @@ export async function runH4aAsyncTests(): Promise<void> {
       eq(ob.kind, undefined, "a theorem carries no kind");
       eq(ob.attempts, 2);
       eq(ob.history[0].verified, false);
+      eq(ob.history[1].answer, undefined, "a theorem's accepted attempt carries no answer, as before");
       eq(ob.finalTerm, "proof_refl(2)");
       eq(ob.authorship!.provers[0].prover, "scripted:test");
       eq(ob.authorship!.provers[0].attemptsUsed, 2);
@@ -1347,6 +1349,7 @@ test("B-187 L3: CLI `prove --proposals` runs the loop without a key: the budget 
     eq(ob.attempts, 2);
     eq(ob.history[0].reason, "refused (unsolved): no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min");
     eq(ob.history[1].verified, true);
+    eq(ob.history[1].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
     eq(ob.finalTerm, SHIP.trimEnd());
     eq(ob.authorship.provers[0].prover, "scripted:proposals.md");
     eq(ob.authorship.provers[0].attemptsUsed, 2);
@@ -1357,7 +1360,7 @@ test("B-187 L3: CLI `prove --proposals` runs the loop without a key: the budget 
     eq(text.stdout.includes([
       "  ✓ Fulfil: Shipped, which Depot needs (2 attempt(s))",
       `      attempt 1: ${ob.history[0].reason}`,
-      "      attempt 2: accepted",
+      "      attempt 2: accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min",
       "      entry: Ship:",
       "      by scripted:proposals.md in 2 attempt(s)",
     ].join("\n")), true, text.stdout);

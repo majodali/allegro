@@ -315,7 +315,12 @@ import { fileURLToPath } from "url";
 /** One attempt as the worker records it: the candidate the proposer sent
  *  (a proof term, or a node block), whether the kernel accepted it, and the
  *  kernel's reason when it did not. */
-export interface AttemptRecord { proofTerm: string; verified: boolean; reason?: string }
+export interface AttemptRecord {
+  proofTerm: string; verified: boolean; reason?: string;
+  /** The kernel's answer on acceptance, when the kind gives one (a plan
+   *  obligation's: the solution). */
+  answer?: string;
+}
 
 export interface WorkerResult {
   /** The final source after all successful splices. */
@@ -446,6 +451,8 @@ export type KindSplice =
 
 export interface KindJudgement {
   discharged: boolean;
+  /** The kernel's answer on acceptance, when the kind gives one. */
+  answer?:    string;
   /** The kernel's reason, when not discharged. */
   reason?:    string;
   /** The theorem kind's prior-attempt record for the next request. */
@@ -548,7 +555,9 @@ export const planKind: ObligationKindSpec = {
   // `halt`, `open`, `unsolved`, `plan-edited` and `plan-missing` included.
   judge({ source, ob, candidate, evaluate }) {
     const a = answerPlanProposal({ source, obligation: ob, proposal: candidate, evaluate });
-    return a.accepted ? { discharged: true } : { discharged: false, reason: formatPlanProposalAnswer(a) };
+    return a.accepted
+      ? { discharged: true, answer: formatPlanProposalAnswer(a) }
+      : { discharged: false, reason: formatPlanProposalAnswer(a) };
   },
   primer: (repoRoot) => loadPlanPrimer(repoRoot),
 };
@@ -651,7 +660,7 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
           role:             "primary",
           effortBudgetUsed: { attempts: attempt },
         });
-        history.push({ proofTerm: candidate, verified: true });
+        history.push({ proofTerm: candidate, verified: true, ...(j.answer ? { answer: j.answer } : {}) });
       } else {
         history.push({ proofTerm: candidate, verified: false, reason: j.reason ?? "verification failed" });
         if (j.prior) so.priorAttempts.push(j.prior);
