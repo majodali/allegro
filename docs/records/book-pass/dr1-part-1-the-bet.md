@@ -951,4 +951,14 @@ Four decisions, recorded in the inventory:
 Agreed for R-DR1-25, when it is ruled: only a field's owner writes it,
 and a verdict shows which extensions a result rests on.
 
+**R-DR1-2, ruled 2026-11-11.** Not as recommended above. The question
+is both the framing of the book and a decision, and comes first. It
+becomes a thesis statement, "Why a new language, now", which opens
+Part I and is not a decision, and two decisions at the head of
+chapter 1, all in the inventory: "Trust comes from the kernel, not the
+author" and "A system is described in the language of its domain, and
+that language grows with the understanding". Both support R-DR1-12,
+R-DR1-19 and R-DR1-20. The term *theory* (of a system) is ratified
+with the wording.
+
 Still to rule: every other ask.

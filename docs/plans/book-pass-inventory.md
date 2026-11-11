@@ -245,6 +245,38 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### One engine for compiling and proving
 
+**The thesis of Part I, ruled 2026-11-11 (DR1).** Not a decision: the framing statement that opens the part, and what the tour argues at length.
+
+> **Why a new language, now.** Writing code was never the hard part of building a system. The hard part is building a shared understanding of what the system is and should do, and keeping that understanding true as it changes. That is a theory, worked out in discourse among people, and now between people and machines. When machines write the code, the theory is what remains. A programming language is where a theory is written down precisely enough to be checked. Allegro is built for that job.
+
+#### Trust comes from the kernel, not the author
+- Decides: a program states its intent as claims. The kernel decides those claims by evaluation, whoever or whatever wrote the code. A reviewer reads what was claimed and what was decided, not every line.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: none
+- Significance: 5 — the first answer to why a new language now
+- Label: foundational — the claim, prover and review decisions rest on it
+- Units: none of its own
+- Options recorded: trust placed in the author, or in tests the author chose (the industry's default)
+- Sources: docs/book/vision.md §1, §2 "Why both, why now"; the maintainer's motivations (above) and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: new, by ruling; replaces the review's proposal "Built for code that machines write and a kernel checks", whose clause trading authoring ergonomics for checkability is dropped. Supports "Substrate and surfaces: a DSL inherits the whole kernel" and the two proposals still to rule (models and mappings as checked values; declarative paradigms as libraries).
+- Chapter: One engine for compiling and proving
+
+#### A system is described in the language of its domain, and that language grows with the understanding
+- Decides: code and claims are written in the terms of a domain model, which people and agents can read far more easily than general-purpose code. Nothing is lost by this: a statement in a domain language is checked exactly as strictly as any other. No prewritten domain language is enough. As the people and agents building a system understand it better, they extend its language, and each new concept becomes vocabulary that the kernel checks from then on.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: Trust comes from the kernel, not the author
+- Significance: 5 — the second answer: understanding, through domain languages built during the work
+- Label: foundational — extension, surfaces, domain models and Vivace rest on it
+- Units: none of its own
+- Options recorded: fixed, prewritten domain languages (rejected: system development is theory building and discourse building, among people as much as between people and agents); general-purpose code with claims beside it
+- Sources: the maintainer's motivations 2 to 4 (above) and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §4
+- Notes: new, by ruling. Supports "Substrate and surfaces: a DSL inherits the whole kernel" and the two proposals still to rule, as the first decision does.
+- Chapter: One engine for compiling and proving
+
 #### Everything above the kernel is an extension, and there is one way to extend
 - Decides: an extension adds values, functions, syntax, metadata fields and the rules that govern them through one interface. That interface is the same for the standard language and for a library a user writes. An extension is written in Allegro and checked like any other program. The standard language is a set of extensions selected by configuration. Nothing in the kernel names it.
 - Status: partly built; ruled 2026-11-11 (DR1); to be fully built before release
@@ -409,7 +441,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Everything above the kernel is an extension, and there is one way to extend
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding
 - Significance: 4 — frames what every DSL, pilot and rung is
 - Label: foundational — Vivace's "no new machinery", the rung-2 seriousness proof and the library grammar surface rest on it
 - Units: none
@@ -501,7 +533,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Units: evaluator, modules (to be checked in their parts)
 - Options recorded: an extension interface of opaque calls (rejected: it would bound optimization and likely give unacceptable performance)
 - Sources: the maintainer's ruling of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken): "PE must operate effectively on expressions that cross the extension interface … My goal for Allegro is to have no limits on optimization, although that might not come 100% from PE"
-- Notes: new, by ruling. Whether a capability's declared laws may license rewrites around its opaque body is read with "Laws licence rewrites" in Part VI.
+- Notes: new, by ruling. Whether a capability's declared laws may license rewrites around its opaque body is read with "Laws licence rewrites" in Part VI. Also for Part VI, when it becomes an issue: making capability bodies optimizable by writing them in Allegretto or Allegro expressions.
 - Held finding (2026-11-11, DR1): the installed hooks are host closures the evaluator calls, opaque to partial evaluation. Held with the install-operations finding above.
 - Chapter: A small base and the surfaces above it
 
