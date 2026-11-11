@@ -159,6 +159,15 @@ before it.
   `open`, `unsolved`): the names the protocol gives each reason a
   [proposal](#def-proposal) is refused. Ratified at PR #182's comment,
   2026-11-10.
+- <a id="def-kind-registry"></a>**Kind registry** (`OBLIGATION_KINDS`
+  in `pcp/llm-worker.ts`): the per-obligation-kind table of request,
+  splice, success test and primer that [the loop](#def-the-loop) reads,
+  one entry per kind of obligation. Ratified at PR #184's comment,
+  2026-11-11.
+- <a id="def-proposals-file"></a>**Proposals file**: the markdown file
+  of prepared answers, one section per obligation and one fenced block
+  per attempt, that the scripted [proposer](#def-proposer) reads.
+  Ratified at PR #184's comment, 2026-11-11.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -1224,3 +1233,5 @@ R7 and R8 at their rows' time.
     re-synced. C124 (the phantom `--api-key`, B-175 item 6) is L4's and
     stays. The chapter's §9 is updated. B-175 item 5 says L3 closed it.
     The oracle lines are in L3's PR.
+- **2026-11-11 — L3's default, A5 and the two terms ratified at PR
+  #184's comment ('All asks ratified as they are').**

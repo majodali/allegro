@@ -338,9 +338,9 @@ C122. `propose` exits with code 0 whatever the obligations' state. evidence: E15
 
 ### The `prove` subcommand [implemented]
 
-C175. Without `--proposals`, `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [proposed: this IR]
+C175. Without `--proposals`, `prove` creates a language-model client before reading the file, exiting with code 1 when `ANTHROPIC_API_KEY` is unset. evidence: E16, E24. [decided: owner, 2026-11-11]
 
-C176. With `--proposals FILE.md`, `prove` answers from the file through the scripted proposer of `pcp/llm-worker.ts`, reading no key. evidence: E3, E40. [proposed: this IR]
+C176. With `--proposals FILE.md`, `prove` answers from the file through the scripted proposer of `pcp/llm-worker.ts`, reading no key. evidence: E3, E40. [decided: owner, 2026-11-11]
 
 C124. The missing-key message offers a `--api-key` flag that `src/index.ts` does not parse. evidence: E3, E16. [decided: owner, 2026-11-02]
 
@@ -348,27 +348,27 @@ C125. `prove` runs `runLlmWorker` in `pcp/llm-worker.ts` with at most `--max-att
 
 C126. `runLlmWorker` takes the pending obligations from one run of `evalSource` with the `softFail` flag set. evidence: E17. [decided: owner, 2026-11-02]
 
-C177. Per attempt, `runLlmWorker` sends the client the primer section and the request text of the obligation's kind. evidence: E17. [proposed: this IR]
+C177. Per attempt, `runLlmWorker` sends the client the primer section and the request text of the obligation's kind. evidence: E17. [decided: owner, 2026-11-11]
 
-C184. `runLlmWorker` splices the answer's first `allegro` code block, or else its first fenced block, into a theorem's `by` slot, or into the open plan's `catalog NAME:` block as its last entry. evidence: E17. [proposed: this IR]
+C184. `runLlmWorker` splices the answer's first `allegro` code block, or else its first fenced block, into a theorem's `by` slot, or into the open plan's `catalog NAME:` block as its last entry. evidence: E17. [decided: owner, 2026-11-11]
 
-C178. `runLlmWorker` evaluates the spliced source once through `evalSource`, keeping a proof term when the new verdict lists the theorem as discharged and a catalog entry when `answerPlanProposal` accepts it. evidence: E17. [proposed: this IR]
+C178. `runLlmWorker` evaluates the spliced source once through `evalSource`, keeping a proof term when the new verdict lists the theorem as discharged and a catalog entry when `answerPlanProposal` accepts it. evidence: E17. [decided: owner, 2026-11-11]
 
-C179. The system prompt is `docs/book/proving-in-allegro.md` for a theorem and section 2.9 of `docs/book/vivace/planning-dsl.md` for a plan obligation, each read relative to the current working directory. evidence: E18. [proposed: this IR]
+C179. The system prompt is `docs/book/proving-in-allegro.md` for a theorem and section 2.9 of `docs/book/vivace/planning-dsl.md` for a plan obligation, each read relative to the current working directory. evidence: E18. [decided: owner, 2026-11-11]
 
-C180. A discharged obligation's authorship names the client's `modelId()` as the prover, the model or `scripted:FILE` for the scripted proposer, with the attempts used. evidence: E17, E40. [proposed: this IR]
+C180. A discharged obligation's authorship names the client's `modelId()` as the prover, the model or `scripted:FILE` for the scripted proposer, with the attempts used. evidence: E17, E40. [decided: owner, 2026-11-11]
 
 C131. `prove --output FILE.alg` writes the source with every kept proof term spliced in. evidence: E3. [decided: owner, 2026-11-02]
 
-C181. `prove` exits with code 0 when every obligation the loop attempted discharged, code 1 otherwise. evidence: E3, E17. [proposed: this IR]
+C181. `prove` exits with code 0 when every obligation the loop attempted discharged, code 1 otherwise. evidence: E3, E17. [decided: owner, 2026-11-11]
 
-C185. `runLlmWorker` skips an obligation the client declines, as the scripted proposer declines one its file holds no answer for, attempting it never. evidence: E17, E40. [proposed: this IR]
+C185. `runLlmWorker` skips an obligation the client declines, as the scripted proposer declines one its file holds no answer for, attempting it never. evidence: E17, E40. [decided: owner, 2026-11-11]
 
-C182. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once per run, and evaluates each turn's source with its `use` header stripped. evidence: E17. [proposed: this IR]
+C182. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once per run, and evaluates each turn's source with its `use` header stripped. evidence: E17. [decided: owner, 2026-11-11]
 
 C134. In a run on 2026-11-01, `evalSource` over a source opening with `use contracts`, the type system the one extension, threw a parse error. evidence: E28. [decided: owner, 2026-11-02]
 
-C183. In a run on 2026-11-10, `prove --proposals` over `tests/planning-loop-proposals.alg`, whose header holds three `use` directives, discharged its plan obligation in two attempts. evidence: E40. [proposed: this IR]
+C183. In a run on 2026-11-10, `prove --proposals` over `tests/planning-loop-proposals.alg`, whose header holds three `use` directives, discharged its plan obligation in two attempts. evidence: E40. [decided: owner, 2026-11-11]
 
 C136. `src/test/pcp.ts` pins the worker's helpers, one loop of `runLlmWorker` with a mock client, and the missing-key failure of `prove`. evidence: E30. [decided: owner, 2026-11-02]
 
@@ -484,9 +484,9 @@ G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: own
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G29. cluster: C175, C176, C124, C125, C126, C177, C184, C178, C179, C180, C131, C181, C185 [proposed: this IR]
+G29. cluster: C175, C176, C124, C125, C126, C177, C184, C178, C179, C180, C131, C181, C185 [decided: owner, 2026-11-11]
 
-G30. cluster: C182, C134, C183, C136 [proposed: this IR]
+G30. cluster: C182, C134, C183, C136 [decided: owner, 2026-11-11]
 
 G22. cluster: C137, C138, C139 [decided: owner, 2026-11-02]
 
@@ -621,3 +621,5 @@ A4. Ratify the re-proposed claims about `verify --obligation` as chunk L2 of B-1
 A4 resolved: ratified by the owner at PR #182's comment, 2026-11-10; the statuses are flipped.
 
 A5. Ratify the re-proposed claims about `prove` and the worker as chunk L3 of B-187 (the planning loop, the next validating demo) left the code, with their clusters G29 and G30: C175 and C176 (the client, without and with `--proposals`), which replace C123; C177, C184, C178, C179 and C180 (the request, the splice, the success test, the primer section and the authorship per obligation kind), which replace C127, C128, C129 and C130; C181 and C185 (the exit code, and a declined obligation skipped), which replace C132; C182, which replaces C133; and C183, which replaces the inferred C135 and its relation R4. Depends: C175, C176, C177, C178, C179, C180, C181, C182, C183, C184, C185.
+
+A5 resolved: ratified by the owner at PR #184's comment, 2026-11-11; the statuses are flipped.
