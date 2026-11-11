@@ -122,4 +122,21 @@ as the working answer, to be analysed with "Who can see a member";
 knowledge inside a branch needs nothing beyond pure, bounded functions
 and the kernel's ordinary rebinding of names.
 
+**Ask 4, refutation, error and abort, ruled 2026-11-11.** Three
+decisions, in the inventory:
+
+1. "A refutation marks everything computed from it." Every way a
+   program can be wrong is a refutation recorded by the kernel: a false
+   claim, a call on a non-function, conflicting definitions. It is
+   carried to everything computed from the value and cannot be
+   removed, tested for or forged.
+2. "A failure a program can handle is supplied by an extension." The
+   `error` field and `make_error` leave the kernel. The maintainer:
+   "exception" probably fits better than "error"; the choice is each
+   extension's.
+3. "Evaluation stops early for two reasons only": a broken kernel
+   invariant, or a resource limit. A limit leaves claims undecided,
+   never refuted. Capability denial as an abort, the five abort
+   classes and the depth bound dissolve into it.
+
 (Further rulings are recorded as they are taken.)

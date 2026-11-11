@@ -37,10 +37,10 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; The composite is one sequence of optionally-keyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
    - Draws on: [concepts.md](../book/concepts.md) T0 §9, §12 to §14, [allegretto/structures.md](../book/allegretto/structures.md) §1, §2.
 7. **Metadata and the capability to write it** *(recommended pilot)* (13 decisions). Every value carries independent metadata fields, and only the holder of a field's writer may originate it.
-   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Authority is an unforgeable value; A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Capability denial is an abort, not an error value.
+   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Authority is an unforgeable value; A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Evaluation stops early for two reasons only.
    - Draws on: [units.md](../book/units.md) §3.1, [concepts.md](../book/concepts.md) T2 §19, §19b, §21, [allegretto/structures.md](../book/allegretto/structures.md) §3, Appendix C, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §1 to §4, §6, §9.
 8. **How metadata propagates** (7 decisions). The fixed vocabulary by which fields travel through evaluation, errors as a viral field, the source field, and which layer registers what.
-   - Decisions: Primitives receive full values; How the base applies propagation; Errors as a viral metadata field; The source field: an expression as metadata; Each layer registers its own fields; Field versus channel, and channel registration; Subsumption of legacy primitives into channel operations.
+   - Decisions: Primitives receive full values; How the base applies propagation; A failure a program can handle is supplied by an extension; The source field: an expression as metadata; Each layer registers its own fields; Field versus channel, and channel registration; Subsumption of legacy primitives into channel operations.
    - Draws on: [concepts.md](../book/concepts.md) T2 §20, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §5, §8.
 9. **Four planes** (5 decisions). Where each kind of information about a value lives, and the sanctioned interfaces that reach each plane.
    - Decisions: Four planes and the placement rule; Plane interfaces are sanctioned and policed; Engine meta slots retired into registered members; The data plane has no accessor; Where the host plane is declared.
@@ -52,7 +52,7 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; An extension is made of functions and metadata fields.
    - Draws on: [concepts.md](../book/concepts.md) §15, [allegretto/structures.md](../book/allegretto/structures.md) §4, Scope (planned).
 12. **Evaluation over unresolved information** (11 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
-   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Specified aborts; Evaluation depth bound.
+   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Evaluation stops early for two reasons only; Evaluation stops early for two reasons only.
    - Draws on: [concepts.md](../book/concepts.md) §25 to §29, [allegretto/structures.md](../book/allegretto/structures.md) §10, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 to §6, Futures and the base primitives (planned).
 
 **Part III: Syntax and modules**
@@ -147,7 +147,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
-| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; Errors as a viral metadata field | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; A failure a program can handle is supplied by an extension | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
 | Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Installing a layer into the base | DR1, rulings of 2026-11-11 |
@@ -1126,21 +1126,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §3
 - Chapter: Metadata and the capability to write it
 
-#### Capability denial is an abort, not an error value
-- Decides: refusing a write, an install or a fabricating rule aborts evaluation instead of returning an error value, because an error value would be forgeable.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Writes gated by a capability, reads free
-- Significance: 2 — local to the capability unit
-- Label: swappable — the refusal mechanism
-- Units: capability
-- Options recorded: denial as an error value (rejected)
-- Sources: docs/book/concepts.md SC-8 class C; docs/book/allegretto/metadata-and-capability.md §6
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §6
-- Chapter: Metadata and the capability to write it
-
-
 #### Only the kernel records the outcome of a claim
 - Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
 - Status: partly built; ruled 2026-11-11 (DR2)
@@ -1152,6 +1137,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a claim as an ordinary function of some extension, writing the outcome into its own field (rejected: it does not remove the trusted operation, it moves it into that extension)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. The kernel's contents are then values, pure primitives, the evaluator, metadata with its fields and rules, authority, and this operation.
+- Chapter: Metadata and the capability to write it
+
+#### A refutation marks everything computed from it
+- Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Only the kernel records the outcome of a claim; A field's rule is a pure, bounded function; An effect consumes only values whose claims are decided
+- Significance: 5 — the one mechanism behind halting, effect gating and reporting every failure
+- Label: foundational — every phase's result and every effect rest on it
+- Options recorded: an abort at the first failure (rejected: a phase reports every refutation); a program-visible error value for a program's own mistakes (rejected: it could be forged, tested and laundered)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. With it an effect never consumes a refuted value, and a phase goes on evaluating what does not depend on one, then ends refuted. A test for the mark is itself computed from the refuted value, so it is refuted too.
+- Held finding (2026-11-11, DR2): the kernel throws on an ill-formed application and on some type errors instead of recording a refutation (the five abort classes of the former "Specified aborts").
 - Chapter: Metadata and the capability to write it
 ### How metadata propagates
 
@@ -1185,20 +1184,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation: `print(t + 1)` prints nothing when `t` carries one (`src/evaluator.ts:745`–`746`). Fixed when the pass takes this decision in order.
 - Chapter: How metadata propagates
 
-#### Errors as a viral metadata field
-- Decides: an error is a `viral` field with a public writer (`make_error`), so it rides every derived result through residual chains, user functions and an `if` condition, reproducing automatic error propagation without a special form.
-- Status: settled
+#### A failure a program can handle is supplied by an extension
+- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: How the base applies propagation; Writes gated by a capability, reads free
-- Significance: 3 — the base's error model
-- Label: swappable — a field registration in the capability unit
-- Units: capability
-- Options recorded: error lost after the first residual hop (legacy, ruled a bug); an error-carrying `if` condition taking the else branch (legacy, ruled away)
-- Sources: docs/decisions.md D28(b), C4.3-R1, C4.3-R2; docs/book/allegretto/metadata-and-capability.md §8; docs/plans/structures-implementation.md §6 (C4.3 rulings R1, R2)
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8
+- Depends on: An extension is made of functions and metadata fields; A refutation marks everything computed from it
+- Significance: 3 — keeps recoverable failure out of the kernel
+- Label: swappable — one extension's field and functions
+- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Errors as a viral metadata field". The maintainer: "exception" probably fits better than "error", and the choice is left to each extension. To be placed with the standard language in Part IV when that part is reviewed.
+- Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
+- Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
 - Chapter: How metadata propagates
-
 #### The source field: an expression as metadata
 - Decides: a value can carry the Expression it evaluated from (plus span) as a `drop` field with a kernel-private writer, attached on demand at calls of source-aware functions and on resolved top-level bindings, read through `source of x` under the `observe` effect.
 - Status: settled
@@ -1556,35 +1555,18 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: structures.md §4 marks the Allegro-surface `scope_*` primitives as still pending.
 - Chapter: Evaluation over unresolved information
 
-#### Specified aborts
-- Decides: open — the base aborts in exactly five distinguishable classes (host-invariant assertion, plane violation, capability denial, resource guard, ill-formed application), and type errors thrown by the base are rework, not specification.
-- Status: open
+#### Evaluation stops early for two reasons only
+- Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information; Capability denial is an abort, not an error value
-- Significance: 2 — lets tools tell an interpreter bug from a user error
-- Label: swappable — an error taxonomy
-- Units: evaluator, capability, base-primitives
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md SC-8, candidates R18, R19, R20; docs/plans/pe-rules.md §6 RR5 (a kernel fault as a plain Error)
-- Book home (fragments' proposal): concepts.md Part 0 (SC-8)
-- Notes: not ratified. Today one class `AllegroError` carries no discriminator (B-110(d)).
+- Depends on: A refutation marks everything computed from it; Evaluation is total over unresolved information
+- Significance: 3 — separates the kernel's own faults and limits from a program's mistakes
+- Label: swappable — the limits and how they are reported
+- Options recorded: five classes of abort, capability denial and ill-formed application among them (what the inventory listed; three of the five are refutations or cannot arise)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
 - Chapter: Evaluation over unresolved information
-
-#### Evaluation depth bound
-- Decides: evaluation aborts past a depth of 10,000, as a resource guard distinguishable from unresolved information.
-- Status: partly built
-- Type: implementation — a resource limit of this interpreter, inside the classes "Specified aborts" names
-- Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information
-- Significance: 1 — a host guard
-- Label: swappable — a constant in the evaluator
-- Units: evaluator
-- Options recorded: none recorded; candidate R18 asks for a requirement above it; D35's resource budgets as catchable capabilities are the deferred general form
-- Sources: docs/book/allegretto/evaluator.md §2; docs/book/concepts.md SC-8 class D, candidate R18; src/evaluator.ts:15
-- Book home (fragments' proposal): allegretto/evaluator.md §2
-- Chapter: Evaluation over unresolved information
-
 ### Grammars as values
 
 #### Grammars are Allegro values
@@ -2371,7 +2353,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Metadata is a field on every value; Errors as a viral metadata field
+- Depends on: Metadata is a field on every value; A failure a program can handle is supplied by an extension
 - Significance: 2 — the reader's view of the metadata plane at the surface
 - Label: swappable — a surface over channel reads
 - Units: base-grammar, metadata
@@ -3006,7 +2988,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Errors as a viral metadata field; Strict at the contract, informational for undeclared code
+- Depends on: A failure a program can handle is supplied by an extension; Strict at the contract, informational for undeclared code
 - Significance: 3 — failure semantics of all contract forms
 - Label: foundational — the halt invariant cited across the project
 - Units: contracts
@@ -3034,7 +3016,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Invariants are refinements; Errors as a viral metadata field; Mechanical purity gates
+- Depends on: Invariants are refinements; A failure a program can handle is supplied by an extension; Mechanical purity gates
 - Significance: 3 — an instance never exists tagged valid before its invariant holds
 - Label: swappable — the mint's guard
 - Units: refinements, type-core
@@ -3782,7 +3764,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Incompleteness lives in write-once future cells; Errors as a viral metadata field
+- Depends on: Incompleteness lives in write-once future cells; A failure a program can handle is supplied by an extension
 - Significance: 3 — the I/O edge of the futures model
 - Label: swappable — the capability implementations
 - Units: futures, base-primitives
@@ -4267,7 +4249,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | SC-5 | concepts.md: One composite kind rather than two |
 | SC-6 | concepts.md: Scopes are values |
 | SC-7 | concepts.md: Propagation is drawn from a fixed, inspectable vocabulary |
-| SC-8 | concepts.md: Specified aborts |
+| SC-8 | concepts.md: Evaluation stops early for two reasons only |
 | T-R1 | register: Severity reconciliation: D34's strict-by-default binds at discharge ACCOUNTING (always … |
 | T-R2 | register: The flip is PER-PROJECT CONFIG, deferred: total-by-default, per-kind severity promotion, … |
 | T-R3 | register: Exhaustiveness stays info until T-R2 lands; promoting non-exhaustive-over-finite-type (or … |
