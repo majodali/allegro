@@ -349,7 +349,7 @@ if (flagless[0] === "inspect") {
   const filename = flagless[1];
   if (!filename) {
     console.error(
-      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--output FILE.alg] [--json]");
+      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--proposals FILE.md] [--output FILE.alg] [--json]");
     process.exit(1);
   }
   const maxIdx = argv.indexOf("--max-attempts");
@@ -359,7 +359,11 @@ if (flagless[0] === "inspect") {
   const outputIdx = argv.indexOf("--output");
   const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
   const asJson = argv.includes("--json");
-  runPcpProve(filename, maxAttempts, model, outputPath, asJson).catch(e => {
+  // B-187 L3: `--proposals FILE.md` answers from prepared proposals (the
+  // scripted proposer): no key, no network.
+  const proposalsIdx = argv.indexOf("--proposals");
+  const proposalsPath = proposalsIdx >= 0 ? argv[proposalsIdx + 1] : undefined;
+  runPcpProve(filename, maxAttempts, model, outputPath, asJson, proposalsPath).catch(e => {
     console.error(e.message);
     process.exit(1);
   });
@@ -614,7 +618,10 @@ async function runPcpPropose(
 /**
  * Phase H4a: LLM worker. Runs the proof loop against Claude, splices
  * each successful proof term into the source, optionally writes the
- * proved source to --output (default: stdout summary).
+ * proved source to --output (default: stdout summary). B-187 L3: the
+ * loop serves every obligation kind (a plan obligation's proposal is a
+ * catalog entry), and with `--proposals FILE.md` the client is the
+ * scripted proposer, which answers from the file.
  */
 async function runPcpProve(
   filename: string,
@@ -622,9 +629,13 @@ async function runPcpProve(
   model: string | undefined,
   outputPath: string | undefined,
   asJson: boolean,
+  proposalsPath?: string,
 ): Promise<void> {
-  const { runLlmWorker, createAnthropicClient } = await import("../pcp/llm-worker.js");
-  const client = await createAnthropicClient({ model });
+  const { runLlmWorker, createAnthropicClient, createScriptedClient, loadProposalsFile } =
+    await import("../pcp/llm-worker.js");
+  const client = proposalsPath
+    ? createScriptedClient(loadProposalsFile(proposalsPath), { prover: `scripted:${path.basename(proposalsPath)}` })
+    : await createAnthropicClient({ model });
   const result = await runLlmWorker({
     filename,
     maxAttempts,
@@ -640,10 +651,13 @@ async function runPcpProve(
       allDischarged: result.allDischarged,
       summary: result.summary,
       perObligation: result.perObligation.map(o => ({
-        name: o.name, discharged: o.discharged, attempts: o.attempts,
+        name: o.name, ...(o.kind ? { kind: o.kind } : {}),
+        discharged: o.discharged, attempts: o.attempts,
         finalTerm: o.finalTerm,
         authorship: o.authorship,
+        history: o.history,
       })),
+      ...(result.skipped ? { skipped: result.skipped } : {}),
     }));
   } else {
     console.log(`allegro prove — ${filename}`);
@@ -652,12 +666,20 @@ async function runPcpProve(
     for (const o of result.perObligation) {
       const mark = o.discharged ? "✓" : "✗";
       console.log(`  ${mark} ${o.name} (${o.attempts} attempt(s))`);
+      if (o.kind === "plan") {
+        // B-187 L3: a plan obligation's turns, each with the kernel's answer.
+        o.history.forEach((h, i) => console.log(`      attempt ${i + 1}: ${h.verified ? (h.answer ?? "accepted") : h.reason}`));
+        if (o.finalTerm) console.log(`      entry: ${o.finalTerm.split("\n")[0]}`);
+        if (o.authorship) console.log(`      by ${o.authorship.provers[0].prover} in ${o.authorship.provers[0].attemptsUsed} attempt(s)`);
+        continue;
+      }
       if (o.finalTerm) console.log(`      proof: ${o.finalTerm.split("\\n")[0]}`);
       if (!o.discharged && o.history.length > 0) {
         const last = o.history[o.history.length - 1];
         if (last.reason) console.log(`      last failure: ${last.reason}`);
       }
     }
+    for (const name of result.skipped ?? []) console.log(`  - ${name} (no prepared proposal)`);
     if (outputPath) console.log(`Wrote proved source to ${outputPath}`);
   }
   process.exit(result.allDischarged ? 0 : 1);

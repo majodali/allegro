@@ -1216,8 +1216,8 @@ export function extractObligations(
 
   // B-187 L1: the plan obligations of the file's open plans, last, so the
   // theorem and law obligations above keep their order. Opt-in: `allegro
-  // obligations`, `propose` and `verify` (since chunk L2) ask for them;
-  // the LLM worker does not yet (chunk L3).
+  // obligations`, `propose` and `verify` (since chunk L2) and the worker
+  // (`pcp/llm-worker.ts`, since chunk L3) ask for them.
   if (opts?.plans) obligations.push(...extractPlanObligations(evalCtx, opts));
 
   return obligations;
@@ -1715,8 +1715,10 @@ export function formatTodo(args: {
 
 /** B-187 L2: the TODO section of a plan obligation, in the form of a
  *  theorem's: what is missing, where the answer goes, and the hash that
- *  refuses an answer which edits the plan instead. */
-function formatPlanTodo(p: PlanObligationContent): string[] {
+ *  refuses an answer which edits the plan instead. The LLM-free and LLM
+ *  workers' request text for a plan obligation uses the same words
+ *  (`pcp/llm-worker.ts`, chunk L3). */
+export function formatPlanTodo(p: PlanObligationContent): string[] {
   const lines: string[] = [];
   lines.push(`**Gap:** ${p.message}`);
   lines.push("");
