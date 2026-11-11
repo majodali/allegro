@@ -1011,4 +1011,10 @@ in phase 2, by a Tier-0 PR then. R-DR1-38: of the review's two terms,
 *principle decision* stands in the sense of R-DR1-1; *proposal from
 the motivations* has served its purpose.
 
+**On PR #185, 2026-11-11.** The maintainer: Part I looks good, all
+correct. The chapter titles are "Why a new language" and "Keep it
+simple". Titles of the form "A, and B" or "A, not B", and repetitive
+forms in general, are to be avoided; the existing ones are corrected
+later, when all wording is reviewed for style.
+
 Every ask is ruled.

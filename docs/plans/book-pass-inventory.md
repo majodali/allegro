@@ -13,15 +13,15 @@ The order binds by dependency: every decision comes after the decisions it depen
 **Front matter**
 
 - **How this book is organized** (the preface, as merged). Holds the organization the book follows; it presents no decision.
-- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (One operation, and what may be trusted); One operation: partial evaluation (One operation, and what may be trusted); Correctness and safety are one kind of claim (One operation, and what may be trusted); Claims are evaluated like everything else (One operation, and what may be trusted); The kernel trusts only what it has evaluated (One operation, and what may be trusted); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
+- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (Keep it simple); One operation: partial evaluation (Keep it simple); Correctness and safety are one kind of claim (Keep it simple); Claims are evaluated like everything else (Keep it simple); The kernel trusts only what it has evaluated (Keep it simple); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
 
 **Part I: The bet**
 
-Chapters 1 and 2 as ruled in DR1 (2026-11-11); their names are provisional. The part opens with the thesis statement "Why a new language, now", which is not a decision. The demo ladder and the three-part positioning are narrative, told in the tour.
+Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer gave on PR #185; all wording is reviewed for style in a later pass. The part opens with the thesis statement "Why a new language, now", which is not a decision. The demo ladder and the three-part positioning are narrative, told in the tour.
 
-1. **Why a new language, and how it grows** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
+1. **Why a new language** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
    - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
-2. **One operation, and what may be trusted** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
+2. **Keep it simple** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
    - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
 Chapter 3 of the first proposal is dissolved: its decisions are folded into chapters 1 and 2 (DR1). The chapter numbers of Parts II to VI below are those of the first proposal and are renumbered when phase 1 ends.
 
@@ -156,7 +156,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; The verdict as accumulated metadata | Proofs as values; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
 | The return check reports a conforming refined return as a mismatch | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A name bound twice wins silently; implicit production replacement; ordered choice | the grammar, module and binding decisions | Parts III and IV | DR1, rulings of 2026-11-11 |
-| Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | One operation, and what may be trusted | DR1, rulings of 2026-11-11 |
+| Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | Keep it simple | DR1, rulings of 2026-11-11 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -169,7 +169,7 @@ The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pas
 - **The chapters leaving the book** leave as proposed. Units and layers are discussed early as architectural principles, in appendices, not chapters.
 - **Every decision is worked through in order.** Any decision may change, be removed, or gain new neighbours, and the resulting code and test changes are made. The process is strictly monotonic: once a decision is approved and its code changes made, every decision up to it, and the code stemming from them, is final and correct. A point of non-monotonicity is a process failure: the pass goes back, reorders or revises, and repeats until the list is fully ordered and monotonic.
 - **Two types of decision.** Each decision is about language capability or about implementation. No capability decision may depend on an implementation decision. The three cycles the merge broke looked like decisions whose type was unclear. Capability decisions that necessarily depend on each other are stated as one decision.
-- **Order of definition carries no meaning.** A new decision, below in "Why a new language, and how it grows". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
+- **Order of definition carries no meaning.** A new decision, below in "Why a new language". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
 - **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
 
 Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "Incompleteness lives in write-once future cells". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
@@ -207,24 +207,24 @@ They came together over years of exploration into most of what Allegro is today.
 |---|---|
 | [preface.md](../book/preface.md) (How this book is organized) | Stays the preface, unchanged. Goes to: the preface. |
 | [README.md](../../README.md) (Introduction) | Leaves the book's order: it stays the repository's front page; its account of what Allegro is feeds the tour. Goes to: the tour (what Allegro is). |
-| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: One operation, and what may be trusted (See what the compiler knows); Proofs as values (The prover loop); Tools over the pipeline (subcommands). |
+| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Proofs as values (The prover loop); Tools over the pipeline (subcommands). |
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Who can see a member (Private members). |
-| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); One operation, and what may be trusted (§1, §1a, §2, §5); Why a new language, and how it grows (§1 Substrate and surfaces, §1a, §5); One operation, and what may be trusted (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
+| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
-| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language, and how it grows (layer, track, unit); Four planes (plane); Installing a layer into the base (plane interface). |
-| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language, and how it grows (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
-| [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language, and how it grows (§1, §2, §4, §5); Values and their seven kinds (§3, §3.2); Metadata and the capability to write it (§3.1). |
+| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Installing a layer into the base (plane interface). |
+| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
+| [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values and their seven kinds (§3, §3.2); Metadata and the capability to write it (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
-| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: One operation, and what may be trusted (Part 0 R1, R2); Why a new language, and how it grows (Part 0 R6, §23); Values and their seven kinds (T0 §1 to §3, §8); Expressions, functions and symbols (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata and the capability to write it (T2 §19, §19b, §21); How metadata propagates (T2 §20); Four planes (T1 §11, §18, §22); Installing a layer into the base (§23, §24); Scopes (§15); Evaluation over unresolved information (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
-| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language, and how it grows (the boundary); Values and their seven kinds (the minimal base); Installing a layer into the base (the install surface). |
+| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values and their seven kinds (T0 §1 to §3, §8); Expressions, functions and symbols (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata and the capability to write it (T2 §19, §19b, §21); How metadata propagates (T2 §20); Four planes (T1 §11, §18, §22); Installing a layer into the base (§23, §24); Scopes (§15); Evaluation over unresolved information (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
+| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values and their seven kinds (the minimal base); Installing a layer into the base (the install surface). |
 | [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values and their seven kinds (§11, Appendix B); Expressions, functions and symbols (§5); Structures (§1, §2); Metadata and the capability to write it (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation over unresolved information (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
 | Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values and their seven kinds; Expressions, functions and symbols. |
 | [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata and the capability to write it (§1 to §4, §6, §9); How metadata propagates (§5, §8); Installing a layer into the base (§7). |
 | Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
 | [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values and their seven kinds (§2 (the default arm)); Installing a layer into the base (§7, §8); Evaluation over unresolved information (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
 | Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values and their seven kinds; Evaluation over unresolved information; Hosts: the terminal and the browser. |
-| [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language, and how it grows (the L1 boundary); Grammars as values (the boundary). |
+| [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Grammars as values (the boundary). |
 | [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Grammars as values (§1 to §5, §7, §8); Extending the grammar (§6); The surface language (§5 (layout)). |
 | [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Grammars as values (§1, §2); Extending the grammar (§4); Modules, the use header and one pipeline (§4 (activation)); The surface language (§3). |
 | [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules, the use header and one pipeline (Loading, Loaded once per process); Who can see a member (module objects). |
@@ -239,15 +239,15 @@ They came together over years of exploration into most of what Allegro is today.
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
 | [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules, the use header and one pipeline (the build track); Compiling beyond the interpreter (undelivered tracks). |
 | [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules, the use header and one pipeline (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
-| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: One operation, and what may be trusted (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
+| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
 | [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
-| [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: One operation, and what may be trusted (When PE-as-discharge isn't enough); Proofs as values (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
-| [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language, and how it grows (the ladder); Units of measure (rung 2); Finding solutions to a model (rung 3, the capstone). |
+| [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Proofs as values (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
+| [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language (the ladder); Units of measure (rung 2); Finding solutions to a model (rung 3, the capstone). |
 | Appendices (registers and records) | Stay appendices, outside the order. |
 
 ## The decisions, in book order
 
-### Why a new language, and how it grows
+### Why a new language
 
 **The thesis of Part I, ruled 2026-11-11 (DR1).** Not a decision: the framing statement that opens the part, and what the tour argues at length.
 
@@ -265,7 +265,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: trust placed in the author, or in tests the author chose (the industry's default)
 - Sources: docs/book/vision.md §1, §2 "Why both, why now"; the maintainer's motivations (above) and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: new, by ruling; replaces the review's proposal "Built for code that machines write and a kernel checks", whose clause trading authoring ergonomics for checkability is dropped. Supports "A language inherits every check of what it is built on" and the two proposals still to rule (models and mappings as checked values; declarative paradigms as libraries).
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs the principle of "Reviewability through a top-down semantic view"; its concrete half (the safety grade, drill-down, semantic diffs) is read with "Safety grade as the default verification surface" in Part VI.
 #### A system is described in the language of its domain, and that language grows with the understanding
@@ -280,7 +280,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: fixed, prewritten domain languages (rejected: system development is theory building and discourse building, among people as much as between people and agents); general-purpose code with claims beside it
 - Sources: the maintainer's motivations 2 to 4 (above) and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §4
 - Notes: new, by ruling. Supports "A language inherits every check of what it is built on" and the two proposals still to rule, as the first decision does.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### Everything above the kernel is an extension, and there is one way to extend
 - Decides: an extension adds values, functions, syntax, metadata fields and the rules that govern them through one interface. That interface is the same for the standard language and for a library a user writes. An extension is written in Allegro and checked like any other program. The standard language is a set of extensions selected by configuration. Nothing in the kernel names it.
@@ -300,7 +300,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
 - Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "Minimal base surface of about forty primitives".
 - Held finding (2026-11-11, DR1): the platform with no extension loaded cannot load one: `use` is a parse error under `--base` (`src/index.ts:115`–`119`, `252`–`253`). Held on the CLI's decisions.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### The kernel contains only what no extension could supply
 - Decides: something belongs in the kernel only if the platform could not exist without it and no extension could provide it. Everything else is an extension.
@@ -313,7 +313,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a richer kernel for convenience (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: replaces "Simplicity criterion for the base".
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### Meaning comes before notation
 - Decides: a program's meaning is the structure of values and expressions it denotes. A syntax is a mapping onto that structure, and two notations that map to the same structure are the same program. Semantics are designed and decided without reference to any notation. A notation can therefore change without changing what any program means.
@@ -326,7 +326,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a language defined by its syntax, semantics following (the common practice)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: new, by ruling; from the maintainer's motivation 2.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Surface syntax is provisional, reviewed against a corpus"; deprecation paths are a policy question for the surface chapter of Part IV.
 #### The kernel holds no language
@@ -341,7 +341,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: some syntax as part of the bootstrap (rejected: no language in the kernel)
 - Sources: docs/decisions.md "Standing rulings" (layer rulings 1 to 4); docs/book/allegretto/README.md; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Allegretto is syntax-free; the parser lives above the base"; the clause on re-hosting the parser on Vivace's generator is dropped, since it names no decision.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### Order of definition carries no meaning
 - Decides: the order in which definitions and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Only effects have an order: plain effects are not declarations, and happen in the order the program writes them.
@@ -355,7 +355,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: replaces "Language extensions are declarative". Supersedes the standing ruling that an `add` over an existing production only warns.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
 - Decides: every language on the platform is a set of extensions, the standard language included. A small domain language is therefore checked as strictly as the language it was built from. General-purpose and domain-specific languages differ only in breadth.
@@ -368,7 +368,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: domain languages as separate tools with their own, weaker checks (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: replaces "Substrate and surfaces: a DSL inherits the whole kernel".
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### A mapping between models is itself a checked value
 - Decides: a domain model is a language. A mapping from one model to another is written declaratively and is itself a value, so the kernel checks what a mapping produces as it checks anything else. Examples: from a grammar to the values it denotes, from a data model to an interface, from data to an analysis.
@@ -381,7 +381,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: mappings as generators outside the language, unchecked (the practice that stalled)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: new, by ruling; from the maintainer's motivation 3.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
 #### A paradigm is a library
 - Decides: a declarative style of programming, such as queries, logic or constraints, is supplied by an extension, not by another language or runtime. Every paradigm shares the one kernel, its checks and its tools, and paradigms can be mixed in one program.
@@ -394,9 +394,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: several languages on one runtime; mapping libraries between languages (both need a language builder's investment)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: new, by ruling; from the maintainer's motivation 4.
-- Chapter: Why a new language, and how it grows
+- Chapter: Why a new language
 
-### One operation, and what may be trusted
+### Keep it simple
 
 #### One operation: partial evaluation
 - Decides: Allegro does one thing with a program: it evaluates whatever the available information determines and leaves the rest as a smaller program, the residual. Checking a type, proving a claim, compiling, optimizing and running are all this one operation, given more or less information. An analysis of a program is itself a function, evaluated over the program's expression, which every value carries as metadata.
@@ -411,7 +411,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §1, §1a move 1, §5 principle 2; docs/book/concepts.md R2, §25; docs/book/units.md §4.1 row 13; the maintainer's rulings of 2026-11-11 in the review session (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Partial evaluation as the compilation model". The maintainer, 2026-11-11: an analysis over the source expression carried as metadata "doesn't feel like cheating when we give it to everyone to use"; optimisation, expression transformation and source-aware functions use the same expression model.
 - Held finding (2026-11-11, DR1): termination and exhaustiveness are privileged host passes wired into the pipeline (`src/totality.ts:219`–`257`, `477`–`1140`), not ordinary functions over the expression that any extension could write. Held on "Termination by bounded decrease" and "Exhaustiveness checking at info severity".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Phases are configuration
 - Decides: Allegro has no fixed compile time or run time. A phase is one evaluation, defined by the information and the capabilities available to it. An effect is a call on a capability, such as writing output. Where the capability is absent, the call cannot be evaluated and stays in the residual. Building, validating and executing a program are phases a project configures. A configuration may state what a phase must leave decided.
@@ -427,7 +427,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. A phase's diagnostics (refutations, verdicts, warnings) are its result, metadata rendered by the tool that ran the phase, and are never program output; program output is an effect through a capability, so the two are different streams even where a console shows both. "Capability" is kept for this sense; how it relates to the capability to write a metadata field is explored in Part II. Absorbs "Multi-phase build as successive partial evaluation" and "Project severity configuration" as its realisations; both to be re-read in their parts.
 - Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "Minimal base surface of about forty primitives" and "Environment capabilities outside the base, effect-labelled".
 - Held finding (2026-11-11, DR1): the precompile and compile-time phases are hard-coded in the pipeline. Held on "Multi-phase build as successive partial evaluation" and "Precompile before the evaluation loop".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Claims are evaluated like everything else
 - Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
@@ -443,7 +443,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every result says how strongly it holds"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
 - Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
 - Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "One evalSource pipeline for programs and libraries".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
 - Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
@@ -460,7 +460,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: a failed claim might not apply to an effect, though no example is known; the rule stands until a valid counter-example is found. A single phase with both the information and an output capability (a script run, the REPL) may perform an effect before it reaches a later false claim.
 - Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Correctness and safety are one kind of claim
 - Decides: what a program computes and what it is allowed to do are both stated as claims and decided by the same evaluation. No kind of claim has a checker of its own: not a type, an effect, a permission or a termination measure. A feature that could only be checked by separate machinery is evidence against the design, and is raised as such, not built.
@@ -475,7 +475,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §2, §5; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Provable correctness and safety as one predicate machinery". Read strictly.
 - Held finding (2026-11-11, DR1): effects are label sets merged by union and checked by inclusion in code of their own (`EffectSet = Set<string>`, `src/effects.ts:41`). Held on the effects decisions of Part IV.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### The kernel trusts only what it has evaluated
 - Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, the return of a capability, a statement a program asks it to accept: each is reported as assumed, and everything that rests on it says so.
@@ -489,7 +489,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: three legs with an SMT solver as a trusted fallback (rejected: a solver is one more proposer, checked or assumed)
 - Sources: docs/book/vision.md §2; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT" and merges "SMT as a selective fallback", which is no longer a decision.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Anyone may propose, and the record shows who
 - Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
@@ -504,7 +504,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §1, §2; docs/book/proving-in-allegro.md; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Participant-neutral prover protocol with the kernel as trust boundary"; its trust half is now "Trust comes from the kernel, not the author".
 - Held finding (2026-11-11, DR1): authorship is not kept: the verdict credits every discharged theorem to `auto-PE` (`src/pcp.ts:831`). Held on "Obligations and proposals as machine and human views".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### A decided claim can be translated into a proof an outside checker accepts
 - Decides: Allegro does not keep proofs in another system's format. It can replay the evaluation that decided a claim as a sequence of named steps, and a translator turns those steps into a proof for an independent checker. Trusting Allegro's kernel is then a choice, not a requirement.
@@ -518,7 +518,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: proofs stored in a directly exportable form (rejected by the maintainer: translation, not direct export)
 - Sources: docs/book/vision.md §2; docs/decisions.md D7; the maintainer's ruling of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Proofs exportable to external checkers". The constraint that remains on representation is light: the kernel's rules must be stated, and an evaluation replayable step by step. Assumed and sampled results translate as assumptions.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Host code reaches a program only as a capability
 - Decides: code in the host's language cannot be checked by the kernel, so it enters in one place: as a capability that the environment supplies to a phase. An extension may declare a capability; a configuration supplies it. A capability takes data and returns data. It cannot write metadata, so it cannot forge a type, a proof or the result of any analysis. A claim about what a capability returns is either checked when the data arrives or reported as assumed.
@@ -532,7 +532,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a foreign-function interface inside extensions (rejected with the admitted-tier option above); the maintainer's note: this is a second mechanism beside extensions, with a cleaner distinction than before, and no alternative is seen
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/platform/host.ir.md (environment capabilities)
 - Notes: new, by ruling. A database driver, a file system and a fast numeric routine are one construct; the last is a capability with no effect. Data from outside arrives with no claims and earns them by being checked.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### No interface limits optimization
 - Decides: partial evaluation sees through every extension. An expression that crosses from a program into an extension, or from one extension into another, is evaluated as one expression, so the extension interface costs nothing a program can measure. Optimizations that partial evaluation does not find are functions over a program's expression, open to every extension. The one opaque point is the body of a capability.
@@ -547,7 +547,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's ruling of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken): "PE must operate effectively on expressions that cross the extension interface … My goal for Allegro is to have no limits on optimization, although that might not come 100% from PE"
 - Notes: new, by ruling. Whether a capability's declared laws may license rewrites around its opaque body is read with "Laws licence rewrites" in Part VI. Also for Part VI, when it becomes an issue: making capability bodies optimizable by writing them in Allegretto or Allegro expressions.
 - Held finding (2026-11-11, DR1): the installed hooks are host closures the evaluator calls, opaque to partial evaluation. Held with the install-operations finding above.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Every result says how strongly it holds
 - Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). A result that rests on a weaker result is itself reported at the weaker strength. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently. A result also names the extensions and capabilities it rests on.
@@ -564,7 +564,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): three tier lists disagree (docs/book/vision.md §1a; `src/pcp.ts:230`–`236`; `src/totality.ts:500`). Held on the proofs, laws and termination decisions of Part IV.
 - Held finding (2026-11-11, DR1): the keyword `proven` names a check made on four samples, and a `proven` clause is absent from the verdict, whose ledger then reads "all proofs rest on proven backing" (`lib/proven.alg:4`–`5`, `src/pcp.ts:1021`). Held on "Bounded sampling for universal claims".
 - Held finding (2026-11-11, DR1): the safety grade reads `proven-safe` whenever nothing complained (`src/introspect.ts:496`–`504`); a verdict resting on sampled backing is headed "Verdict (verified)" (`src/pcp.ts:646`, `959`). Held on "Safety grade as the default verification surface" and "The verdict as accumulated metadata".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
 - Decides: a program need state no claims. What can be inferred is inferred, and shown. Its authors add claims as their understanding grows, and the same program moves from a quick experiment to a fully decided system without being rewritten.
@@ -578,7 +578,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: every claim decided before a program may run (the formal-methods default); no claims at all (the scripting default)
 - Sources: docs/book/vision.md §5; the maintainer's motivation 6 and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Progressive disclosure of formality".
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 #### Each decision lives in one replaceable unit of code
 - Decides: the code is divided into the smallest units that each hold one decision. A unit depends only on units it names, and can be replaced without editing the others. A unit is split when its parts could be revised independently, never for size alone.
@@ -592,7 +592,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: replaces "Units in a narrow DAG" and merges "Unit granularity rule". "Layer" was only ever a way of organising code and is to be done away with before release (the maintainer, 2026-11-11); until then L0 to L3 are vocabulary of the units appendix only.
 - Held finding (2026-11-11, DR1): 2 forbidden imports, 5 mixed files and 456 kind comparisons outside their units (`npm run lint:units`). Held here; the evaluator's imports of the standard language's units are also the extension decision's findings.
-- Chapter: One operation, and what may be trusted
+- Chapter: Keep it simple
 
 ### Values and their seven kinds
 
@@ -4106,7 +4106,7 @@ Not merged, because they relate without needing each other: "Mediated member acc
 - "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies" move after "Parse failure reporting and recovery" (Grammars as values).
 - "A browser-compatible core" moves after "Browser sandbox as an IIFE bundle with a library registry" (Hosts: the terminal and the browser).
 
-**Contents changed.** "Why a new language, and how it grows" lists "Order of definition carries no meaning", which the rulings added but the list missed (9 decisions). "Evaluation over unresolved information" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
+**Contents changed.** "Why a new language" lists "Order of definition carries no meaning", which the rulings added but the list missed (9 decisions). "Evaluation over unresolved information" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
 
 ### The maintainer's rulings on the type check, 2026-11-06 (PR #164)
 
@@ -4125,7 +4125,7 @@ The ten hard calls stand, except three put to review; the merge of the incomplet
 
 ### Unresolved dependencies
 
-None remain. The fragments marked or misnamed 43 dependency references (25 distinct names); each resolved to an entry of the merged inventory (the working merge notes list every resolution). One guessed name has no entry of its own: "Layers L0 to L3 with dependencies pointing down" resolves to "Everything above the kernel is an extension, and there is one way to extend", which states the downward rule. If the layer spine deserves its own decision section, it would be a new entry in "Why a new language, and how it grows".
+None remain. The fragments marked or misnamed 43 dependency references (25 distinct names); each resolved to an entry of the merged inventory (the working merge notes list every resolution). One guessed name has no entry of its own: "Layers L0 to L3 with dependencies pointing down" resolves to "Everything above the kernel is an extension, and there is one way to extend", which states the downward rule. If the layer spine deserves its own decision section, it would be a new entry in "Why a new language".
 
 ### Cycles found and how they were broken
 

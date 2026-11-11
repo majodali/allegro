@@ -299,6 +299,10 @@ merges, this list is their text.
    - **Intensifiers**: "key", "crucial", "load-bearing", "critically".
    - **Bold labels** on every line or list item.
    - **Abstract nouns** where a verb would do.
+   - **Paired-clause titles**: a title of the form "A, and B" or "A,
+     not B". More generally, any form repeated across titles or
+     sentences (added 2026-11-11, on DR1). Existing instances among the
+     decision titles are corrected in the later style pass, not now.
 9. **Process detail moves out.** How the project is worked on (process,
    lanes, measurement, file maps, studies) leaves the book's narrative.
 10. **A concept is defined where it is first used or decided.**
