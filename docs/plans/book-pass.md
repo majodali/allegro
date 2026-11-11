@@ -1087,6 +1087,11 @@ its approval.
   evaluation stays in Part I. Every decision that partial evaluation
   applies to (claims, compilation, types, optimisation) is worded to
   show the one approach.
+- **R40 — Layers go.** Ruled 2026-11-11 with DR1: "layer" was only ever
+  a way of organising code. The standard language is a configuration of
+  extensions, not a tier, and the term is to be done away with before
+  release. Until then L0 to L3 are vocabulary of the units appendix
+  only, and no decision of the book rests on them.
 
 ## 7. Record
 

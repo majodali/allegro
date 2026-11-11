@@ -971,4 +971,23 @@ open as a goal, "A decided claim can be translated into a proof an
 outside checker accepts": the maintainer chose translation over direct
 export. Chapter 1 splits in two when Part I is fully ruled.
 
-Still to rule: every other ask.
+**Chapter 2's asks, ruled 2026-11-11** (R-DR1-12 to R-DR1-24, and the
+confirmation of the translation wording for R-DR1-11). In the review
+session's wording, recorded in the inventory: "The kernel contains only
+what no extension could supply" (R-DR1-13); "Meaning comes before
+notation" (R-DR1-17); "A language inherits every check of what it is
+built on" (R-DR1-12); "A mapping between models is itself a checked
+value" (R-DR1-19, open); "A paradigm is a library" (R-DR1-20, open);
+"Order of definition carries no meaning" (R-DR1-16), where binding a
+name twice in one scope is an error and plain effects, not being
+declarations, happen in written order; "Each decision lives in one
+replaceable unit of code" (R-DR1-21 with R-DR1-22). R-DR1-14 and
+R-DR1-15 are not decisions: "layer" was only ever a way of organising
+code, and is to be done away with before release. R-DR1-23 (the three
+"moves", a word the maintainer found unclear) and R-DR1-24 (the demo
+ladder) are narrative, told in the tour; R-DR1-33's new chapter is not
+needed. Part I's first two chapters are regrouped in the inventory
+under provisional names.
+
+Still to rule: chapter 3 (R-DR1-25, R-DR1-27 to R-DR1-31), R-DR1-32,
+and the placement asks R-DR1-34 to R-DR1-37.
