@@ -1308,7 +1308,7 @@ export async function runH4aAsyncTests(): Promise<void> {
   const RUSH_ENTRY = "Rush:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (f => f(f))(f => f(f))";
   const HASTE_ENTRY = "Haste:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (g => g(g))(g => g(g))";
 
-  await asyncTest("B-187 L4: the reply's time box ends a turn whose client stalls; the attempt counts and the loop goes on", async () => {
+  await asyncTest("B-187 L4: the reply's timeout ends a turn whose client stalls; the attempt counts and the loop goes on", async () => {
     const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
     fs.writeFileSync(tmp, PENDING_SRC);
     try {
@@ -1379,7 +1379,7 @@ export async function runH4aAsyncTests(): Promise<void> {
     }
   });
 
-  await asyncTest("B-187 L4: the loop on L2's demo still converges in two attempts with the CLI's default time boxes on", async () => {
+  await asyncTest("B-187 L4: the loop on L2's demo still converges in two attempts with the CLI's default timeouts on, in the worker thread", async () => {
     const scripted = createScriptedClient({ byObligation: new Map([[GAP, [FREIGHT.trimEnd(), SHIP.trimEnd()]]]), unnamed: [] });
     const result = await runLlmWorker({
       filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 5, client: scripted, extensions: [typeExt],
@@ -1509,7 +1509,7 @@ test("B-187 L4: parseProveArgs reads `--api-key` (B-175 item 6), the two time bo
   eq(formatSeconds(1500), "1.5 s");
 });
 
-test("B-187 L4: CLI `prove` refuses a malformed time box and names `--api-key` beside `ANTHROPIC_API_KEY` without a key", () => {
+test("B-187 L4: CLI `prove` refuses a malformed `--turn-timeout` and names `--api-key` beside `ANTHROPIC_API_KEY` without a key", () => {
   const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
   fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
   try {
