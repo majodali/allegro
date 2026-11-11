@@ -81,7 +81,11 @@ already recorded on Part II's entries.
 
 ## What changed
 
-Nothing yet: this record opens the review.
+Part II of `docs/plans/book-pass-inventory.md`, from 74 decisions in
+nine chapters to 49 in seven, as "Rulings taken" records. One Part I
+decision is amended ("The kernel trusts only what it has evaluated").
+New held findings are on the entries that name them; the largest is
+that the evaluator calls installed host functions at fixed points.
 
 ## Terms introduced
 
@@ -207,5 +211,16 @@ decisions, in the inventory, replacing PE Rule 1 and PE Rule 2:
 - Ask 13: "channel" goes. "Metadata fields are independent"; "An
   extension registers its own fields; the kernel has two".
 
-Every structural ask is ruled. Ask 14 (wording that names layers,
-`--base` or L2) is done when Part II is regrouped.
+**Leftovers and regrouping, ruled 2026-11-11.** Seven entries fold into
+ruled decisions (writes gated and reads free; writers as closures;
+one-shot registration; how propagation is applied; primitives
+receiving full values; untyped structures; empty array and record);
+the serialisation rule for symbols moves to the privacy decision of
+Part IV; "Trust in a value needs no seal" is reworded and kept. Part II
+is regrouped into seven chapters in dependency order, with provisional
+titles: Values; Programs as values; Authority; Metadata; Evaluation;
+What an extension is built from; When a program is wrong. 49
+decisions, every dependency pointing to an earlier decision. Ask 14 is
+done with the regrouping.
+
+Every ask is ruled.
