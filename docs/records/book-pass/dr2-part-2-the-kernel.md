@@ -153,4 +153,24 @@ decisions, in the inventory, replacing PE Rule 1 and PE Rule 2:
    on it by extensions.
 4. "A refutation on a path that may be taken refutes the program."
 
+**Asks 6, 7, 9 and 15, ruled 2026-11-11.**
+
+- Ask 7: "The same program and the same information give the same
+  result." Determinism is built in.
+- Ask 15: "The environment is not a value", merging the two scope
+  entries. Tabled, for want of a solid use case and of an analysis of
+  their effect on unforgeability: introspection of an environment, and
+  a tool translating one environment into another for a program that
+  requires a specific one.
+- "A missing value is a cell that is filled once" and "When information
+  arrives, what waited on it is evaluated again", reworded.
+- Ask 6: not a decision of its own. The maintainer doubted that a name
+  without a value arises apart from futures and values not yet
+  defined. A capability a phase is not given and an input not yet
+  supplied are cells; a name nothing declares is a refutation.
+- Ask 9: the test stands (an implementation decision stays only if a
+  reader could choose otherwise and the choice shapes the code). Eight
+  housekeeping entries are removed as decisions and tabled as work
+  owed. The four-plane model is extraneous: its chapter is dropped.
+
 (Further rulings are recorded as they are taken.)
