@@ -961,4 +961,14 @@ that language grows with the understanding". Both support R-DR1-12,
 R-DR1-19 and R-DR1-20. The term *theory* (of a system) is ratified
 with the wording.
 
+**R-DR1-5, R-DR1-8, R-DR1-9, R-DR1-10 and R-DR1-11, ruled 2026-11-11.**
+In the review session's wording, recorded in the inventory:
+"Correctness and safety are one kind of claim", read strictly, so the
+separate effects checker is a held finding; "The kernel trusts only
+what it has evaluated", which replaces the three legs and absorbs the
+SMT entry; "Anyone may propose, and the record shows who"; and, still
+open as a goal, "A decided claim can be translated into a proof an
+outside checker accepts": the maintainer chose translation over direct
+export. Chapter 1 splits in two when Part I is fully ruled.
+
 Still to rule: every other ask.

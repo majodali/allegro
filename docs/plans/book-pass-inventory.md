@@ -13,12 +13,12 @@ The order binds by dependency: every decision comes after the decisions it depen
 **Front matter**
 
 - **How this book is organized** (the preface, as merged). Holds the organization the book follows; it presents no decision.
-- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (One engine for compiling and proving); One operation: partial evaluation (One engine for compiling and proving); Provable correctness and safety as one predicate machinery (One engine for compiling and proving); Claims are evaluated like everything else (One engine for compiling and proving); Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
+- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (One engine for compiling and proving); One operation: partial evaluation (One engine for compiling and proving); Correctness and safety are one kind of claim (One engine for compiling and proving); Claims are evaluated like everything else (One engine for compiling and proving); The kernel trusts only what it has evaluated (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
 
 **Part I: The bet**
 
 1. **One engine for compiling and proving** (8 decisions). The defining bets: a platform of extensions over a minimal core, partial evaluation as the compiler, and proof by the same evaluation, with failures halting the build.
-   - Decisions: Everything above the kernel is an extension, and there is one way to extend; One operation: partial evaluation; Provable correctness and safety as one predicate machinery; Claims are evaluated like everything else; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
+   - Decisions: Everything above the kernel is an extension, and there is one way to extend; One operation: partial evaluation; Correctness and safety are one kind of claim; Claims are evaluated like everything else; Anyone may propose, and the record shows who; The kernel trusts only what it has evaluated; The kernel trusts only what it has evaluated; A decided claim can be translated into a proof an outside checker accepts.
    - Draws on: [vision.md](../book/vision.md) §1, §1a, §2, §5, [concepts.md](../book/concepts.md) Part 0 R1, R2, [proving-in-allegro.md](../book/proving-in-allegro.md) When PE-as-discharge isn't enough.
 2. **A small base and the surfaces above it** (9 decisions). Why the base stays small and ignorant of its layers, how every language above it is a surface inheriting the whole kernel, and how the code is cut into units that match.
    - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Language extensions are declarative; The kernel holds no language; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
@@ -328,21 +328,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the precompile and compile-time phases are hard-coded in the pipeline. Held on "Multi-phase build as successive partial evaluation" and "Precompile before the evaluation loop".
 - Chapter: One engine for compiling and proving
 
-#### Provable correctness and safety as one predicate machinery
-- Decides: the defining feature is provable correctness (positive: refinements, contracts, invariants) and safety (negative: effects, capabilities, information flow), all stated as predicates and discharged by the same machinery (predicate sets, abstract domains, entailment, PE reduction), with the falsifiable constraint that a feature needing parallel infrastructure fails the thesis and is surfaced as a thesis-level concern, never quietly built.
-- Status: settled
+#### Correctness and safety are one kind of claim
+- Decides: what a program computes and what it is allowed to do are both stated as claims and decided by the same evaluation. No kind of claim has a checker of its own: not a type, an effect, a permission or a termination measure. A feature that could only be checked by separate machinery is evidence against the design, and is raised as such, not built.
+- Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
-- Depends on: One operation: partial evaluation
-- Significance: 5 — the thesis every L2 feature is checked against
-- Label: foundational — every L2 analysis and the metadata plane's design are judged by it
-- Units: none
-- Options recorded: SMT, structural type checking or symbolic execution as the discharge mechanism (named as what other systems pick)
-- Sources: docs/book/vision.md §2 (table, falsifiable constraint), §5 principles 2 and 12; docs/book/vision.md §2 (Falsifiable design constraint), §5 principle 2; docs/book/demo-ladder.ir.md C24, C73
-- Book home (fragments' proposal): the tour (proposed), then vision.md / the tour / Vision and principles
-- Notes: Merged from fragment A ("Provable correctness and safety as one predicate machinery"), fragment C ("Falsifiable design constraint: no parallel infrastructure"). C: likely also in fragment A's scope. Told in the tour.
+- Depends on: Claims are evaluated like everything else
+- Significance: 5 — safety is not a second system; the design states what would falsify it
+- Label: foundational — effects, permissions, termination and every later kind of claim rest on it
+- Units: none of its own
+- Options recorded: a lattice and a checker per kind of claim (rejected); wording that lets a kind of claim keep its own entailment procedure (rejected: it would excuse the separate effects checker)
+- Sources: docs/book/vision.md §2, §5; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Provable correctness and safety as one predicate machinery". Read strictly.
+- Held finding (2026-11-11, DR1): effects are label sets merged by union and checked by inclusion in code of their own (`EffectSet = Set<string>`, `src/effects.ts:41`). Held on the effects decisions of Part IV.
 - Chapter: One engine for compiling and proving
-
 #### Claims are evaluated like everything else
 - Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -374,68 +373,46 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
 - Chapter: One engine for compiling and proving
 
-#### Participant-neutral prover protocol with the kernel as trust boundary
-- Decides: humans, AI agents, hybrids and tools propose [implementation, proof] pairs through one protocol, the kernel verifies each independently as the single trust boundary, and authorship is recorded per discharged theorem.
-- Status: settled
+#### Anyone may propose, and the record shows who
+- Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
+- Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
-- Depends on: Provable correctness and safety as one predicate machinery
-- Significance: 4 — defines who discharges claims and why AI output is checkable
-- Label: foundational — the proof collaboration protocol and the writer-capability integrity model serve it
-- Units: pcp, cli
-- Options recorded: an AI-centric framing (generalised to participant-neutral by maintainer direction); an AI-centric protocol (generalised to participant-neutral by maintainer direction)
-- Sources: docs/book/vision.md §1, §1a move 3, §2 leg 2, §5 principle 13; docs/book/vision.md §1a move 3, §2 leg 2, §5 principle 13 and the source note; docs/plans/release-track.md §3 D3; docs/book/getting-started.md (The prover loop); docs/book/platform/tooling.ir.md C130
-- Book home (fragments' proposal): the tour (proposed) / Proving in Allegro / Tooling
-- Notes: Merged from fragment A ("Participant-neutral prover protocol with the kernel as trust boundary"), fragment C ("Participant-neutral prover protocol with recorded authorship"). Assembly: fragment C's dependencies on PE-as-discharge and theorems were dropped; the protocol is a thesis-level bet and those entries depend on it. Significance calibrated from 4/5.
+- Depends on: The kernel trusts only what it has evaluated
+- Significance: 4 — one protocol for every participant
+- Label: foundational — the prover loop, obligations and proposals rest on it
+- Units: none of its own
+- Options recorded: separate paths for human and machine provers (rejected)
+- Sources: docs/book/vision.md §1, §2; docs/book/proving-in-allegro.md; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Participant-neutral prover protocol with the kernel as trust boundary"; its trust half is now "Trust comes from the kernel, not the author".
+- Held finding (2026-11-11, DR1): authorship is not kept: the verdict credits every discharged theorem to `auto-PE` (`src/pcp.ts:831`). Held on "Obligations and proposals as machine and human views".
 - Chapter: One engine for compiling and proving
-
-#### Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
-- Decides: predicates are Allegro lambdas discharged by evaluating them to `true` (primary), provers supply implementation and proof together (primary), and SMT is a use-case-driven fallback for arithmetic-heavy obligations, never foundational.
-- Status: partly built
+#### The kernel trusts only what it has evaluated
+- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, the return of a capability, a statement a program asks it to accept: each is reported as assumed, and everything that rests on it says so.
+- Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
-- Rationale kind: mixed
-- Depends on: One operation: partial evaluation; Participant-neutral prover protocol with the kernel as trust boundary
-- Significance: 5 — sets the discharge mechanism the evaluator was designed for
-- Label: foundational — the proof kernel and the evaluator's role as checker rest on leg 1
-- Units: evaluator; proofs?; pcp?
-- Options recorded: SMT as the primary mechanism (rejected as foundational)
-- Sources: docs/book/vision.md §2 "The proof strategy — three legs"
-- Book home (fragments' proposal): the tour (proposed)
-- Notes: the SMT leg has no implementation in the sources read. Assembly: the language-level form of its first leg is the entry "Proofs are values discharged by evaluation" (chapter: Proofs as values), into which fragment C's "PE-as-discharge as the primary proof strategy" was merged. Told in the tour.
+- Rationale kind: technical
+- Depends on: Claims are evaluated like everything else; Trust comes from the kernel, not the author
+- Significance: 5 — one trust mechanism; everything else is a proposer
+- Label: foundational — the tiers, the verdict and every outside tool rest on it
+- Units: none of its own
+- Options recorded: three legs with an SMT solver as a trusted fallback (rejected: a solver is one more proposer, checked or assumed)
+- Sources: docs/book/vision.md §2; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT" and merges "SMT as a selective fallback", which is no longer a decision.
 - Chapter: One engine for compiling and proving
-
-#### SMT as a selective fallback
-- Decides: SMT is to be explored only where PE is not strong enough or prover-generated proofs are uneconomical, combining with the other legs, never as the foundation.
-- Status: open
+#### A decided claim can be translated into a proof an outside checker accepts
+- Decides: Allegro does not keep proofs in another system's format. It can replay the evaluation that decided a claim as a sequence of named steps, and a translator turns those steps into a proof for an independent checker. Trusting Allegro's kernel is then a choice, not a requirement.
+- Status: open; ruled 2026-11-11 (DR1), wording to confirm
 - Type: capability
 - Rationale kind: vision
-- Depends on: Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
-- Significance: 3 — bounds what the kernel will ever trust
-- Label: swappable — a fallback discharger behind the obligation interface
-- Units: not yet a unit
-- Options recorded: SMT as the primary mechanism (the incumbents' choice)
-- Sources: docs/book/vision.md §2 (leg 3); docs/book/proving-in-allegro.md (When PE-as-discharge isn't enough)
-- Book home (fragments' proposal): Proving in Allegro
-- Notes: nothing is built. Assembly: its dependency ("PE-as-discharge as the primary proof strategy") resolves to the thesis entry "Three-leg proof strategy", of which this is the third leg.
+- Depends on: The kernel trusts only what it has evaluated
+- Significance: 3 — an independent check of the kernel itself
+- Label: foundational — it requires that evaluation be replayable and that each step be an instance of a stated rule
+- Units: none (not built)
+- Options recorded: proofs stored in a directly exportable form (rejected by the maintainer: translation, not direct export)
+- Sources: docs/book/vision.md §2; docs/decisions.md D7; the maintainer's ruling of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Proofs exportable to external checkers". The constraint that remains on representation is light: the kernel's rules must be stated, and an evaluation replayable step by step. Assumed and sampled results translate as assumptions.
 - Chapter: One engine for compiling and proving
-
-#### Proofs exportable to external checkers
-- Decides: proofs should be exportable to external checkers (Lean, Coq or similar) with transitive assurance through dependencies, and representation choices prefer forms that translate to standard proof-assistant primitives.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT
-- Significance: 3 — constrains every foundational representation choice
-- Label: foundational — would cascade through the proof value and the kernel's trusted base
-- Units: not yet a unit
-- Options recorded: none recorded; the hard question (which base components ship with a proof) is named open
-- Sources: docs/book/vision.md §2 "Trust beyond Allegro", §5 principle 16; docs/decisions.md D7; docs/book/vision.md §2 (Trust beyond Allegro), §5 principle 16; D7
-- Book home (fragments' proposal): the tour (proposed) / Vision and principles / Proving in Allegro
-- Notes: Merged from fragment A ("Proofs portable to external checkers"), fragment C ("Proofs exportable to external checkers"). C: likely shared with the L0/L2 fragments. Assembly: fragment C's dependency on `Type : Type` stratified at export was dropped; export constrains that representation choice, so the stratification note sits with "Kinds are types, and Type is its own type". Significance calibrated from 3/4.
-- Chapter: One engine for compiling and proving
-
-### A small base and the surfaces above it
-
 #### Substrate and surfaces: a DSL inherits the whole kernel
 - Decides: Allegretto is the substrate and every language built on it, Allegro Standard included, is a surface that inherits the whole kernel (types, proofs, effects, laws, prover protocol), so general-purpose versus domain-specific is a breadth axis, not two kinds of language.
 - Status: settled
@@ -557,7 +534,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — a test every capability must pass
 - Rationale kind: vision
-- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Provable correctness and safety as one predicate machinery
+- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Correctness and safety are one kind of claim
 - Significance: 3 — the positioning analog of the falsifiable constraint; shapes how features are admitted
 - Label: foundational — the differentiator map, the demo ladder's stories and the claims register are organised by it
 - Units: none
@@ -572,7 +549,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what the platform must demonstrate
 - Rationale kind: vision
-- Depends on: The three moves as the test of a new capability; Provable correctness and safety as one predicate machinery
+- Depends on: The three moves as the test of a new capability; Correctness and safety are one kind of claim
 - Significance: 3 — orders the demonstration of the whole platform
 - Label: foundational — each rung's scenes inherit the mechanisms the lower rungs show
 - Units: none
@@ -603,7 +580,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Provable correctness and safety as one predicate machinery
+- Depends on: Correctness and safety are one kind of claim
 - Significance: 4 — shapes every verdict surface and the discharge tiers
 - Label: foundational — discharge tiers, the assumption ledger and safety grades rest on it
 - Units: pcp, introspect, cli
@@ -2753,7 +2730,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what a machine prover is told
 - Rationale kind: vision
-- Depends on: Participant-neutral prover protocol with the kernel as trust boundary
+- Depends on: Anyone may propose, and the record shows who
 - Significance: 2 — makes the protocol's neutrality literal
 - Label: swappable — the primer is data to the worker
 - Units: not yet a unit (`pcp/llm-worker.ts` has no unit)
@@ -3325,7 +3302,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Refinement types; Kernel structural equality is the default; Extensions are the module substrate; Rung 2 domain: units of measure over state machines; Provable correctness and safety as one predicate machinery
+- Depends on: Refinement types; Kernel structural equality is the default; Extensions are the module substrate; Rung 2 domain: units of measure over state machines; Correctness and safety are one kind of claim
 - Significance: 3 — the demonstration that a domain check needs no new machinery
 - Label: swappable — a library over the kernel
 - Units: not yet a unit
@@ -3386,7 +3363,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what the Vivace tier is made of
 - Rationale kind: vision
-- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Provable correctness and safety as one predicate machinery
+- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Correctness and safety are one kind of claim
 - Significance: 3 — sets what a domain model may and may not add
 - Label: foundational — every pilot is held to it; a pilot that cannot express its domain is a finding against the lower layers
 - Units: not yet a unit
@@ -3923,7 +3900,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Participant-neutral prover protocol with the kernel as trust boundary; Soft-fail evaluation for verdict tools
+- Depends on: Anyone may propose, and the record shows who; Soft-fail evaluation for verdict tools
 - Significance: 2 — the protocol's request side
 - Label: swappable — renderings over the `pcp` schemas
 - Units: pcp, cli
