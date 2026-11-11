@@ -822,8 +822,12 @@ item 6. `prove --transcript FILE.md` writes a run turn by turn as
 Markdown with a JSON twin; `demos/rung4/transcripts/` opens with the
 scripted loop's transcript on `tests/planning-loop-proposals.alg`. The
 run with a language model is the maintainer's to make (the plan's §7).
-`docs/book/platform/tooling.ir.md` replaces C124, C175 and C182 by C186
-to C194 (ask A6).
+As the maintainer ruled at the PR, it uses a second client, `prove
+--proposer claude-code`, which runs Claude Code's scripted mode
+(`claude -p`) on the maintainer's Claude subscription. The SDK client
+stays for API billing. Public demos that need Claude API calls are
+deferred. `docs/book/platform/tooling.ir.md` replaces C124, C175, C180
+and C182 by C186 to C197 (ask A6).
 
 ### 2026-11 — The LLM-free worker and the scripted proposer (B-187, chunk L3)
 

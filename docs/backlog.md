@@ -3524,7 +3524,11 @@ table and the stream plans.
   stopped on L1's demo writing its catalog as a list, its default
   ratified with every ask on 2026-11-11 (the plan's §7); L4 (the LLM
   worker with a time box) at its PR, its keyed run owed by the
-  maintainer (the plan's §7).
+  maintainer (the plan's §7). Ruled at L4's PR on 2026-11-11: the keyed
+  run drives the maintainer's Claude subscription through Claude Code's
+  scripted mode (`prove --proposer claude-code`), and public demos that
+  need Claude API calls are deferred, the website's loop demo out of
+  L7's scope until a route exists.
   **Pointer**: the plan's §2 (the probes) and §6 (the
   rulings)
 - [ ] **B-188** (first out-of-scope finding of the planning-loop stream)

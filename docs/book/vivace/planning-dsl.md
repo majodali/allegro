@@ -855,7 +855,9 @@ proposals without a key. Chunk L4 gave each turn a time box: a turn
 whose check does not finish in time (30 s by default) is refused as a
 timeout and the loop goes on; `allegro prove --transcript FILE.md`
 records a run turn by turn, and `demos/rung4/transcripts/` holds the
-first, the scripted loop on `tests/planning-loop-proposals.alg`. The
+first, the scripted loop on `tests/planning-loop-proposals.alg`;
+`allegro prove --proposer claude-code` runs the loop through Claude
+Code's scripted mode on a Claude subscription. The
 ledger entries are the stream's later chunks.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
