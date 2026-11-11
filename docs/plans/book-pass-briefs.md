@@ -360,6 +360,8 @@ Then one ask per placement question (a decision that belongs to another chapter 
 
 **The right decision, not the cheapest change** (R34 (recommend the right decision)): recommend the option that makes the decision right for the language; state the size of each option's change as a cost, never as the reason.
 
+**The original goals, not the code's habits** (R38 (the purpose of the decision review)): where the code or a later ruling departs from an original goal of Allegro because no alternative was obvious at the time, say so, analyse the alternatives now, and recommend the decision that serves the goal; never restate a goal to fit the code. Partial evaluation is primary: "compile time" and "run time" are not concepts of the language, and phases are configuration. Word every Decides so a reader who does not know the project understands it, with no project term the earlier decisions have not introduced.
+
 **What is already covered**: decisions already ruled, with their sources. **What changed**: §1 the decisions against the code (a table: decision, what the code does, pointer, verdict); §2 new held findings (defects in these decisions, for R36); §3 other findings (defects no decision in this part holds, for the maintainer to file); §4 order and dependency findings (a decision out of order, a capability depending on an implementation decision, a cycle). **Terms introduced**. **Rulings taken** (placeholder).
 
 No IR and no prose: phase 1 writes no chapter content. Short direct sentences, the recommendation first in each ask, every identifier named at its first use on the same line. Aim at about 12,000 words at most; if the part needs more, stop at a decision boundary and report where the next slice starts.
