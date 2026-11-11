@@ -802,6 +802,27 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — The LLM-free worker and the scripted proposer (B-187, chunk L3)
+
+B-187 (the planning loop, the next validating demo), chunk L3 of
+`docs/plans/planning-loop.md`. The worker in `pcp/llm-worker.ts` is one
+loop for every obligation kind, as ruling R3 (a) asked: a registry,
+`OBLIGATION_KINDS`, gives each kind its request text, its splice, its
+success test and its primer section. Theorems keep the H4a behaviour,
+and their tests pass unchanged. A plan obligation's proposal is one
+catalog entry, judged by `answerPlanProposal`. The worker loads a file
+as the CLI does, `use` header included, once per run, which closes
+B-175 (the tooling chapter's findings) item 5. `allegro prove FILE
+--proposals FILE.md` answers from a Markdown file of prepared
+proposals, one section per obligation and one fenced block per
+attempt, with no key and no network. On L1's open plan, with its catalog
+written as a block, the loop converges in two attempts: refused as
+`open`, then accepted, authored by the scripted proposer. The chunk
+stopped on one point: L1's demo writes its catalog as a list, which the
+splice refuses, so the loop cannot run on that file as it stands (the
+plan's §7). `docs/book/platform/tooling.ir.md` replaces C123, C127 to
+C130, C132, C133 and C135 by C175 to C185 (ask A5).
+
 ### 2026-11 — The proposal protocol (B-187, chunk L2)
 
 B-187 (the planning loop, the next validating demo), chunk L2 of

@@ -843,8 +843,13 @@ hand-written catalog entry. Chunk L2 added the catalog's surface form,
 `src/pcp.ts` splices a proposal into the catalog and judges it, and
 `allegro verify --obligation` judges a plan obligation;
 `tests/planning-loop-proposals.alg` pins three proposals and their
-answers; §2.9 is the proposer's output contract. The worker and the
-ledger entries are the stream's later chunks.
+answers; §2.9 is the proposer's output contract. Chunk L3 made the
+worker in `pcp/llm-worker.ts` one loop for theorems and plan
+obligations: it sends §2.9 as the system prompt for a plan obligation,
+splices each reply into the catalog and asks again with the kernel's
+refusal, and `allegro prove --proposals FILE.md` runs it from prepared
+proposals without a key. The ledger entries are the stream's later
+chunks.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
