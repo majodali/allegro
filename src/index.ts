@@ -345,25 +345,16 @@ if (flagless[0] === "inspect") {
   });
 } else if (flagless[0] === "prove") {
   // Phase H4a: LLM worker. Asks Claude to fill in pending proof terms,
-  // verifies each via the kernel, iterates up to --max-attempts.
+  // verifies each via the kernel, iterates up to --max-attempts. The flags
+  // are parsed by `parseProveArgs` in `pcp/llm-worker.ts` (B-187 L4).
   const filename = flagless[1];
   if (!filename) {
     console.error(
-      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--proposals FILE.md] [--output FILE.alg] [--json]");
+      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--api-key KEY] [--proposals FILE.md] " +
+      "[--turn-timeout MS] [--reply-timeout MS] [--transcript FILE.md] [--output FILE.alg] [--json]");
     process.exit(1);
   }
-  const maxIdx = argv.indexOf("--max-attempts");
-  const maxAttempts = maxIdx >= 0 ? Number(argv[maxIdx + 1]) : 5;
-  const modelIdx = argv.indexOf("--model");
-  const model = modelIdx >= 0 ? argv[modelIdx + 1] : undefined;
-  const outputIdx = argv.indexOf("--output");
-  const outputPath = outputIdx >= 0 ? argv[outputIdx + 1] : undefined;
-  const asJson = argv.includes("--json");
-  // B-187 L3: `--proposals FILE.md` answers from prepared proposals (the
-  // scripted proposer): no key, no network.
-  const proposalsIdx = argv.indexOf("--proposals");
-  const proposalsPath = proposalsIdx >= 0 ? argv[proposalsIdx + 1] : undefined;
-  runPcpProve(filename, maxAttempts, model, outputPath, asJson, proposalsPath).catch(e => {
+  runPcpProve(filename, argv).catch(e => {
     console.error(e.message);
     process.exit(1);
   });
@@ -621,27 +612,35 @@ async function runPcpPropose(
  * proved source to --output (default: stdout summary). B-187 L3: the
  * loop serves every obligation kind (a plan obligation's proposal is a
  * catalog entry), and with `--proposals FILE.md` the client is the
- * scripted proposer, which answers from the file.
+ * scripted proposer, which answers from the file. B-187 L4: a time box
+ * per turn (`--turn-timeout MS` for the kernel, `--reply-timeout MS` for
+ * the client), `--api-key KEY` (B-175 item 6), and `--transcript FILE.md`
+ * with its JSON twin beside it.
  */
-async function runPcpProve(
-  filename: string,
-  maxAttempts: number,
-  model: string | undefined,
-  outputPath: string | undefined,
-  asJson: boolean,
-  proposalsPath?: string,
-): Promise<void> {
-  const { runLlmWorker, createAnthropicClient, createScriptedClient, loadProposalsFile } =
-    await import("../pcp/llm-worker.js");
+async function runPcpProve(filename: string, argv: string[]): Promise<void> {
+  const {
+    runLlmWorker, createAnthropicClient, createScriptedClient, loadProposalsFile,
+    parseProveArgs, formatTranscript, transcriptJsonPath,
+  } = await import("../pcp/llm-worker.js");
+  const parsed = parseProveArgs(argv);
+  if ("error" in parsed) throw new Error(`allegro prove: ${parsed.error}`);
+  const { maxAttempts, model, outputPath, asJson, proposalsPath, apiKey,
+          turnTimeoutMs, replyTimeoutMs, transcriptPath } = parsed;
   const client = proposalsPath
     ? createScriptedClient(loadProposalsFile(proposalsPath), { prover: `scripted:${path.basename(proposalsPath)}` })
-    : await createAnthropicClient({ model });
+    : await createAnthropicClient({ model, apiKey });
   const result = await runLlmWorker({
     filename,
     maxAttempts,
     enableLlm: true,
     client,
+    turnTimeoutMs,
+    replyTimeoutMs,
   });
+  if (transcriptPath) {
+    fs.writeFileSync(transcriptPath, formatTranscript(result.transcript), "utf-8");
+    fs.writeFileSync(transcriptJsonPath(transcriptPath), JSON.stringify(result.transcript, null, 2) + "\n", "utf-8");
+  }
   if (outputPath) {
     fs.writeFileSync(outputPath, result.sourceAfter, "utf-8");
   }
@@ -681,6 +680,7 @@ async function runPcpProve(
     }
     for (const name of result.skipped ?? []) console.log(`  - ${name} (no prepared proposal)`);
     if (outputPath) console.log(`Wrote proved source to ${outputPath}`);
+    if (transcriptPath) console.log(`Wrote the transcript to ${transcriptPath} and ${transcriptJsonPath(transcriptPath)}`);
   }
   process.exit(result.allDischarged ? 0 : 1);
 }

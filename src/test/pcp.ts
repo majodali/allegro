@@ -37,6 +37,10 @@ import {
 import {
   createScriptedClient, parseProposals, loadPlanPrimer, OBLIGATION_KINDS,
 } from "../../pcp/llm-worker.js";
+import {
+  parseProveArgs, kernelTimeoutReason, formatSeconds, transcriptJsonPath,
+  DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
+} from "../../pcp/llm-worker.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
@@ -1288,6 +1292,111 @@ export async function runH4aAsyncTests(): Promise<void> {
     eq(result.summary.skipped, seen.length);
     eq(result.perObligation.length, 0);
   });
+
+  // --- B-187 L4: the time box per turn (docs/plans/planning-loop.md) ---
+  //
+  // Two budgets: the client's reply and the kernel's evaluation of the
+  // spliced source. A kernel budget judges the turn in a worker thread that
+  // the loop terminates when the budget runs out, because `evalSource` is
+  // synchronous and a loop in tail position passes the evaluator's depth
+  // guard. No test reaches the network: every client is the test's own.
+  //
+  // A node block whose estimate is the self-application `(f => f(f))(f =>
+  // f(f))` diverges: the call is in tail position, so the TCO loop runs it
+  // forever and `MAX_DEPTH` never fires (the CLI ran it 40 s without an
+  // answer before this chunk).
+  const RUSH_ENTRY = "Rush:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (f => f(f))(f => f(f))";
+  const HASTE_ENTRY = "Haste:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (g => g(g))(g => g(g))";
+
+  await asyncTest("B-187 L4: the reply's time box ends a turn whose client stalls; the attempt counts and the loop goes on", async () => {
+    const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      let calls = 0;
+      let aborted = false;
+      const stalling: LlmClient = {
+        modelId: () => "mock-model",
+        send({ signal }) {
+          calls++;
+          if (calls === 1) {
+            // Never resolves on its own: only the box's signal ends it.
+            return new Promise<string>((_, reject) => {
+              signal?.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); });
+            });
+          }
+          return Promise.resolve("```allegro\nproof_refl(2)\n```");
+        },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 3, client: stalling, primer: "(mock primer)", replyTimeoutMs: 200,
+      });
+      eq(aborted, true, "the stalled request's signal was aborted");
+      eq(result.allDischarged, true);
+      const ob = result.perObligation[0];
+      eq(ob.attempts, 2, "the stalled turn counts as an attempt");
+      eq(JSON.stringify(ob.history[0]), JSON.stringify({
+        proofTerm: "", verified: false,
+        reason: "refused (timeout): the proposer did not reply within 0.2 s", refusal: "timeout",
+      }));
+      eq(ob.history[1].verified, true);
+      eq(ob.turns[0].reply, undefined, "the transcript records no reply");
+      eq(ob.turns[0].refusal, "timeout");
+      eq(ob.turns[0].replyMs >= 200, true, String(ob.turns[0].replyMs));
+      eq(ob.turns[0].kernelMs, undefined, "the kernel was not asked");
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  await asyncTest("B-187 L4: the kernel's time box ends a turn whose proposal diverges, refused as `timeout`, up to the attempt limit", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l4-"));
+    try {
+      const file = path.join(dir, "fulfil.alg");
+      fs.writeFileSync(file, L1_OPEN_PLAN);
+      const scripted = createScriptedClient({ byObligation: new Map([[GAP, [RUSH_ENTRY, HASTE_ENTRY]]]), unnamed: [] });
+      const asked: string[] = [];
+      const client: LlmClient = {
+        modelId: scripted.modelId, answers: scripted.answers,
+        async send(args) { asked.push(args.userMessage); return scripted.send(args); },
+      };
+      const result = await runLlmWorker({ filename: file, maxAttempts: 2, client, extensions: [typeExt], turnTimeoutMs: 2000 });
+      eq(result.allDischarged, false);
+      eq(result.summary.pending, 1);
+      const ob = result.perObligation[0];
+      eq(ob.name, GAP);
+      eq(ob.attempts, 2, "each diverging turn is one attempt; the loop ends at the limit");
+      const refusal = "refused (timeout): the kernel did not finish within 2 s: the proposal may make the plan's search or a proof diverge";
+      eq(kernelTimeoutReason(2000), refusal);
+      eq(JSON.stringify(ob.history[0]), JSON.stringify({ proofTerm: RUSH_ENTRY, verified: false, reason: refusal, refusal: "timeout" }));
+      eq(JSON.stringify(ob.history[1]), JSON.stringify({ proofTerm: HASTE_ENTRY, verified: false, reason: refusal, refusal: "timeout" }),
+         "a second thread, started after the first was terminated, ends the same way");
+      eq(asked[1].includes(`Last attempt's refusal:\n- ${refusal}\n\nAttempts so far: 1\n- 1: \`Rush\`, ${refusal}\n`), true, asked[1]);
+      eq(ob.turns.every(t => t.refusal === "timeout" && t.kernel === refusal && (t.kernelMs ?? 0) >= 2000), true,
+         JSON.stringify(ob.turns.map(t => [t.refusal, t.kernelMs])));
+      eq(result.sourceAfter, L1_OPEN_PLAN, "no diverging entry is kept");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await asyncTest("B-187 L4: the loop on L2's demo still converges in two attempts with the CLI's default time boxes on", async () => {
+    const scripted = createScriptedClient({ byObligation: new Map([[GAP, [FREIGHT.trimEnd(), SHIP.trimEnd()]]]), unnamed: [] });
+    const result = await runLlmWorker({
+      filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 5, client: scripted, extensions: [typeExt],
+      turnTimeoutMs: DEFAULT_TURN_TIMEOUT_MS, replyTimeoutMs: DEFAULT_REPLY_TIMEOUT_MS,
+    });
+    eq(DEFAULT_TURN_TIMEOUT_MS, 30_000);
+    eq(DEFAULT_REPLY_TIMEOUT_MS, 120_000);
+    eq(result.summary.discharged, 1);
+    const ob = result.perObligation[0];
+    eq(ob.attempts, 2);
+    eq(ob.history[0].reason, "refused (unsolved): no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min");
+    eq(ob.history[0].refusal, undefined, "a refusal of the kernel's own carries no loop refusal");
+    eq(ob.history[1].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+    eq(ob.authorship!.provers[0].attemptsUsed, 2);
+    eq(result.transcript.turnTimeoutMs, 30_000);
+    eq(result.transcript.obligations[0].turns.map(t => t.accepted).join(","), "false,true");
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1373,6 +1482,48 @@ test("B-187 L3: CLI `prove --proposals` runs the loop without a key: the budget 
     ].join("\n")), true, text.stdout);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- B-187 L4: the `prove` command's options and the transcript ---
+
+test("B-187 L4: parseProveArgs reads `--api-key` (B-175 item 6), the two time boxes and `--transcript`", () => {
+  const d = parseProveArgs(["prove", "f.alg"]);
+  eq(JSON.stringify(d), JSON.stringify({ maxAttempts: 5, asJson: false, turnTimeoutMs: 30_000, replyTimeoutMs: 120_000 }),
+     "the defaults: five attempts, a kernel box of 30 s, a reply box of 120 s");
+  const o = parseProveArgs(["prove", "f.alg", "--api-key", "KEY-FROM-THE-COMMAND-LINE", "--turn-timeout", "5000",
+                            "--reply-timeout", "0", "--transcript", "t.md", "--model", "m", "--max-attempts", "3", "--json"]);
+  if ("error" in o) throw new Error(o.error);
+  eq(o.apiKey, "KEY-FROM-THE-COMMAND-LINE", "the key on the command line is passed to the client");
+  eq(o.turnTimeoutMs, 5000);
+  eq(o.replyTimeoutMs, 0, "0 turns a box off");
+  eq(o.transcriptPath, "t.md");
+  eq(o.model, "m");
+  eq(o.maxAttempts, 3);
+  eq(o.asJson, true);
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--api-key"])), JSON.stringify({ error: "--api-key takes a value" }));
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--turn-timeout", "soon"])),
+     JSON.stringify({ error: "--turn-timeout takes milliseconds, a whole number (0: no time box)" }));
+  eq(transcriptJsonPath("demos/rung4/transcripts/x.md"), "demos/rung4/transcripts/x.json");
+  eq(formatSeconds(30_000), "30 s");
+  eq(formatSeconds(1500), "1.5 s");
+});
+
+test("B-187 L4: CLI `prove` refuses a malformed time box and names `--api-key` beside `ANTHROPIC_API_KEY` without a key", () => {
+  const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
+  fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
+  try {
+    const bad = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp, "--turn-timeout", "soon"],
+                          { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(bad.status, 1);
+    eq(bad.stderr.includes("allegro prove: --turn-timeout takes milliseconds"), true, bad.stderr);
+    const nokey = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp],
+                            { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(nokey.status, 1);
+    eq(nokey.stderr.includes("Set the environment variable or pass --api-key"), true,
+       "the flag the message offers is the flag `prove` parses");
+  } finally {
+    fs.unlinkSync(tmp);
   }
 });
 
