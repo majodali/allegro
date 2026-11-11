@@ -13,15 +13,15 @@ The order binds by dependency: every decision comes after the decisions it depen
 **Front matter**
 
 - **How this book is organized** (the preface, as merged). Holds the organization the book follows; it presents no decision.
-- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Programmable language platform: minimal core, extensions are the language (One engine for compiling and proving); One operation: partial evaluation (One engine for compiling and proving); Provable correctness and safety as one predicate machinery (One engine for compiling and proving); Claims are evaluated like everything else (One engine for compiling and proving); Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
+- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (One engine for compiling and proving); One operation: partial evaluation (One engine for compiling and proving); Provable correctness and safety as one predicate machinery (One engine for compiling and proving); Claims are evaluated like everything else (One engine for compiling and proving); Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
 
 **Part I: The bet**
 
 1. **One engine for compiling and proving** (8 decisions). The defining bets: a platform of extensions over a minimal core, partial evaluation as the compiler, and proof by the same evaluation, with failures halting the build.
-   - Decisions: Programmable language platform: minimal core, extensions are the language; One operation: partial evaluation; Provable correctness and safety as one predicate machinery; Claims are evaluated like everything else; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
+   - Decisions: Everything above the kernel is an extension, and there is one way to extend; One operation: partial evaluation; Provable correctness and safety as one predicate machinery; Claims are evaluated like everything else; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
    - Draws on: [vision.md](../book/vision.md) §1, §1a, §2, §5, [concepts.md](../book/concepts.md) Part 0 R1, R2, [proving-in-allegro.md](../book/proving-in-allegro.md) When PE-as-discharge isn't enough.
 2. **A small base and the surfaces above it** (9 decisions). Why the base stays small and ignorant of its layers, how every language above it is a surface inheriting the whole kernel, and how the code is cut into units that match.
-   - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Language extensions are declarative; Allegretto is syntax-free; the parser lives above the base; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
+   - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Language extensions are declarative; The kernel holds no language; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
    - Draws on: [vision.md](../book/vision.md) §1 Substrate and surfaces, §1a, §5, [architecture-vocabulary.md](../book/architecture-vocabulary.md) layer, track, unit, [layers.md](../book/layers.md) §1, [units.md](../book/units.md) §1, §2, §4, §5, [concepts.md](../book/concepts.md) Part 0 R6, §23, [allegretto/README.md](../book/allegretto/README.md) the boundary, [extension/README.md](../book/extension/README.md) the L1 boundary, [demo-ladder.ir.md](../book/demo-ladder.ir.md) the ladder.
 3. **Claims a reader can trust** (6 decisions). How verification results show their strength, how claims are written in the program's own syntax and disclosed progressively, and how review works top-down.
    - Decisions: Every claim states its discharge strength; Formal claims written in the program's own syntax; Reviewability through a top-down semantic view; Progressive disclosure of formality; Analyzer silence over guessing; Surface syntax is provisional, reviewed against a corpus.
@@ -150,6 +150,9 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
 | Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; Errors as a viral metadata field | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
+| The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
+| The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
+| Installed hooks are opaque to partial evaluation | The layer installs; the base never imports | Installing a layer into the base | DR1, rulings of 2026-11-11 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -242,19 +245,24 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### One engine for compiling and proving
 
-#### Programmable language platform: minimal core, extensions are the language
-- Decides: Allegro is a minimal formal core (Allegretto) under a curated stack of extensions (Allegro Standard, then Vivace), and everything beyond the value kinds and their primitives, syntax and type system included, is an importable extension built with the same mechanisms user extensions use.
-- Status: settled
+#### Everything above the kernel is an extension, and there is one way to extend
+- Decides: an extension adds values, functions, syntax, metadata fields and the rules that govern them through one interface. That interface is the same for the standard language and for a library a user writes. An extension is written in Allegro and checked like any other program. The standard language is a set of extensions selected by configuration. Nothing in the kernel names it.
+- Status: partly built; ruled 2026-11-11 (DR1); to be fully built before release
 - Type: capability
 - Rationale kind: vision
 - Depends on: none
-- Significance: 5 — every layer and unit boundary follows from it
-- Label: foundational — the layer model, R6, the unit DAG and every install hook rest on it
-- Units: none
-- Options recorded: new constructs as compiler forks (rejected by the vision's wording); no other alternative recorded
-- Sources: docs/book/vision.md §1, §5 principle 1; docs/book/concepts.md R1, R6; docs/decisions.md D4; docs/book/allegretto/structures.md §1 (D27 "the layering proof")
-- Book home (fragments' proposal): the tour (proposed), then vision.md
-- Notes: three tier names are "locked" (vision §1). The substrate/surfaces vocabulary is a separate entry. Told in the tour.
+- Significance: 5 — the platform bet: a small kernel whose power is what extensions can add
+- Label: foundational — every surface, the standard language and every user library rest on it
+- Units: none of its own
+- Options recorded: two tiers, privileged host layers for the standard language and Allegro modules for users (what the code does today, adopted for want of an alternative; rejected, R38 (the purpose of the decision review) of book-pass.md); extensions containing host-language code behind an admitted tier (rejected: host code in the process can forge any analysis, so the label cannot be enforced)
+- Sources: docs/book/vision.md §1, §5; docs/book/concepts.md R1, R9; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Programmable language platform: minimal core, extensions are the language". "Allegretto" is the platform with no extension loaded; "Allegro Standard" is a named configuration; `--base` and the `typed` flag are not concepts of the language. One interface is about the interface, not the implementation language; with host code excluded from extensions (next decision but two), the two coincide. "Self-hosting and a package ecosystem" is re-read against this in its part.
+- Held finding (2026-11-11, DR1): the standard language's type system is host code holding writers, a trusted base larger than the kernel (`createTypeSystem`, `src/types-std.ts:4894`). Held on the decisions of Part IV that it realises.
+- Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "The layer installs; the base never imports" and its neighbours.
+- Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "One evalSource pipeline for programs and libraries" and "Precompile before the evaluation loop".
+- Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
+- Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "Minimal base surface of about forty primitives".
+- Held finding (2026-11-11, DR1): the platform with no extension loaded cannot load one: `use` is a parse error under `--base` (`src/index.ts:115`–`119`, `252`–`253`). Held on the CLI's decisions.
 - Chapter: One engine for compiling and proving
 
 #### One operation: partial evaluation
@@ -262,7 +270,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 5 — the defining technical bet; every check, compilation and optimisation is this operation
 - Label: foundational — residuals as values, the PE rules, discharge and every analysis rest on it
 - Units: evaluator
@@ -401,7 +409,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 4 — frames what every DSL, pilot and rung is
 - Label: foundational — Vivace's "no new machinery", the rung-2 seriousness proof and the library grammar surface rest on it
 - Units: none
@@ -416,7 +424,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what the base language offers
 - Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 4 — the criterion behind SC-1, SC-2, SC-5
 - Label: foundational — every specification choice cites it
 - Units: none
@@ -430,7 +438,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability — it fixes what Allegretto, the language `--base` runs, may contain
 - Rationale kind: technical
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 4 — the rule every L0 file is measured against
 - Label: foundational — install hooks, field ownership and the unit DAG enforce it
 - Units: all L0 units
@@ -445,7 +453,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled in principle (maintainer, 2026-11-05); partly built (the shipped parser uses ordered choice)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 4 — every extension, and every author of one, depends on it
 - Label: foundational — the parser algorithm, ambiguity detection and module loading rest on it
 - Units: grammar-formalism, base-grammar, modules (to be checked)
@@ -454,19 +462,47 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: A small base and the surfaces above it
 - Notes: added by ruling; its type (capability) and its dependants are checked in the next chunk.
 
-#### Allegretto is syntax-free; the parser lives above the base
-- Decides: Allegretto (L0) is a specification with no concrete syntax; the standard parser and all concrete syntax belong to the extension substrate (L1) and may later be re-hosted on Vivace's parser generator.
-- Status: settled
-- Type: capability — a user can replace the syntax, because none is in the base
-- Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language; Simplicity criterion for the base; The base does not know about the layers
-- Significance: 4 — every surface form, including Allegro Standard's own syntax, is an extension
-- Label: foundational — grammar extension, module loading and all L2 surface forms rest on it
-- Units: none (boundary between L0 and L1); grammar-formalism, base-grammar, grammar-extension
-- Options recorded: a parser inside L0 (rejected: L0's definition is syntax-free; the bootstrap parser is external to L0)
-- Sources: docs/decisions.md "Layer rulings 1–4"; docs/book/allegretto/README.md "Explicitly NOT in this layer"; docs/book/layers.md §1 (not read); Layer ruling 1 (docs/decisions.md "Standing rulings"); docs/book/layers.md §1 rulings; docs/book/extension/README.md "Provides"
-- Book home (fragments' proposal): concepts.md Part 0 (beside R9), or allegretto/README.md / extension/README (proposed chapter "The extension substrate")
-- Notes: Merged from fragment A ("Allegretto is a syntax-free specification"), fragment B ("Concrete syntax is an extension, the parser lives above the base"). B: the ruling allows the parser to exist "prior to a formal extension substrate"; that is the shipped state for the base grammar.
+#### The kernel holds no language
+- Decides: the kernel is values, pure primitives, the evaluator, metadata with its capabilities, and the extension interface. It has no syntax. Every concrete syntax, the first grammar included, is an extension.
+- Status: settled; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Simplicity criterion for the base; The base does not know about the layers
+- Significance: 4 — every surface form, the standard language's own syntax included, is an extension
+- Label: foundational — grammar extension, module loading and every surface form rest on it
+- Units: none (the boundary between the kernel and the first extension)
+- Options recorded: some syntax as part of the bootstrap (rejected: no language in the kernel)
+- Sources: docs/decisions.md "Standing rulings" (layer rulings 1 to 4); docs/book/allegretto/README.md; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Allegretto is syntax-free; the parser lives above the base"; the clause on re-hosting the parser on Vivace's generator is dropped, since it names no decision.
+- Chapter: A small base and the surfaces above it
+
+#### Host code reaches a program only as a capability
+- Decides: code in the host's language cannot be checked by the kernel, so it enters in one place: as a capability that the environment supplies to a phase. An extension may declare a capability; a configuration supplies it. A capability takes data and returns data. It cannot write metadata, so it cannot forge a type, a proof or the result of any analysis. A claim about what a capability returns is either checked when the data arrives or reported as assumed.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Phases are configuration; Claims are evaluated like everything else
+- Significance: 4 — fixes the trusted base: the kernel and the capabilities a configuration supplies, nothing else
+- Label: foundational — every host, every I/O surface and every foreign routine rest on it
+- Units: to be placed in Part VI (hosts)
+- Options recorded: a foreign-function interface inside extensions (rejected with the admitted-tier option above); the maintainer's note: this is a second mechanism beside extensions, with a cleaner distinction than before, and no alternative is seen
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/platform/host.ir.md (environment capabilities)
+- Notes: new, by ruling. A database driver, a file system and a fast numeric routine are one construct; the last is a capability with no effect. Data from outside arrives with no claims and earns them by being checked.
+- Chapter: A small base and the surfaces above it
+
+#### No interface limits optimization
+- Decides: partial evaluation sees through every extension. An expression that crosses from a program into an extension, or from one extension into another, is evaluated as one expression, so the extension interface costs nothing a program can measure. Optimizations that partial evaluation does not find are functions over a program's expression, open to every extension. The one opaque point is the body of a capability.
+- Status: open; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: One operation: partial evaluation; Everything above the kernel is an extension, and there is one way to extend; Host code reaches a program only as a capability
+- Significance: 5 — performance is how the partial-evaluation approach is demonstrated
+- Label: foundational — the form of every install, hook and module boundary rests on it
+- Units: evaluator, modules (to be checked in their parts)
+- Options recorded: an extension interface of opaque calls (rejected: it would bound optimization and likely give unacceptable performance)
+- Sources: the maintainer's ruling of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken): "PE must operate effectively on expressions that cross the extension interface … My goal for Allegro is to have no limits on optimization, although that might not come 100% from PE"
+- Notes: new, by ruling. Whether a capability's declared laws may license rewrites around its opaque body is read with "Laws licence rewrites" in Part VI.
+- Held finding (2026-11-11, DR1): the installed hooks are host closures the evaluator calls, opaque to partial evaluation. Held with the install-operations finding above.
 - Chapter: A small base and the surfaces above it
 
 #### Units in a narrow DAG
@@ -474,7 +510,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: implementation — code organisation
 - Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 4 — makes each decision findable and forkable
 - Label: foundational — the book's "as implemented" and "explore" blocks rest on it
 - Units: all
@@ -626,7 +662,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Simplicity criterion for the base; Programmable language platform: minimal core, extensions are the language
+- Depends on: Simplicity criterion for the base; Everything above the kernel is an extension, and there is one way to extend
 - Significance: 5 — lets extensions build and return any part of the language
 - Label: foundational — every kind, residual and type-as-value rests on it
 - Units: value
@@ -1727,7 +1763,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Allegretto is syntax-free; the parser lives above the base; One value universe
+- Depends on: The kernel holds no language; One value universe
 - Significance: 4 — runtime grammar extension, `use` activation and the analyzer all operate on grammar values
 - Label: foundational — fragment merging, base chains and `grammar2_*` primitives assume it
 - Units: grammar-formalism
@@ -1934,7 +1970,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Allegretto is syntax-free; the parser lives above the base; Scope is the evaluation environment, not data
+- Depends on: The kernel holds no language; Scope is the evaluation environment, not data
 - Significance: 4 — the standard library, grammars and the type system all arrive as extensions
 - Label: foundational — loading, typed module objects and grammar harvesting
 - Units: module-loading
@@ -1993,7 +2029,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Programmable language platform: minimal core, extensions are the language; Extensions are the module substrate
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Extensions are the module substrate
 - Significance: 3 — the gate between a file and every DSL it speaks
 - Label: foundational — the CLI, the module loader, the sandbox, the pipeline's input contract and every library DSL depend on the split
 - Units: module-loading, cli, grammar-extension
@@ -2566,7 +2602,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Programmable language platform: minimal core, extensions are the language
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
 - Significance: 2 — which language a user meets
 - Label: swappable — a host default
 - Units: cli
@@ -2671,7 +2707,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — where tactics live is what a prover imports
 - Rationale kind: vision
-- Depends on: Theorems as statements, proved `by` a term; Programmable language platform: minimal core, extensions are the language
+- Depends on: Theorems as statements, proved `by` a term; Everything above the kernel is an extension, and there is one way to extend
 - Significance: 2 — shows proof strategy as user-extensible
 - Label: swappable — a library
 - Units: not yet a unit (`lib/tactics.alg`)
@@ -4066,7 +4102,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability — the package ecosystem is user-facing; self-hosting is its implementation half
 - Rationale kind: vision
-- Depends on: Code generation from the expression graph, JavaScript first; Programmable language platform: minimal core, extensions are the language
+- Depends on: Code generation from the expression graph, JavaScript first; Everything above the kernel is an extension, and there is one way to extend
 - Significance: 2 — long-range direction
 - Label: foundational — re-hosting the parser would cascade through L1
 - Units: not yet a unit

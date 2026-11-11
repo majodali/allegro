@@ -928,4 +928,27 @@ R-DR1-25. No ordering rule (claims before effects) is adopted. The term
 *capability* is kept for the sense of decision 2; its relation to the
 capability to write a metadata field is explored in Part II.
 
+**R-DR1-3 and R-DR1-18, ruled 2026-11-11.** Not as recommended above.
+Four decisions, recorded in the inventory:
+
+1. "Everything above the kernel is an extension, and there is one way
+   to extend" (replaces R-DR1-3's entry). One interface for the standard
+   language and a user's library; extensions are written in Allegro;
+   the standard language is a configuration; `--base` and the `typed`
+   flag are not concepts. To be fully built before release; no interim
+   stage with host code inside extensions.
+2. "The kernel holds no language" (restates R-DR1-18). The first grammar
+   is an extension.
+3. "Host code reaches a program only as a capability" (new). Data in,
+   data out, no metadata writes. The maintainer notes it is a second
+   mechanism beside extensions, cleaner than before, with no
+   alternative seen.
+4. "No interface limits optimization" (new). Partial evaluation works
+   across the extension interface; optimization may not come wholly
+   from partial evaluation. Performance is not recorded as a risk: it
+   is how the approach is demonstrated.
+
+Agreed for R-DR1-25, when it is ruled: only a field's owner writes it,
+and a verdict shows which extensions a result rests on.
+
 Still to rule: every other ask.
