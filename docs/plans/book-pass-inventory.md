@@ -13,12 +13,12 @@ The order binds by dependency: every decision comes after the decisions it depen
 **Front matter**
 
 - **How this book is organized** (the preface, as merged). Holds the organization the book follows; it presents no decision.
-- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Programmable language platform: minimal core, extensions are the language (One engine for compiling and proving); Partial evaluation as the compilation model (One engine for compiling and proving); Provable correctness and safety as one predicate machinery (One engine for compiling and proving); Compile-time first: failures halt the build (One engine for compiling and proving); Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
+- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Programmable language platform: minimal core, extensions are the language (One engine for compiling and proving); One operation: partial evaluation (One engine for compiling and proving); Provable correctness and safety as one predicate machinery (One engine for compiling and proving); Claims are evaluated like everything else (One engine for compiling and proving); Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT (One engine for compiling and proving); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
 
 **Part I: The bet**
 
 1. **One engine for compiling and proving** (8 decisions). The defining bets: a platform of extensions over a minimal core, partial evaluation as the compiler, and proof by the same evaluation, with failures halting the build.
-   - Decisions: Programmable language platform: minimal core, extensions are the language; Partial evaluation as the compilation model; Provable correctness and safety as one predicate machinery; Compile-time first: failures halt the build; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
+   - Decisions: Programmable language platform: minimal core, extensions are the language; One operation: partial evaluation; Provable correctness and safety as one predicate machinery; Claims are evaluated like everything else; Participant-neutral prover protocol with the kernel as trust boundary; Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT; SMT as a selective fallback; Proofs exportable to external checkers.
    - Draws on: [vision.md](../book/vision.md) §1, §1a, §2, §5, [concepts.md](../book/concepts.md) Part 0 R1, R2, [proving-in-allegro.md](../book/proving-in-allegro.md) When PE-as-discharge isn't enough.
 2. **A small base and the surfaces above it** (9 decisions). Why the base stays small and ignorant of its layers, how every language above it is a surface inheriting the whole kernel, and how the code is cut into units that match.
    - Decisions: Substrate and surfaces: a DSL inherits the whole kernel; Simplicity criterion for the base; The base does not know about the layers; Language extensions are declarative; Allegretto is syntax-free; the parser lives above the base; Units in a narrow DAG; The three moves as the test of a new capability; The demo ladder as the thesis test; Unit granularity rule.
@@ -144,6 +144,12 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | `channel_register` accepts any rule string | Fixed propagation vocabulary | Metadata and the capability to write it | the pilot's review, §7 item 2 |
 | A user-registered viral field stops computation | How the base applies propagation | How metadata propagates | the pilot's review, §7 item 3 |
 | The ownership test never checks owners | Each layer registers its own fields | How metadata propagates | the pilot's review, §7 item 4 |
+| Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; Exhaustiveness checking at info severity | Termination and completion | DR1, rulings of 2026-11-11 |
+| `print` is a base primitive | Minimal base surface of about forty primitives; Environment capabilities outside the base, effect-labelled | Values and their seven kinds; Hosts | DR1, rulings of 2026-11-11 |
+| Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
+| A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
+| A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; Errors as a viral metadata field | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -183,9 +189,9 @@ They came together over years of exploration into most of what Allegro is today.
 | 1. Power from a small kernel | Programmable language platform; One value universe; Metadata on every value |
 | 2. Semantic model precedes syntax | Programmable language platform (the parser above a syntax-free base); Types are values |
 | 3. Model-driven engineering | Programmable language platform (a DSL inherits the whole kernel); Types are values; Refinement types |
-| 4. Declarative paradigms, for anyone | Programmable language platform; Partial evaluation as the compilation model (extensions cost nothing at run time); the new decision that extensions are declarative |
+| 4. Declarative paradigms, for anyone | Programmable language platform; One operation: partial evaluation (extensions cost nothing at run time); the new decision that extensions are declarative |
 | 5. Reflection without the fire | One value universe (code is data); Metadata on every value; One predicate machinery for correctness and safety |
-| 6. Formal and agile | Evaluation total over unresolved information; Refinement types; Compile-time first: failures halt the build; the three-leg proof strategy |
+| 6. Formal and agile | Evaluation total over unresolved information; Refinement types; Claims are evaluated like everything else; the three-leg proof strategy |
 | The AI revolution | Participant-neutral proving with recorded authorship; Every claim states its discharge strength; One predicate machinery: code written by anyone, checked the same way |
 
 ## Today's chapters, mapped
@@ -251,19 +257,35 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: three tier names are "locked" (vision §1). The substrate/surfaces vocabulary is a separate entry. Told in the tour.
 - Chapter: One engine for compiling and proving
 
-#### Partial evaluation as the compilation model
-- Decides: each build phase is a partial-evaluation step in which more symbols are bound, and type checking, effect inference, totality and proof discharge are all evaluation over partially resolved programs on one engine, never a parallel analyser.
-- Status: settled
-- Type: capability — the language exposes it: residuals are values, and every check is an evaluation a user can read
+#### One operation: partial evaluation
+- Decides: Allegro does one thing with a program: it evaluates whatever the available information determines and leaves the rest as a smaller program, the residual. Checking a type, proving a claim, compiling, optimizing and running are all this one operation, given more or less information. An analysis of a program is itself a function, evaluated over the program's expression, which every value carries as metadata.
+- Status: settled; ruled 2026-11-11 (DR1)
+- Type: capability
 - Rationale kind: mixed
 - Depends on: Programmable language platform: minimal core, extensions are the language
-- Significance: 5 — the defining technical bet; every L2 analysis is evaluation
-- Label: foundational — residuals as values, PE rules, discharge, precompile all rest on it
+- Significance: 5 — the defining technical bet; every check, compilation and optimisation is this operation
+- Label: foundational — residuals as values, the PE rules, discharge and every analysis rest on it
 - Units: evaluator
-- Options recorded: separate checking passes over a separate IR (rejected in R2's definition and SC-3's alternative)
-- Sources: docs/book/vision.md §1, §1a move 1, §5 principle 2; docs/book/concepts.md R2, §25; docs/book/units.md §4.1 row 13
-- Book home (fragments' proposal): the tour (proposed), then concepts.md Part 0 (R2)
-- Notes: concepts.md files R2 as a requirement (no alternatives) while the vision states it as a choice; the alternatives test of concepts.md §0 would make the "one engine" half a specification. Told in the tour.
+- Options recorded: separate checking passes over a separate IR (rejected); analyses as privileged host passes (what the code does today for termination and exhaustiveness, held below)
+- Sources: docs/book/vision.md §1, §1a move 1, §5 principle 2; docs/book/concepts.md R2, §25; docs/book/units.md §4.1 row 13; the maintainer's rulings of 2026-11-11 in the review session (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Partial evaluation as the compilation model". The maintainer, 2026-11-11: an analysis over the source expression carried as metadata "doesn't feel like cheating when we give it to everyone to use"; optimisation, expression transformation and source-aware functions use the same expression model.
+- Held finding (2026-11-11, DR1): termination and exhaustiveness are privileged host passes wired into the pipeline (`src/totality.ts:219`–`257`, `477`–`1140`), not ordinary functions over the expression that any extension could write. Held on "Termination by bounded decrease" and "Exhaustiveness checking at info severity".
+- Chapter: One engine for compiling and proving
+
+#### Phases are configuration
+- Decides: Allegro has no fixed compile time or run time. A phase is one evaluation, defined by the information and the capabilities available to it. An effect is a call on a capability, such as writing output. Where the capability is absent, the call cannot be evaluated and stays in the residual. Building, validating and executing a program are phases a project configures. A configuration may state what a phase must leave decided.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: mixed
+- Depends on: One operation: partial evaluation
+- Significance: 5 — removes compile time and run time as concepts of the language
+- Label: foundational — every effect, every host and the build pipeline rest on it
+- Units: pipeline, base-primitives (to be checked in their parts)
+- Options recorded: fixed compile-time and run-time phases built into the language (what the code does today, adopted for want of an alternative; rejected, R38 (the purpose of the decision review) of book-pass.md); `print` and other effects as base primitives (rejected: every primitive is pure)
+- Sources: the maintainer's rulings of 2026-11-11 (R38 and R39 (partial evaluation is primary) of book-pass.md; ../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/concepts.md §25 to §29; docs/book/platform/host.ir.md (environment capabilities)
+- Notes: new, by ruling. A phase's diagnostics (refutations, verdicts, warnings) are its result, metadata rendered by the tool that ran the phase, and are never program output; program output is an effect through a capability, so the two are different streams even where a console shows both. "Capability" is kept for this sense; how it relates to the capability to write a metadata field is explored in Part II. Absorbs "Multi-phase build as successive partial evaluation" and "Project severity configuration" as its realisations; both to be re-read in their parts.
+- Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "Minimal base surface of about forty primitives" and "Environment capabilities outside the base, effect-labelled".
+- Held finding (2026-11-11, DR1): the precompile and compile-time phases are hard-coded in the pipeline. Held on "Multi-phase build as successive partial evaluation" and "Precompile before the evaluation loop".
 - Chapter: One engine for compiling and proving
 
 #### Provable correctness and safety as one predicate machinery
@@ -271,7 +293,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Partial evaluation as the compilation model
+- Depends on: One operation: partial evaluation
 - Significance: 5 — the thesis every L2 feature is checked against
 - Label: foundational — every L2 analysis and the metadata plane's design are judged by it
 - Units: none
@@ -281,19 +303,35 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: Merged from fragment A ("Provable correctness and safety as one predicate machinery"), fragment C ("Falsifiable design constraint: no parallel infrastructure"). C: likely also in fragment A's scope. Told in the tour.
 - Chapter: One engine for compiling and proving
 
-#### Compile-time first: failures halt the build
-- Decides: specifications are discharged during partial evaluation and the executable carries only residuals, runtime checks being the fallback; a failed proof, an undeclared effect (`div` included) or a failed refinement or type annotation halts compilation, in libraries as in user code, while two paths stay weaker: construction-path invariant failure yields an error value and non-exhaustive matching an info notice, promotion of either being a maintainer decision.
-- Status: settled
+#### Claims are evaluated like everything else
+- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase.
+- Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
-- Rationale kind: vision
-- Depends on: Partial evaluation as the compilation model
-- Significance: 5 — "build safety in": a failed proof never becomes a running program
-- Label: foundational — the halt invariants and CE-R8's two weaker paths are defined against it
-- Units: pipeline, totality, effects, proofs
-- Options recorded: none recorded at thesis level; CE-R8 records two consciously weaker paths; degrading to warnings or error values (rejected by "Build, don't derive")
-- Sources: docs/book/vision.md §2 "Build, don't derive", §5 principle 10; docs/decisions.md CE-R8; docs/book/vision.md §2 (Build, don't derive); CE-R1, CE-R8 (docs/decisions.md); docs/book/platform/build-pipeline.ir.md C64 to C80
-- Book home (fragments' proposal): the tour (proposed) / The evaluation pipeline / the tour
-- Notes: Merged from fragment A ("Compile-time first; failures halt the build"), fragment C ("Failures halt the build, with two weaker paths"). A: CE-R8 keeps construction-path invariant failure as an error value and non-exhaustive match as info; those belong to the L2 fragment. C: shared with the L2 fragment. Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting (C79); `inspect` can thus grade `has-errors` without a halt (tooling C96). Assembly: fragment C's dependencies on the pipeline and on effect declarations were dropped; the halt policy is a thesis-level bet that the pipeline and the effect contract implement. Told in the tour.
+- Rationale kind: mixed
+- Depends on: One operation: partial evaluation; Phases are configuration
+- Significance: 5 — partial evaluation applied to claims: discharged, refuted or residual
+- Label: foundational — every check, the verdict and every halt rest on it
+- Units: pipeline, totality, effects, proofs (to be checked in their parts)
+- Options recorded: halting as configuration (rejected: a refuted claim always halts its phase; what a configuration chooses is how much may stay undecided); halting at the first refutation only (rejected: a halted phase may go on evaluating independent expressions, without effects, to report every refutation); warnings as claims (no: warnings are informational metadata)
+- Sources: docs/book/vision.md §2 "Build, don't derive", §5 principle 10; docs/decisions.md CE-R1, CE-R8; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every claim states its discharge strength"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
+- Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
+- Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "One evalSource pipeline for programs and libraries".
+- Chapter: One engine for compiling and proving
+
+#### An effect consumes only values whose claims are decided
+- Decides: an effect is performed only on values that have passed every claim made about them. A value carrying a refuted claim never reaches an effect. A value carrying an undecided claim has that claim evaluated first. After a phase has refuted a claim, it performs no further effect, though it may go on evaluating to report every refutation.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Claims are evaluated like everything else; Phases are configuration
+- Significance: 4 — the one rule joining claims and effects; it replaces any ordering of checks before effects
+- Label: foundational — every capability call rests on it
+- Units: evaluator, base-primitives (to be checked in their parts)
+- Options recorded: a rule that a phase decides every decidable claim before any effect (rejected: the dependency rule and the default configuration, validating in a phase with no output capability before executing, do the work); gating `print` alone (rejected: the rule holds for every effect)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: a failed claim might not apply to an effect, though no example is known; the rule stands until a valid counter-example is found. A single phase with both the information and an output capability (a script run, the REPL) may perform an effect before it reaches a later false claim.
+- Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
 - Chapter: One engine for compiling and proving
 
 #### Participant-neutral prover protocol with the kernel as trust boundary
@@ -316,7 +354,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Partial evaluation as the compilation model; Participant-neutral prover protocol with the kernel as trust boundary
+- Depends on: One operation: partial evaluation; Participant-neutral prover protocol with the kernel as trust boundary
 - Significance: 5 — sets the discharge mechanism the evaluator was designed for
 - Label: foundational — the proof kernel and the evaluator's role as checker rest on leg 1
 - Units: evaluator; proofs?; pcp?
@@ -709,7 +747,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — a partially evaluated program is a value a user can hold
 - Rationale kind: technical
-- Depends on: One value universe; Partial evaluation as the compilation model
+- Depends on: One value universe; One operation: partial evaluation
 - Significance: 4 — residuals flow through the same machinery as results
 - Label: foundational — residuals, source metadata and PE rules rest on it
 - Units: expression
@@ -947,7 +985,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model; The base does not know about the layers
+- Depends on: One operation: partial evaluation; The base does not know about the layers
 - Significance: 4 — without it every layer threads its information by hand
 - Label: foundational — every L2 channel rides on it
 - Units: metadata
@@ -1525,7 +1563,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model; Expressions are values, forming a DAG
+- Depends on: One operation: partial evaluation; Expressions are values, forming a DAG
 - Significance: 5 — without it compile and run would separate again
 - Label: foundational — residuals, futures and staged discharge rest on it
 - Units: evaluator
@@ -1938,7 +1976,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### One evalSource pipeline for programs and libraries
 - Decides: every program, REPL entry, subcommand and library load passes through the same `evalSource` pipeline, so every compile-time check fires inside libraries exactly as in user code.
 - Status: settled
-- Type: implementation — it realises the clause of "Compile-time first: failures halt the build" that libraries are checked as user code
+- Type: implementation — it realises the clause of "Claims are evaluated like everything else" that libraries are checked as user code
 - Rationale kind: mixed
 - Depends on: Extensions are the module substrate; Build pipeline as a track, not a layer
 - Significance: 4 — makes library assurance the same assurance as user code
@@ -2058,7 +2096,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Partial evaluation as the compilation model; Metadata is a field on every value; One value universe
+- Depends on: One operation: partial evaluation; Metadata is a field on every value; One value universe
 - Significance: 5 — the type system is an extension and PE-as-discharge applies to it
 - Label: foundational — kinds, refinements, effects as values and every check depend on it
 - Units: type-core
@@ -2232,7 +2270,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what a compile-time check can prove
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model
+- Depends on: One operation: partial evaluation
 - Significance: 4 — the cheap form of discharge over residuals
 - Label: swappable — a domain set can be extended behind `impliesDomain`
 - Units: refinements
@@ -2483,7 +2521,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Compile-time first: failures halt the build
+- Depends on: Claims are evaluated like everything else
 - Significance: 2 — spelling of the typing surface
 - Label: swappable — spelling over `typed_function` and `type_check`
 - Units: tree-builder, type-core, type-primitives
@@ -2574,7 +2612,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Partial evaluation as the compilation model; Writes gated by a capability, reads free; Kinds are types, and Type is its own type
+- Depends on: One operation: partial evaluation; Writes gated by a capability, reads free; Kinds are types, and Type is its own type
 - Significance: 4 — the provability thesis in the language
 - Label: foundational — laws, PCP, `proven`, verdict
 - Units: proofs; proofs, evaluator
@@ -2754,7 +2792,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Effects are values in one lattice; Partial evaluation as the compilation model
+- Depends on: Effects are values in one lattice; One operation: partial evaluation
 - Significance: 4 — the falsifiable "one engine" claim applied to effects
 - Label: foundational — totality, purity gates and the halt rule
 - Units: effects, pipeline
@@ -2870,7 +2908,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Shape and knowledge are separate; Partial evaluation as the compilation model
+- Depends on: Shape and knowledge are separate; One operation: partial evaluation
 - Significance: 4 — compile-time and runtime checking are one mechanism
 - Label: foundational — contract discharge, branch refinement and mechanism choice
 - Units: contracts, refinements
@@ -3295,7 +3333,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability
 - Rationale kind: vision
-- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Vivace adds a discipline, not machinery; Compile-time first: failures halt the build
+- Depends on: Substrate and surfaces: a DSL inherits the whole kernel; Vivace adds a discipline, not machinery; Claims are evaluated like everything else
 - Significance: 3 — the hypothesis rung 3 tests
 - Label: foundational — the pilots and B-080's roster are its tests
 - Units: not yet a unit
@@ -3401,7 +3439,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Compile-time first: failures halt the build; Statement forms that declare a binding
+- Depends on: Claims are evaluated like everything else; Statement forms that declare a binding
 - Significance: 3 — makes "a plan that does not check does not build" literal
 - Label: swappable — the library picks which path a site uses
 - Units: not yet a unit
@@ -3622,7 +3660,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — the mechanism by which a function's body is checked before it runs
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model; Types are values that constrain values
+- Depends on: One operation: partial evaluation; Types are values that constrain values
 - Significance: 4 — where type and effect inference happen
 - Label: foundational — the divergence stamp, the effects declaration check and the inferred list depend on its output
 - Units: pipeline, evaluator
@@ -3695,7 +3733,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — a rule of the precompile mechanism
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model; Precompile before the evaluation loop
+- Depends on: One operation: partial evaluation; Precompile before the evaluation loop
 - Significance: 2 — compile time runs no effect
 - Label: swappable — inside the evaluator
 - Units: evaluator
@@ -3710,7 +3748,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — it decides what the verdict tools can report
 - Rationale kind: technical
-- Depends on: Compile-time first: failures halt the build
+- Depends on: Claims are evaluated like everything else
 - Significance: 2 — lets tooling report instead of stopping
 - Label: swappable — a flag on one stage
 - Units: pipeline, cli
@@ -3984,7 +4022,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability
 - Rationale kind: vision
-- Depends on: Partial evaluation as the compilation model; Incompleteness lives in write-once future cells
+- Depends on: One operation: partial evaluation; Incompleteness lives in write-once future cells
 - Significance: 3 — the T-build milestone M6 and the "config is a compile-time theorem" claim
 - Label: foundational — would define how every later binding stage is reached
 - Units: not yet a unit (only `applyPhase` exists, driven by futures alone)
@@ -3999,7 +4037,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability — it decides what a program compiles to
 - Rationale kind: technical
-- Depends on: Partial evaluation as the compilation model; Multi-phase build as successive partial evaluation
+- Depends on: One operation: partial evaluation; Multi-phase build as successive partial evaluation
 - Significance: 3 — milestone M8; a prerequisite of self-hosting
 - Label: foundational — T-bootstrap depends on it
 - Units: not yet a unit
@@ -4059,7 +4097,7 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | 12 | Post-passes registered by layers | The evalSource stage order | (b) Retyped implementation. | It decides where the code registers its post-passes; no program's meaning changes. |
 | 13 | Post-passes registered by layers | Plane interfaces are sanctioned and policed | (b) The same retyping. | As above. |
 | 14 | Inspect reports only what the pipeline computed | The evalSource stage order | (a) Removed; "Types are values that constrain values" remains. | Inspect promises to add no analysis of its own; which stage computes each fact is the pipeline's arrangement. |
-| 15 | One command-line entry with subcommands | One evalSource pipeline for programs and libraries | (a) Removed; the entry now depends on nothing. | The command-line surface holds whatever runs behind it; what every run checks is "Compile-time first: failures halt the build". |
+| 15 | One command-line entry with subcommands | One evalSource pipeline for programs and libraries | (a) Removed; the entry now depends on nothing. | The command-line surface holds whatever runs behind it; what every run checks is "Claims are evaluated like everything else". |
 | 16 | File runner as one evaluation with futures drained | Callers pre-scan and strip the `use` header | (a) Now depends on "`use` header for language extension, `import` for module values". | The runner honours the header; the pre-scan is how a caller does it. |
 | 17 | REPL as successive evaluations over a persistent scope | One evalSource pipeline for programs and libraries | (a) Now depends on "Scope is the evaluation environment, not data". | An entry sees the earlier entries by scope layering; the shared pipeline is how it runs. |
 | 18 | Execution tracing and step-through debugging | The evalSource stage order | (a) Now depends on "Expressions are values, forming a DAG". | Tracing and graph inspection show evaluation and the expression graph, not the stage list. |
@@ -4071,7 +4109,7 @@ Three typings go against a source or need the maintainer's eye:
 
 - "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata channels are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata channels are independent" instead.
 - "Scope leaves the value universe" is typed implementation, although it supersedes a specification choice. Its own options line says no scope reaches user code as a value, so leaving `Value` changes the representation only.
-- "Partial evaluation as the compilation model" is typed capability. The language exposes it: residuals are values, and every check is an evaluation a user can read.
+- "One operation: partial evaluation" is typed capability. The language exposes it: residuals are values, and every check is an evaluation a user can read.
 
 **Mutual capability dependencies.** One pair was merged:
 
@@ -4128,7 +4166,7 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every claim states its discharge strength". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
 6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every claim states its discharge strength".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".
-8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Compile-time first: failures halt the build".
+8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Claims are evaluated like everything else".
 9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "Minimal base surface of about forty primitives".
 10. **Stale statements inside one chapter.** `docs/book/standard/type-system.md` §3 still lists `extends` after inheritance was dissolved, and §4 calls the retirement of prefixed slots unimplemented while recording completed chunks; `docs/book/standard/core-types.md` says ten core types and lists eleven; `docs/book/implementation-map.md` puts `src/introspect.ts` in L2 while `scripts/analyze/units.json` puts it on the track layer; `docs/book/concepts.md` R6's delta (27 imports) disagrees with its §23 (7 imports); several register entries name retired files or the retired carrier (detail in the Notes of the entries concerned).
 

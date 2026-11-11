@@ -887,4 +887,45 @@ the planning-loop stream's boundary.
 
 ## Rulings taken
 
-(Placeholder: the maintainer's rulings on R-DR1-1 to R-DR1-38.)
+The maintainer rules this review item by item, in the review session,
+with the review session's own reading of it (2026-11-11) beside the
+asks above. Rulings are recorded here as they are taken; the ruled
+decisions are in `docs/plans/book-pass-inventory.md`.
+
+**The purpose, 2026-11-11** (R38 (the purpose of the decision review) of
+`docs/plans/book-pass.md`). The review restores Allegro's original
+goals where implementation choices blurred them; it never restates a
+goal to fit the code. "Compile time" is not a concept of the language.
+
+**R-DR1-4, R-DR1-6, R-DR1-7 and R-DR1-26, ruled 2026-11-11.** Not as
+recommended above. They become four decisions of chapter 1, in the
+maintainer's and the review session's wording, recorded in the
+inventory:
+
+1. "One operation: partial evaluation" (replaces R-DR1-4's entry).
+   Compilation as partial evaluation stays in Part I. An analysis is a
+   function evaluated over the program's expression, carried as
+   metadata; given to everyone, that is not a privileged pass. So
+   termination and exhaustiveness are held findings as host passes, not
+   as "not evaluation".
+2. "Phases are configuration" (new). No fixed compile time or run time.
+   Every primitive is pure; an effect is a call on a capability a
+   phase's environment supplies, and stays in the residual where the
+   capability is absent. `print` leaves the primitives. Diagnostics are
+   a phase's result, never program output: two streams.
+3. "Claims are evaluated like everything else" (replaces R-DR1-6's
+   entry; merges R-DR1-26). Discharged, refuted or residual. Halting on
+   a refuted claim is not configurable; a halted phase may go on
+   evaluating independent expressions to report every refutation; a
+   configuration may state what a phase must leave decided; warnings
+   are informational metadata.
+4. "An effect consumes only values whose claims are decided" (new).
+   The rule holds for every effect, until a valid counter-example is
+   found. After a refutation a phase performs no further effect.
+
+R-DR1-7 is not a decision of its own: "never silently weakened" goes to
+R-DR1-25. No ordering rule (claims before effects) is adopted. The term
+*capability* is kept for the sense of decision 2; its relation to the
+capability to write a metadata field is explored in Part II.
+
+Still to rule: every other ask.
