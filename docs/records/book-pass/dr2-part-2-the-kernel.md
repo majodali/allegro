@@ -97,4 +97,29 @@ extension at a fixed point of its own. Chapter 10 is rebuilt on that.
 The decisions "Carrying needs a handle; deciding needs a hook" and
 "Knowledge propagation inside the evaluator" dissolve.
 
+**Four kernel decisions, ruled 2026-11-11**, written into the inventory:
+
+1. "An extension is made of functions and metadata fields." The ruling
+   on ask 1, reworded: the maintainer pointed out that "no hooks" means
+   something only against history, since the book never introduces
+   hooks. What the decision settles is the closed set of building
+   blocks.
+2. "A field's rule is a pure, bounded function." The maintainer: such
+   rules are "pure, self-contained and tightly timebound", not
+   callbacks that take part in the evaluator's own work; whether to
+   allow more general callbacks was the question ("a vampire is at the
+   door asking to come in"). Ruled: no. A rule sees only field values,
+   performs no effect and always finishes; for now it may not recurse.
+   This settles ask 8: a rule is a function its owner supplies.
+3. "Only the kernel records the outcome of a claim." No alternative
+   was seen: a claim function in an extension only moves the trusted
+   operation there.
+4. "Authority is an unforgeable value." It settles ask 2 and covers
+   field writers, supplied capabilities and private access.
+
+Also agreed: privacy by possession of an unforgeable key stays open,
+as the working answer, to be analysed with "Who can see a member";
+knowledge inside a branch needs nothing beyond pure, bounded functions
+and the kernel's ordinary rebinding of names.
+
 (Further rulings are recorded as they are taken.)

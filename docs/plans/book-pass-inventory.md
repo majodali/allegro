@@ -37,7 +37,7 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; The composite is one sequence of optionally-keyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
    - Draws on: [concepts.md](../book/concepts.md) T0 §9, §12 to §14, [allegretto/structures.md](../book/allegretto/structures.md) §1, §2.
 7. **Metadata and the capability to write it** *(recommended pilot)* (13 decisions). Every value carries independent metadata fields, and only the holder of a field's writer may originate it.
-   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled; Fixed propagation vocabulary; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Capability denial is an abort, not an error value.
+   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Authority is an unforgeable value; A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Capability denial is an abort, not an error value.
    - Draws on: [units.md](../book/units.md) §3.1, [concepts.md](../book/concepts.md) T2 §19, §19b, §21, [allegretto/structures.md](../book/allegretto/structures.md) §3, Appendix C, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §1 to §4, §6, §9.
 8. **How metadata propagates** (7 decisions). The fixed vocabulary by which fields travel through evaluation, errors as a viral field, the source field, and which layer registers what.
    - Decisions: Primitives receive full values; How the base applies propagation; Errors as a viral metadata field; The source field: an expression as metadata; Each layer registers its own fields; Field versus channel, and channel registration; Subsumption of legacy primitives into channel operations.
@@ -46,10 +46,10 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: Four planes and the placement rule; Plane interfaces are sanctioned and policed; Engine meta slots retired into registered members; The data plane has no accessor; Where the host plane is declared.
    - Draws on: [architecture-vocabulary.md](../book/architecture-vocabulary.md) plane, [concepts.md](../book/concepts.md) T1 §11, §18, §22, [allegretto/structures.md](../book/allegretto/structures.md) Appendix A, [standard/type-system.md](../book/standard/type-system.md) §4.
 10. **Installing a layer into the base** (10 decisions). How a layer gives the base meaning through gated installs and hooks without the base importing it, and the crossings still open.
-   - Decisions: The layer installs; the base never imports; Installs are gated by the field's writer; One check hook per field, called with a free reader; Member dispatch and call-site unification through the dispatch hook; Carrying needs a handle; deciding needs a hook; Knowledge propagation inside the evaluator; Layers reach the base only through metadata and capability; Computed projections installed, not stored; Analysis results cross upward through a gated install; Shared TypeScript types as representation leakage.
+   - Decisions: An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; Layers reach the base only through metadata and capability; An extension is made of functions and metadata fields; An extension is made of functions and metadata fields; Shared TypeScript types as representation leakage.
    - Draws on: [architecture-vocabulary.md](../book/architecture-vocabulary.md) plane interface, [concepts.md](../book/concepts.md) §23, §24, [allegretto/README.md](../book/allegretto/README.md) the install surface, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §7, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §7, §8.
 11. **Scopes** (4 decisions). The evaluation environment, kept outside the value universe and layered by parent chain, with its facts plane.
-   - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; Facts plane immutable-layered and opaque to the base.
+   - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; An extension is made of functions and metadata fields.
    - Draws on: [concepts.md](../book/concepts.md) §15, [allegretto/structures.md](../book/allegretto/structures.md) §4, Scope (planned).
 12. **Evaluation over unresolved information** (11 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
    - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Specified aborts; Evaluation depth bound.
@@ -139,7 +139,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Finding | Decision | Chapter | Source |
 |---|---|---|---|
 | A second viral field erases the first | Metadata channels are independent | Metadata and the capability to write it | the pilot's review, §7 item 1 |
-| `channel_register` accepts any rule string | Fixed propagation vocabulary | Metadata and the capability to write it | the pilot's review, §7 item 2 |
+| `channel_register` accepts any rule string | A field's rule is a pure, bounded function | Metadata and the capability to write it | the pilot's review, §7 item 2 |
 | A user-registered viral field stops computation | How the base applies propagation | How metadata propagates | the pilot's review, §7 item 3 |
 | The ownership test never checks owners | Each layer registers its own fields | How metadata propagates | the pilot's review, §7 item 4 |
 | Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; Exhaustiveness checking at info severity | Termination and completion | DR1, rulings of 2026-11-11 |
@@ -150,7 +150,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; Errors as a viral metadata field | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
-| Installed hooks are opaque to partial evaluation | The layer installs; the base never imports | Installing a layer into the base | DR1, rulings of 2026-11-11 |
+| Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Installing a layer into the base | DR1, rulings of 2026-11-11 |
 | The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
 | Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
 | Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; The verdict as accumulated metadata | Proofs as values; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
@@ -295,7 +295,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §1, §5; docs/book/concepts.md R1, R9; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Programmable language platform: minimal core, extensions are the language". "Allegretto" is the platform with no extension loaded; "Allegro Standard" is a named configuration; `--base` and the `typed` flag are not concepts of the language. One interface is about the interface, not the implementation language; with host code excluded from extensions (next decision but two), the two coincide. "Self-hosting and a package ecosystem" is re-read against this in its part.
 - Held finding (2026-11-11, DR1): the standard language's type system is host code holding writers, a trusted base larger than the kernel (`createTypeSystem`, `src/types-std.ts:4894`). Held on the decisions of Part IV that it realises.
-- Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "The layer installs; the base never imports" and its neighbours.
+- Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "An extension is made of functions and metadata fields" and its neighbours.
 - Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "One evalSource pipeline for programs and libraries" and "Precompile before the evaluation loop".
 - Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
 - Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "Minimal base surface of about forty primitives".
@@ -1000,43 +1000,37 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §3
 - Chapter: Metadata and the capability to write it
 
-#### Metadata origination is capability-controlled
-- Decides: a field carrying authority must be unforgeable by code without its writer; authority is a capability held, not a name.
-- Status: settled
+#### Authority is an unforgeable value
+- Decides: the right to do something that not all code may do is a function value that cannot be forged or guessed: writing a metadata field, reading a private member, performing an effect. Any code that holds the value can use it, pass it on, or wrap it in a narrower one. Nothing is granted by name, or by the identity of whoever asks.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata channels are independent
-- Significance: 4 — metadata that anyone can write cannot be evidence
-- Label: foundational — proofs, provenance and gated installs rest on it
-- Units: capability
-- Options recorded: trust carried by naming a channel (rejected: externalised registration would be a counterfeit vector)
-- Sources: docs/book/concepts.md R12; docs/book/allegretto/metadata-and-capability.md §1, §6
-- Book home (fragments' proposal): concepts.md Part 0 (R12)
-- Notes: Significance calibrated from 5.
+- Depends on: Metadata channels are independent; Host code reaches a program only as a capability
+- Significance: 5 — one idea for field writers, supplied capabilities and private access
+- Label: foundational — proofs, effects, privacy and every field's writer rest on it
+- Options recorded: authority by name or by the identity of the requester (rejected); three separate mechanisms for field writers, effects and member privacy (what the inventory listed)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Metadata origination is capability-controlled"; "Writes gated by a capability, reads free", "Writers are closures: delegable, attenuable, unforgeable" and, in Part IV, "Evidence is possession" are re-read as its instances. Open under it: privacy by possession of an unforgeable key, the working answer, analysed with "Who can see a member"; its first test is reflection, since every extension can read a value's source expression: what does an expression show of a key to code that does not hold it?
 - Chapter: Metadata and the capability to write it
-
-#### Fixed propagation vocabulary
-- Decides: a field's rule is one of `viral`, `union`, `computed`, `positional`, `drop`, applied by the base without knowing the field's meaning, with the semantics a rule needs (a merge for `union`) installed by the field's owner.
-- Status: partly built
+#### A field's rule is a pure, bounded function
+- Decides: a rule computes a field's value on a result from the field's values on the function applied and on its arguments. It sees nothing else, performs no effect, and always finishes. For now a rule may not recurse, which the kernel can check by itself.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled
-- Significance: 4 — makes integrity enforceable over inspectable rules
-- Label: foundational — every field registration and the integrity check use it
-- Units: metadata
-- Options recorded: arbitrary propagation closures per field (rejected: a closure is not inspectable, so a fabricating rule on an integrity field could not be refused); extend the vocabulary rather than open it
-- Sources: docs/book/concepts.md SC-7; docs/decisions.md D2; docs/book/allegretto/metadata-and-capability.md §5; docs/records/concepts-analyses.md §4.2 (not read)
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §5
-- Notes: `positional` is vocabulary without a path; removing it is an open maintainer decision. The `union` rule and the `effects` path are not one mechanism (B-146).
-- Held finding (2026-11-10, from the pilot's review §7 item 2): `channel_register` accepts any rule string; `channel_register("xq", "nonsense")` returns a writer and the field then behaves as `drop` (`src/capability.ts:56`). Fixed when the pass takes this decision in order.
+- Depends on: Metadata fields registered with declared propagation rules; Authority is an unforgeable value
+- Significance: 4 — the one place kernel evaluation runs an extension's code
+- Label: foundational — every field registration rests on it
+- Options recorded: a fixed vocabulary of five rules with owner-installed semantics (what the code does today; it becomes a library of common rules); general callbacks that take part in the evaluator's own work, with state or events (rejected: "a vampire is at the door asking to come in")
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Fixed propagation vocabulary". Purity follows from evaluating a rule with no capability supplied, and the kernel refuses a rule that holds one. The no-recursion form is relaxed only when a real rule needs more, with evidence.
+- Held finding (2026-11-10, from the pilot's review §7 item 2): `channel_register` accepts any rule string; `channel_register("xq", "nonsense")` returns a writer and the field then behaves as `drop` (`src/capability.ts:56`).
 - Chapter: Metadata and the capability to write it
-
 #### Writes gated by a capability, reads free
 - Decides: originating a field value requires its writer, propagation is evaluator-performed and authority-free, reads are free, and integrity fields may register only non-fabricating rules.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata origination is capability-controlled; Fixed propagation vocabulary
+- Depends on: Authority is an unforgeable value; A field's rule is a pure, bounded function
 - Significance: 4 — the read/write asymmetry introspection and PCP need
 - Label: foundational — every writer and forgery scenario D rest on it
 - Units: capability, metadata
@@ -1146,6 +1140,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §6
 - Chapter: Metadata and the capability to write it
 
+
+#### Only the kernel records the outcome of a claim
+- Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Claims are evaluated like everything else; The kernel trusts only what it has evaluated; Authority is an unforgeable value
+- Significance: 5 — the anchor of the trusted base
+- Label: foundational — every result's strength rests on it
+- Options recorded: a claim as an ordinary function of some extension, writing the outcome into its own field (rejected: it does not remove the trusted operation, it moves it into that extension)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. The kernel's contents are then values, pure primitives, the evaluator, metadata with its fields and rules, authority, and this operation.
+- Chapter: Metadata and the capability to write it
 ### How metadata propagates
 
 #### Primitives receive full values
@@ -1153,7 +1160,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — a rule for host primitive code, realising that channels are independent
 - Rationale kind: technical
-- Depends on: Host functions as values with declared evaluation control; Fixed propagation vocabulary
+- Depends on: Host functions as values with declared evaluation control; A field's rule is a pure, bounded function
 - Significance: 4 — removes the lazy/eager stripping asymmetry
 - Label: foundational — every primitive implementation relies on it
 - Units: evaluator, base-primitives
@@ -1167,7 +1174,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability — which field value survives a residual is observable
 - Rationale kind: technical
-- Depends on: Fixed propagation vocabulary
+- Depends on: A field's rule is a pure, bounded function
 - Significance: 3 — the generic half of propagation
 - Label: swappable — inside the metadata unit
 - Units: metadata, evaluator
@@ -1197,7 +1204,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Fixed propagation vocabulary; Writes gated by a capability, reads free; Expressions are values, forming a DAG
+- Depends on: A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Expressions are values, forming a DAG
 - Significance: 3 — gives meta-functions AST access without grammar productions
 - Label: swappable — one field registration and an evaluator attachment point
 - Units: metadata, capability, evaluator
@@ -1328,97 +1335,25 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### Installing a layer into the base
 
-#### The layer installs; the base never imports
-- Decides: a layer gives the base meaning by installing an implementation under a slot keyed by field name (merge, check, dispatch, projection, facts merge), the base calls it with opaque values and never imports the layer, and the base stores symbols without interpreting them.
-- Status: partly built
-- Type: implementation — installs are host-level: no Allegro program installs into the base
+#### An extension is made of functions and metadata fields
+- Decides: the kernel gives an extension two things to build with: ordinary functions, and metadata fields, each with a rule the extension supplies for how the field travels through evaluation. Every feature above the kernel is built from these: a typed call, an operator on typed values, a check on a member.
+- Status: open (the code installs host functions at fixed points of the evaluator); ruled 2026-11-11 (DR2)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Plane interfaces are sanctioned and policed
-- Significance: 4 — how Allegro Standard attaches to Allegretto
-- Label: foundational — every L2-to-L0 crossing uses it
-- Units: capability, evaluator, scope
-- Options recorded: the evaluator importing L2 symbols (the prior state; 131 imports measured); deleting the type dispatch altogether (rejected: dispatch is needed during evaluation because discharge is evaluation)
-- Sources: docs/plans/plane-interfaces.md §5.1 (P1), §5.2 (P2), §6, §9; docs/book/concepts.md §23, §24; docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: §5's principles were "accepted as provisional" with a survey trigger (§5.7), re-run at the plan's exit (§11). Significance calibrated from 5.
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; No interface limits optimization; A field's rule is a pure, bounded function
+- Significance: 5 — the whole of the extension interface
+- Label: foundational — every extension, the standard language included, is built on it
+- Options recorded: a kernel with a purpose-built extension point for each feature, checks, dispatch, projections and analyses installed at fixed points of the evaluator (what the code does today; rejected: the maintainer always had concerns about how such points would be handled by partial evaluation)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "The layer installs; the base never imports" and dissolves the entries on gated installs, the check hook, the dispatch hook, handles, knowledge propagation inside the evaluator, installed projections, analysis results crossing upward, and the facts plane. How today's uses fare: a typed literal is a value the extension's syntax maps to; an operator is the extension's own function; a check at a call is a claim at the top of the function's body; a computed field is an ordinary function; knowledge inside a branch is the extension's own `if` evaluating each branch with names rebound to values carrying the extra fact, using the kernel's ordinary operation of evaluating an expression with names rebound. Branch knowledge is the case to prove first.
+- Held finding (2026-11-11, DR2): the evaluator calls installed host functions for merge, check, dispatch, projection, analysis and facts merge (`src/capability.ts:96`–`144`), and imports the standard language's units (`src/evaluator.ts:9`–`10`). Held here; the largest change Part II names.
 - Chapter: Installing a layer into the base
-
-#### Installs are gated by the field's writer
-- Decides: installing into any hook requires holding the writer of the corresponding field, checked by identity against the registry, and a foreign install is refused with an error.
-- Status: settled
-- Type: implementation — a gate on host-level installs
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Writers are closures: delegable, attenuable, unforgeable
-- Significance: 3 — otherwise any module could decide what type checking means
-- Label: swappable — the gate inside the capability unit
-- Units: capability
-- Options recorded: ungated installs by field name (the prior `installFieldMerge`)
-- Sources: docs/plans/plane-interfaces.md §5.4 (P4); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### One check hook per field, called with a free reader
-- Decides: argument checking at a typed call site runs every installed field check, each receiving the expected constraint, the argument, a reader over all fields and the site, with no ordering between checks; a declared parameter type with no installed check aborts.
-- Status: settled
-- Type: implementation — the check wiring inside the evaluator; installs are host-level
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 3 — removes type checking from the evaluator
-- Label: swappable — the hook signature
-- Units: evaluator, capability
-- Options recorded: three hooks for the three jobs of `checkArgType` (rejected); ordering checks by field dependency (rejected: it would encode which field derives from which)
-- Sources: docs/plans/plane-interfaces.md §6.1, §8.1 (ruling 1); docs/book/allegretto/metadata-and-capability.md §7; docs/book/allegretto/evaluator.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### Member dispatch and call-site unification through the dispatch hook
-- Decides: type-directed dispatch at primitive applications and composed calls, including member dispatch and call-site unification, is an installed dispatcher that may answer or decline with null, in which case the base proceeds as Allegretto.
-- Status: settled
-- Type: implementation — the dispatch wiring inside the evaluator; installs are host-level
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 3 — the evaluator decides nothing about types
-- Label: swappable — the hook's two entry points
-- Units: evaluator, capability
-- Options recorded: member dispatch as a separate population (rejected, ruling 3); descriptor predicates folded in (they stay: P6)
-- Sources: docs/plans/plane-interfaces.md §8.3 (ruling 3), §9 C3 row (call-site unification, maintainer ruling 2026-10-22); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### Carrying needs a handle; deciding needs a hook
-- Decides: open in its remainder — where the base only passes a layer's value through, it should hold an opaque handle given at registration rather than an installed implementation; the type-vocabulary population (base primitives naming types they build) is to be solved this way.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports
-- Significance: 3 — touches every primitive that builds a typed result
-- Label: swappable — a registration surface
-- Units: base-primitives, evaluator
-- Options recorded: extend the hook mechanism to carrying (rejected by P3)
-- Sources: docs/plans/plane-interfaces.md §5.3 (P3), §7; B-145; docs/book/allegretto/evaluator.md §8
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7 or evaluator.md §8
-- Chapter: Installing a layer into the base
-
-#### Knowledge propagation inside the evaluator
-- Decides: open — how the evaluator's remaining effect and knowledge inference (predicate sets at primitive application, a Param's effect bound, the precompile stash) leaves L0, given that the generic `union` rule cannot encode an effect set.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Fixed propagation vocabulary
-- Significance: 3 — the last two forbidden edges of the evaluator
-- Label: swappable — behind the evaluator's install surface
-- Units: evaluator
-- Options recorded: an installed interpreter, larger than a hook (named); whether the facts merge and the `predicates` value-merge become one (B-146)
-- Sources: docs/plans/plane-interfaces.md §7; docs/book/allegretto/evaluator.md §8; docs/book/allegretto/metadata-and-capability.md §5, §7; B-146
-- Book home (fragments' proposal): allegretto/evaluator.md §8
-- Chapter: Installing a layer into the base
-
 #### Layers reach the base only through metadata and capability
 - Decides: every L2 unit reaches L0 through the `metadata` and `capability` units, never through a kind's representation, so `refinements` and `effects` sit below `type-core` and the grammar engine depends on nothing of Allegretto.
 - Status: partly built
 - Type: implementation
 - Rationale kind: technical
-- Depends on: Each decision lives in one replaceable unit of code; The layer installs; the base never imports
+- Depends on: Each decision lives in one replaceable unit of code; An extension is made of functions and metadata fields
 - Significance: 3 — P2 as a graph property
 - Label: foundational — the L2 unit order rests on it
 - Units: metadata, capability, refinements?, effects?
@@ -1427,42 +1362,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): units.md §5
 - Chapter: Installing a layer into the base
 
-#### Computed projections installed, not stored
-- Decides: a field computed on read, such as `shape` over `type`, is an installed projection served by name from `metaReadRaw`, whose read path names no field.
-- Status: settled
-- Type: implementation — how `shape` is served
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 2 — local to metadata reads
-- Label: swappable — one hook
-- Units: metadata, capability
-- Options recorded: the refinement-chain walk in L0's accessor layer (the prior `typeShape` in `slots.ts`, moved to `refinements`)
-- Sources: docs/plans/plane-interfaces.md §6 hook (c), §9 C4; docs/book/allegretto/metadata-and-capability.md §2, §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: `discharged` is still read from a binding-plane slot by registration `bindingKey`, a name-specific read (B-104).
-- Chapter: Installing a layer into the base
-
-#### Analysis results cross upward through a gated install
-- Decides: when a lower unit needs an analysis only a higher unit computes (effects inferred, may diverge), the producer installs the answer under a question about a field and the consumer reads it by name, erroring if it is missing once a compilation has begun.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer; Each decision lives in one replaceable unit of code
-- Significance: 2 — closes the reverse crossing
-- Label: swappable — one hook
-- Units: capability
-- Options recorded: (a) gated install (taken); (b) leave the `set*` probes and file an item; (c) ordinary imports (impossible: inverts the unit order)
-- Sources: docs/plans/plane-interfaces.md §8.2 (ruling 2), §9 C5, §11; docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: the ruling table of plane-interfaces.md §8 still lists ruling 2 as "Open"; §11 records it taken as option (a) on 2026-10-21. The inline cutoff (`setInlineCutoff`) is an ungated injection of the same shape, recorded as owed (evaluator.md §7).
-- Chapter: Installing a layer into the base
-
 #### Shared TypeScript types as representation leakage
 - Decides: open — L2 representation types crossing into L0 erase at runtime but let the base destructure the layer's representation; the tension is accepted for now, with the `value` contract's own types as the sanctioned shared types, and its resolution deferred to a self-hosted semantic hierarchy.
 - Status: open
 - Type: implementation
 - Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Value as a contract, seven kind units and an assembly
+- Depends on: An extension is made of functions and metadata fields; Value as a contract, seven kind units and an assembly
 - Significance: 2 — porous interfaces, bounded
 - Label: foundational — the fix is bootstrapping-era work across layers
 - Units: all L0 units
@@ -1514,21 +1419,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: flatten-copy on extend (the prior implementation)
 - Sources: docs/book/concepts.md IC-5; docs/decisions.md D26; docs/plans/archive/structured-values-unification.md B5
 - Book home (fragments' proposal): scope chapter (planned)
-- Chapter: Scopes
-
-#### Facts plane immutable-layered and opaque to the base
-- Decides: a fact about a name is layered onto a child scope that branches, asserts and `requires` push and discard, the base stores fact payloads as opaque values, and layers are combined only through an installed, writer-gated facts merge.
-- Status: settled
-- Type: implementation — how the evaluator stores knowledge; branch-local knowledge is decided in the contracts chapter
-- Rationale kind: technical
-- Depends on: Scopes layer by parent chain; Installs are gated by the field's writer
-- Significance: 3 — occurrence knowledge without in-place mutation
-- Label: swappable — inside the scope unit
-- Units: scope
-- Options recorded: mutate-and-pop `scopePredicates` (the prior implementation); the scope importing the predicate-set merge (M12, closed at B-112 C1)
-- Sources: docs/decisions.md D26; docs/book/allegretto/structures.md §4; docs/book/allegretto/README.md invariants; docs/plans/plane-interfaces.md §6 hook (e); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): scope chapter (planned)
-- Notes: the evaluator still casts the fact to `PredicateSet` when it attaches it (`src/evaluator.ts:526`), part of B-146.
 - Chapter: Scopes
 
 ### Evaluation over unresolved information
@@ -4357,7 +4247,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | R9 | concepts.md: The language surface is extensible (where a Sources line names a plan, the plan's ruling of that number) |
 | R10 | concepts.md: Evaluation is resumable on new information (where a Sources line names a plan, the plan's ruling of that number) |
 | R11 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
-| R12 | concepts.md: Metadata origination is capability-controlled (where a Sources line names a plan, the plan's ruling of that number) |
+| R12 | concepts.md: Authority is an unforgeable value (where a Sources line names a plan, the plan's ruling of that number) |
 | R14 | concepts.md: Code is organised into separately-loadable units (where a Sources line names a plan, the plan's ruling of that number) |
 | R15 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
 | R16 | concepts.md: Same source and same inputs give the same residual (where a Sources line names a plan, the plan's ruling of that number) |
