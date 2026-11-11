@@ -89,4 +89,12 @@ No terms introduced.
 
 ## Rulings taken
 
-(Recorded as they are taken.)
+**Ask 1, ruled 2026-11-11: no hooks.** The maintainer took option (b):
+"I always had concerns about how hooks would be handled by PE." The
+kernel offers an extension ordinary functions and metadata fields, each
+field with a rule its owner supplies; the evaluator never calls into an
+extension at a fixed point of its own. Chapter 10 is rebuilt on that.
+The decisions "Carrying needs a handle; deciding needs a hook" and
+"Knowledge propagation inside the evaluator" dissolve.
+
+(Further rulings are recorded as they are taken.)
