@@ -52,7 +52,7 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; An extension is made of functions and metadata fields.
    - Draws on: [concepts.md](../book/concepts.md) §15, [allegretto/structures.md](../book/allegretto/structures.md) §4, Scope (planned).
 12. **Evaluation over unresolved information** (11 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
-   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Evaluation stops early for two reasons only; Evaluation stops early for two reasons only.
+   - Decisions: Evaluation is total over unresolved information; A call is evaluated by evaluating the function's body; A branch that may not be taken is evaluated without capabilities; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Evaluation stops early for two reasons only; Evaluation stops early for two reasons only.
    - Draws on: [concepts.md](../book/concepts.md) §25 to §29, [allegretto/structures.md](../book/allegretto/structures.md) §10, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 to §6, Futures and the base primitives (planned).
 
 **Part III: Syntax and modules**
@@ -1437,36 +1437,58 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: concepts.md §26 says `isResolved` is "walked structurally" and that an unresolved value "transitively contains" a symbol or pending cell; `src/types.ts:455-470` answers true for any Structure whatever its slots hold, as evaluator.md §3 says. §26 is wrong about the code. Told in the tour.
 - Chapter: Evaluation over unresolved information
 
-#### PE Rule 1: residualise, but unfold composed calls
-- Decides: an application with an unresolved argument residualises with fields propagated, unless it applies a composed function, which is unfolded into its substituted body, except a call into a recursion cycle during a typed compilation and a call inside a speculated `when` arm, which residualise carrying the callee's effects.
-- Status: settled
-- Type: capability — it decides what a residual is, which every check reads
+#### A call is evaluated by evaluating the function's body
+- Decides: applying a function to arguments means evaluating its body with whatever is known about those arguments. The call survives into the residual only where the body cannot be reduced further. This holds across every boundary: a program's own functions, an extension's, another extension's.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; How the base applies propagation
-- Significance: 4 — unfolding is what lets discharge see inside a call
-- Label: foundational — refinement checks, effect inference and theorem discharge rely on unfolding
-- Units: evaluator
-- Options recorded: (a) restate the rule with unfolding as policy (taken); (b) residualise every composed call with an unresolved argument plus a separate inlining stage (rejected: loses discharge inside calls)
-- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6 RR1, RR9; docs/book/allegretto/evaluator.ir.md C201 to C205
-- Book home (fragments' proposal): concepts.md T3 §25 / allegretto/evaluator.md §3
-- Notes: Significance calibrated from 5.
+- Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; No interface limits optimization
+- Significance: 5 — what lets a check, a proof or an optimization see inside a call
+- Label: foundational — every claim decided inside a call rests on it
+- Options recorded: leaving a call as a residual behind its signature (rejected: it hides everything inside the callee); the two exceptions of the former rule, a recursion cycle during a typed compilation and a call inside a speculated `when` arm (replaced by the next decision and by sharing)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "PE Rule 1: residualise, but unfold composed calls", without its exceptions.
 - Chapter: Evaluation over unresolved information
 
-#### PE Rule 2: speculate every branch, run no effect
-- Decides: a lazy primitive with an unresolved control input evaluates every branch speculatively (`eval_if` both branches, `eval_when` every arm's guard and body with pattern names as fresh Params, the right operand of `&&` and `||`) in a fresh child scope marked as compile mode, so an effect reached there becomes a residual carrying its effects.
-- Status: settled
-- Type: capability — it decides what a residual is, which every check reads
+#### A recursive call is evaluated once for each state of knowledge
+- Decides: while evaluating a function's body, the evaluator may meet a call to the same function with the same information known about its arguments. It does not open that call again. The call stays in the residual, as a call to the function being evaluated. Claims stated about the function's result are assumed at that inner call and decided on the body.
+- Status: open (a design to prove on real cases); ruled 2026-11-11 (DR2)
+- Type: capability
 - Rationale kind: technical
-- Depends on: PE Rule 1: residualise, but unfold composed calls; Host functions as values with declared evaluation control
-- Significance: 4 — an unknown condition no longer hides everything behind it
-- Label: foundational — effect inference through branches rests on it
-- Units: evaluator, base-primitives
-- Options recorded: RR2 (b) type patterns bind typed placeholders (deferred, needs the type side); RR2 (c) exempt binding primitives; RR3 (b) speculate only in precompile; RR3 (c) exempt short-circuit operators; RR7 (b) always residualise a branch tail call; RR9 options A, B, B2 for nested speculation cost (C taken)
-- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6 RR2, RR3, RR7, RR9; docs/book/allegretto/evaluator.ir.md C178 to C200
-- Book home (fragments' proposal): concepts.md T3 §25 / allegretto/evaluator.md §3
-- Notes: `allegretto/evaluator.md` §3 prose still says `eval_when`, `&&` and `||` do not meet Rule 2 and that `eval_when` evaluates no branch; the IR (C179, C189 to C196) and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. The residual `eval_when` holds arms as written, not evaluated (C196). Rule 2 is left to each lazy primitive's implementation (C50). RR9's narrowing is to be revisited "when we want to push PE for more optimizations".
+- Depends on: A call is evaluated by evaluating the function's body; Claims are evaluated like everything else; Evaluation stops early for two reasons only
+- Significance: 5 — where much of Allegro's potential is delivered
+- Label: foundational — checking, proof and optimization of every recursive function rest on it
+- Options recorded: residualising every call into a recursion cycle during a typed compilation (what the code does today); unfolding to a depth limit
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the principled replacement for both exceptions of the former rule. A state of knowledge at a call is everything the evaluator knows about its arguments, their values and their metadata. A recursive function needs a stated claim, or nothing is known at the inner call. Where the states of knowledge never repeat, evaluation reaches a resource limit and the outcome is undecided. The maintainer: recursion "will be where we deliver a lot of Allegro's potential"; it will likely need a whole section. Read with B-180 (recursion handling under partial evaluation).
+- Held finding (2026-11-11, DR2): the recursion cutoff residualises by rule of thumb and names typed compilation (`src/evaluator.ts`, the inline cutoff; docs/book/concepts.md §25).
+- Chapter: Evaluation over unresolved information
+#### A branch that may not be taken is evaluated without capabilities
+- Decides: when a condition cannot be decided, both branches are still evaluated, so that what is true on either path is still discovered. Neither branch is given any capability, so any effect it reaches stays in the residual. The kernel has one conditional; every other branching form is built on it by an extension.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A call is evaluated by evaluating the function's body; Phases are configuration; Authority is an unforgeable value
+- Significance: 4 — an unknown condition hides nothing behind it
+- Label: foundational — effect inference and every check through a branch rest on it
+- Options recorded: a scope marked as compile mode (what the code does today); several lazy primitives in the kernel, `eval_when`, `&&` and `||` among them (rejected: one conditional, the rest by extension)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "PE Rule 2: speculate every branch, run no effect". Growth under nested conditions is bounded by sharing equal sub-evaluations, since expressions form a shared graph, and by resource limits, not by an exception.
+- Held finding (2026-11-11, DR2): `eval_when`, `&&` and `||` are kernel primitives with their own speculation (`src/evaluator.ts`, `src/primitives.ts`), and speculation runs in a scope flagged `compileMode`. Held here and on the pattern-matching decisions of Part IV.
 - Chapter: Evaluation over unresolved information
 
+#### A refutation on a path that may be taken refutes the program
+- Decides: if a claim is refuted in a branch whose condition cannot be decided, the program is wrong, unless what is known already rules that branch out. A program that means to handle the bad case uses a handled failure.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A branch that may not be taken is evaluated without capabilities; A refutation marks everything computed from it
+- Significance: 4 — a provably failing path is a mistake, however rarely taken
+- Label: foundational — every check of a function with a branch rests on it
+- Options recorded: leaving the refutation conditional until the condition is known (rejected: a function with a failing path would pass until run on the bad input)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling.
+- Chapter: Evaluation over unresolved information
 #### Incompleteness lives in write-once future cells
 - Decides: structures are always structurally complete; incompleteness is an unresolved future occupying a slot, never a structure state, and the future is its sole external locus: a write-once monotonic cell filled once, with `Future[Future[T]]` flattening and equality on an unresolved future residualising, write-once enforced at the phase interface; one representation serves REPL declarations, forward chaining and async futures.
 - Status: settled
@@ -3565,7 +3587,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: implementation — a cutoff for a precompile performance pathology
 - Rationale kind: technical
-- Depends on: PE Rule 1: residualise, but unfold composed calls; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
+- Depends on: A call is evaluated by evaluating the function's body; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
 - Significance: 3 — without it precompile unfolds recursion until the stack overflows
 - Label: swappable — one injected predicate
 - Units: evaluator, pipeline; pipeline, evaluator; totality, pipeline
@@ -4014,7 +4036,7 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 1. **GLL or ordered choice.** `docs/book/grammar-formalism.md` §1 says GLL is chosen and §5.1 speaks of GLL memoization; `docs/book/extension/grammar.md` §1 and §4 describe a memoized parser with PEG-committed ordered choice. The shipped base grammar relies on alternative order, and ambiguity detection is opt-in for that reason. Entries: "Memoized recursive-descent engine with seed-growing left recursion", "Ambiguity is banned and detected, not resolved by alternative order", "Rules for user-written EBNF". The grammars chapter cannot be written until one source is ruled stale.
 2. **Whether `when` arms narrow knowledge.** `docs/book/standard/pattern-matching.md` §3 says they do not; `docs/book/standard/contracts.md` §4 says the arms lift the matched pattern tagged `match-case`, and §9 says that shipped. A spot check finds the `match-case` provenance tag declared in `src/refinements.ts:457` and no other occurrence of the string in `src/` (a text search, not a binder-aware survey), which suggests the tag has no producer and pattern-matching.md is the current one. Entries: "Unification and branch refinement in patterns", "Branch refinement narrows knowledge per region".
 3. **Effects as values or a set of strings.** `docs/book/standard/effects.md` says an effect is a value of kind `Effect` composed by conjunction, with no separate effect-set type; the code holds an effect set as `Set<string>` merged by union (`src/effects.ts:41`), and non-trivial unions coerce to `opaque`. Entry: "Effects are values in one lattice" (status partly built).
-4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "PE Rule 2: speculate every branch, run no effect", "The discriminator rule for kind comparisons".
+4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "A branch that may not be taken is evaluated without capabilities", "The discriminator rule for kind comparisons".
 5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every result says how strongly it holds". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
 6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every result says how strongly it holds".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".

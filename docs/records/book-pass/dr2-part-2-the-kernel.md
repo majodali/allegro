@@ -139,4 +139,18 @@ decisions, in the inventory:
    never refuted. Capability denial as an abort, the five abort
    classes and the depth bound dissolve into it.
 
+**Ask 5, the partial-evaluation rules, ruled 2026-11-11.** Four
+decisions, in the inventory, replacing PE Rule 1 and PE Rule 2:
+
+1. "A call is evaluated by evaluating the function's body", with no
+   exceptions.
+2. "A recursive call is evaluated once for each state of knowledge"
+   (open, a design to prove). The maintainer: "The recursion case will
+   be where we deliver a lot of Allegro's potential - we'll likely need
+   a whole section on it."
+3. "A branch that may not be taken is evaluated without capabilities."
+   One conditional in the kernel; `eval_when`, `&&` and `||` are built
+   on it by extensions.
+4. "A refutation on a path that may be taken refutes the program."
+
 (Further rulings are recorded as they are taken.)
