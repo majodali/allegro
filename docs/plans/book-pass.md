@@ -1092,6 +1092,17 @@ its approval.
   extensions, not a tier, and the term is to be done away with before
   release. Until then L0 to L3 are vocabulary of the units appendix
   only, and no decision of the book rests on them.
+- **R41 — DR1 ruled; the vision chapter.** Every ask of DR1 was ruled
+  item by item in the review session on 2026-11-11, with the review
+  session's own reading beside the review's; the rulings are in the
+  record `docs/records/book-pass/dr1-part-1-the-bet.md` and the ruled
+  decisions in the inventory. Part I is a thesis statement and 23
+  decisions in two chapters. A Part I decision owns no code: every
+  violation is a held finding on the decision that realises it.
+  `docs/book/vision.md` (Tier 0) is not patched now; the tour and Part
+  I replace it when they are written in phase 2, by a Tier-0 PR with
+  the maintainer's sign-off then. The strength vocabulary is four
+  words: decided, sampled, assumed, undecided.
 
 ## 7. Record
 
@@ -1262,6 +1273,15 @@ its approval.
   loads no extension (`use` is a parse error); a return-type mismatch
   reports after the program has run and exits 0; a failed proof halts
   only after the program has run.
+- **2026-11-11 — DR1 ruled** (the review session, now discussing each
+  item with the maintainer). R38 to R41 recorded in §6. The inventory's
+  Part I rewritten as ruled: the thesis statement "Why a new language,
+  now" and 23 decisions in two chapters (10 and 13), chapter 3
+  dissolved; 256 decisions in all. About twenty held findings recorded
+  on the decisions of Parts II to VI that realise them, the standard
+  language as privileged host code the largest. Two proposals deferred
+  to their parts. Lints: `lint:docs:check` anchors 0 · order 0 · ids
+  783.
 
 ## 8. Sessions
 

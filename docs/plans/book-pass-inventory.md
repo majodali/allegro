@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts: 256 decisions after DR1's rulings of 2026-11-11 (Part I: 23, with a thesis statement; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -21,11 +21,9 @@ Chapters 1 and 2 as ruled in DR1 (2026-11-11); their names are provisional. The 
 
 1. **Why a new language, and how it grows** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
    - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
-2. **One operation, and what may be trusted** (11 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
-   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Each decision lives in one replaceable unit of code.
-3. **Claims a reader can trust** (6 decisions). How verification results show their strength, how claims are written in the program's own syntax and disclosed progressively, and how review works top-down.
-   - Decisions: Every claim states its discharge strength; Formal claims written in the program's own syntax; Reviewability through a top-down semantic view; Progressive disclosure of formality; Analyzer silence over guessing; Surface syntax is provisional, reviewed against a corpus.
-   - Draws on: [getting-started.md](../book/getting-started.md) See what the compiler knows, [vision.md](../book/vision.md) §1a move 2, §3, §5 principles 6 to 13, [platform/tooling.ir.md](../book/platform/tooling.ir.md) C102 to C110.
+2. **One operation, and what may be trusted** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
+   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
+Chapter 3 of the first proposal is dissolved: its decisions are folded into chapters 1 and 2 (DR1). The chapter numbers of Parts II to VI below are those of the first proposal and are renumbered when phase 1 ends.
 
 **Part II: Allegretto, the kernel**
 
@@ -153,6 +151,12 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
 | Installed hooks are opaque to partial evaluation | The layer installs; the base never imports | Installing a layer into the base | DR1, rulings of 2026-11-11 |
+| The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
+| Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
+| Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; The verdict as accumulated metadata | Proofs as values; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
+| The return check reports a conforming refined return as a mismatch | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
+| A name bound twice wins silently; implicit production replacement; ordered choice | the grammar, module and binding decisions | Parts III and IV | DR1, rulings of 2026-11-11 |
+| Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | One operation, and what may be trusted | DR1, rulings of 2026-11-11 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -195,7 +199,7 @@ They came together over years of exploration into most of what Allegro is today.
 | 4. Declarative paradigms, for anyone | Programmable language platform; One operation: partial evaluation (extensions cost nothing at run time); the new decision that extensions are declarative |
 | 5. Reflection without the fire | One value universe (code is data); Metadata on every value; One predicate machinery for correctness and safety |
 | 6. Formal and agile | Evaluation total over unresolved information; Refinement types; Claims are evaluated like everything else; the three-leg proof strategy |
-| The AI revolution | Participant-neutral proving with recorded authorship; Every claim states its discharge strength; One predicate machinery: code written by anyone, checked the same way |
+| The AI revolution | Participant-neutral proving with recorded authorship; Every result says how strongly it holds; One predicate machinery: code written by anyone, checked the same way |
 
 ## Today's chapters, mapped
 
@@ -203,9 +207,9 @@ They came together over years of exploration into most of what Allegro is today.
 |---|---|
 | [preface.md](../book/preface.md) (How this book is organized) | Stays the preface, unchanged. Goes to: the preface. |
 | [README.md](../../README.md) (Introduction) | Leaves the book's order: it stays the repository's front page; its account of what Allegro is feeds the tour. Goes to: the tour (what Allegro is). |
-| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Claims a reader can trust (See what the compiler knows); Proofs as values (The prover loop); Tools over the pipeline (subcommands). |
+| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: One operation, and what may be trusted (See what the compiler knows); Proofs as values (The prover loop); Tools over the pipeline (subcommands). |
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Who can see a member (Private members). |
-| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); One operation, and what may be trusted (§1, §1a, §2, §5); Why a new language, and how it grows (§1 Substrate and surfaces, §1a, §5); Claims a reader can trust (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
+| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); One operation, and what may be trusted (§1, §1a, §2, §5); Why a new language, and how it grows (§1 Substrate and surfaces, §1a, §5); One operation, and what may be trusted (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
 | [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language, and how it grows (layer, track, unit); Four planes (plane); Installing a layer into the base (plane interface). |
 | [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language, and how it grows (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
@@ -235,7 +239,7 @@ They came together over years of exploration into most of what Allegro is today.
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
 | [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules, the use header and one pipeline (the build track); Compiling beyond the interpreter (undelivered tracks). |
 | [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules, the use header and one pipeline (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
-| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Claims a reader can trust (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
+| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: One operation, and what may be trusted (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
 | [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
 | [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: One operation, and what may be trusted (When PE-as-discharge isn't enough); Proofs as values (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
 | [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language, and how it grows (the ladder); Units of measure (rung 2); Finding solutions to a model (rung 3, the capstone). |
@@ -263,6 +267,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling; replaces the review's proposal "Built for code that machines write and a kernel checks", whose clause trading authoring ergonomics for checkability is dropped. Supports "A language inherits every check of what it is built on" and the two proposals still to rule (models and mappings as checked values; declarative paradigms as libraries).
 - Chapter: Why a new language, and how it grows
 
+- Notes (2026-11-11, chapter 3 folded in): absorbs the principle of "Reviewability through a top-down semantic view"; its concrete half (the safety grade, drill-down, semantic diffs) is read with "Safety grade as the default verification surface" in Part VI.
 #### A system is described in the language of its domain, and that language grows with the understanding
 - Decides: code and claims are written in the terms of a domain model, which people and agents can read far more easily than general-purpose code. Nothing is lost by this: a statement in a domain language is checked exactly as strictly as any other. No prewritten domain language is enough. As the people and agents building a system understand it better, they extend its language, and each new concept becomes vocabulary that the kernel checks from then on.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -311,7 +316,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language, and how it grows
 
 #### Meaning comes before notation
-- Decides: a program's meaning is the structure of values and expressions it denotes. A syntax is a mapping onto that structure, and two notations that map to the same structure are the same program. Semantics are designed and decided without reference to any notation.
+- Decides: a program's meaning is the structure of values and expressions it denotes. A syntax is a mapping onto that structure, and two notations that map to the same structure are the same program. Semantics are designed and decided without reference to any notation. A notation can therefore change without changing what any program means.
 - Status: settled; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
@@ -323,6 +328,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling; from the maintainer's motivation 2.
 - Chapter: Why a new language, and how it grows
 
+- Notes (2026-11-11, chapter 3 folded in): absorbs "Surface syntax is provisional, reviewed against a corpus"; deprecation paths are a policy question for the surface chapter of Part IV.
 #### The kernel holds no language
 - Decides: the kernel is values, pure primitives, the evaluator, metadata with its capabilities, and the extension interface. It has no syntax. Every concrete syntax, the first grammar included, is an extension.
 - Status: settled; ruled 2026-11-11 (DR1)
@@ -424,7 +430,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: One operation, and what may be trusted
 
 #### Claims are evaluated like everything else
-- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase.
+- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -434,11 +440,13 @@ They came together over years of exploration into most of what Allegro is today.
 - Units: pipeline, totality, effects, proofs (to be checked in their parts)
 - Options recorded: halting as configuration (rejected: a refuted claim always halts its phase; what a configuration chooses is how much may stay undecided); halting at the first refutation only (rejected: a halted phase may go on evaluating independent expressions, without effects, to report every refutation); warnings as claims (no: warnings are informational metadata)
 - Sources: docs/book/vision.md §2 "Build, don't derive", §5 principle 10; docs/decisions.md CE-R1, CE-R8; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
-- Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every claim states its discharge strength"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
+- Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every result says how strongly it holds"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
 - Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
 - Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "One evalSource pipeline for programs and libraries".
 - Chapter: One operation, and what may be trusted
 
+- Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
+- Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
 #### An effect consumes only values whose claims are decided
 - Decides: an effect is performed only on values that have passed every claim made about them. A value carrying a refuted claim never reaches an effect. A value carrying an undecided claim has that claim evaluated first. After a phase has refuted a claim, it performs no further effect, though it may go on evaluating to report every refutation.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -541,6 +549,37 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the installed hooks are host closures the evaluator calls, opaque to partial evaluation. Held with the install-operations finding above.
 - Chapter: One operation, and what may be trusted
 
+#### Every result says how strongly it holds
+- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). A result that rests on a weaker result is itself reported at the weaker strength. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently. A result also names the extensions and capabilities it rests on.
+- Status: partly built; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: The kernel trusts only what it has evaluated; Host code reaches a program only as a capability
+- Significance: 5 — no bare checkmark: every result carries its strength and what it rests on
+- Label: foundational — the verdict, the ledger, every grade and every keyword naming a check rest on it
+- Units: none of its own
+- Options recorded: one vocabulary per kind of claim with a published mapping (rejected); the three lists in use today (rejected)
+- Sources: docs/book/vision.md §1a, §5 principle 10; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Every claim states its discharge strength"; absorbs "never silently weakened" from the review's proposal on performance and safety, and the rule that only a field's owner writes it.
+- Held finding (2026-11-11, DR1): three tier lists disagree (docs/book/vision.md §1a; `src/pcp.ts:230`–`236`; `src/totality.ts:500`). Held on the proofs, laws and termination decisions of Part IV.
+- Held finding (2026-11-11, DR1): the keyword `proven` names a check made on four samples, and a `proven` clause is absent from the verdict, whose ledger then reads "all proofs rest on proven backing" (`lib/proven.alg:4`–`5`, `src/pcp.ts:1021`). Held on "Bounded sampling for universal claims".
+- Held finding (2026-11-11, DR1): the safety grade reads `proven-safe` whenever nothing complained (`src/introspect.ts:496`–`504`); a verdict resting on sampled backing is headed "Verdict (verified)" (`src/pcp.ts:646`, `959`). Held on "Safety grade as the default verification surface" and "The verdict as accumulated metadata".
+- Chapter: One operation, and what may be trusted
+
+#### From experiment to proof without rewriting
+- Decides: a program need state no claims. What can be inferred is inferred, and shown. Its authors add claims as their understanding grows, and the same program moves from a quick experiment to a fully decided system without being rewritten.
+- Status: settled; ruled 2026-11-11 (DR1)
+- Type: capability
+- Rationale kind: vision
+- Depends on: Claims are evaluated like everything else; Every result says how strongly it holds
+- Significance: 4 — formal and experimental practice in one language
+- Label: foundational — inference, optional annotations and the undecided strength rest on it
+- Units: none of its own
+- Options recorded: every claim decided before a program may run (the formal-methods default); no claims at all (the scripting default)
+- Sources: docs/book/vision.md §5; the maintainer's motivation 6 and rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
+- Notes: replaces "Progressive disclosure of formality".
+- Chapter: One operation, and what may be trusted
+
 #### Each decision lives in one replaceable unit of code
 - Decides: the code is divided into the smallest units that each hold one decision. A unit depends only on units it names, and can be replaced without editing the others. A unit is split when its parts could be revised independently, never for size alone.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -554,97 +593,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Units in a narrow DAG" and merges "Unit granularity rule". "Layer" was only ever a way of organising code and is to be done away with before release (the maintainer, 2026-11-11); until then L0 to L3 are vocabulary of the units appendix only.
 - Held finding (2026-11-11, DR1): 2 forbidden imports, 5 mixed files and 456 kind comparisons outside their units (`npm run lint:units`). Held here; the evaluator's imports of the standard language's units are also the extension decision's findings.
 - Chapter: One operation, and what may be trusted
-
-### Claims a reader can trust
-
-#### Every claim states its discharge strength
-- Decides: no verification answer is a bare checkmark: each claim reports its tier, visibly and transitively through results; the verdict lists theorems and obligations with their tiers, an assumption ledger lists the admitted and sampled backings with the proofs resting on each, and a weaker check never borrows a stronger one's vocabulary.
-- Status: settled
-- Type: capability
-- Rationale kind: vision
-- Depends on: Correctness and safety are one kind of claim
-- Significance: 4 — shapes every verdict surface and the discharge tiers
-- Label: foundational — discharge tiers, the assumption ledger and safety grades rest on it
-- Units: pcp, introspect, cli
-- Options recorded: boolean "verified" (rejected)
-- Sources: docs/book/vision.md §1a move 2, §5 principles 7, 8, 9; docs/book/vision.md §1a move 2, §5 principles 8 and 9; docs/book/proving-in-allegro.md (Laws, discharge tiers); docs/book/getting-started.md (See what the compiler knows); docs/plans/release-track.md §3 D2; docs/book/platform/tooling.ir.md C102 to C110
-- Book home (fragments' proposal): the tour (proposed) / Proving in Allegro / Tooling
-- Notes: Merged from fragment A ("Every claim carries a visible discharge strength"), fragment C ("Verification claims state their strength"). C: the tier lists disagree across sources: vision §1a names proven/enumerated/sampled/admitted/pending; getting-started adds witnessed; the primer uses kernel/enumerated/witnessed/sampled/admitted/pending, which matches `src/pcp.ts:155` and `src/types-std.ts:2229`; the div tiers are auto/witnessed/admitted/undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations (tooling C105). Assembly: the tooling side's dependencies (the divergence tiers and the prover protocol) were dropped so the thesis entry precedes them; the tier lists are reconciled in Open questions.
-- Chapter: Claims a reader can trust
-
-#### Formal claims written in the program's own syntax
-- Decides: refinements, contracts, effects, termination metrics and theorems are written in the program's own syntax, as ordinary statements and leading body lines, not in a separate specification language.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: A language inherits every check of what it is built on
-- Significance: 4 — the user-visible face of "types as values; one engine"
-- Label: foundational — the prover protocol splices into the same source; inspect reads the same source
-- Units: none
-- Options recorded: none recorded
-- Sources: docs/book/getting-started.md (Your first verified program); docs/book/vision.md §2 (types as predicates), §5 principle 2; docs/book/demo-ladder.ir.md C31
-- Book home (fragments' proposal): Getting started / Surface syntax of Allegro Standard (proposed)
-- Notes: Assembly: the dependencies on the body-form clauses and on theorems as statements were dropped to break cycles; those entries implement this principle and depend on it.
-- Chapter: Claims a reader can trust
-
-#### Reviewability through a top-down semantic view
-- Decides: review works through a layered view of inferred types, effects, discharged invariants and semantic diffs over the code, surfaced as a safety grade with drill-down, rather than bottom-up line reading; the safety grade and `inspect` exist, while semantic diffs and editor (LSP) integration are not built.
-- Status: partly built
-- Type: capability
-- Rationale kind: vision
-- Depends on: Every claim states its discharge strength
-- Significance: 3 — motivates introspection and safety grades
-- Label: swappable — the view is a tool over the analyses
-- Units: introspect?; not yet a unit
-- Options recorded: bottom-up disjointed code review (rejected); bottom-up line-by-line review (rejected by the reviewability claim)
-- Sources: docs/book/vision.md §3, §5 principles 6, 7, 11; docs/book/vision.md §3, §6; docs/plans/release-track.md §3 D3 (semantic diffs: hypothesis); docs/book/platform/tooling.ir.md C158 to C160; B-067, B-068
-- Book home (fragments' proposal): the tour (proposed) / Tooling
-- Notes: Merged from fragment A ("Reviewability through a top-down semantic view"), fragment C ("Semantic review surface and editor integration").
-- Chapter: Claims a reader can trust
-
-#### Progressive disclosure of formality
-- Decides: beginners write ordinary code with everything inferred, intermediates add targeted invariants, experts write proof tactics; formal work concentrates in libraries and DSLs, inferences are always displayable and annotations optional.
-- Status: settled
-- Type: capability
-- Rationale kind: vision
-- Depends on: Formal claims written in the program's own syntax
-- Significance: 3 — sets what a user must write versus what the compiler must infer
-- Label: foundational — body-form clauses being optional, contracts living in libraries, and the inspect summary all assume it
-- Units: none
-- Options recorded: none recorded
-- Sources: docs/book/vision.md §5 principles 5, 6, 14; §4 ("predicates and proofs are opt-in")
-- Book home (fragments' proposal): Vision and principles / Surface syntax of Allegro Standard (proposed)
-- Notes: Assembly: the dependency on the safety grade was inverted (the safety grade is the first rung of this ladder). Significance calibrated from 4.
-- Chapter: Claims a reader can trust
-
-#### Analyzer silence over guessing
-- Decides: when an analysis cannot determine the facts it stays silent rather than guessing, because false positives erode trust.
-- Status: settled
-- Type: capability
-- Rationale kind: vision
-- Depends on: Every claim states its discharge strength
-- Significance: 2 — a policy every analysis follows
-- Label: swappable — policy per analysis
-- Units: none
-- Options recorded: none recorded
-- Sources: docs/book/vision.md §5 principle 11
-- Book home (fragments' proposal): vision.md
-- Chapter: Claims a reader can trust
-
-#### Surface syntax is provisional, reviewed against a corpus
-- Decides: every feature and syntax element is expected to be reviewed and possibly redefined once a corpus of real use exists, so surface syntax is treated as provisional and redos get deprecation paths.
-- Status: settled
-- Type: capability — a policy on the surface a user writes
-- Rationale kind: mixed
-- Depends on: none
-- Significance: 2 — licenses every surface entry below to be swappable
-- Label: swappable — a policy over the surface, nothing below depends on a particular spelling
-- Units: none
-- Options recorded: none recorded
-- Sources: docs/book/vision.md §5 principle 15
-- Book home (fragments' proposal): vision.md / Surface syntax of Allegro Standard (proposed chapter), opening section
-- Notes: Merged from fragment A ("Surface syntax is provisional, redone from a corpus"), fragment C ("Surface syntax is provisional, reviewed against a corpus"). Significance calibrated from 2/3.
-- Chapter: Claims a reader can trust
 
 ### Values and their seven kinds
 
@@ -2503,7 +2451,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: aesthetic
-- Depends on: Surface syntax is provisional, reviewed against a corpus
+- Depends on: Meaning comes before notation
 - Significance: 2 — the most common declaration form, but a spelling
 - Label: swappable — replaced inside the base grammar only
 - Units: base-grammar, tree-builder
@@ -2623,7 +2571,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: aesthetic
-- Depends on: Surface syntax is provisional, reviewed against a corpus
+- Depends on: Meaning comes before notation
 - Significance: 1 — local spelling
 - Label: swappable — base-grammar only
 - Units: base-grammar, tree-builder
@@ -2654,7 +2602,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Proofs are values discharged by evaluation; Formal claims written in the program's own syntax
+- Depends on: Proofs are values discharged by evaluation; Claims are evaluated like everything else
 - Significance: 3 — the proof surface every rung and the prover loop splice into
 - Label: swappable — the statements lower to proof primitives
 - Units: proofs, tree-builder
@@ -2683,7 +2631,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
-- Depends on: Discharge mechanisms without search; Every claim states its discharge strength
+- Depends on: Discharge mechanisms without search; Every result says how strongly it holds
 - Significance: 3 — the only universal-claim path beyond finite enumeration
 - Label: swappable — a symbolic engine could replace the sampler behind the same primitives
 - Units: proofs
@@ -2787,14 +2735,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Lawful interfaces; Every claim states its discharge strength
+- Depends on: Lawful interfaces; Every result says how strongly it holds
 - Significance: 3 — "no boolean verified anywhere"
 - Label: swappable — tier policy and gate list
 - Units: equality-laws, proofs
 - Options recorded: gating everything at once (rejected: would halt existing programs; strictness ships incrementally)
 - Sources: E-R4, E-R6 (docs/plans/equality-and-laws.md §3); docs/book/proving-in-allegro.md "Laws, discharge tiers, and the strict gate"
 - Book home (fragments' proposal): proposed "Equality and laws"
-- Notes: E-R6 named two fields; three shipped (`lawName` added). Two transitive backing carriers coexist (B-115). Assembly: the dependency on the divergence tiers ("Four-tier discharge spectrum") was replaced by the thesis-level tier vocabulary ("Every claim states its discharge strength"); law tiers share the vocabulary, not the divergence analysis.
+- Notes: E-R6 named two fields; three shipped (`lawName` added). Two transitive backing carriers coexist (B-115). Assembly: the dependency on the divergence tiers ("Four-tier discharge spectrum") was replaced by the thesis-level tier vocabulary ("Every result says how strongly it holds"); law tiers share the vocabulary, not the divergence analysis.
 - Chapter: Equality and laws
 
 ### Effects
@@ -2964,7 +2912,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — the clauses and what they lower to are the surface; the chain's stage names are its form
 - Rationale kind: mixed
-- Depends on: The declarative `grammar { … }` block with hygienic templates; Formal claims written in the program's own syntax; Grammar extension as operation deltas, extensible by default
+- Depends on: The declarative `grammar { … }` block with hygienic templates; Claims are evaluated like everything else; Grammar extension as operation deltas, extensible by default
 - Significance: 3 — every L2 annotation reaches analysers the same way
 - Label: foundational — totality, effects and contracts analysers read properties
 - Units: tree-builder, contracts; tree-builder, grammar-extension, totality
@@ -3238,7 +3186,7 @@ They came together over years of exploration into most of what Allegro is today.
 #### The verdict as accumulated metadata
 - Decides: open — the verdict should be the top-level value's accumulated metadata (each channel defining its accumulation), replacing `buildVerdict`'s out-of-band walk of top-level bindings.
 - Status: open
-- Type: implementation — how the verdict is computed; what it reports is "Every claim states its discharge strength"
+- Type: implementation — how the verdict is computed; what it reports is "Every result says how strongly it holds"
 - Rationale kind: technical
 - Depends on: Four-tier discharge spectrum; Metadata fields registered with declared propagation rules
 - Significance: 2 — how obligations reach the verdict
@@ -3254,7 +3202,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability
 - Rationale kind: vision
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Every claim states its discharge strength
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Every result says how strongly it holds
 - Significance: 2 — closes a "silently trusted" gap
 - Label: swappable — verdict assembly
 - Units: contracts, pcp
@@ -3299,7 +3247,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Law discharge tiers and the first strict gate; Every claim states its discharge strength; Dimensions as data, named dimensions as refinements over one Quantity
+- Depends on: Law discharge tiers and the first strict gate; Every result says how strongly it holds; Dimensions as data, named dimensions as refinements over one Quantity
 - Significance: 2 — principle 9 applied to a demo
 - Label: swappable — library policy
 - Units: not yet a unit
@@ -3822,14 +3770,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: vision
-- Depends on: Inspect reports only what the pipeline computed; Every claim states its discharge strength; Progressive disclosure of formality
+- Depends on: Inspect reports only what the pipeline computed; Every result says how strongly it holds; From experiment to proof without rewriting
 - Significance: 3 — the reviewability claim's face
 - Label: swappable — `safetyGradeFor` behind the summary
 - Units: introspect
 - Options recorded: a proof transcript as the default surface (rejected by principle 7)
 - Sources: docs/book/vision.md §3, §5 principle 7; docs/book/platform/tooling.ir.md C85 to C98 (def-safety-grade)
 - Book home (fragments' proposal): Tooling
-- Notes: the implemented grade counts no unproven sub-expression, unlike principle 7's "N warnings about M unproven sub-expressions" (R6); nothing produces `has-warnings` (C92); the code calls the grade a coarse placeholder (C94). Assembly: gained a dependency on "Progressive disclosure of formality" (inverted from that entry).
+- Notes: the implemented grade counts no unproven sub-expression, unlike principle 7's "N warnings about M unproven sub-expressions" (R6); nothing produces `has-warnings` (C92); the code calls the grade a coarse placeholder (C94). Assembly: gained a dependency on "From experiment to proof without rewriting" (inverted from that entry).
 - Chapter: Tools over the pipeline
 
 #### One command-line entry with subcommands
@@ -4119,7 +4067,7 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
 | 8 | Export marks the binding, and a module with no exports is open | Module loading and typed module objects are separate layers | (a) Now depends on "Extensions are the module substrate". | Export rests on modules existing; which unit loads them is a cut in the code. |
 | 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Occurrence facts live in the scope's facts plane, which that entry states. |
-| 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every claim states its discharge strength". | Contracts must reach the verdict and the ledger however the verdict is computed. |
+| 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every result says how strongly it holds". | Contracts must reach the verdict and the ledger however the verdict is computed. |
 | 11 | Planning surface conventions | Library before surface | (a) Now depends on "A plan is an outcome graph with derived wiring". | The conventions spell the model; the order in which the library and the grammar were built changes no spelling. |
 | 12 | Post-passes registered by layers | The evalSource stage order | (b) Retyped implementation. | It decides where the code registers its post-passes; no program's meaning changes. |
 | 13 | Post-passes registered by layers | Plane interfaces are sanctioned and policed | (b) The same retyping. | As above. |
@@ -4149,7 +4097,7 @@ Not merged, because they relate without needing each other: "Mediated member acc
 **The three cycles the merge broke, re-examined.**
 
 1. "`use` header for language extension, `import` for module values" and "Callers pre-scan and strip the `use` header": a capability and its implementation. The pre-scan is implementation and keeps its edge to the header. No capability depends on the pre-scan any more (row 16).
-2. "Formal claims written in the program's own syntax" against "Body-form clauses at the head of a body, lowered through one chain" and "Theorems as statements, proved `by` a term": all three are capability, and they are not mutual. The principle is stated without any particular form; each form is one instance of it. The edges from the instances to the principle stand, and nothing is merged.
+2. "Claims are evaluated like everything else" against "Body-form clauses at the head of a body, lowered through one chain" and "Theorems as statements, proved `by` a term": all three are capability, and they are not mutual. The principle is stated without any particular form; each form is one instance of it. The edges from the instances to the principle stand, and nothing is merged.
 3. "Precompile before the evaluation loop" and "The evalSource stage order": both implementation. The stage order places precompile, so it keeps the edge. Precompile realises checking a function's body before it runs; no capability depends on either.
 
 **Moves.** All within a chapter; no decision changed chapter.
@@ -4170,6 +4118,11 @@ The ten hard calls stand, except three put to review; the merge of the incomplet
 
 ## Open questions
 
+### Proposals deferred by DR1 to their parts
+
+- **For DR2, with the expressions chapter**: "A program built by a program is checked like any other" (reflection checked end to end; the review's R-DR1-32). `expr_eval` calls the evaluator directly (`src/primitives.ts:405`–`409`); whether a constructed program skips checks was not confirmed either way by one probe.
+- **For DR5, with Vivace**: "Business rules define the domain" (when a rule has no expressible form, extend the language, never contort the rule; docs/book/vision.md §5 principle 4; the review's R-DR1-36).
+
 ### Unresolved dependencies
 
 None remain. The fragments marked or misnamed 43 dependency references (25 distinct names); each resolved to an entry of the merged inventory (the working merge notes list every resolution). One guessed name has no entry of its own: "Layers L0 to L3 with dependencies pointing down" resolves to "Everything above the kernel is an extension, and there is one way to extend", which states the downward rule. If the layer spine deserves its own decision section, it would be a new entry in "Why a new language, and how it grows".
@@ -4179,10 +4132,10 @@ None remain. The fragments marked or misnamed 43 dependency references (25 disti
 Three cycles appeared in the merged graph. Each was a misread direction, not two decisions in one:
 
 1. "`use` header for language extension, `import` for module values" and "Callers pre-scan and strip the `use` header" depended on each other. The pre-scan implements the header, so only the pre-scan keeps the edge.
-2. "Formal claims written in the program's own syntax" depended on the body-form clauses and on theorems as statements, both of which depend on it. The principle keeps no edge to its implementations.
+2. "Claims are evaluated like everything else" depended on the body-form clauses and on theorems as statements, both of which depend on it. The principle keeps no edge to its implementations.
 3. "Precompile before the evaluation loop" and "The evalSource stage order" depended on each other. The stage order places precompile, so only the stage order keeps the edge.
 
-Other edges were changed without a cycle forcing it, so that the order reads right. Thesis-level decisions dropped their edges to their own implementations: the discharge-strength claim, the prover protocol, the halt policy and proof export. "Progressive disclosure of formality" no longer depends on the safety grade; the edge was inverted. Law discharge tiers rest on the shared tier vocabulary, not on the divergence spectrum. "Effects deferred during precompile" gained an edge to precompile. Each entry's Notes say which. Chunk P1b re-examined the three cycles by decision type: see "The type check, 2026-11-05".
+Other edges were changed without a cycle forcing it, so that the order reads right. Thesis-level decisions dropped their edges to their own implementations: the discharge-strength claim, the prover protocol, the halt policy and proof export. "From experiment to proof without rewriting" no longer depends on the safety grade; the edge was inverted. Law discharge tiers rest on the shared tier vocabulary, not on the divergence spectrum. "Effects deferred during precompile" gained an edge to precompile. Each entry's Notes say which. Chunk P1b re-examined the three cycles by decision type: see "The type check, 2026-11-05".
 
 ### Conflicting sources the fragments recorded
 
@@ -4190,8 +4143,8 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 2. **Whether `when` arms narrow knowledge.** `docs/book/standard/pattern-matching.md` §3 says they do not; `docs/book/standard/contracts.md` §4 says the arms lift the matched pattern tagged `match-case`, and §9 says that shipped. A spot check finds the `match-case` provenance tag declared in `src/refinements.ts:457` and no other occurrence of the string in `src/` (a text search, not a binder-aware survey), which suggests the tag has no producer and pattern-matching.md is the current one. Entries: "Unification and branch refinement in patterns", "Branch refinement narrows knowledge per region".
 3. **Effects as values or a set of strings.** `docs/book/standard/effects.md` says an effect is a value of kind `Effect` composed by conjunction, with no separate effect-set type; the code holds an effect set as `Set<string>` merged by union (`src/effects.ts:41`), and non-trivial unions coerce to `opaque`. Entry: "Effects are values in one lattice" (status partly built).
 4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "PE Rule 2: speculate every branch, run no effect", "The discriminator rule for kind comparisons".
-5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every claim states its discharge strength". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
-6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every claim states its discharge strength".
+5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every result says how strongly it holds". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
+6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every result says how strongly it holds".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".
 8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Claims are evaluated like everything else".
 9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "Minimal base surface of about forty primitives".

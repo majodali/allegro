@@ -989,5 +989,26 @@ ladder) are narrative, told in the tour; R-DR1-33's new chapter is not
 needed. Part I's first two chapters are regrouped in the inventory
 under provisional names.
 
-Still to rule: chapter 3 (R-DR1-25, R-DR1-27 to R-DR1-31), R-DR1-32,
-and the placement asks R-DR1-34 to R-DR1-37.
+**Chapter 3 and the remaining asks, ruled 2026-11-11.** "Every result
+says how strongly it holds" (R-DR1-25), with one vocabulary of four
+words: decided, sampled, assumed, undecided. "From experiment to proof
+without rewriting" (R-DR1-29). Folded into decisions already ruled:
+R-DR1-27 and R-DR1-30 into "Claims are evaluated like everything
+else", R-DR1-31 into "Meaning comes before notation", the principle of
+R-DR1-28 into "Trust comes from the kernel, not the author", its
+concrete half going to Part VI. On R-DR1-27 the maintainer corrected
+the wording: writing a claim in the language of its target is an
+important feature, not a requirement; a claim is written in the model
+and language that best suit it, for example with logical quantifiers
+the target's language lacks. Chapter 3 dissolves, and Part I is two
+chapters of 10 and 13 decisions after the thesis statement. R-DR1-1:
+a Part I decision owns no code; every violation is a held finding on
+the decision that realises it. Deferred: R-DR1-32 to DR2 and R-DR1-36
+to DR5 (the inventory's Open questions); R-DR1-33 and R-DR1-35 fall
+away; R-DR1-34 is covered by the fold. R-DR1-37: `docs/book/vision.md`
+is not patched; the tour and Part I replace it when they are written
+in phase 2, by a Tier-0 PR then. R-DR1-38: of the review's two terms,
+*principle decision* stands in the sense of R-DR1-1; *proposal from
+the motivations* has served its purpose.
+
+Every ask is ruled.
