@@ -1064,6 +1064,30 @@ its approval.
   `docs/decisions.md`, R36, R37 and §2.8 as written, part (e) of the
   briefs, and the terms *held finding* and *decision review*.
 
+**Rulings taken 2026-11-11, in the review session, on DR1's method.**
+
+- **R38 — The purpose of the decision review.** The maintainer's
+  statement: implementation choices made over time have blurred and
+  weakened some of Allegro's initial goals, and the review is there to
+  rectify that. A decision is adjusted when it is shown unsound because
+  it contradicts a prior decision. Wherever a choice was adopted counter
+  to the original goals because no alternative was obvious, the review
+  revisits it analytically and corrects it; it does not restate the
+  goal to fit the code. Two named cases: "compile time" is not a
+  necessary concept for Allegro, since partial evaluation is primary
+  and build, validation and execution phases are configuration; and the
+  original goals lean to a single extension mechanism for all. The
+  wording of each decision is as strong and clear as it can be, and
+  makes sense to a reader who does not know the project, the early
+  decisions above all.
+- **R39 — Partial evaluation is primary, stated consistently.** Taken
+  with R38: the three claim rulings of DR1 (a refuted claim halts, a
+  pending one does not, no check silently weakened) are one decision,
+  partial evaluation applied to claims; and compilation as partial
+  evaluation stays in Part I. Every decision that partial evaluation
+  applies to (claims, compilation, types, optimisation) is worded to
+  show the one approach.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
