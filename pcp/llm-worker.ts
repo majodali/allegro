@@ -215,7 +215,8 @@ export async function createAnthropicClient(opts: LlmClientOptions = {}): Promis
   if (!apiKey) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Set the environment variable or pass --api-key, " +
-      "or use `allegro propose` (the human-interactive worker) instead.");
+      "or use `allegro propose` (the human-interactive worker) instead. " +
+      "To use a Claude subscription instead of API billing, pass --proposer claude-code (Claude Code's scripted mode).");
   }
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey });
@@ -235,6 +236,79 @@ export async function createAnthropicClient(opts: LlmClientOptions = {}): Promis
         .map((b: any) => b.text)
         .join("");
       return text;
+    },
+  };
+}
+
+// -----------------------------------------------------------------------------
+// The Claude Code client (B-187 L4, ruled at its PR)
+// -----------------------------------------------------------------------------
+//
+// A second language-model client, for a proposer who has a Claude
+// subscription and no API billing: each request is one run of Claude Code's
+// scripted mode, `claude -p`, which uses the logged-in subscription. The
+// run has the primer as its whole system prompt, no tools and one turn, and
+// keeps no session on disk. It runs in an empty temporary directory, so no
+// CLAUDE.md, hook or MCP server of the caller's working directory loads
+// (`--bare` is not used: bare mode reads no subscription login). The
+// child's environment drops `ANTHROPIC_API_KEY`, so the run cannot fall back
+// to API billing.
+
+export interface ClaudeCodeClientOptions {
+  /** `--model`: an alias (`opus`, `sonnet`) or a full name; Claude Code's
+   *  default when absent. */
+  model?:  string;
+  /** The executable; `claude` (found on PATH) by default. */
+  binary?: string;
+}
+
+/** The arguments of one `claude -p` run. */
+export function claudeCodeArgs(systemPrompt: string, model?: string): string[] {
+  return [
+    "-p", "--output-format", "json", "--system-prompt", systemPrompt,
+    "--tools", "", "--max-turns", "1", "--no-session-persistence",
+    ...(model ? ["--model", model] : []),
+  ];
+}
+
+/** An `LlmClient` over Claude Code's scripted mode. `send` writes the
+ *  request to the run's stdin and answers the `result` field of its JSON
+ *  output; a non-zero exit, output that is not JSON, a missing `result` or
+ *  `is_error` set throws with the run's text, which the loop records as a
+ *  failed attempt. An aborted signal (the reply's time box) kills the run. */
+export function createClaudeCodeClient(opts: ClaudeCodeClientOptions = {}): LlmClient {
+  const binary = opts.binary ?? "claude";
+  return {
+    modelId: () => `claude-code:${opts.model ?? "default"}`,
+    async send({ systemPrompt, userMessage, signal }) {
+      const { spawn } = await import("node:child_process");
+      const os = await import("node:os");
+      const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-claude-code-"));
+      const env = { ...process.env };
+      delete env.ANTHROPIC_API_KEY;
+      try {
+        const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+          const child = spawn(binary, claudeCodeArgs(systemPrompt, opts.model), { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+          let out = "", err = "";
+          child.stdout.on("data", (d) => { out += d; });
+          child.stderr.on("data", (d) => { err += d; });
+          const onAbort = () => { child.kill("SIGKILL"); reject(new Error("claude-code: the run was aborted")); };
+          if (signal?.aborted) onAbort(); else signal?.addEventListener("abort", onAbort, { once: true });
+          child.on("error", (e) => { signal?.removeEventListener("abort", onAbort); reject(new Error(`claude-code: could not run \`${binary}\`: ${e.message}`)); });
+          child.on("close", (c) => { signal?.removeEventListener("abort", onAbort); resolve({ code: c, stdout: out, stderr: err }); });
+          child.stdin.on("error", () => { /* the run may exit before reading */ });
+          child.stdin.end(userMessage);
+        });
+        const text = [stdout.trim(), stderr.trim()].filter(t => t.length > 0).join("\n");
+        if (code !== 0) throw new Error(`claude-code exited with code ${code}: ${text}`);
+        let parsed: any;
+        try { parsed = JSON.parse(stdout); } catch { throw new Error(`claude-code printed no JSON: ${text}`); }
+        if (typeof parsed?.result !== "string") throw new Error(`claude-code printed no result: ${text}`);
+        if (parsed.is_error === true) throw new Error(`claude-code reported an error: ${parsed.result}`);
+        return parsed.result;
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
     },
   };
 }
@@ -1093,7 +1167,14 @@ export interface ProveOptions {
   replyTimeoutMs: number;
   /** `--transcript FILE.md`: the transcript, and its JSON twin beside it. */
   transcriptPath?: string;
+  /** `--proposer anthropic|claude-code` (ruled at L4's PR): the SDK client
+   *  (API billing; the default) or Claude Code's scripted mode (a
+   *  subscription). Absent: `anthropic`. `--proposals FILE` selects the
+   *  scripted proposer. */
+  proposer?:      ProposerName;
 }
+
+export type ProposerName = "anthropic" | "claude-code";
 
 /** Parse `prove`'s flags from the command line's arguments. Answers the
  *  options, or the error to print. */
@@ -1108,6 +1189,14 @@ export function parseProveArgs(argv: string[]): ProveOptions | { error: string }
     maxAttempts: 5, asJson: argv.includes("--json"),
     turnTimeoutMs: DEFAULT_TURN_TIMEOUT_MS, replyTimeoutMs: DEFAULT_REPLY_TIMEOUT_MS,
   };
+  const proposer = value("--proposer");
+  if (proposer === null) return { error: "--proposer takes a value" };
+  if (proposer !== undefined) {
+    if (proposer !== "anthropic" && proposer !== "claude-code") {
+      return { error: `--proposer takes anthropic or claude-code, not ${proposer}` };
+    }
+    opts.proposer = proposer;
+  }
   const strings: Array<[string, "model" | "outputPath" | "proposalsPath" | "apiKey" | "transcriptPath"]> = [
     ["--model", "model"], ["--output", "outputPath"], ["--proposals", "proposalsPath"],
     ["--api-key", "apiKey"], ["--transcript", "transcriptPath"],

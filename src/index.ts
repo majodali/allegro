@@ -350,7 +350,7 @@ if (flagless[0] === "inspect") {
   const filename = flagless[1];
   if (!filename) {
     console.error(
-      "usage: allegro prove <file> [--max-attempts N] [--model MODEL] [--api-key KEY] [--proposals FILE.md] " +
+      "usage: allegro prove <file> [--max-attempts N] [--proposer anthropic|claude-code] [--model MODEL] [--api-key KEY] [--proposals FILE.md] " +
       "[--turn-timeout MS] [--reply-timeout MS] [--transcript FILE.md] [--output FILE.alg] [--json]");
     process.exit(1);
   }
@@ -620,15 +620,19 @@ async function runPcpPropose(
 async function runPcpProve(filename: string, argv: string[]): Promise<void> {
   const {
     runLlmWorker, createAnthropicClient, createScriptedClient, loadProposalsFile,
-    parseProveArgs, formatTranscript, transcriptJsonPath,
+    parseProveArgs, formatTranscript, transcriptJsonPath, createClaudeCodeClient,
   } = await import("../pcp/llm-worker.js");
   const parsed = parseProveArgs(argv);
   if ("error" in parsed) throw new Error(`allegro prove: ${parsed.error}`);
   const { maxAttempts, model, outputPath, asJson, proposalsPath, apiKey,
-          turnTimeoutMs, replyTimeoutMs, transcriptPath } = parsed;
+          turnTimeoutMs, replyTimeoutMs, transcriptPath, proposer } = parsed;
+  // Ruled at L4's PR: `--proposer claude-code` drives a Claude subscription
+  // through Claude Code's scripted mode; the SDK client needs API billing.
   const client = proposalsPath
     ? createScriptedClient(loadProposalsFile(proposalsPath), { prover: `scripted:${path.basename(proposalsPath)}` })
-    : await createAnthropicClient({ model, apiKey });
+    : proposer === "claude-code"
+      ? createClaudeCodeClient({ model })
+      : await createAnthropicClient({ model, apiKey });
   const result = await runLlmWorker({
     filename,
     maxAttempts,

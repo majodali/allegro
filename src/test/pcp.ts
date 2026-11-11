@@ -41,6 +41,7 @@ import {
   parseProveArgs, kernelTimeoutReason, formatSeconds, transcriptJsonPath,
   DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
 } from "../../pcp/llm-worker.js";
+import { createClaudeCodeClient, claudeCodeArgs } from "../../pcp/llm-worker.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
@@ -1397,6 +1398,86 @@ export async function runH4aAsyncTests(): Promise<void> {
     eq(result.transcript.turnTimeoutMs, 30_000);
     eq(result.transcript.obligations[0].turns.map(t => t.accepted).join(","), "false,true");
   });
+
+  // --- B-187 L4, ruled at its PR: the Claude Code client ---
+  //
+  // `--proposer claude-code` runs `claude -p` per request. No test runs the
+  // real binary: each test writes a fake `claude` into a temp directory and
+  // names it through the binary override (or, for the CLI, PATH).
+  await asyncTest("B-187 L4: the Claude Code client drives the loop on L2's demo through a fake `claude -p` (the proposer claude-code)", async () => {
+    const fake = writeFakeClaude({ reply: "```allegro\n" + SHIP.trimEnd() + "\n```" });
+    try {
+      const client = createClaudeCodeClient({ model: "sonnet", binary: fake.binary });
+      eq(client.modelId(), "claude-code:sonnet");
+      eq(createClaudeCodeClient().modelId(), "claude-code:default");
+      const result = await runLlmWorker({
+        filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 2, client, extensions: [typeExt],
+      });
+      const ob = result.perObligation.find(o => o.name === GAP)!;
+      eq(ob.discharged, true, JSON.stringify(ob.history));
+      eq(ob.attempts, 1);
+      eq(ob.history[0].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+      eq(ob.authorship!.provers[0].prover, "claude-code:sonnet");
+      eq(result.transcript.prover, "claude-code:sonnet", "the transcript names the prover");
+      // What the fake saw on the run for the plan obligation.
+      const runs = fake.runs();
+      const planRun = runs.find(r => r.stdin.startsWith(`Attempt 1 for plan obligation \`${GAP}\``))!;
+      eq(planRun !== undefined, true, JSON.stringify(runs.map(r => r.stdin.slice(0, 60))));
+      eq(planRun.args.slice(0, 4).join(" "), "-p --output-format json --system-prompt");
+      eq(planRun.args[4], loadPlanPrimer(), "the system prompt is the kind's primer section");
+      eq(JSON.stringify(planRun.args.slice(5)), JSON.stringify(["--tools", "", "--max-turns", "1", "--no-session-persistence", "--model", "sonnet"]));
+      eq(planRun.cwdEmpty, true, "the run's working directory is an empty temp directory");
+      eq(planRun.cwd.startsWith(os.tmpdir()), true, planRun.cwd);
+      eq(planRun.apiKey, "", "ANTHROPIC_API_KEY is not passed to the run");
+      eq(fs.existsSync(planRun.cwd), false, "the temp directory is removed");
+    } finally {
+      fake.remove();
+    }
+  });
+
+  await asyncTest("B-187 L4: a `claude -p` run that exits non-zero is a failed attempt of the worker, its text in the history", async () => {
+    const fake = writeFakeClaude({ exitCode: 3, reply: "Not logged in · Please run /login", stderr: "auth failed" });
+    try {
+      const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+      fs.writeFileSync(tmp, PENDING_SRC);
+      try {
+        const result = await runLlmWorker({ filename: tmp, maxAttempts: 3, client: createClaudeCodeClient({ binary: fake.binary }), primer: "(mock primer)" });
+        const ob = result.perObligation[0];
+        eq(ob.discharged, false);
+        eq(ob.attempts, 1, "a failed run ends the obligation's attempts, as an API error does");
+        eq(ob.history[0].reason!.startsWith("API error: claude-code exited with code 3: "), true, ob.history[0].reason);
+        eq(ob.history[0].reason!.includes("Not logged in · Please run /login") && ob.history[0].reason!.includes("auth failed"), true, ob.history[0].reason);
+      } finally {
+        fs.unlinkSync(tmp);
+      }
+    } finally {
+      fake.remove();
+    }
+  });
+
+  await asyncTest("B-187 L4: the reply's timeout kills a `claude -p` run that does not answer", async () => {
+    const fake = writeFakeClaude({ reply: "```allegro\nproof_refl(2)\n```", sleepSeconds: 30 });
+    try {
+      const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+      fs.writeFileSync(tmp, PENDING_SRC);
+      try {
+        const started = Date.now();
+        const result = await runLlmWorker({ filename: tmp, maxAttempts: 1, client: createClaudeCodeClient({ binary: fake.binary }),
+                                            primer: "(mock primer)", replyTimeoutMs: 500 });
+        eq(result.perObligation[0].history[0].reason, "refused (timeout): the proposer did not reply within 0.5 s");
+        eq(Date.now() - started < 20_000, true, "the loop did not wait for the run");
+        const pid = Number(fs.readFileSync(path.join(fake.dir, "pid"), "utf-8"));
+        await new Promise(r => setTimeout(r, 200));
+        let alive = true;
+        try { process.kill(pid, 0); } catch { alive = false; }
+        eq(alive, false, "the run was killed");
+      } finally {
+        fs.unlinkSync(tmp);
+      }
+    } finally {
+      fake.remove();
+    }
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1572,6 +1653,112 @@ test("B-187 L4: CLI `prove --proposals --transcript` writes the scripted loop's 
     eq(twin.obligations[0].authorship.provers[0].prover, "scripted:proposals.md");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- B-187 L4, ruled at its PR: the Claude Code client's helpers ---
+//
+// A fake `claude` for the tests: it refuses arguments without `-p`,
+// `--output-format json`, `--tools ""` and `--max-turns 1` (exit 2), records
+// its arguments, stdin, working directory and ANTHROPIC_API_KEY, and prints
+// a JSON object whose `result` is the reply. With `planOnly`, it answers
+// the reply only to a plan obligation's request for `Fulfil`, and a reply
+// without a code block otherwise, so the loop's other obligations cost no
+// kernel turn.
+function writeFakeClaude(opts: { reply: string; exitCode?: number; stderr?: string; sleepSeconds?: number; planOnly?: boolean }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-fake-claude-"));
+  const binary = path.join(dir, "claude");
+  fs.writeFileSync(path.join(dir, "reply.json"), JSON.stringify({ type: "result", is_error: (opts.exitCode ?? 0) !== 0, result: opts.reply, session_id: "fake" }));
+  fs.writeFileSync(path.join(dir, "other.json"), JSON.stringify({ type: "result", is_error: false, result: "No proposal for this one.", session_id: "fake" }));
+  fs.writeFileSync(binary, [
+    "#!/bin/bash",
+    `D=${JSON.stringify(dir)}`,
+    "echo $$ > \"$D/pid\"",
+    "args=(\"$@\"); ok=\"\"",
+    "for ((i=0; i<${#args[@]}; i++)); do a=\"${args[$i]}\"; n=\"${args[$((i+1))]-__none__}\"",
+    "  [ \"$a\" = \"-p\" ] && ok=\"${ok}p\"",
+    "  [ \"$a\" = \"--output-format\" ] && [ \"$n\" = \"json\" ] && ok=\"${ok}j\"",
+    "  [ \"$a\" = \"--tools\" ] && [ \"$n\" = \"\" ] && ok=\"${ok}t\"",
+    "  [ \"$a\" = \"--max-turns\" ] && [ \"$n\" = \"1\" ] && ok=\"${ok}m\"",
+    "done",
+    "if [ \"$ok\" != \"pjtm\" ]; then echo \"fake claude: bad arguments ($ok): $*\" >&2; exit 2; fi",
+    "n=$(ls \"$D\" | grep -c '^run-')",
+    "R=\"$D/run-$n\"; mkdir \"$R\"",
+    "cat > \"$R/stdin\"",
+    "for a in \"$@\"; do printf '%s\\0' \"$a\"; done > \"$R/args\"",
+    "pwd > \"$R/cwd\"; ls -A | wc -l | tr -d ' ' > \"$R/cwdcount\"",
+    "printf '%s' \"${ANTHROPIC_API_KEY-}\" > \"$R/apikey\"",
+    ...(opts.sleepSeconds ? [`exec sleep ${opts.sleepSeconds}`] : []),
+    ...(opts.stderr ? [`echo ${JSON.stringify(opts.stderr)} >&2`] : []),
+    opts.planOnly
+      ? "if head -1 \"$R/stdin\" | grep -q 'for plan obligation `Fulfil'; then cat \"$D/reply.json\"; else cat \"$D/other.json\"; fi"
+      : "cat \"$D/reply.json\"",
+    `exit ${opts.exitCode ?? 0}`,
+    "",
+  ].join("\n"), { mode: 0o755 });
+  return {
+    dir, binary,
+    runs: () => fs.readdirSync(dir).filter(n => n.startsWith("run-")).sort().map(n => {
+      const r = path.join(dir, n);
+      const args = fs.readFileSync(path.join(r, "args"), "utf-8").split("\0");
+      args.pop();
+      return {
+        stdin: fs.readFileSync(path.join(r, "stdin"), "utf-8"), args,
+        cwd: fs.readFileSync(path.join(r, "cwd"), "utf-8").trim(),
+        cwdEmpty: fs.readFileSync(path.join(r, "cwdcount"), "utf-8").trim() === "0",
+        apiKey: fs.readFileSync(path.join(r, "apikey"), "utf-8"),
+      };
+    }),
+    remove: () => fs.rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test("B-187 L4: parseProveArgs reads `--proposer` (anthropic by default, or claude-code); claudeCodeArgs is the run's command line", () => {
+  const d = parseProveArgs(["prove", "f.alg"]);
+  if ("error" in d) throw new Error(d.error);
+  eq(d.proposer, undefined, "absent: the SDK client");
+  const c = parseProveArgs(["prove", "f.alg", "--proposer", "claude-code", "--model", "opus"]);
+  if ("error" in c) throw new Error(c.error);
+  eq(c.proposer, "claude-code");
+  eq(c.model, "opus");
+  const a = parseProveArgs(["prove", "f.alg", "--proposer", "anthropic"]);
+  if ("error" in a) throw new Error(a.error);
+  eq(a.proposer, "anthropic");
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--proposer", "gpt"])),
+     JSON.stringify({ error: "--proposer takes anthropic or claude-code, not gpt" }));
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--proposer"])), JSON.stringify({ error: "--proposer takes a value" }));
+  eq(JSON.stringify(claudeCodeArgs("PRIMER", "opus")), JSON.stringify(
+    ["-p", "--output-format", "json", "--system-prompt", "PRIMER", "--tools", "", "--max-turns", "1", "--no-session-persistence", "--model", "opus"]));
+  eq(claudeCodeArgs("PRIMER").includes("--model"), false, "no model: Claude Code's default");
+  eq(claudeCodeArgs("PRIMER").includes("--bare"), false, "bare mode reads no subscription login");
+});
+
+test("B-187 L4: CLI `prove --proposer claude-code` runs the loop through `claude` on PATH, with no key; the SDK path names the route", () => {
+  const fake = writeFakeClaude({ reply: "```allegro\n" + SHIP.trimEnd() + "\n```", planOnly: true });
+  try {
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposer", "claude-code", "--model", "sonnet", "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "", PATH: `${fake.dir}${path.delimiter}${process.env.PATH}` } });
+    const out = JSON.parse(r.stdout);
+    const ob = out.perObligation.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+    eq(ob.discharged, true, r.stdout + r.stderr);
+    eq(ob.attempts, 1);
+    eq(ob.authorship.provers[0].prover, "claude-code:sonnet");
+    eq(r.status, 1, "the laws and `courier`, answered without a code block, stay pending");
+    eq(fake.runs().every(run => run.args.includes("--model") && run.args[run.args.indexOf("--model") + 1] === "sonnet"), true);
+    // The SDK path's missing-key message names the subscription route.
+    const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
+    try {
+      const nokey = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp],
+                              { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+      eq(nokey.status, 1);
+      eq(nokey.stderr.includes("pass --proposer claude-code (Claude Code's scripted mode)"), true, nokey.stderr);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  } finally {
+    fake.remove();
   }
 });
 
