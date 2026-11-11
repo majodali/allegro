@@ -299,6 +299,10 @@ merges, this list is their text.
    - **Intensifiers**: "key", "crucial", "load-bearing", "critically".
    - **Bold labels** on every line or list item.
    - **Abstract nouns** where a verb would do.
+   - **Paired-clause titles**: a title of the form "A, and B" or "A,
+     not B". More generally, any form repeated across titles or
+     sentences (added 2026-11-11, on DR1). Existing instances among the
+     decision titles are corrected in the later style pass, not now.
 9. **Process detail moves out.** How the project is worked on (process,
    lanes, measurement, file maps, studies) leaves the book's narrative.
 10. **A concept is defined where it is first used or decided.**
@@ -1059,10 +1063,50 @@ its approval.
   against each decision in phase 1; reviews of about 12,000 words, a
   part split where larger. The chunk sequence of §5 gains DR1 to DR6
   and CH0 to CH33.
-- **Ratified 2026-11-11, on PR #183.** The maintainer reviewed the PR and
+- **Ratified 2026-11-10, on PR #183.** The maintainer reviewed the PR and
   ratified every change: the four corrected entries of
   `docs/decisions.md`, R36, R37 and §2.8 as written, part (e) of the
   briefs, and the terms *held finding* and *decision review*.
+
+**Rulings taken 2026-11-11, in the review session, on DR1's method.**
+
+- **R38 — The purpose of the decision review.** The maintainer's
+  statement: implementation choices made over time have blurred and
+  weakened some of Allegro's initial goals, and the review is there to
+  rectify that. A decision is adjusted when it is shown unsound because
+  it contradicts a prior decision. Wherever a choice was adopted counter
+  to the original goals because no alternative was obvious, the review
+  revisits it analytically and corrects it; it does not restate the
+  goal to fit the code. Two named cases: "compile time" is not a
+  necessary concept for Allegro, since partial evaluation is primary
+  and build, validation and execution phases are configuration; and the
+  original goals lean to a single extension mechanism for all. The
+  wording of each decision is as strong and clear as it can be, and
+  makes sense to a reader who does not know the project, the early
+  decisions above all.
+- **R39 — Partial evaluation is primary, stated consistently.** Taken
+  with R38: the three claim rulings of DR1 (a refuted claim halts, a
+  pending one does not, no check silently weakened) are one decision,
+  partial evaluation applied to claims; and compilation as partial
+  evaluation stays in Part I. Every decision that partial evaluation
+  applies to (claims, compilation, types, optimisation) is worded to
+  show the one approach.
+- **R40 — Layers go.** Ruled 2026-11-11 with DR1: "layer" was only ever
+  a way of organising code. The standard language is a configuration of
+  extensions, not a tier, and the term is to be done away with before
+  release. Until then L0 to L3 are vocabulary of the units appendix
+  only, and no decision of the book rests on them.
+- **R41 — DR1 ruled; the vision chapter.** Every ask of DR1 was ruled
+  item by item in the review session on 2026-11-11, with the review
+  session's own reading beside the review's; the rulings are in the
+  record `docs/records/book-pass/dr1-part-1-the-bet.md` and the ruled
+  decisions in the inventory. Part I is a thesis statement and 23
+  decisions in two chapters. A Part I decision owns no code: every
+  violation is a held finding on the decision that realises it.
+  `docs/book/vision.md` (Tier 0) is not patched now; the tour and Part
+  I replace it when they are written in phase 2, by a Tier-0 PR with
+  the maintainer's sign-off then. The strength vocabulary is four
+  words: decided, sampled, assumed, undecided.
 
 ## 7. Record
 
@@ -1226,6 +1270,22 @@ its approval.
 - **2026-11-10 — two phases** (the review session). R37 recorded in §6;
   §2.8 states the phases; §5 gains the phase chunks; the header's
   `chunks` lists them; part (e) of the briefs is the phase-1 brief.
+- **2026-11-10 — DR1 opened: the decision review of Part I** (the review
+  session). `docs/records/book-pass/dr1-part-1-the-bet.md`: the 23
+  decisions of chapters 1 to 3 ruled, eight new decisions proposed from
+  the maintainer's motivations, 13 held findings. Reproduced: `--base`
+  loads no extension (`use` is a parse error); a return-type mismatch
+  reports after the program has run and exits 0; a failed proof halts
+  only after the program has run.
+- **2026-11-11 — DR1 ruled** (the review session, now discussing each
+  item with the maintainer). R38 to R41 recorded in §6. The inventory's
+  Part I rewritten as ruled: the thesis statement "Why a new language,
+  now" and 23 decisions in two chapters (10 and 13), chapter 3
+  dissolved; 256 decisions in all. About twenty held findings recorded
+  on the decisions of Parts II to VI that realise them, the standard
+  language as privileged host code the largest. Two proposals deferred
+  to their parts. Lints: `lint:docs:check` anchors 0 · order 0 · ids
+  783.
 
 ## 8. Sessions
 

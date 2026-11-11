@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-11 — Part I's decisions ruled.** The first decision review
+  is ruled item by item. Part I of the inventory is now a thesis
+  statement ("Why a new language, now") and 23 decisions in two
+  chapters, worded for a reader who does not know the project: partial
+  evaluation as the one operation, phases as configuration, claims
+  evaluated like everything else, one way to extend, host code only as
+  a capability, and results that say how strongly they hold. The plan
+  records the review's purpose: to restore Allegro's original goals
+  where implementation choices blurred them. Ids 783.
+
 - **2026-11-10 — the book pass in two phases.** The plan now reviews
   every decision of the inventory first, part by part, ruling each and
   checking it against the code, before any chapter content is written;
