@@ -28,19 +28,19 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
 **Part II: Allegretto, the kernel**
 
 4. **Values and their seven kinds** (8 decisions). Everything is a value of one of seven fixed kinds, and the base offers a small set of primitives over them.
-   - Decisions: One value universe; Seven representation kinds; Kind is a host discriminant, not a type; Value as a contract, seven kind units and an assembly; Bits is the only scalar; Minimal base surface of about forty primitives; Each decision lives in one replaceable unit of code; Scalar encodings inside Bits.
+   - Decisions: One value universe; Seven representation kinds; Seven representation kinds; Value as a contract, seven kind units and an assembly; The kernel's plain data is a sequence of bits, and it computes nothing on them; The kernel's primitives are pure and few; Each decision lives in one replaceable unit of code; The kernel's plain data is a sequence of bits, and it computes nothing on them.
    - Draws on: [units.md](../book/units.md) §3, §3.2, [concepts.md](../book/concepts.md) T0 §1 to §3, §8, [allegretto/README.md](../book/allegretto/README.md) the minimal base, [allegretto/structures.md](../book/allegretto/structures.md) §11, Appendix B, Value, the kinds and the assembly (planned), [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 (the default arm), Futures and the base primitives (planned).
 5. **Expressions, functions and symbols** (8 decisions). Unevaluated applications are values forming a DAG; functions are data; symbols are identified by fully-qualified name.
-   - Decisions: Expressions are values, forming a DAG; Symbol identity is a fully-qualified name; Host functions as values with declared evaluation control; Expressions memoize per evaluation context; Positional parameters owned by membership; Functions are data: params plus body; Transient reference symbols resolved by base name; Symbols interned by FQN.
+   - Decisions: Expressions are values, forming a DAG; Symbol identity is a fully-qualified name; A function may take an argument unevaluated; Expressions memoize per evaluation context; Positional parameters owned by membership; Functions are data: params plus body; Transient reference symbols resolved by base name; Symbols interned by FQN.
    - Draws on: [concepts.md](../book/concepts.md) T0 §4 to §7, [allegretto/structures.md](../book/allegretto/structures.md) §5, Value, the kinds and the assembly (planned).
 6. **Structures** (8 decisions). The one composite kind, how its entries are laid out, how it is constructed, and why it is immutable.
    - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; The composite is one sequence of optionally-keyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
    - Draws on: [concepts.md](../book/concepts.md) T0 §9, §12 to §14, [allegretto/structures.md](../book/allegretto/structures.md) §1, §2.
 7. **Metadata and the capability to write it** *(recommended pilot)* (13 decisions). Every value carries independent metadata fields, and only the holder of a field's writer may originate it.
-   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Authority is an unforgeable value; A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Evaluation stops early for two reasons only.
+   - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; Authority is an unforgeable value; A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Evaluation stops early for two reasons only.
    - Draws on: [units.md](../book/units.md) §3.1, [concepts.md](../book/concepts.md) T2 §19, §19b, §21, [allegretto/structures.md](../book/allegretto/structures.md) §3, Appendix C, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §1 to §4, §6, §9.
 8. **How metadata propagates** (7 decisions). The fixed vocabulary by which fields travel through evaluation, errors as a viral field, the source field, and which layer registers what.
-   - Decisions: Primitives receive full values; How the base applies propagation; A failure a program can handle is supplied by an extension; The source field: an expression as metadata; Each layer registers its own fields; Field versus channel, and channel registration; Minimal base surface of about forty primitives.
+   - Decisions: Primitives receive full values; How the base applies propagation; A failure a program can handle is supplied by an extension; Every value keeps its origin; An extension registers its own fields; the kernel has two; An extension registers its own fields; the kernel has two; The kernel's primitives are pure and few.
    - Draws on: [concepts.md](../book/concepts.md) T2 §20, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §5, §8.
 9. **Four planes** (5 decisions). Where each kind of information about a value lives, and the sanctioned interfaces that reach each plane.
    - Decisions: Metadata is a field on every value; Each decision lives in one replaceable unit of code; Each decision lives in one replaceable unit of code; Metadata is a field on every value; Each decision lives in one replaceable unit of code.
@@ -138,12 +138,12 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 
 | Finding | Decision | Chapter | Source |
 |---|---|---|---|
-| A second viral field erases the first | Metadata channels are independent | Metadata and the capability to write it | the pilot's review, §7 item 1 |
+| A second viral field erases the first | Metadata fields are independent | Metadata and the capability to write it | the pilot's review, §7 item 1 |
 | `channel_register` accepts any rule string | A field's rule is a pure, bounded function | Metadata and the capability to write it | the pilot's review, §7 item 2 |
 | A user-registered viral field stops computation | How the base applies propagation | How metadata propagates | the pilot's review, §7 item 3 |
-| The ownership test never checks owners | Each layer registers its own fields | How metadata propagates | the pilot's review, §7 item 4 |
+| The ownership test never checks owners | An extension registers its own fields; the kernel has two | How metadata propagates | the pilot's review, §7 item 4 |
 | Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; Exhaustiveness checking at info severity | Termination and completion | DR1, rulings of 2026-11-11 |
-| `print` is a base primitive | Minimal base surface of about forty primitives; Environment capabilities outside the base, effect-labelled | Values and their seven kinds; Hosts | DR1, rulings of 2026-11-11 |
+| `print` is a base primitive | The kernel's primitives are pure and few; Environment capabilities outside the base, effect-labelled | Values and their seven kinds; Hosts | DR1, rulings of 2026-11-11 |
 | Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
@@ -299,7 +299,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "An extension is made of functions and metadata fields" and its neighbours.
 - Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "One evalSource pipeline for programs and libraries" and "Precompile before the evaluation loop".
 - Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
-- Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "Minimal base surface of about forty primitives".
+- Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "The kernel's primitives are pure and few".
 - Held finding (2026-11-11, DR1): the platform with no extension loaded cannot load one: `use` is a parse error under `--base` (`src/index.ts:115`–`119`, `252`–`253`). Held on the CLI's decisions.
 - Chapter: Why a new language
 
@@ -426,7 +426,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: fixed compile-time and run-time phases built into the language (what the code does today, adopted for want of an alternative; rejected, R38 (the purpose of the decision review) of book-pass.md); `print` and other effects as base primitives (rejected: every primitive is pure)
 - Sources: the maintainer's rulings of 2026-11-11 (R38 and R39 (partial evaluation is primary) of book-pass.md; ../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/concepts.md §25 to §29; docs/book/platform/host.ir.md (environment capabilities)
 - Notes: new, by ruling. A phase's diagnostics (refutations, verdicts, warnings) are its result, metadata rendered by the tool that ran the phase, and are never program output; program output is an effect through a capability, so the two are different streams even where a console shows both. "Capability" is kept for this sense; how it relates to the capability to write a metadata field is explored in Part II. Absorbs "Multi-phase build as successive partial evaluation" and "Project severity configuration" as its realisations; both to be re-read in their parts.
-- Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "Minimal base surface of about forty primitives" and "Environment capabilities outside the base, effect-labelled".
+- Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "The kernel's primitives are pure and few" and "Environment capabilities outside the base, effect-labelled".
 - Held finding (2026-11-11, DR1): the precompile and compile-time phases are hard-coded in the pipeline. Held on "Multi-phase build as successive partial evaluation" and "Precompile before the evaluation loop".
 - Chapter: Keep it simple
 
@@ -479,7 +479,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### The kernel trusts only what it has evaluated
-- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, the return of a capability, a statement a program asks it to accept: each is reported as assumed, and everything that rests on it says so.
+- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, or a statement a program asks it to accept, is reported as assumed, and everything that rests on it says so. A claim decided with the help of a capability is decided, and names the capability.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: technical
@@ -492,6 +492,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT" and merges "SMT as a selective fallback", which is no longer a decision.
 - Chapter: Keep it simple
 
+- Notes (amended 2026-11-11, DR2, with the maintainer's approval): the return of a capability is not a claim, so it is not "assumed"; a claim decided by calling a capability is decided and names it.
 #### Anyone may propose, and the record shows who
 - Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -613,7 +614,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Values and their seven kinds
 
 #### Seven representation kinds
-- Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure.
+- Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure. A kind says how a value is represented; types come from extensions.
 - Status: settled
 - Type: capability — concepts.md files it as a specification choice, visible to the layers above
 - Rationale kind: technical
@@ -625,20 +626,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-1, T0 §2; docs/decisions.md D1, D46, D51
 - Book home (fragments' proposal): concepts.md Part 0 (SC-1) / kinds chapter (planned II.3)
 - Notes: Significance calibrated from 5.
-- Chapter: Values and their seven kinds
-
-#### Kind is a host discriminant, not a type
-- Decides: `v.kind` is an interpreter tag invisible at the language level, separate from types; the definitional ladder runs representations → values → types → kinds, and the language taxonomy is data versus computation forms.
-- Status: settled
-- Type: capability — it decides what the language does not expose
-- Rationale kind: technical
-- Depends on: Seven representation kinds
-- Significance: 4 — keeps the type system an extension
-- Label: foundational — Allegro Standard's type system as an extension rests on it
-- Units: kinds, value
-- Options recorded: kind as a type (rejected: the type system would be fixed at seven)
-- Sources: docs/decisions.md D46; docs/book/concepts.md T0 §2; docs/book/allegretto/structures.md §2 (D46 block)
-- Book home (fragments' proposal): kinds chapter (planned II.3)
+- Notes (2026-11-11, DR2): ruled; each kind passes the kernel's criterion. Absorbs "Kind is a host discriminant, not a type". Carried forward to the open privacy question: a symbol is identified by name, and a name can be guessed.
 - Chapter: Values and their seven kinds
 
 #### Value as a contract, seven kind units and an assembly
@@ -656,51 +644,32 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: specified and probed on TypeScript 7.0.2; the move rides the first chunk that edits the `Value` union. Today all of it is in `src/types.ts`.
 - Chapter: Values and their seven kinds
 
-#### Bits is the only scalar
-- Decides: Allegretto has one uninterpreted scalar, a bit vector of known length, and `Int`, `Float`, `String` and `Bool` are Bits with a type attached at L2.
-- Status: settled
+#### The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart and does nothing else with them. What the bits mean, and every operation on them, comes from extensions and from capabilities.
+- Status: partly built (arithmetic and the scalar encodings are kernel primitives today); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Seven representation kinds; Everything above the kernel is an extension, and there is one way to extend
-- Significance: 4 — puts numeric and textual semantics in extensions
-- Label: foundational — core types and typed literals build on it
-- Units: bits
-- Options recorded: a fixed set of primitive scalars (violates R6); tagged scalars (the tag is a degenerate type channel)
-- Sources: docs/book/concepts.md SC-2, T0 §3; docs/decisions.md D9 (no references inside Bits)
-- Book home (fragments' proposal): concepts.md Part 0 (SC-2) / kinds chapter (planned)
-- Notes: revisit trigger recorded: a numeric or textual operation that cannot be expressed at L2 without the base knowing its semantics.
+- Depends on: Seven representation kinds
+- Significance: 4 — the smallest kernel that still holds data
+- Label: foundational — every scalar type and every numeric operation is built above it
+- Options recorded: machine arithmetic and comparison as kernel primitives (the review session's first draft; rejected by the maintainer: specific scalar representations and operations could, and some should, belong in extensions, and some operations will always be defined there); an integer, a float and a text encoding fixed in the kernel (what the code does today)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Bits is the only scalar" and "Scalar encodings inside Bits". The 64-bit width, the IEEE float and the UTF-8 text encoding become choices of the standard language and of the arithmetic capability.
+- Held finding (2026-11-11, DR2): arithmetic, comparison and the scalar encodings are base primitives (`src/primitives.ts`).
 - Chapter: Values and their seven kinds
-
-#### Minimal base surface of about forty primitives
-- Decides: Allegretto's irreducible base is about forty primitives in five groups (Bits, Expression, Structure, channels, Scope) plus core control (`eval_if`, `seq`, `id`); types, proofs, effects, contracts, totality, pattern matching, grammar tooling and IO are not base.
-- Status: partly built
+#### The kernel's primitives are pure and few
+- Decides: the kernel's primitives cover six things: telling bits apart; building and reading structures and expressions; one conditional; evaluating an expression with names rebound; registering a metadata field; evaluating a claim. None performs an effect. An effect is always a capability.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: The kernel contains only what no extension could supply; Everything above the kernel is an extension, and there is one way to extend
-- Significance: 4 — the layering proof
-- Label: foundational — every primitive's layer placement follows
-- Units: base-primitives
-- Options recorded: the per-primitive audit (keep, refactor, subsume, extension, env, delete); `eval_when` as base control versus a pattern-matching library is marked a judgment call
-- Sources: docs/decisions.md D27, D28; docs/book/allegretto/structures.md §11, Appendix B; docs/plans/archive/structured-values-unification.md B8
-- Book home (fragments' proposal): allegretto base-primitives chapter (planned, II.5)
-- Notes: physical relocation out of `src/primitives.ts` rides M2/M3. units.md row 15 lists `eval_when`, `print` and `make_error` as base-primitives, while Appendix B marks `eval_when` EXTENSION and `print` ENV: the sources disagree on placement.
+- Depends on: The kernel contains only what no extension could supply; Seven representation kinds
+- Significance: 4 — the whole of what the kernel computes
+- Label: foundational — every extension is built from these
+- Options recorded: a target of about forty primitives (dropped: the criterion decides the count); primitives that declare the effects they produce (rejected: every primitive is pure)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Minimal base surface of about forty primitives" and "Host functions as values with declared evaluation control"; "Primitives receive full values" is a rule of the kernel's own code under it.
+- Held finding (2026-11-11, DR1 and DR2): 178 primitives in one table, 54 of them the standard language's, `print` and other effects among them (`src/primitives.ts:4509` onward).
 - Chapter: Values and their seven kinds
-
-#### Scalar encodings inside Bits
-- Decides: an integer is 64-bit, a float is IEEE-754 packed into the same 64 bits, and a string is UTF-8 bytes.
-- Status: settled
-- Type: capability — the number semantics a program sees
-- Rationale kind: technical
-- Depends on: Bits is the only scalar
-- Significance: 1 — local encoding
-- Label: swappable — behind the `bits` unit's factories
-- Units: bits
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md T0 §3; docs/book/units.md §4.1 row 2; src/types.ts:276-484 (makeInt, makeFloat, stringToBits)
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: the sources record no rationale for these encodings.
-- Chapter: Values and their seven kinds
-
 ### Expressions, functions and symbols
 
 #### Expressions are values, forming a DAG
@@ -733,21 +702,18 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: the qualification syntax `x[ns.name]` is deferred (C5.2-R4); ambiguity is a detected error.
 - Chapter: Expressions, functions and symbols
 
-#### Host functions as values with declared evaluation control
-- Decides: a primitive function is host-implemented and carries declarations the evaluator acts on (`lazy`: do not evaluate my arguments; `effects`: labels I produce; `sourceAware`: attach each argument's originating expression), so primitives never reach into the evaluator.
-- Status: settled
-- Type: capability — evaluation control and effect labels are semantics a program observes
+#### A function may take an argument unevaluated
+- Decides: a parameter can be declared to receive its argument as written: the expression itself, with nothing evaluated, together with the context it was written in, which the function cannot inspect. The function may read the expression, and may hand it back to the kernel to be evaluated in that context, whole, in part or transformed, with names rebound or capabilities withheld as it chooses. There is one unevaluated form; everything else about the argument is found by evaluating it.
+- Status: open (use cases to work through); ruled 2026-11-11 (DR2)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Seven representation kinds
-- Significance: 3 — keeps the propagation table authoritative
-- Label: swappable — the declaration set can grow behind the unit
-- Units: primitive-function
-- Options recorded: lazy registration as a way to see ASTs (replaced by `sourceAware`); lazy registration to dodge argument stripping (deleted with D3)
-- Sources: docs/book/concepts.md T0 §8; docs/decisions.md D3, D47; docs/book/allegretto/structures.md §3.1 "What migrates"; docs/plans/structures-implementation.md §6 item 2
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: two proof primitives stay lazy for a different reason: as non-value interpreters a residual or error proposition must become a failed proof, and lazy registration is the only way to opt out of the Rule 1 residual guard (structures.md §3.1).
+- Depends on: Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
+- Significance: 4 — what lets control forms be built by extensions
+- Label: foundational — `if` with branch knowledge, pattern matching and every analysis of an expression rest on it
+- Options recorded: laziness as a privilege of kernel primitives (what the code does today); passing a partly evaluated form (not needed: the function asks the kernel to evaluate what it wants evaluated)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; it replaces the `lazy` and `sourceAware` declarations of primitives. The declaration is a property of the parameter, since the kernel has no syntax. The maintainer: the function cannot know which other extensions are loaded, so that information is carried in the expression; here each part of an expression holds the function it applies, and the context stays with the expression. Use cases to work through: `if` with branch knowledge (first), pattern matching, `&&` and `||`, reading a function's body for termination, diagnostics that show an expression, rewriting by laws.
 - Chapter: Expressions, functions and symbols
-
 #### Expressions memoize per evaluation context
 - Decides: an Expression carries a memo table keyed by evaluation context, and a clone shares it.
 - Status: settled
@@ -857,7 +823,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: One composite kind: Structure; Bits is the only scalar
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it computes nothing on them
 - Significance: 2 — local to the structure unit
 - Label: swappable — collection types choose representations above
 - Units: structure
@@ -941,7 +907,7 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### Metadata and the capability to write it
 
-#### Metadata channels are independent
+#### Metadata fields are independent
 - Decides: each piece of named information about a value is handled by its own declaration, independently of every other, and no operation may disturb a field it does not know about.
 - Status: settled
 - Type: capability
@@ -960,9 +926,9 @@ They came together over years of exploration into most of what Allegro is today.
 #### Metadata is a field on every value
 - Decides: every representation kind carries an optional `meta` map, so a typed `42` is a Bits with a `type` field, and attaching metadata yields a new value of the same kind.
 - Status: settled
-- Type: capability — metadata rides each occurrence of a value, which a program observes; concepts.md files the representation as implementation and its R3 entry (Metadata channels are independent) calls placement a specification choice
+- Type: capability — metadata rides each occurrence of a value, which a program observes; concepts.md files the representation as implementation and its R3 entry (Metadata fields are independent) calls placement a specification choice
 - Rationale kind: technical
-- Depends on: Metadata channels are independent; Seven representation kinds
+- Depends on: Metadata fields are independent; Seven representation kinds
 - Significance: 5 — every residual carries propagated fields this way
 - Label: foundational — every metadata read and write and PE Rule 1's residual rest on it
 - Units: metadata
@@ -972,38 +938,90 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: D10, D15 and D17 are still marked "accepted (executed)" in decisions.md although D48(b) retired the carrier they describe; decisions.md records no supersession for them. Told in the tour.
 - Chapter: Metadata and the capability to write it
 
-#### Metadata fields registered with declared propagation rules
-- Decides: extensions register their own metadata fields, each with a declared propagation rule, rather than the base fixing a set of annotation channels.
-- Status: settled
+#### An extension registers its own fields; the kernel has two
+- Decides: a metadata field is registered by the extension whose concept it holds, with the rule for how it travels. The kernel registers only two: the outcome of a claim, and a value's origin.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata channels are independent
-- Significance: 4 — the extension mechanism for value information
-- Label: foundational — every channel registers this way
-- Units: metadata, capability
-- Options recorded: a fixed set of annotation channels (implied alternative); `__*` meta-bindings (replaced)
-- Sources: docs/decisions.md D2; docs/book/allegretto/structures.md §3; docs/book/allegretto/metadata-and-capability.md §3
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §3
+- Depends on: Metadata fields are independent
+- Significance: 4 — the kernel names no extension's concept
+- Label: foundational — every field rests on it
+- Options recorded: a fixed set of fields in the kernel (rejected); one registration for a group of fields, a channel (dropped with the term)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Metadata fields registered with declared propagation rules" and "Each layer registers its own fields"; the open "Field versus channel, and channel registration" is removed, and "channel" is no longer a term: a field is a field.
+- Held finding (2026-11-10, from the pilot's review §7 item 4): the ownership test names an owner file per field but only checks that each field is registered (`src/boundary-tests.ts:924`–`936`).
+- Held finding (2026-11-11, DR2): the kernel registers `error`, `knowledge`, `warnings` and `exported` (`src/capability.ts:181`–`195`); the registration primitive is named `channel_register`.
 - Chapter: Metadata and the capability to write it
-
 #### Authority is an unforgeable value
 - Decides: the right to do something that not all code may do is a function value that cannot be forged or guessed: writing a metadata field, reading a private member, performing an effect. Any code that holds the value can use it, pass it on, or wrap it in a narrower one. Nothing is granted by name, or by the identity of whoever asks.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata channels are independent; Host code reaches a program only as a capability
+- Depends on: Metadata fields are independent; Host code reaches a program only as a capability
 - Significance: 5 — one idea for field writers, supplied capabilities and private access
 - Label: foundational — proofs, effects, privacy and every field's writer rest on it
 - Options recorded: authority by name or by the identity of the requester (rejected); three separate mechanisms for field writers, effects and member privacy (what the inventory listed)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Metadata origination is capability-controlled"; "Writes gated by a capability, reads free", "Writers are closures: delegable, attenuable, unforgeable" and, in Part IV, "Evidence is possession" are re-read as its instances. Open under it: privacy by possession of an unforgeable key, the working answer, analysed with "Who can see a member"; its first test is reflection, since every extension can read a value's source expression: what does an expression show of a key to code that does not hold it?
 - Chapter: Metadata and the capability to write it
+
+#### A capability is granted, never acquired
+- Decides: host code enters only through the configuration of a phase. An extension receives a capability only when the code using that extension passes it one. An extension cannot bring host code of its own, and cannot obtain a capability it was not handed.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Authority is an unforgeable value; Host code reaches a program only as a capability
+- Significance: 4 — no third-party extension installs anything transitively
+- Label: foundational — the trust placed in every extension rests on it
+- Options recorded: capabilities available to any code by name (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the first of the maintainer's two questions on making capability extensions trustworthy.
+- Chapter: Metadata and the capability to write it
+
+#### What code may do is bounded by the capabilities it is given, and that bound is a claim
+- Decides: a program, a function or an extension can state which capabilities it uses. The kernel decides that claim like any other.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is granted, never acquired; Claims are evaluated like everything else
+- Significance: 4 — what an extension is allowed to do is checked, not trusted
+- Label: foundational — the effects decisions of Part IV are to be read as its instances
+- Options recorded: effect labels as a separate system (to be re-read in Part IV: an effect label is the name of a capability that code can reach)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling.
+- Chapter: Metadata and the capability to write it
+
+#### A capability is supplied per target
+- Decides: for each kind of phase, whoever supplies a capability gives either an implementation to run or code to emit. Exporting a program is a phase in which capabilities are emitted, not performed. The kernel's own primitives are translated in the same way.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is granted, never acquired; Phases are configuration
+- Significance: 4 — how a program that uses capabilities becomes native code
+- Label: foundational — every back end rests on it
+- Options recorded: capabilities that exist only in the interpreter (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the second of the maintainer's two questions. To be placed with Part VI when that part is reviewed.
+- Chapter: Metadata and the capability to write it
+
+#### Machine arithmetic is a capability that ships with the platform
+- Decides: arithmetic and comparison on machine integers and floating-point numbers are a pure capability that ships with the platform and is supplied in every standard configuration, build phases included, so known values still fold. A claim decided with its help names it.
+- Status: open (to prove); ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Significance: 4 — shrinks the kernel to what no capability could supply
+- Label: swappable — another arithmetic can be supplied in its place
+- Options recorded: machine arithmetic in the kernel (rejected, see the bits decision)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
+- Chapter: Metadata and the capability to write it
 #### A field's rule is a pure, bounded function
 - Decides: a rule computes a field's value on a result from the field's values on the function applied and on its arguments. It sees nothing else, performs no effect, and always finishes. For now a rule may not recurse, which the kernel can check by itself.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata fields registered with declared propagation rules; Authority is an unforgeable value
+- Depends on: An extension registers its own fields; the kernel has two; Authority is an unforgeable value
 - Significance: 4 — the one place kernel evaluation runs an extension's code
 - Label: foundational — every field registration rests on it
 - Options recorded: a fixed vocabulary of five rules with owner-installed semantics (what the code does today; it becomes a library of common rules); general callbacks that take part in the evaluator's own work, with state or events (rejected: "a vampire is at the door asking to come in")
@@ -1031,7 +1049,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — delegation and attenuation are what a writer's holder can do
 - Rationale kind: technical
-- Depends on: Writes gated by a capability, reads free; Host functions as values with declared evaluation control
+- Depends on: Writes gated by a capability, reads free; A function may take an argument unevaluated
 - Significance: 4 — authority as a value, trackable in the PE dataflow
 - Label: foundational — every gated install checks writer identity
 - Units: capability, primitive-function
@@ -1145,7 +1163,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — a rule for host primitive code, realising that channels are independent
 - Rationale kind: technical
-- Depends on: Host functions as values with declared evaluation control; A field's rule is a pure, bounded function
+- Depends on: A function may take an argument unevaluated; A field's rule is a pure, bounded function
 - Significance: 4 — removes the lazy/eager stripping asymmetry
 - Label: foundational — every primitive implementation relies on it
 - Units: evaluator, base-primitives
@@ -1184,51 +1202,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
 - Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
 - Chapter: How metadata propagates
-#### The source field: an expression as metadata
-- Decides: a value can carry the Expression it evaluated from (plus span) as a `drop` field with a kernel-private writer, attached on demand at calls of source-aware functions and on resolved top-level bindings, read through `source of x` under the `observe` effect.
-- Status: settled
+#### Every value keeps its origin
+- Decides: the result of evaluating an expression carries that expression as metadata, and no later evaluation discards it. Each residual keeps a reference to the expression immediately before it, so every step of evaluation can be traced back to what was first written or constructed. What is known about an expression is found by evaluating it: each part of the result carries the fields derived so far, and its own origin.
+- Status: partly built (to verify); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A field's rule is a pure, bounded function; Writes gated by a capability, reads free; Expressions are values, forming a DAG
-- Significance: 3 — gives meta-functions AST access without grammar productions
-- Label: swappable — one field registration and an evaluator attachment point
-- Units: metadata, capability, evaluator
-- Options recorded: universal attachment (rejected: cost on every hot path); a public writer (superseded: a doctored source could make a verdict display a different proposition); source text as a second payload (rejected); a first-class inert AST value (needs a quote carrier, deferred); lazy attachment at statement level (rejected tentatively); binding-level attachment on Structures (deferred to an identity audit)
-- Sources: docs/decisions.md D47, B-094-1/2/3; docs/book/allegretto/structures.md §3.1; docs/book/allegretto/metadata-and-capability.md §8
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8 (design in structures.md §3.1)
-- Notes: the effect label `observe` belongs to the effects fragment.
+- Depends on: Expressions are values, forming a DAG; An extension registers its own fields; the kernel has two
+- Significance: 4 — analyses, diagnostics and proof translation read it
+- Label: foundational — every analysis of a program and every report about one rest on it
+- Options recorded: attaching the expression on demand, at calls of functions that ask for it, and reading it under an `observe` effect (what the code does today; rejected: attach always and let partial evaluation drop what nothing reads)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "The source field: an expression as metadata". Only the kernel writes the record. Assumptions to verify, in the maintainer's words "all assumption": that keeping the origin is cheap apart from memory, that partial evaluation eliminates an origin nothing reads, and that every evaluation step preserves the link. The raw form will not be friendly to use; there is scope for a utility extension for querying and analysing origins.
+- Held finding (2026-11-11, DR2): the `source` field is attached on demand and read under `observe` (`src/capability.ts:181`).
 - Chapter: How metadata propagates
-
-#### Each layer registers its own fields
-- Decides: a field is registered where its concept lives; the base registers only `error` and `source`, the fields whose concepts survive under `--base`, and a battery pins the ownership table.
-- Status: partly built
-- Type: capability — it decides which fields the base language has
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Metadata fields registered with declared propagation rules
-- Significance: 3 — R6 for fields
-- Label: swappable — registrations move between units
-- Units: capability, metadata
-- Options recorded: the base registering every field at module init (prior state, moved at B-109)
-- Sources: docs/book/allegretto/metadata-and-capability.md §3, §8; docs/book/concepts.md R6 delta
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8
-- Notes: `knowledge`, `warnings` and `exported` are still registered by the base with no owner (B-111).
-- Held finding (2026-11-10, from the pilot's review §7 item 4): the ownership test names an owner file per field but only checks that each field is registered, never which file registered it (`src/boundary-tests.ts:924`–`936`). The fix is a test change in `src/boundary-tests.ts`; ruled case by case under R32 (M3 reconciled with the monotonic pass) if an implementation stream then holds the file.
-- Chapter: How metadata propagates
-
-#### Field versus channel, and channel registration
-- Decides: open — a metadata field is storage and a channel is the capability built on one or more fields, their rules, writer and interpreting code; whether one channel-level registration ("these fields, these rules, this semantics, this owner") replaces field-by-field registration, and what the three ownerless fields are.
-- Status: open
-- Type: capability — the registration surface an extension author uses
-- Rationale kind: technical
-- Depends on: Each layer registers its own fields
-- Significance: 3 — closes the fourth owed plane interface
-- Label: swappable — a registration surface in the capability unit
-- Units: capability, metadata
-- Options recorded: none recorded beyond the hook (d) sketch; hook (e), the facts merge, is proposed to be (d)'s registration read by a second consumer
-- Sources: docs/book/allegretto/metadata-and-capability.md §4; docs/plans/metadata-on-values.md §6 ruling 1 (vocabulary); docs/plans/plane-interfaces.md §6 hook (d), (e); docs/book/concepts.md §24 item 4; B-111
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §4
-- Chapter: How metadata propagates
-
 ### Installing a layer into the base
 
 #### An extension is made of functions and metadata fields
@@ -1895,7 +1881,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Every Standard value has a type, with no implicit fallback; Bits is the only scalar
+- Depends on: Every Standard value has a type, with no implicit fallback; The kernel's plain data is a sequence of bits, and it computes nothing on them
 - Significance: 3 — the types every program uses
 - Label: swappable — each type behind its member set
 - Units: core-types, type-primitives
@@ -2190,7 +2176,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Host functions as values with declared evaluation control
+- Depends on: A function may take an argument unevaluated
 - Significance: 2 — local to the conditional, but its thunking interacts with tail calls
 - Label: swappable — the spelling is base-grammar; the thunking rides the lazy-primitive mechanism
 - Units: base-grammar, tree-builder, base-primitives
@@ -2912,7 +2898,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: implementation — how the verdict is computed; what it reports is "Every result says how strongly it holds"
 - Rationale kind: technical
-- Depends on: Four-tier discharge spectrum; Metadata fields registered with declared propagation rules
+- Depends on: Four-tier discharge spectrum; An extension registers its own fields; the kernel has two
 - Significance: 2 — how obligations reach the verdict
 - Label: swappable — verdict assembly
 - Units: pcp
@@ -3586,7 +3572,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
-- Depends on: Minimal base surface of about forty primitives; Effect inference is driven by partial evaluation, and a declaration is a contract
+- Depends on: The kernel's primitives are pure and few; Effect inference is driven by partial evaluation, and a declaration is a contract
 - Significance: 3 — makes I/O visible to the effect system
 - Label: swappable — the host can offer a different set
 - Units: not yet a unit (T-host track); base-primitives, futures (today; a `host` unit is proposed)
@@ -3806,7 +3792,7 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 
 Three typings go against a source or need the maintainer's eye:
 
-- "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata channels are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata channels are independent" instead.
+- "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata fields are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata fields are independent" instead.
 - "The environment is not a value" is typed implementation, although it supersedes a specification choice. Its own options line says no scope reaches user code as a value, so leaving `Value` changes the representation only.
 - "One operation: partial evaluation" is typed capability. The language exposes it: residuals are values, and every check is an evaluation a user can read.
 
@@ -3816,7 +3802,7 @@ Three typings go against a source or need the maintainer's eye:
 |---|---|---|
 | A missing value is a cell that is filled once | "Incompleteness is a value in a slot"; "Future cells: write-once, monotonic, flattening" | The first states incompleteness as an unresolved future; the second states the future as the sole locus of incompleteness. Each is stated in the other's terms, so neither holds alone. Sources, options and notes are the union. |
 
-Not merged, because they relate without needing each other: "Mediated member access" and the access tiers and evidence it stages; "`use` header for language extension, `import` for module values" and "Activation by a `use` header, per file and not transitive"; "Metadata channels are independent" and "Metadata is a field on every value".
+Not merged, because they relate without needing each other: "Mediated member access" and the access tiers and evidence it stages; "`use` header for language extension, `import` for module values" and "Activation by a `use` header, per file and not transitive"; "Metadata fields are independent" and "Metadata is a field on every value".
 
 **The three cycles the merge broke, re-examined.**
 
@@ -3871,7 +3857,7 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every result says how strongly it holds".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".
 8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Claims are evaluated like everything else".
-9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "Minimal base surface of about forty primitives".
+9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "The kernel's primitives are pure and few".
 10. **Stale statements inside one chapter.** `docs/book/standard/type-system.md` §3 still lists `extends` after inheritance was dissolved, and §4 calls the retirement of prefixed slots unimplemented while recording completed chunks; `docs/book/standard/core-types.md` says ten core types and lists eleven; `docs/book/implementation-map.md` puts `src/introspect.ts` in L2 while `scripts/analyze/units.json` puts it on the track layer; `docs/book/concepts.md` R6's delta (27 imports) disagrees with its §23 (7 imports); several register entries name retired files or the retired carrier (detail in the Notes of the entries concerned).
 
 ### Placement questions this proposal raises
@@ -4072,7 +4058,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | P7 | chunk or principle P7 of the plan or chapter cited beside it (for example a chunk of B-157 or of this book pass) |
 | R1 | concepts.md: Allegretto is the simplest base that can carry Allegro (where a Sources line names a plan, the plan's ruling of that number) |
 | R2 | concepts.md: Partial evaluation is the mechanism by which layers are added (where a Sources line names a plan, the plan's ruling of that number) |
-| R3 | concepts.md: Metadata channels are independent (where a Sources line names a plan, the plan's ruling of that number) |
+| R3 | concepts.md: Metadata fields are independent (where a Sources line names a plan, the plan's ruling of that number) |
 | R4 | concepts.md: Evaluation is total over unresolved information (where a Sources line names a plan, the plan's ruling of that number) |
 | R5 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
 | R6 | concepts.md: Everything above the kernel is an extension, and there is one way to extend (where a Sources line names a plan, the plan's ruling of that number) |
@@ -4095,7 +4081,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | S2d | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | S4b | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | SC-1 | concepts.md: Seven representation kinds |
-| SC-2 | concepts.md: Bits is the only scalar |
+| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it computes nothing on them |
 | SC-3 | concepts.md: Expressions are values |
 | SC-4 | concepts.md: Symbol identity is fully-qualified, not spelling |
 | SC-5 | concepts.md: One composite kind rather than two |

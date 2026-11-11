@@ -173,4 +173,39 @@ decisions, in the inventory, replacing PE Rule 1 and PE Rule 2:
   housekeeping entries are removed as decisions and tabled as work
   owed. The four-plane model is extraneous: its chapter is dropped.
 
-(Further rulings are recorded as they are taken.)
+**Asks 3, 10, 11, 12 and 13, ruled 2026-11-11.**
+
+- "A function may take an argument unevaluated" (open). The maintainer
+  asked how unevaluated: the argument is the expression as written,
+  with its context; the function reads what it needs and hands some or
+  all of it, or a transformed version, to the kernel to evaluate. The
+  function cannot know which other extensions are loaded, so that
+  information is carried in the expression. Use cases are to be worked
+  through.
+- Ask 10: the seven kinds stand; kind is not a type.
+- Ask 11: not as first drafted. The maintainer: specific scalar
+  representations and operations could, and some should, belong in
+  extensions; the argument from "assumed" results is weak, since some
+  operations will always be defined in extensions. Two questions
+  decide it, and both are answered by new decisions: "A capability is
+  granted, never acquired" and "What code may do is bounded by the
+  capabilities it is given, and that bound is a claim" (trust); "A
+  capability is supplied per target" (export). So "The kernel's plain
+  data is a sequence of bits, and it computes nothing on them" and
+  "Machine arithmetic is a capability that ships with the platform".
+- **A Part I decision amended, with the maintainer's approval**: "The
+  kernel trusts only what it has evaluated" no longer calls a
+  capability's return "assumed". A claim decided with the help of a
+  capability is decided, and names the capability.
+- "The kernel's primitives are pure and few": six things, no count.
+- Ask 12: "Every value keeps its origin." Attached always; partial
+  evaluation drops what nothing reads; `observe` goes. The maintainer:
+  each residual keeps a reference to its immediately preceding
+  expression, so every change can be traced back to the original
+  source; there is scope for a utility extension for querying origins.
+  The cost assumptions are to be verified.
+- Ask 13: "channel" goes. "Metadata fields are independent"; "An
+  extension registers its own fields; the kernel has two".
+
+Every structural ask is ruled. Ask 14 (wording that names layers,
+`--base` or L2) is done when Part II is regrouped.
