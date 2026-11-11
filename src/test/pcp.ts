@@ -1527,6 +1527,54 @@ test("B-187 L4: CLI `prove` refuses a malformed time box and names `--api-key` b
   }
 });
 
+test("B-187 L4: CLI `prove --proposals --transcript` writes the scripted loop's transcript and its JSON twin", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l4-cli-"));
+  try {
+    const proposals = path.join(dir, "proposals.md");
+    fs.writeFileSync(proposals, [
+      "## `Fulfil: Shipped, which Depot needs`", "",
+      "```allegro", FREIGHT.trimEnd(), "```", "",
+      "```allegro", SHIP.trimEnd(), "```", "",
+    ].join("\n"));
+    const transcript = path.join(dir, "scripted.md");
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposals", proposals, "--transcript", transcript, "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    const md = fs.readFileSync(transcript, "utf-8");
+    for (const part of [
+      `# Transcript: \`prove ${file}\`\n`,
+      "- **Prover:** `scripted:proposals.md`\n",
+      "- **Date:** ",
+      "- **Attempt limit:** 5 per obligation\n",
+      "- **Time box:** kernel 30 s per turn, reply 120 s\n",
+      "- **Skipped** (the proposer has no answer): `Quantity.law_mul_comm`",
+      "## `Fulfil: Shipped, which Depot needs` (plan)\n\n**Result:** discharged after 2 attempt(s).\n",
+      "### Attempt 1\n\n**Request** (system prompt: §2.9 \"Output contract for a plan proposer\" of `docs/book/vivace/planning-dsl.md`):\n\n````text\nAttempt 1 for plan obligation `Fulfil: Shipped, which Depot needs`.\n",
+      "\n```allegro\n" + FREIGHT.trimEnd() + "\n```\n",
+      "```text\n" + out.perObligation[0].history[0].reason + "\n```\n",
+      "### Attempt 2\n",
+      "```text\naccepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min\n```\n",
+      "### Authorship\n\n```json\n{\n  \"provers\": [\n",
+    ]) eq(md.includes(part), true, `transcript lacks: ${part}\n---\n${md}`);
+    eq(md.includes("### 2.9 Output contract"), false, "the primer is named, not quoted");
+    eq(/\*\*Reply\*\* \(\d+ ms\), its code block:/.test(md) && /\*\*Kernel\*\* \(\d+ ms\):/.test(md), true, "the time each took");
+    const twin = JSON.parse(fs.readFileSync(path.join(dir, "scripted.json"), "utf-8"));
+    eq(twin.version, "transcript/1");
+    eq(twin.prover, "scripted:proposals.md");
+    eq(twin.obligations.length, 1);
+    eq(twin.obligations[0].kind, "plan");
+    eq(twin.obligations[0].turns.length, 2);
+    eq(twin.obligations[0].turns[0].candidate, FREIGHT.trimEnd());
+    eq(twin.obligations[0].turns[0].kernel, out.perObligation[0].history[0].reason);
+    eq(twin.obligations[0].turns[1].accepted, true);
+    eq(twin.obligations[0].authorship.provers[0].prover, "scripted:proposals.md");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- Phase A: introspection / semantic summary ---
 
 
