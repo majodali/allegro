@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 217 decisions after DR4's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 51; Part III: 23; Part IV: 66; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts: 218 decisions after DR5's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 51; Part III: 23; Part IV: 63; Part V: 27, of which 15 are held; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -79,25 +79,25 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
    - Decisions: A contract is a predicate that becomes knowledge, discharged by PE; What is known about a value travels with the value; A match where no arm matches is a refutation; A body clause is a notation; Contract checks sit at function entry and return; Unification in patterns.
 22. **Termination and completion** (4 decisions). Termination as a claim, completion as termination plus arrival, and how a decrease is recognised.
    - Decisions: Termination is a claim; Completion is totality and liveness; Termination by bounded decrease; Mutual recursion requires every edge to decrease.
-23. **When a check fails** (3 decisions). Purity of equality and invariants, assumptions on the record, and counterexamples.
-   - Decisions: Equality, coercion and invariant predicates hold no capability and terminate; An assumption is always on the record; Every failure carries a legible counterexample.
-24. **Units of measure** (4 decisions). A worked language: dimensions as refinements, laws at their real strengths, quantity literals.
+23. **When a check fails** (4 decisions). Purity of equality and invariants, assumptions on the record, counterexamples, and predicates that explain a refusal.
+   - Decisions: Equality, coercion and invariant predicates hold no capability and terminate; An assumption is always on the record; Every failure carries a legible counterexample; A predicate can explain its refusal.
+
+**Part V: Vivace**
+
+As ruled in DR5 (2026-11-12), with the chapter titles the maintainer confirmed on PR #193. The part opens with the introduction "What Vivace is for", which is not a list of decisions. The worked languages are evidence; planning's entries are held, not ruled.
+
+25. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
+   - Decisions: A model is a value; A transformation is a model; Two models relate only through a declared mapping; A change to a model is a mapping from the old one.
+26. **Search and optimization** (3 decisions). Solving as proposing, a solver that sees its problem unevaluated, and the difference between feasible and best.
+   - Decisions: Solving is proposing a value for an unknown, and the kernel checks it; A solver sees its problem unevaluated; Feasible is decided; best says how strongly it holds.
+27. **Analysing models** (1 decision). Meta-modelling as analysis with tools, and the questions left open.
+   - Decisions: A model's quality is a question for analysis.
+28. **Units of measure** (4 decisions; a worked language, reworded in DR4).
    - Decisions: Dimensions as data, named dimensions as refinements over one Quantity; Quantity laws at honest tiers; Number-anchored quantity literals; Conversion sugar with `in`.
-
-**Part V: Domains built on the kernel**
-
-26. **Units of measure** (5 decisions). The second rung of the thesis test: dimensional analysis as a library of refinements, with literals and laws at honest tiers.
-   - Decisions: Rung 2 domain: units of measure over state machines; Dimensions as data, named dimensions as refinements over one Quantity; Quantity laws at honest tiers; Number-anchored quantity literals; Conversion sugar with `in`.
-   - Draws on: [demo-ladder.ir.md](../book/demo-ladder.ir.md) rung 2.
-27. **Vivace: models as the program** (5 decisions). The application tier as a discipline over the kernel and a hypothesis tested by pilots.
-   - Decisions: Vivace adds a discipline, not machinery; Vivace hypothesis: models as the review artefacts; Three different pilots, planning first; Shape 1 before Shape 2; Library before surface.
-   - Draws on: [vision.md](../book/vision.md) §4, [vivace/README.md](../book/vivace/README.md).
-28. **Plans as outcome graphs** (12 decisions). The planning pilot: outcome graphs, nodes, constraints, estimates and budgets, failure handling and enforcement.
-   - Decisions: A plan is an outcome graph with derived wiring; Leaf and composite nodes, with `uses` to borrow a plan; Failure handlers over outcomes; Two enforcement shapes for a well-formed plan; A refinement predicate explains its own refusal; Planning surface conventions; Bracket constraints as refinements, named as predicate fixtures; Planning-local effort and money, durations from the units DSL; Estimates roll up, budgets are proved; Scheduling, resources, performers and latitude; Fan-in through an explicit aggregator node; Explicit `raise` and failure context in handlers.
-   - Draws on: [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) the model, conventions, enforcement.
-29. **Finding solutions to a model** (6 decisions). Choices, templates, catalogs and search over a model, and composing models with an AI loop.
-   - Decisions: Choices, templates and solution finding by enumeration; Completion from a catalog; Library search over kernel residuals; Composition of models and the AI loop over a model; Mixed-model solution finding as the capstone; Search beyond enumeration.
-   - Draws on: [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) choices, catalogs, search, [demo-ladder.ir.md](../book/demo-ladder.ir.md) rung 3, the capstone.
+29. **Plans as outcome graphs** (11 decisions; held, not ruled).
+   - Decisions: A plan is an outcome graph with derived wiring; Leaf and composite nodes, with `uses` to borrow a plan; Failure handlers over outcomes; Two enforcement shapes for a well-formed plan; Planning surface conventions; Bracket constraints as refinements, named as predicate fixtures; Planning-local effort and money, durations from the units DSL; Estimates roll up, budgets are proved; Scheduling, resources, performers and latitude; Fan-in through an explicit aggregator node; Explicit `raise` and failure context in handlers.
+30. **Finding solutions to a plan** (4 decisions; held, not ruled).
+   - Decisions: Choices, templates and solution finding by enumeration; Completion from a catalog; Library search over kernel residuals; Search beyond enumeration.
 
 **Part VI: Building and running programs**
 
@@ -209,7 +209,7 @@ They came together over years of exploration into most of what Allegro is today.
 | [README.md](../../README.md) (Introduction) | Leaves the book's order: it stays the repository's front page; its account of what Allegro is feeds the tour. Goes to: the tour (what Allegro is). |
 | [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Claims and proofs (The prover loop); Tools over the pipeline (subcommands). |
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Reaching a member (Private members). |
-| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
+| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Models (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
 | [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
 | [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules and programs (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
@@ -235,14 +235,14 @@ They came together over years of exploration into most of what Allegro is today.
 | [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts (§3). |
 | [standard/totality.md](../book/standard/totality.md) (Totality and termination) | Becomes the termination chapter; the cutoff goes to the pipeline chapter. Goes to: Termination and completion (§1 to §5); When a check fails (§5 (severity)); The build pipeline (§7, §8 (the cutoff)). |
 | [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts (§1 to §4, §6, §8); When a check fails (§7, §10). |
-| [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Vivace: models as the program. |
-| [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
+| [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Models. |
+| [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a plan (choices, catalogs, search). |
 | [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Compiling beyond the interpreter (undelivered tracks). |
 | [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules and programs (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
 | [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Claims and proofs (C130); Tools over the pipeline. |
 | [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
 | [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Claims and proofs (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
-| [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language (the ladder); Units of measure (rung 2); Finding solutions to a model (rung 3, the capstone). |
+| [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language (the ladder); Units of measure (rung 2); Finding solutions to a plan (rung 3, the capstone). |
 | Appendices (registers and records) | Stay appendices, outside the order. |
 
 ## The decisions, in book order
@@ -383,6 +383,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: mappings as generators outside the language, unchecked (the practice that stalled)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: new, by ruling; from the maintainer's motivation 3.
+- Notes (2026-11-12, DR5): worked out in Part V: "A transformation is a model", "Two models relate only through a declared mapping", "A change to a model is a mapping from the old one".
 - Chapter: Why a new language
 
 #### A paradigm is a library
@@ -509,6 +510,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §1, §2; docs/book/proving-in-allegro.md; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Participant-neutral prover protocol with the kernel as trust boundary"; its trust half is now "Trust comes from the kernel, not the author".
 - Held finding (2026-11-11, DR1): authorship is not kept: the verdict credits every discharged theorem to `auto-PE` (`src/pcp.ts:831`). Held on "Obligations and proposals as machine and human views".
+- Notes (2026-11-12, DR5): an obligation is a claim waiting for a value, and a proposal supplies it. A theorem without a proof and a gap in a model are the same thing: anyone may propose the missing value, and the kernel evaluates the claim again when it arrives.
 - Chapter: Keep it simple
 
 #### A decided claim can be translated into a proof an outside checker accepts
@@ -2605,7 +2607,147 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: call-site origin and known facts in messages do not ship (B-057); `false || error "…"` does not pass the error value through. Related: "A refinement predicate explains its own refusal" (Plans as outcome graphs) is the kernel channel this entry's predicate-message clause rests on.
 - Chapter: When a check fails
 
+#### A predicate can explain its refusal
+- Decides: a predicate may answer an explanation in place of false. Anything other than true refutes the claim, and the refutation carries what the predicate answered, so a model's failures are reported in the model's own terms with no registry of renderers.
+- Status: partly built
+- Type: capability
+- Rationale kind: technical
+- Depends on: Refinement types; Constructing a refined value claims its predicate; Every failure carries a legible counterexample
+- Significance: 3 — counterexample legibility, one of the seven Vivace gaps
+- Label: swappable — a predicate convention plus one kernel channel
+- Units: refinements, type-primitives
+- Options recorded: a renderer hook `T.onFailure` (the v1 sketch, archived); a registered slot or renderer registry (rejected); deferring rendering until the primitive version ran (the 2026-10-25 ruling, lifted at C1)
+- Sources: docs/book/vivace/planning-dsl.md §7 (C1); docs/book/standard/contracts.md §7 (cited there); docs/plans/planning-pilot.md §1, stage C1; B-081; docs/book/language-reference.md (a predicate that answers an error value)
+- Book home (fragments' proposal): Contracts and invariants, cited from The planning DSL
+- Notes: remaining under B-081: the inspect channel, call-site origin, rendering the refused value.
+- Notes (2026-11-12, DR5): moved from Part V and renamed from "A refinement predicate explains its own refusal": the decision is general, not about plans. Restated on the Part IV review's rule about truth; the entry had the kernel carry an error value's text.
+- Chapter: When a check fails
+
+### Models
+
+**The introduction to Part V, ruled 2026-11-12 (DR5).** Not a list of decisions: definitions, a goal, observations and scope, as the maintainer set them out.
+
+> **What Vivace is for.** A model is a description of a system, written in a language made for its domain and precise enough to be checked. A meta-model is that language: its types, its notation and its claims. Modelling is the practice of building a shared understanding of a system by writing, checking and revising models of it. Allegro is a platform for checked languages. Vivace is narrower: it supplies the meta-models and the tools for constructing models, inspecting them, transforming them, relating them and searching them.
+>
+> Two things are already decided by earlier parts. A model is checked with the same rigour as any other program. Checking a model and running it are the same evaluation, without and with the capability to act.
+>
+> The goal: declarations and rules, findings and failures are each written in the language that expresses them most clearly and efficiently. A language is extended so that it corresponds more closely to a model, never because a rule could not otherwise be said.
+>
+> Two observations. Real problems need several models that interact in subtle ways, which is a central difficulty of model-driven engineering. Many domains need search and optimization, which are hard to state in traditional programming languages.
+>
+> Beyond modelling, Vivace brings meta-modelling: the discipline and the means of building and evolving models. It supplies tools to analyse a model, logically and empirically; it does not supply the answers.
+
+#### A model is a value
+- Decides: a model is a value built from a meta-model: the language it is written in, with its types, notation and claims. Ordinary functions construct it, inspect it, transform it and compare it, and Vivace supplies the meta-models and tools for doing so.
+- Status: partly built (plans are values built through a library); ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: vision
+- Depends on: A system is described in the language of its domain, and that language grows with the understanding; A language inherits every check of what it is built on; One value universe; Types are values that constrain values
+- Significance: 5 — everything Vivace does to a model is done to a value
+- Label: foundational — search, mappings and analysis all take models as values
+- Options recorded: a model that exists only as program text, or only as a set of types (not chosen: neither can be searched, compared or mapped by ordinary functions)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken); docs/book/vision.md §4; docs/book/vivace/README.md
+- Notes: new, by ruling; replaces "Vivace adds a discipline, not machinery" and "Vivace hypothesis: models as the review artefacts", whose other statements are decisions of Parts I and IV or are told in the part's introduction. The maintainer: "a model is definitely a value and Vivace provides the tools and meta-model(s) to construct model values (as well as inspect, transform, compare, etc)". Vivace brings mechanisms, all of them extensions; it adds nothing to what must be trusted.
+- Chapter: Models
+
+#### A transformation is a model
+- Decides: a transformation from one model to another is written declaratively, as a model that defines a function, and is never only an imperative function. It can therefore be inspected, compared and checked like the models it relates.
+- Status: open; ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: vision
+- Depends on: A model is a value; A mapping between models is itself a checked value
+- Significance: 4 — what relates models is as open to inspection as the models
+- Label: foundational — mappings, evolution and generation
+- Options recorded: transformations as imperative functions, opaque to everything but a call
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "Transforms are also models - not just imperative functions, declarative models that define functions."
+- Chapter: Models
+
+#### Two models relate only through a declared mapping
+- Decides: every relation between two models is a mapping that is declared, formally defined and checked. Vivace defines each kind of mapping through which models can relate.
+- Status: open; ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: vision
+- Depends on: A transformation is a model; A mapping between models is itself a checked value
+- Significance: 5 — real problems need several models that interact
+- Label: foundational — composing models, and solving across them
+- Options recorded: models coupled implicitly, through shared names or code that reads both
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken); docs/plans/planning-loop.md §6 (the second model's composition point)
+- Notes: new, by ruling; the maintainer sees it as critical: "Vivace needs to formally define every mapping through which two models can relate." The kinds are to be worked out; candidates: one model's values typed by another's; a claim that spans two models; a translation with claims about what it preserves; one model as a more detailed version of another; a view of part of a model. Absorbs "Composition of models and the AI loop over a model" and "Mixed-model solution finding as the capstone": several models coupled into one space of solutions is the direction this decision and the decisions on search lead to. The planning-loop stream's first design for a composition point: a plan's outcome typed by a system model's artifact.
+- Chapter: Models
+
+#### A change to a model is a mapping from the old one
+- Decides: evolving a model uses the mechanism that relates two models: the new version is related to the old by a declared mapping, with claims about what it preserves.
+- Status: open; ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: vision
+- Depends on: Two models relate only through a declared mapping
+- Significance: 3 — a model changes as understanding does
+- Label: swappable — how versions are related
+- Options recorded: none recorded
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
+- Notes: new, by ruling.
+- Chapter: Models
+
+### Search and optimization
+
+#### Solving is proposing a value for an unknown, and the kernel checks it
+- Decides: a model with parts not yet supplied is a claim waiting for values. A search routine, an outside solver, a person or an AI may supply them. None needs to be trusted, because the candidate is evaluated.
+- Status: partly built (plan templates, catalogs and the proposal loop); ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A model is a value; Anyone may propose, and the record shows who; When information arrives, what waited on it is evaluated again; The kernel trusts only what it has evaluated
+- Significance: 5 — search needs no trusted solver
+- Label: foundational — every solver and every proposer
+- Options recorded: a solver whose answer is accepted on its word
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken); docs/plans/planning-loop.md §6
+- Notes: new, by ruling. The planning-loop stream's rulings are its first instance: a gap in a plan is an obligation, and a proposal is one catalog entry that never edits the author's plan.
+- Chapter: Search and optimization
+
+#### A solver sees its problem unevaluated
+- Decides: an unknown may be represented by an unbound symbol, and ordinary evaluation of an expression that holds one gives a residual. A solver takes its problem unevaluated, evaluates what it chooses, and reads the result: which parts are resolved and which are not. Vivace supplies functions that return the two.
+- Status: open, a design to prove; ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function may take an argument unevaluated; Evaluation is total over unresolved information; Reading an expression never yields authority
+- Significance: 4 — how a search is written as an ordinary function
+- Label: foundational — search and optimization written in Allegro, open to partial evaluation
+- Options recorded: a primitive that asks of any value whether it is resolved (`is_resolved`, removed in the Part IV review: it makes any function's behaviour depend on the phase; here only a function that declares an unevaluated argument sees a residual, and it sees it by reading an expression)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: unknowns may be represented by unbound symbols, and normal evaluation turns those, and hence a solver function, into a residual; solver functions can take unevaluated arguments, "but this may be a use case for something akin to `is_resolved`"; "Vivace should provide functions that parse expressions and return resolved and unresolved parts." The maintainer confirmed on PR #193: reading the residual of an expression the solver evaluated itself is correct, and `is_resolved` is not; different grammars may handle unknowns differently, so an unbound symbol is one representation. A second use case for unevaluated arguments, after `if` with knowledge in its branches. A candidate is tried by evaluating the problem with the unknown's name rebound, a kernel primitive.
+- Chapter: Search and optimization
+
+#### Feasible is decided; best says how strongly it holds
+- Decides: that a candidate satisfies a model is decided by evaluation. That no better candidate exists is a claim over all candidates: decided only by exhausting them, and otherwise sampled or assumed. Search finds a feasible answer; optimization claims the best.
+- Status: partly built (enumeration over plan templates); ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; Every result says how strongly it holds; A claim about every value is decided by evaluating it with the value unknown
+- Significance: 4 — an optimum never claims more than was shown
+- Label: foundational — every optimizer
+- Options recorded: one verdict for a solution, with no distinction between satisfying the model and being the best
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "Feasible vs best is exactly my understanding of search vs optimization."
+- Chapter: Search and optimization
+
+### Analysing models
+
+#### A model's quality is a question for analysis
+- Decides: whether a model is effective, efficient or correct, and when it should be split in several, are questions Vivace gives the tools to analyse, logically and empirically. It does not give the answers. A logical finding is a claim about a model or its meta-model; an empirical one is a measurement over the model's uses, and says so in its strength.
+- Status: open; ruled 2026-11-12 (DR5)
+- Type: capability
+- Rationale kind: vision
+- Depends on: A model is a value; Every result says how strongly it holds
+- Significance: 3 — meta-modelling is a practice with tools, not a set of rules
+- Label: swappable — the analyses offered
+- Options recorded: rules that pronounce a model good or bad
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "what Vivace provides is the tools to analyze models logically and empirically to help answer questions like effectiveness and efficiency." Open questions, listed and not decided: what makes a model effective; when to decompose one; which of these judgments can be stated as claims about a language.
+- Chapter: Analysing models
+
 ### Units of measure
+
+**A worked language.** Reworded in the Part IV review (DR4); placed in Part V, where worked languages go. Evidence for the decisions of this part, not a set of book decisions in its own right.
 
 #### Dimensions as data, named dimensions as refinements over one Quantity
 - Decides: a dimension is structural data (the full seven-vector of SI base dimensions) and each named dimension is a refinement over one `Quantity` record, so dimensional soundness is refinement discharge, with a mechanics-focused shipped unit set.
@@ -2666,91 +2808,16 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): proposed "Units of measure" ---
 - Chapter: Units of measure
 
-### Vivace: models as the program
-
-#### Vivace adds a discipline, not machinery
-- Decides: a Vivace domain is an L1 grammar extension plus L2 types and contracts, introducing no new trust roots, its guarantees reducing to L2 provability; the layer exists for the model-first methodology.
-- Status: settled
-- Type: capability — it decides what the Vivace tier is made of
-- Rationale kind: vision
-- Depends on: A language inherits every check of what it is built on; Correctness and safety are one kind of claim
-- Significance: 3 — sets what a domain model may and may not add
-- Label: foundational — every pilot is held to it; a pilot that cannot express its domain is a finding against the lower layers
-- Units: not yet a unit
-- Options recorded: new layer machinery (rejected in the boundary contract)
-- Sources: docs/book/vivace/README.md (May depend on; Invariants); docs/book/vision.md §4 (transitive assurance)
-- Book home (fragments' proposal): L3 Vivace: boundary contract
-- Notes: Significance calibrated from 4.
-- Chapter: Vivace: models as the program
-
-#### Vivace hypothesis: models as the review artefacts
-- Decides: application developers are to work in the highest-abstraction model that expresses the problem, with predicates and proofs opt-in, models and their constraints as the review artefacts, failures as build errors with counterexamples every stakeholder can read, and specialist-authored models giving transitive assurance; the tier is a hypothesis tested by three domain pilots (planning workflow, software system model, physics simulation), specification and verification first with execution external.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: A language inherits every check of what it is built on; Vivace adds a discipline, not machinery; Claims are evaluated like everything else
-- Significance: 3 — the hypothesis rung 3 tests
-- Label: foundational — the pilots and B-080's roster are its tests
-- Units: not yet a unit
-- Options recorded: Shape 1 (specify, execute externally) versus Shape 2 (Allegro runs the model); none recorded ("don't over-design ahead of evidence")
-- Sources: docs/book/vision.md §4; docs/plans/release-track.md §3 D6
-- Book home (fragments' proposal): the tour (proposed) / vivace/README.md / L3 Vivace: boundary contract / Vision and principles
-- Notes: Merged from fragment A ("Vivace as a model-driven hypothesis tier"), fragment C ("Vivace hypothesis: models as the review artefacts"). A: seven known gaps are named as open work there; detail belongs to the Vivace fragment. C: vision §4 calls it "work-in-progress, not settled"; seven gaps are open (B-081 to B-087 range). Assembly: placed in Part V; its dependencies are thesis-level, so it could open the book's L3 discussion as early as Part I if the maintainer prefers. Significance calibrated from 2/4.
-- Chapter: Vivace: models as the program
-
-#### Three different pilots, planning first
-- Decides: three deliberately different pilots test the hypothesis (project planning, a software system model, physics simulations), and the planning workflow goes first as a self-contained DSL with rich structural constraints.
-- Status: settled
-- Type: capability — it decides which domains the tier must express
-- Rationale kind: mixed
-- Depends on: Vivace hypothesis: models as the review artefacts
-- Significance: 3 — fixes rung 3's domain
-- Label: swappable — another first pilot replaces one library
-- Units: not yet a unit
-- Options recorded: software system model (tests composition); physics simulations (float refinements over units)
-- Sources: docs/book/vivace/planning-dsl.md §1; docs/book/vision.md §4 (The pilots); docs/plans/planning-pilot.md §1, R4; docs/plans/archive/project-1-planning-dsl-design.md
-- Book home (fragments' proposal): The planning DSL
-- Notes: confirmed by the maintainer 2026-10-25.
-- Chapter: Vivace: models as the program
-
-#### Shape 1 before Shape 2
-- Decides: every pilot starts as Shape 1, specified and verified in Allegro with execution external, and Shape 2, in which Allegro runs the model, is a later, separable concern.
-- Status: settled
-- Type: capability — it decides that a Vivace model is verified, not run, for now
-- Rationale kind: mixed
-- Depends on: Vivace hypothesis: models as the review artefacts
-- Significance: 3 — keeps the pilot to specification and checking
-- Label: swappable — Shape 2 adds to, not changes, Shape 1
-- Units: not yet a unit
-- Options recorded: execution from the start (Shape 2 first)
-- Sources: docs/book/vision.md §4; docs/book/vivace/planning-dsl.md §1; docs/plans/planning-pilot.md §2 item 1, R4, §7; docs/book/demo-ladder.ir.md C88, C129
-- Book home (fragments' proposal): L3 Vivace: boundary contract / The planning DSL
-- Notes: no backlog item names Shape 2 (demo-ladder C133).
-- Chapter: Vivace: models as the program
-
-#### Library before surface
-- Decides: the planning model is built and tested as a plain Allegro library through its API before the `plan NAME:` grammar, because the surface may surface engine work and the model is what rung 3 tests.
-- Status: settled
-- Type: implementation — a build order; another order changes no capability
-- Rationale kind: technical
-- Depends on: Three different pilots, planning first
-- Significance: 2 — sequencing that makes the API the model's truth
-- Label: swappable — the surface expands to the API's values
-- Units: not yet a unit (`lib/planning.alg`)
-- Options recorded: surface first
-- Sources: docs/plans/planning-pilot.md §2 item 3; docs/book/language-reference.md (Domain surfaces: "the library builds the same values the API builds")
-- Book home (fragments' proposal): The planning DSL
-- Notes: the same rule holds the catalog surface back (convention 14).
-- Chapter: Vivace: models as the program
-
 ### Plans as outcome graphs
+
+**Held, not ruled (DR5, 2026-11-12).** A worked language is evidence for the decisions of this part, and its internal design is largely arbitrary. The maintainer set the pilots aside until the foundational decisions are clear. These entries keep their first-proposal wording, apart from dependency names. Known conflicts with the ruled parts, for when the pilot is taken up: "Two enforcement shapes for a well-formed plan" has a constructor that yields an error value, where a failed construction is now a refutation and an open plan is one that claims nothing yet.
 
 #### A plan is an outcome graph with derived wiring
 - Decides: a plan is a DAG of nodes with typed inputs and outcomes, whose edges are derived from wiring an outcome into every input of the same type in scope, with names assigned only where a match is ambiguous; the performer is metadata, never structure.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Three different pilots, planning first
+- Depends on: A model is a value
 - Significance: 3 — every check, budget and search reads the graph
 - Label: foundational — acyclicity, completeness, budgets, handlers, choices and completion all derive from it
 - Units: not yet a unit (`lib/planning.alg`)
@@ -2802,21 +2869,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vivace/planning-dsl.md §7 (Two enforcement shapes); docs/plans/planning-pilot.md §2 item 4; CE-R8; D32
 - Book home (fragments' proposal): The planning DSL
 - Notes: every node-tree walk inside the predicate is `assume terminates`, since no verified `decreases` metric fits a walk into a child list (§6 table).
-- Chapter: Plans as outcome graphs
-
-#### A refinement predicate explains its own refusal
-- Decides: a refinement predicate that answers an error value explains the refusal, and the kernel carries that text into the halt or error value at every refusal site, with no registered slot and no renderer registry, so a model's legibility travels with its type.
-- Status: partly built
-- Type: capability
-- Rationale kind: technical
-- Depends on: Two enforcement shapes for a well-formed plan; Refinement types
-- Significance: 3 — counterexample legibility, one of the seven Vivace gaps
-- Label: swappable — a predicate convention plus one kernel channel
-- Units: refinements, type-primitives
-- Options recorded: a renderer hook `T.onFailure` (the v1 sketch, archived); a registered slot or renderer registry (rejected); deferring rendering until the primitive version ran (the 2026-10-25 ruling, lifted at C1)
-- Sources: docs/book/vivace/planning-dsl.md §7 (C1); docs/book/standard/contracts.md §7 (cited there); docs/plans/planning-pilot.md §1, stage C1; B-081; docs/book/language-reference.md (a predicate that answers an error value)
-- Book home (fragments' proposal): Contracts and invariants, cited from The planning DSL
-- Notes: remaining under B-081: the inspect channel, call-site origin, rendering the refused value.
 - Chapter: Plans as outcome graphs
 
 #### Planning surface conventions
@@ -2919,14 +2971,16 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): The planning DSL
 - Chapter: Plans as outcome graphs
 
-### Finding solutions to a model
+### Finding solutions to a plan
+
+**Held, not ruled (DR5, 2026-11-12).** A worked language is evidence for the decisions of this part, and its internal design is largely arbitrary. The maintainer set the pilots aside until the foundational decisions are clear. These entries keep their first-proposal wording, apart from dependency names. Known conflict: "Library search over kernel residuals" computes a plan's bound in library code, where evaluating the plan with its choices unknown should give it; an expedient, with "A solver sees its problem unevaluated" as the target.
 
 #### Choices, templates and solution finding by enumeration
 - Decides: a node with `options:` is a choice, a plan with choices is a template, and `solve` enumerates resolutions, keeps the well-formed ones and answers the best by the bound's effort and then its duration, naming the cheapest failing resolution when none fits.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Estimates roll up, budgets are proved; Vivace hypothesis: models as the review artefacts
+- Depends on: Estimates roll up, budgets are proved; A model is a value
 - Significance: 3 — the first solution finding over a model
 - Label: swappable — the search is library code
 - Units: not yet a unit
@@ -2934,7 +2988,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: R3 of docs/plans/planning-pilot.md §3; docs/book/vivace/planning-dsl.md §2.7, convention 13, §7 (D1); docs/book/vision.md §1a ("solution finding is search")
 - Book home (fragments' proposal): The planning DSL
 - Notes: no choice in a borrowed plan or a recovery; a borrowed plan is solved before borrowing.
-- Chapter: Finding solutions to a model
+- Chapter: Finding solutions to a plan
 
 #### Completion from a catalog
 - Decides: a gap is what the wiring and outcome checks already report, a catalog is a list of nodes and plans, and `solve_from` fills the plan's own scope's gaps by chaining catalog nodes backward to a depth, then resolves, with no syntax marking a gap.
@@ -2949,7 +3003,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vivace/planning-dsl.md §2.8, convention 14, §7 (D2); docs/plans/planning-pilot.md stage D2
 - Book home (fragments' proposal): The planning DSL
 - Notes: D2 also made enumeration check the template once and only budgets and handlers per resolution.
-- Chapter: Finding solutions to a model
+- Chapter: Finding solutions to a plan
 
 #### Library search over kernel residuals
 - Decides: the planning search computes its bound directly in the library rather than leaving choices unresolved and reading an interval off the kernel's residual rollup; revisit when a model's constraint is a predicate the kernel already reasons about.
@@ -2964,35 +3018,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vivace/planning-dsl.md §7 (D2 paragraph), §8
 - Book home (fragments' proposal): The planning DSL
 - Notes: a library search is not a parallel proof infrastructure, but the book should argue that against the falsifiable constraint explicitly.
-- Chapter: Finding solutions to a model
-
-#### Composition of models and the AI loop over a model
-- Decides: how two domain models compose (cross-domain predicates, arbitration) and how an AI agent iterates over a model with usable failure modes; both are Vivace gaps without a design.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: Vivace hypothesis: models as the review artefacts; Completion from a catalog
-- Significance: 3 — the capstone's prerequisites
-- Label: foundational — the mixed-model capstone rests on both
-- Units: not yet a unit
-- Options recorded: none recorded
-- Sources: docs/book/vision.md §4 (seven gaps); B-082, B-083; docs/book/demo-ladder.ir.md C130 to C132; docs/plans/release-track.md §3 D6, D7
-- Book home (fragments' proposal): L3 Vivace: boundary contract
-- Chapter: Finding solutions to a model
-
-#### Mixed-model solution finding as the capstone
-- Decides: heterogeneous models coupled into one solution space, AI agents proposing, the kernel scoring and every candidate carrying its assumption ledger, is the summit the ladder climbs toward, kept as labelled direction.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: Composition of models and the AI loop over a model
-- Significance: 3 — the private motivation for sequencing
-- Label: foundational — would rest on every rung
-- Units: not yet a unit
-- Options recorded: none recorded
-- Sources: docs/plans/release-track.md §3 D7, §5 rung 4; docs/book/demo-ladder.ir.md C115
-- Book home (fragments' proposal): The demo ladder and the rung-3 pilot
-- Chapter: Finding solutions to a model
+- Chapter: Finding solutions to a plan
 
 #### Search beyond enumeration
 - Decides: whether to add branch-and-bound over partial resolutions when a template outgrows enumeration.
@@ -3006,7 +3032,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: branch-and-bound (named as the next step)
 - Sources: docs/book/vivace/planning-dsl.md §7, §8; docs/plans/planning-pilot.md stage D3
 - Book home (fragments' proposal): The planning DSL
-- Chapter: Finding solutions to a model
+- Chapter: Finding solutions to a plan
 
 ### The build pipeline
 
@@ -3549,7 +3575,7 @@ The ten hard calls stand, except three put to review; the merge of the incomplet
 ### Proposals deferred by DR1 to their parts
 
 - **Taken in DR3 (2026-11-12)**, as the last clause of "Every program is evaluated the same way, however it arrives"; first deferred to DR2, with the expressions chapter: "A program built by a program is checked like any other" (reflection checked end to end; the review's R-DR1-32). `expr_eval` calls the evaluator directly (`src/primitives.ts:405`–`409`); whether a constructed program skips checks was not confirmed either way by one probe.
-- **For DR5, with Vivace**: "Business rules define the domain" (when a rule has no expressible form, extend the language, never contort the rule; docs/book/vision.md §5 principle 4; the review's R-DR1-36).
+- **Struck in DR5 (2026-11-12)**; the maintainer: a language is extended so that it corresponds more closely to a model and states things clearly and efficiently, rarely if ever because a rule cannot be said. Kept as the goal in Part V's introduction. First deferred to DR5, with Vivace: "Business rules define the domain" (when a rule has no expressible form, extend the language, never contort the rule; docs/book/vision.md §5 principle 4; the review's R-DR1-36).
 
 ### Unresolved dependencies
 

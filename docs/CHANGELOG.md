@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-12 — Part V's foundations ruled.** Vivace's part of
+  `docs/plans/book-pass-inventory.md` now opens with an introduction
+  (what a model and a meta-model are; Vivace's purpose) and eight
+  decisions: a model is a value; a transformation is a model; two
+  models relate only through a declared mapping; a change to a model
+  is a mapping from the old one; solving is proposing a value for an
+  unknown, checked by the kernel; a solver sees its problem
+  unevaluated; feasible is decided and best says how strongly it
+  holds; a model's quality is a question for analysis. The planning
+  pilot's entries are held, not ruled. No code changed. Record:
+  `docs/records/book-pass/dr5-part-5-vivace.md`.
 - **2026-11-12 — Part IV's decisions ruled.** The standard language's
   decisions in `docs/plans/book-pass-inventory.md` are ruled: 66
   decisions in eleven chapters. Every check of the language is a
