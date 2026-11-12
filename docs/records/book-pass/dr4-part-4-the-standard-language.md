@@ -134,3 +134,56 @@ recommendation on each.
   effect values, inference as its own mechanism, effect variables,
   `opaque` and the `unsafe` hierarchy dissolve.
 - Ask 4: termination is a claim like any other and leaves the effects.
+
+**Member access, ruled 2026-11-12.** The maintainer observed that
+private, protected and the like "are not really privacy concerns",
+but "about interface, encapsulation and design discipline", that the
+same could be done by claims over an analysed program, and that
+strict access control would likely need caller-based decisions. The
+conclusion, agreed: two needs, two mechanisms already in Parts I and
+II, and no third.
+
+- Secrecy and power are kept by a key: "A private member is one whose
+  key not all code holds", as ruled.
+- A second decision beside it (open): "Who may use a member is a claim
+  about where the access was written." Private, protected, read-only
+  and caller-based rules are claims over the origins of accesses,
+  which only the kernel writes; they are refuted like any claim,
+  before any effect. For strict caller-based control the two combine:
+  the type's module keeps the key and hands out an accessor whose body
+  makes the claim.
+- To prove: an accessor reading the origin of its call; the access
+  patterns (private, shared within a group, read-only, protected)
+  restated as claims; the cost of deciding such claims on real
+  programs. Protected is a discipline unless the type also limits who
+  may refine it. A trusted module can still be led to access on
+  another's behalf, which is why keys stay the foundation.
+- The chapter is renamed "Reaching a member".
+
+**Asks 5 to 8, ruled 2026-11-12.** The maintainer agreed with the
+recommendation on each.
+
+- Ask 5: "Nothing is a claim until someone makes it." A refuted claim
+  halts; a finding about code that claimed nothing is a report; a
+  project may make claims wholesale and may not soften a refutation.
+  The information severity and the severity configuration go. A
+  pattern match where no arm matches is a refutation, so a match that
+  can fall through refutes the program and exhaustiveness needs no
+  analysis of its own. This promotes what an earlier ruling (CE-R8,
+  the two consciously weaker paths) kept as information.
+- Ask 6: "Constructing a refined value claims its predicate"; a failed
+  construction is a refutation, where an error value is yielded today,
+  the other path of the same earlier ruling. "The standard language's
+  handled failure is an exception", raised and handled explicitly and
+  carried in a field the standard extension owns.
+- Ask 7: "A claim about every value is decided by evaluating it with
+  the value unknown." "A proof term is a proposal": the proof rules
+  are functions of the standard extension and a result decided with
+  their help names it; a kernel primitive that rewrites by a decided
+  equation was the alternative. "Four strengths, one vocabulary":
+  kernel, enumerated, auto and witnessed become decided; sampled
+  stays; admitted becomes assumed; pending and undischarged become
+  undecided; induction checked at four steps is sampled.
+- Ask 8: "What is known about a value travels with the value." One
+  carrier; inside a branch the names tested are rebound; the arms of a
+  pattern match narrow as the branches of `if` do.
