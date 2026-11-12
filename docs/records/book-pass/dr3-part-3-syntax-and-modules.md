@@ -96,8 +96,14 @@ declarative. The held findings already recorded on Part III's entries.
 
 ## What changed
 
-Nothing yet. Part III of `docs/plans/book-pass-inventory.md` is
-rewritten as the asks are ruled, and "Rulings taken" records each.
+Part III of `docs/plans/book-pass-inventory.md`, from 25 decisions in
+three chapters to 23 in four: Parsing; Changing the grammar; The parser
+engine; Modules and programs. One decision is added to Part II's
+"Extensions" chapter ("What the kernel requires of an extension"). New
+held findings are on the entries that name them and in the table at
+the inventory's top. Every dependency of Parts I to III points to an
+earlier decision, and no capability decision depends on an
+implementation decision.
 
 ## Terms introduced
 
@@ -193,3 +199,37 @@ Also agreed:
   brings its notation.
 - The parse must be settled up to the point of a grammar change: a
   condition on any parsing algorithm.
+
+**Asks 5 to 12 and the leftovers, ruled 2026-11-12.** The maintainer
+agreed with the recommendation on each.
+
+- Ask 5: "Every notation stands for an expression."
+- Ask 6: "Grammars combine without regard to order." Adding a form is
+  always allowed; replacing or removing another grammar's form is
+  explicit.
+- Ask 7: "Ambiguity is a claim."
+- Ask 8: "Any parsing algorithm will do that meets five conditions":
+  left recursion; no meaning in the order of alternatives; every parse
+  reported; the parse settled up to each change of grammar; a state
+  carried beside the position. The two entries describing the shipped
+  engine stop being decisions.
+- Ask 9: "A terminal is a function, so a grammar can define its own."
+  The indentation terminals have no special standing.
+- Ask 10: "The loader reaches files through a capability."
+- Ask 11: an extension is evaluated once in a configuration, written
+  into "What the kernel requires of an extension".
+- Ask 12: the pipeline's fixed stages, the header scan by each caller
+  and the in-place writers are held findings. "A library's values are
+  immutable after load", the layer split of module loading, the
+  build-pipeline track entry and the scope-chain entry stop being
+  decisions; "Rules for user-written EBNF" folds into the entry on the
+  `grammar { … }` block.
+- Ask 13 is done with the rewrite. Ask 14 is taken in "Every program
+  is evaluated the same way, however it arrives".
+- The prompt: "Running a program is evaluating its main module with a
+  configuration's capabilities." The maintainer: a prompt needs to
+  allow rebinding. The entry reads this as each entry opening a scope
+  inside the last, so a later binding hides the earlier one; that
+  reading is the review's and awaits the maintainer's confirmation.
+
+Every ask is ruled.

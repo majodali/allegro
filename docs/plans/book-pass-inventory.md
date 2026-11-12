@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 231 decisions after DR2's rulings of 2026-11-11 (Part I: 23, with a thesis statement; Part II: 49; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts: 230 decisions after DR3's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 50; Part III: 23; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -39,22 +39,23 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
    - Decisions: Evaluation is total over unresolved information; The environment is not a value; A function may take an argument unevaluated; A call is evaluated by evaluating the function's body; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
-8. **Extensions** (2 decisions). Functions and metadata fields, and the few pure primitives beneath them.
-   - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few.
+8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
+   - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (5 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
    - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; A failure a program can handle is supplied by an extension; Evaluation stops early for two reasons only.
 
 **Part III: Syntax and modules**
 
-13. **Grammars as values** (10 decisions). The grammar formalism: grammars as Allegro values, scannerless parsing, the memoized engine, precedence, layout and ambiguity.
-   - Decisions: Grammars are Allegro values; Scannerless parsing; Ambiguity is banned and detected, not resolved by alternative order; Named, partially ordered precedence levels; Offside rule through stateful indent terminals; Guards and reservation sets separate keywords from identifiers; Parse failure reporting and recovery; Memoized recursive-descent engine with seed-growing left recursion; The precedence ladder runs as repetition, and memo invalidation tracks dependencies; Static analysis of grammars.
-   - Draws on: [extension/README.md](../book/extension/README.md) the boundary, [grammar-formalism.md](../book/grammar-formalism.md) §1 to §5, §7, §8, [extension/grammar.md](../book/extension/grammar.md) §1, §2.
-14. **Extending the grammar** (4 decisions). Grammar extension as operation deltas that never mutate the base, and the declarative grammar block.
-   - Decisions: Grammar extension as operation deltas, extensible by default; Grammar extension never mutates the base; The declarative `grammar { … }` block with hygienic templates; Rules for user-written EBNF.
-   - Draws on: [grammar-formalism.md](../book/grammar-formalism.md) §6, [extension/grammar.md](../book/extension/grammar.md) §4.
-15. **Modules, the use header and one pipeline** (11 decisions). Extensions as the module substrate, one pipeline for libraries and programs, immutable library values, and how a file activates syntax.
-   - Decisions: Extensions are the module substrate; Module loading and typed module objects are separate layers; Build pipeline as a track, not a layer; One evalSource pipeline for programs and libraries; `use` header for language extension, `import` for module values; Activation by a `use` header, per file and not transitive; Module resolution, caching and the session's runtime; A library's values are immutable after load; Execution contexts layer as a scope chain; Callers pre-scan and strip the `use` header; Conflicts are validated before activation.
-   - Draws on: [layers.md](../book/layers.md) §2 (build pipeline as a track), [extension/grammar.md](../book/extension/grammar.md) §4 (activation), [extension/modules.md](../book/extension/modules.md) Loading, Loaded once per process, [platform/README.md](../book/platform/README.md) the build track, [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) one pipeline, the `use` pre-scan.
+As ruled in DR3 (2026-11-12).
+
+10. **Parsing** (13 decisions). A parser is a function, a grammar is a value, and a notation stands for an expression; how grammars read characters, layout and precedence, and what ambiguity is.
+   - Decisions: Parsing is evaluation; No parser is privileged; Grammars are values; Every notation stands for an expression; The `grammar { … }` block; A parser records where each expression came from in its text; Scannerless parsing; A terminal is a function, so a grammar can define its own; Offside rule through stateful indent terminals; Guards and reserved words separate keywords from identifiers; Named, partially ordered precedence levels; Ambiguity is a claim; Parse failure reporting and recovery.
+11. **Changing the grammar** (4 decisions). How a text changes the language it is written in, how changes combine, and how far one reaches.
+   - Decisions: A text can change the grammar it is read in; Every production can be extended; Grammars combine without regard to order; A grammar change reaches to the end of its block.
+12. **The parser engine** (2 decisions). What any parsing algorithm must do, and how the first engine arrives.
+   - Decisions: Any parsing algorithm will do that meets five conditions; The platform's parser engine ships already built.
+13. **Modules and programs** (4 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
+   - Decisions: A module is an extension that arrives as a file; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
 
 **Part IV: Allegro Standard**
 
@@ -135,7 +136,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | `print` is a base primitive | The kernel's primitives are pure and few; Environment capabilities outside the base, effect-labelled | Values; Hosts | DR1, rulings of 2026-11-11 |
 | Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
-| A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
+| A refuted proof halts only after the program has run | Every program is evaluated the same way, however it arrives | Modules and programs | DR1, rulings of 2026-11-11 |
 | Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; A failure a program can handle is supplied by an extension | Hosts; Metadata | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
@@ -147,6 +148,13 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | The return check reports a conforming refined return as a mismatch | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A name bound twice wins silently; implicit production replacement; ordered choice | the grammar, module and binding decisions | Parts III and IV | DR1, rulings of 2026-11-11 |
 | Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | Keep it simple | DR1, rulings of 2026-11-11 |
+| Parsing is a host stage; the engine, base grammar and tree builder are host code | Parsing is evaluation; Every notation stands for an expression; The platform's parser engine ships already built | Parsing; The parser engine | DR3, rulings of 2026-11-12 |
+| The header is scanned ahead of the parse by each caller, and the callers disagree; an inline grammar in a library is rejected | A text can change the grammar it is read in | Changing the grammar | DR3, rulings of 2026-11-12 |
+| The engine commits to the first matching alternative, reports one parse and cannot change grammar during a parse; terminals are a closed set | Any parsing algorithm will do that meets five conditions; A terminal is a function, so a grammar can define its own; Ambiguity is a claim | Parsing; The parser engine | DR3, rulings of 2026-11-12 |
+| Replacing a base production only warns; appended and front-spliced alternatives take meaning from position | Grammars combine without regard to order; The `grammar { … }` block | Changing the grammar; Parsing | DR3, rulings of 2026-11-12 |
+| The loader is host code with a host file-reader option; the browser has its own scanner and loading code; the load-once cache is per process | A module is an extension that arrives as a file; The loader reaches files through a capability; What the kernel requires of an extension | Modules and programs; Extensions | DR3, rulings of 2026-11-12 |
+| A grammar change does not reach the prompt | Running a program is evaluating its main module with a configuration's capabilities | Modules and programs | DR3, rulings of 2026-11-12 |
+| The pipeline has fixed host stages and writes in place into built values, with a guard for library values | Every program is evaluated the same way, however it arrives | Modules and programs | DR3, rulings of 2026-11-12 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -202,7 +210,7 @@ They came together over years of exploration into most of what Allegro is today.
 | [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
 | [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
-| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
+| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules and programs (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
 | [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values (§3, §3.2); Metadata (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
@@ -214,10 +222,10 @@ They came together over years of exploration into most of what Allegro is today.
 | Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
 | [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
 | Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; Hosts: the terminal and the browser. |
-| [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Grammars as values (the boundary). |
-| [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Grammars as values (§1 to §5, §7, §8); Extending the grammar (§6); The surface language (§5 (layout)). |
-| [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Grammars as values (§1, §2); Extending the grammar (§4); Modules, the use header and one pipeline (§4 (activation)); The surface language (§3). |
-| [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules, the use header and one pipeline (Loading, Loaded once per process); Who can see a member (module objects). |
+| [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Parsing (the boundary). |
+| [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Parsing (§1 to §5, §7, §8); Changing the grammar (§6); The surface language (§5 (layout)). |
+| [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Parsing (§1, §2); Changing the grammar (§4); Modules and programs (§4 (activation)); The surface language (§3). |
+| [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules and programs (Loading, Loaded once per process); Who can see a member (module objects). |
 | [standard/README.md](../book/standard/README.md) (L2 Allegro Standard: boundary contract) | Dissolves into Part IV's opening. Goes to: Types as values (the boundary). |
 | [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Who can see a member (§3, §7); The surface language (§3 (combinators)). |
 | [standard/core-types.md](../book/standard/core-types.md) (Core types) | Joins the types chapter. Goes to: Types as values. |
@@ -227,8 +235,8 @@ They came together over years of exploration into most of what Allegro is today.
 | [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts and the knowledge they give (§1 to §4, §6, §8); When a check fails (§7, §10). |
 | [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Vivace: models as the program. |
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
-| [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules, the use header and one pipeline (the build track); Compiling beyond the interpreter (undelivered tracks). |
-| [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules, the use header and one pipeline (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
+| [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Compiling beyond the interpreter (undelivered tracks). |
+| [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules and programs (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
 | [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
 | [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
 | [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Proofs as values (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
@@ -286,7 +294,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Programmable language platform: minimal core, extensions are the language". "Allegretto" is the platform with no extension loaded; "Allegro Standard" is a named configuration; `--base` and the `typed` flag are not concepts of the language. One interface is about the interface, not the implementation language; with host code excluded from extensions (next decision but two), the two coincide. "Self-hosting and a package ecosystem" is re-read against this in its part.
 - Held finding (2026-11-11, DR1): the standard language's type system is host code holding writers, a trusted base larger than the kernel (`createTypeSystem`, `src/types-std.ts:4894`). Held on the decisions of Part IV that it realises.
 - Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "An extension is made of functions and metadata fields" and its neighbours.
-- Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "One evalSource pipeline for programs and libraries" and "Precompile before the evaluation loop".
+- Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "Every program is evaluated the same way, however it arrives" and "Precompile before the evaluation loop".
 - Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
 - Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "The kernel's primitives are pure and few".
 - Held finding (2026-11-11, DR1): the platform with no extension loaded cannot load one: `use` is a parse error under `--base` (`src/index.ts:115`–`119`, `252`–`253`). Held on the CLI's decisions.
@@ -432,7 +440,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §2 "Build, don't derive", §5 principle 10; docs/decisions.md CE-R1, CE-R8; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every result says how strongly it holds"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
 - Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
-- Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "One evalSource pipeline for programs and libraries".
+- Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "Every program is evaluated the same way, however it arrives".
 - Chapter: Keep it simple
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
@@ -1228,6 +1236,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-11, DR2, leftovers): "Primitives receive full values" is a rule of the kernel's own code: a primitive receives its arguments with their metadata intact.
 - Chapter: Extensions
 
+#### What the kernel requires of an extension
+- Decides: an extension reaches the kernel as expressions and named values; the kernel reads no text and no files. A configuration names the extensions an evaluation starts with and the capabilities it supplies. At startup the kernel has its primitives and nothing else; it evaluates the configuration's extensions in the order their dependencies require. An extension is evaluated once in a configuration, and everything that names it gets the same values. Parsing, loading and every other service come from those extensions.
+- Status: open (the code builds its extensions in host code and caches a loaded library per process); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; A capability is granted, never acquired; An extension registers its own fields; the kernel has two; The kernel holds no language
+- Significance: 5 — how anything above the kernel comes to exist
+- Label: foundational — parsing, modules and every language start from it
+- Options recorded: a kernel that reads text or files itself (rejected: the kernel holds no language, and the mechanism is kept as simple as possible so that more sophisticated mechanisms are loaded as extensions); evaluating an extension once for each module that names it (rejected: a field is registered once and unforgeable values are told apart by identity)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken); docs/book/extension/modules.md "Loading (L1)", "Loaded once per process"
+- Notes: new, by ruling; placed in Part II with the maintainer's approval. These are requirements; the maintainer expects more detail on configuration and the startup process to be needed. Absorbs the load-once clause of "Module resolution, caching and the session's runtime" and the kernel's half of "A module is an extension that arrives as a file" (named values a configuration hands to an evaluation).
+- Held finding (2026-11-12, DR3): the load-once cache is keyed by resolved path and content for one process (`src/modules.ts`), a cache where the decision needs an identity for one configuration.
+- Chapter: Extensions
+
 ### Correctness
 
 #### Only the kernel records the outcome of a claim
@@ -1298,374 +1320,345 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
 - Chapter: Correctness
 
-### Grammars as values
+### Parsing
 
-#### Grammars are Allegro values
-- Decides: a grammar is an ordinary Allegro Object of named productions over a `Rule` union (Terminal, NonTerm, Seq, Alt, Rep, Opt, Guarded) with a start symbol, so grammars are built, composed and analysed like any other value.
-- Status: settled
+#### Parsing is evaluation
+- Decides: a parser is a function from a grammar and a text to an expression. A text that does not parse is a refutation.
+- Status: open (the engine is host code called by a fixed pipeline); ruled 2026-11-12 (DR3)
 - Type: capability
-- Rationale kind: vision
-- Depends on: The kernel holds no language; One value universe
-- Significance: 4 — runtime grammar extension, `use` activation and the analyzer all operate on grammar values
-- Label: foundational — fragment merging, base chains and `grammar2_*` primitives assume it
+- Rationale kind: technical
+- Depends on: One operation: partial evaluation; The kernel holds no language; Expressions are values, forming a DAG; A refutation marks everything computed from it
+- Significance: 5 — places every notation inside the one operation
+- Label: foundational — every decision of Part III
+- Options recorded: parsing as a stage before evaluation, outside it (what the code does; rejected: the kernel holds no language and has one operation)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling. When a parser runs follows from the partial-evaluation decisions: a text that is known is parsed, and a text or grammar that is missing leaves a residual.
+- Held finding (2026-11-12, DR3): parsing is a host stage: the engine is TypeScript (`src/grammar2/engine.ts`) and no Allegro function parses a program's text.
+- Chapter: Parsing
+
+#### No parser is privileged
+- Decides: a parser is an ordinary extension. A configuration may hold several and may replace the one the platform ships.
+- Status: open; ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Parsing is evaluation; What the kernel requires of an extension; Everything above the kernel is an extension, and there is one way to extend
+- Significance: 4 — keeps notation out of the trusted base
+- Label: foundational — a language may bring its own parser
+- Options recorded: one parser built into the platform (what the code does)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "There's nothing privileged about the bootstrap parser we provide."
+- Chapter: Parsing
+
+#### Grammars are values
+- Decides: a grammar is an ordinary structure: named productions over a small set of rule forms (terminal, reference, sequence, alternatives, repetition, option, guard) and a start symbol. It is built, combined and analysed like any other value, and the kernel knows nothing about it.
+- Status: settled; reworded 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: One composite kind: Structure; The kernel holds no language; An extension is made of functions and metadata fields
+- Significance: 4 — grammar change, combination and analysis all operate on grammar values
+- Label: foundational — every decision on changing a grammar
 - Units: grammar-formalism
-- Options recorded: none recorded (the Pratt + Earley hybrid it replaced is noted as superseded)
-- Sources: docs/book/grammar-formalism.md §1, §2, §9, §6; docs/book/extension/grammar.md §1
-- Book home (fragments' proposal): grammar-formalism (chapter "The grammar formalism")
-- Chapter: Grammars as values
+- Options recorded: none recorded (the Pratt and Earley hybrid it replaced is noted as superseded); a grammar as a third kind of extension item beside functions and fields (rejected 2026-11-12: to the kernel a grammar definition is a value)
+- Sources: docs/book/grammar-formalism.md §1, §2, §9, §6; docs/book/extension/grammar.md §1; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: was "Grammars are Allegro values", stated as an Object over a `Rule` union: terms of the typed language, which comes later in the order.
+- Chapter: Parsing
+
+#### Every notation stands for an expression
+- Decides: a grammar form maps what it matched to an expression and does nothing else. Free names in that expression mean what they meant where the form was defined, never what they mean where the form is used.
+- Status: partly built (the forms of the `grammar { … }` block do this; the base grammar does not); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Meaning comes before notation; Grammars are values; Symbol identity is a fully-qualified name
+- Significance: 5 — what a notation can and cannot do
+- Label: foundational — a notation can change without changing what any program means
+- Units: grammar-extension, tree-builder
+- Options recorded: builder functions that run arbitrary code during the parse (deferred in the sources); names captured where the form is used (an earlier state, replaced)
+- Sources: docs/book/grammar-formalism.md §6.4; docs/book/extension/grammar.md §4; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling: "Meaning comes before notation" made concrete. A form that changes the grammar is no exception: its expression's value is the new grammar ("A text can change the grammar it is read in"). Absorbs the hygiene clause of "The `grammar { … }` block".
+- Held finding (2026-11-12, DR3): the base grammar's trees are turned into expressions by host code (`src/grammar2/tree-builder.ts`), which can do what no form's expression can.
+- Chapter: Parsing
+
+#### The `grammar { … }` block
+- Decides: a grammar is written declaratively: operator clauses (`infix`, `prefix`, `postfix`), rule clauses that define, extend or remove a production, and form clauses whose body names the parts it matches and gives the expression they stand for. Whitespace is allowed between the items of a sequence unless a rule says otherwise, and the text a named part matched is available as a string.
+- Status: settled; reworded 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: mixed
+- Depends on: Every notation stands for an expression; Grammars are values
+- Significance: 3 — the notation in which notations are written
+- Label: swappable — another notation for grammars could map to the same grammar values
+- Units: grammar-extension, tree-builder
+- Options recorded: arbitrary builder functions (deferred); an offside form of the block; splicing a new expression form after the identifier fallthrough (rejected: number-led forms were dead code); a named part's match as a length-typed bits value (rejected: an eight-byte match read as an integer)
+- Sources: docs/book/grammar-formalism.md §6.4; docs/book/extension/grammar.md §4; archive dappled-cascading-cantor.md "Design summary", "Scope boundaries"; B-092 U2 and B-151 B1 (docs/book/extension/grammar.md §4)
+- Notes: absorbs "Rules for user-written EBNF". The maintainer: all extensions are declarative.
+- Held finding (2026-11-12, DR3): new expression forms are spliced at the front of the atom production, which works only because the engine tries alternatives in order.
+- Chapter: Parsing
+
+#### A parser records where each expression came from in its text
+- Decides: the position of an expression in its source text is a metadata field the parser's extension registers and writes. The kernel does not know about it. The parse tree stays internal to the parser.
+- Status: open; ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Parsing is evaluation; An extension registers its own fields; the kernel has two; Every value keeps its origin
+- Significance: 3 — every diagnostic that points into a text rests on it
+- Label: swappable — a parser may record more or less
+- Options recorded: the kernel recording source positions in its own origin field (rejected: "Source attachment is not a promise the kernel needs to know about")
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling. Two fields: the kernel's origin field holds the expression an expression came from; the parser's field holds a parsed expression's source information. Following the origin chain to its end reaches an expression that carries the parser's field.
+- Chapter: Parsing
 
 #### Scannerless parsing
-- Decides: grammars consume characters directly with no tokenizer; whitespace is explicit in the formalism, and keywords and identifiers share character space.
+- Decides: a grammar reads characters directly; there is no tokenizer. Whitespace is written in the grammar, and keywords and identifiers share one character space.
 - Status: settled
 - Type: capability — grammar authors write character-level rules
 - Rationale kind: technical
-- Depends on: Grammars are Allegro values
-- Significance: 3 — extensions can add tokens (`**`, `3 m`) without a lexer change
-- Label: foundational — the whitespace interleave, guards and reservation sets exist because of it
+- Depends on: Grammars are values
+- Significance: 3 — two languages' tokens cannot clash when there are no tokens
+- Label: swappable — a tokenizer could be added beneath grammars that want one
 - Units: grammar-formalism
-- Options recorded: a tokenizer layer, kept as the known optimization "if larger files demand it" (benchmark first); an external LL(k)+Pratt experiment, deferred
+- Options recorded: a tokenizer layer, kept as the known optimization "if larger files demand it" (benchmark first); an external LL(k) and Pratt experiment, deferred
 - Sources: docs/book/grammar-formalism.md §1, §4; docs/book/extension/grammar.md §3 "Performance headroom"
-- Book home (fragments' proposal): grammar-formalism
-- Chapter: Grammars as values
+- Chapter: Parsing
 
-#### Ambiguity is banned and detected, not resolved by alternative order
-- Decides: the intended design is that precedence, associativity and longest-match metadata drive disambiguation, ambiguity is a compile-time error, and alternative order carries no meaning.
-- Status: open
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Grammars are Allegro values; Order of definition carries no meaning
-- Significance: 3 — decides whether user extensions inherit silent ordering hazards
-- Label: foundational — the analyzer's disjointness check, `@prec`/`@assoc` semantics and every base production that relies on order
-- Units: grammar-formalism, base-grammar
-- Options recorded: ordered choice as shipped (alt order significant); full disjointness enforcement with explicit opt-outs
-- Sources: docs/book/grammar-formalism.md §1, §3.1, §7.1, §7.5 (W_ALT_OVERLAP opt-in); docs/book/extension/grammar.md §2 (maintainer ruling 2026-06, "under revision")
-- Book home (fragments' proposal): extension/grammar
-- Notes: shipped behaviour contradicts the formalism: `analyzeWithDisjointnessCheck` is opt-in because the base grammar relies on ordering, and the `expr_form` front-splice rule depends on ordered choice. The redesign is "design-discussion scope". Also under revision: tree-builder child access should be label-directed, not positional (grammar.md §2).
-- Chapter: Grammars as values
-
-#### Named, partially ordered precedence levels
-- Decides: precedence levels are named and related by before/after constraints that the analyzer topologically sorts; one-sided constraints are accepted whenever they resolve every actual ambiguity, and no integers appear in the user-visible spec.
-- Status: settled
+#### A terminal is a function, so a grammar can define its own
+- Decides: a terminal is a function from the parser's position and state to a match or a failure. The terminals the engine's package ships, those for indentation among them, have no special standing.
+- Status: open (terminals are cases of the host engine); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Grammars are Allegro values
-- Significance: 3 — makes operator extension composable between independent libraries
-- Label: swappable — confined to precedence analysis and level insertion
-- Units: grammar-formalism, grammar-extension
-- Options recorded: integer precedence (rejected); requiring a total order (rejected in favour of "specify what you know")
-- Sources: docs/book/grammar-formalism.md §3.1, §7.3, §11 item 4; §6.4 (prec(X), above/below, at("*")); archive dappled-cascading-cantor.md "Inside the block"
-- Book home (fragments' proposal): grammar-formalism
-- Notes: `E_PREC_UNDERCONSTRAINED` is specified but is not in the shipped code list (§7.5); only `E_PRECEDENCE_CYCLE` ships.
-- Chapter: Grammars as values
+- Depends on: Grammars are values; No parser is privileged; Functions are data: params plus body
+- Significance: 3 — what a grammar can recognise is not fixed by the engine
+- Label: foundational — layout-sensitive notations and any terminal an extension needs
+- Options recorded: terminals built into the engine, with no way for an extension to add one that carries state (what the code does; simpler, and it gives the shipped engine a standing no extension has)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling.
+- Held finding (2026-11-12, DR3): the terminals are a closed set implemented in the engine (`src/grammar2/engine.ts`).
+- Chapter: Parsing
 
 #### Offside rule through stateful indent terminals
-- Decides: indentation is expressed by stateful terminals `NEWLINE`, `INDENT`, `DEDENT`, `SAMELINE` with parser position `(offset, indent stack)`; `NEWLINE` fires only when the next content is at or below the block's indent, so continuation lines need no special construct.
+- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of offset and indent stack. `NEWLINE` matches only when the next content is at or below the block's indent, so a continuation line needs no construct of its own.
 - Status: partly built
 - Type: capability — grammar authors name the indent terminals in their rules
 - Rationale kind: technical
-- Depends on: Scannerless parsing
-- Significance: 3 — offside-rule grammars (the planning DSL) and mixed modes rest on it
-- Label: swappable — engine terminal handling
+- Depends on: A terminal is a function, so a grammar can define its own; Scannerless parsing
+- Significance: 3 — offside-rule notations and mixed modes rest on it
+- Label: swappable — another set of layout terminals could be defined beside it
 - Units: grammar-formalism
 - Options recorded: a dedicated continuation construct (rejected); tab handling proposals (tabs forbidden by default, `tab_width` opt-in)
 - Sources: docs/book/grammar-formalism.md §5.1–§5.5; docs/book/extension/grammar.md §3
-- Book home (fragments' proposal): grammar-formalism
-- Notes: `SAMELINE` is not implemented (`src/grammar2/engine.ts:712`); §5.4's tab and empty-stack questions are "Proposed", not recorded as decided.
-- Chapter: Grammars as values
+- Notes: `SAMELINE` is not implemented (`src/grammar2/engine.ts:712`); the tab and empty-stack questions of docs/book/grammar-formalism.md §5.4 are "Proposed", not recorded as decided.
+- Chapter: Parsing
 
-#### Guards and reservation sets separate keywords from identifiers
-- Decides: zero-width guards (`NotFollowedBy`, `FollowedBy`, `Reserved(set)`) and named, cumulative reserved sets keep keywords out of identifiers; `left`/`right`/`none` are reserved globally for simplicity.
+#### Guards and reserved words separate keywords from identifiers
+- Decides: zero-width guards (not followed by, followed by, reserved) and named, cumulative sets of reserved words keep keywords out of identifiers.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
 - Depends on: Scannerless parsing
-- Significance: 2 — every keyword an extension adds faces the same choice
-- Label: swappable — base-grammar and analyzer
+- Significance: 2 — every keyword a grammar adds faces the same choice
+- Label: swappable — local to how a grammar tells a keyword from a name
 - Units: grammar-formalism, base-grammar
-- Options recorded: context-sensitive reservation of `left`/`right`/`none` (only inside `grammar { … }`), to revisit if it breaks user code
+- Options recorded: reserving `left`, `right` and `none` only inside a `grammar { … }` block, to revisit if the global reservation breaks user code
 - Sources: docs/book/grammar-formalism.md §2.4, §3.3, §4.1, §11 item 3; docs/book/extension/grammar.md §4
-- Book home (fragments' proposal): grammar-formalism
-- Chapter: Grammars as values
+- Notes: `left`, `right` and `none` are reserved everywhere "for simplicity": a wart, since three words of the grammar notation are taken from every program.
+- Chapter: Parsing
+
+#### Named, partially ordered precedence levels
+- Decides: precedence levels are named and related by before and after constraints. A constraint on one side is enough wherever it settles every case that arises, and no numbers appear.
+- Status: settled
+- Type: capability
+- Rationale kind: technical
+- Depends on: Grammars are values; Order of definition carries no meaning
+- Significance: 3 — independent libraries can each add operators
+- Label: swappable — the means of stating precedence, not the fact of it
+- Units: grammar-formalism, grammar-extension
+- Options recorded: integer precedence (rejected); requiring a total order (rejected in favour of "specify what you know")
+- Sources: docs/book/grammar-formalism.md §3.1, §7.3, §11 item 4; §6.4; archive dappled-cascading-cantor.md "Inside the block"
+- Notes: the error for constraints that leave a case unsettled is specified and not shipped (docs/book/grammar-formalism.md §7.5); only the cycle error ships.
+- Chapter: Parsing
+
+#### Ambiguity is a claim
+- Decides: "this grammar is unambiguous" is a claim, decided, refuted or left undecided like any other. A text with two parses is a refutation. Precedence levels and longest match are the author's means of removing ambiguity; the order of alternatives is not one. The analyses of a grammar (what can match nothing, what is unreachable, what recurses on the left) are ordinary functions over the grammar value.
+- Status: open (the shipped engine resolves ambiguity by the order of alternatives); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Claims are evaluated like everything else; Grammars are values; Order of definition carries no meaning; Named, partially ordered precedence levels
+- Significance: 4 — whether a notation can mean two things silently
+- Label: foundational — combining grammars from independent authors
+- Units: grammar-formalism, base-grammar
+- Options recorded: ordered choice as shipped (the order of alternatives decides); ambiguity as an error of a compile step (the sources' wording; there is no such step, and the general question is undecidable, so a claim with three outcomes is the honest form)
+- Sources: docs/book/grammar-formalism.md §1, §3.1, §7.1–§7.5, §11 item 5; docs/book/extension/grammar.md §2 (maintainer ruling 2026-06, "under revision"); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Ambiguity is banned and detected, not resolved by alternative order" and absorbs "Static analysis of grammars". FIRST-set completion is an open gap of the analyses.
+- Held finding (2026-11-12, DR3): the disjointness check is opt-in because the base grammar relies on the order of its alternatives (`analyzeWithDisjointnessCheck`, `src/grammar2/analyzer.ts`).
+- Chapter: Parsing
 
 #### Parse failure reporting and recovery
-- Decides: failure reports the farthest advance with expected-versus-got; error productions (`@error`) and `@sync` panic recovery are core features, with sync points declared at natural boundaries in the base grammar.
+- Decides: a failed parse reports the farthest point reached, with what was expected and what was found. Error productions and declared recovery points let one parse report several failures.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
-- Depends on: Grammars are Allegro values
-- Significance: 2 — user-facing parse diagnostics
-- Label: swappable — engine
+- Depends on: Parsing is evaluation; Claims are evaluated like everything else
+- Significance: 2 — what a reader of a failed parse sees
+- Label: swappable — reporting can improve without changing any grammar
 - Units: grammar-formalism
-- Options recorded: `@sync` optional (rejected: "core feature, not optional")
+- Options recorded: recovery as optional (rejected: "core feature, not optional")
 - Sources: docs/book/grammar-formalism.md §3.5, §8.2–§8.4, §11 item 6; docs/book/extension/grammar.md §3 (gaps)
-- Book home (fragments' proposal): grammar-formalism
-- Notes: farthest-advance ships; `@error` and `@sync` do not.
-- Chapter: Grammars as values
+- Notes: the farthest-point report ships; error productions and recovery points do not. Reporting several failures from one parse is the parser's case of evaluation continuing on independent expressions after a refutation.
+- Chapter: Parsing
 
-#### Memoized recursive-descent engine with seed-growing left recursion
-- Decides: the engine is a scannerless recursive parser with memoization, ordered choice, Warth-style seed-growing left recursion and stateful indent terminals, with farthest-advance error reporting.
-- Status: partly built
-- Type: implementation — the parsing algorithm, which the rulings keep swappable
-- Rationale kind: technical
-- Depends on: Scannerless parsing; Grammars are Allegro values; Offside rule through stateful indent terminals; Parse failure reporting and recovery
-- Significance: 3 — fixes parse cost and which grammars run
-- Label: swappable — behind the grammar-formalism unit's parse interface; by the maintainer's ruling of 2026-11-05, any algorithm may replace it except one that requires ordered choice, and the shipped ordered choice is to be replaced by GLL or a similar algorithm
-- Units: grammar-formalism
-- Options recorded: GLL (the formalism's stated choice); full GLL "where Warth iteration falls short" (open gap); the retired Pratt + Earley hybrid
-- Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3
-- Book home (fragments' proposal): extension/grammar (chapter "The parser engine")
-- Notes: contradiction — grammar-formalism.md §1 says "GLL is chosen" and §5.1 speaks of "GLL memoization", while grammar.md §1/§4 describe a memoized parser with "PEG-committed ordered choice". The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for the standalone `grammar_*` combinators; its retirement in favour of `grammar2_*` is a backlog item.
-- Chapter: Grammars as values
+### Changing the grammar
 
-#### The precedence ladder runs as repetition, and memo invalidation tracks dependencies
-- Decides: the base grammar's levels are specified left-recursively but rewritten to `tighter (OP tighter)*` and folded back into left-nested nodes by the tree builder; left-recursion growth invalidates only memo entries that read a seed at the same position.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Memoized recursive-descent engine with seed-growing left recursion; Named, partially ordered precedence levels
-- Significance: 2 — parse performance with an unchanged built program
-- Label: swappable — engine and tree-builder internals
-- Units: grammar-formalism, base-grammar, tree-builder
-- Options recorded: running the left-recursive specification directly; clearing every memo entry at the position (the earlier conservative rule)
-- Sources: B-157 P7 and P5 (docs/book/extension/grammar.md §1); grammar-formalism.md §6.4; Warth, Douglass and Millstein 2008
-- Book home (fragments' proposal): extension/grammar
-- Chapter: Grammars as values
-
-#### Static analysis of grammars
-- Decides: `analyze(grammar)` is a pure function computing nullability, FIRST/FOLLOW and reporting undefined names, infinite repetition, unreachable productions (warning) and left-recursion classification, cached per grammar identity.
-- Status: partly built
-- Type: capability — a function grammar authors call
-- Rationale kind: technical
-- Depends on: Grammars are Allegro values; Ambiguity is banned and detected, not resolved by alternative order
-- Significance: 2 — the check that lets extensions fail early
-- Label: swappable — analyzer
-- Units: grammar-formalism
-- Options recorded: unreachable as error (rejected: may be an intentional extension hook); `Opt`+`@prec` overlap as analyzer error (resolved, §11 item 5)
-- Sources: docs/book/grammar-formalism.md §7.1–§7.5, §11 item 5
-- Book home (fragments' proposal): grammar-formalism
-- Notes: FIRST-set completion is an open gap (grammar.md §3).
-- Chapter: Grammars as values
-
-### Extending the grammar
-
-#### Grammar extension as operation deltas, extensible by default
-- Decides: extension is `extend(base, delta)` where a delta maps productions to `Add`, `Append`, `Replace`, `ReplaceAlt`, `Remove` or `Wrap`; `Append` auto-wraps a non-Alt production, and every rule is extensible with no `@extensible` gate.
-- Status: settled
+#### A text can change the grammar it is read in
+- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
+- Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Grammars are Allegro values
-- Significance: 3 — the one mechanism every syntax extension lowers to
-- Label: foundational — fragment merging and the `grammar { … }` surface lower to these operations
-- Units: grammar-extension
-- Options recorded: an opt-in `@extensible` gate (rejected); a future opt-out `@frozen`/`@sealed` for whitespace and core terminals; positional `ByIndex` selectors (allowed, discouraged)
-- Sources: docs/book/grammar-formalism.md §6, §6.1, §11 items 1–2
-- Book home (fragments' proposal): grammar-formalism
-- Chapter: Extending the grammar
-
-#### Grammar extension never mutates the base
-- Decides: extension is immutable layering with structural sharing; base grammars are never mutated.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Grammar extension as operation deltas, extensible by default; Structures immutable by default; derive, never mutate
-- Significance: 3 — makes per-file extension scope and shared libraries safe
-- Label: foundational — per-file activation and the shared module cache assume it
-- Units: grammar-extension
-- Options recorded: none recorded
-- Sources: docs/book/extension/README.md "Invariants"
-- Book home (fragments' proposal): extension/grammar
-- Chapter: Extending the grammar
-
-#### The declarative `grammar { … }` block with hygienic templates
-- Decides: modules declare syntax with `infix`/`prefix`/`postfix`/`expr_prefix`, `rule NAME =`/`+=`/`-=`/`[alt] =`, `expr_form` and `stmt_form` clauses whose EBNF bodies bind labels positionally to a template, substituted at parse time; free symbols in templates resolve in the defining module's context at definition time.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Grammar extension as operation deltas, extensible by default; Named, partially ordered precedence levels
-- Significance: 3 — the user-facing extension surface that `lib/` forms (contracts, totality, units, match) use
-- Label: swappable — it lowers to operation deltas
-- Units: grammar-extension, tree-builder
-- Options recorded: arbitrary parse-time builder lambdas (deferred); non-hygienic capture of parse-site names (the Phase 6 state, replaced in Phase 7); offside `grammar:` block form
-- Sources: docs/book/grammar-formalism.md §6.4; docs/book/extension/grammar.md §4; archive dappled-cascading-cantor.md "Design summary", "Scope boundaries"
-- Book home (fragments' proposal): extension/grammar
-- Chapter: Extending the grammar
-
-#### Rules for user-written EBNF
-- Decides: `ws_any` is interleaved between sequence items unless an explicit whitespace production is written; `expr_form` alternatives splice at the front of `expr_atom`; `INDENT`/`NEWLINE`/`DEDENT` are reachable by name; a `stmt_form` expanding to `binding_decl(...)` declares a binding; a label's matched text builds as a string literal.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: The declarative `grammar { … }` block with hygienic templates; Offside rule through stateful indent terminals
-- Significance: 1 — local rules for extension authors
-- Label: swappable — tree-builder and fragment merging
-- Units: grammar-extension, tree-builder
-- Options recorded: splicing `expr_form` before the `ident` fallthrough (rejected: number-led forms were dead code); a label match as a length-typed Bits (rejected: an eight-byte match read as an Int)
-- Sources: B-092 U2 and B-151 B1 (docs/book/extension/grammar.md §4)
-- Book home (fragments' proposal): extension/grammar
-- Notes: the front-splice rule depends on ordered choice, which "Ambiguity is banned and detected" calls an artifact.
-- Chapter: Extending the grammar
-
-### Modules, the use header and one pipeline
-
-#### Extensions are the module substrate
-- Decides: anonymous extensions (named bindings injected by the execution context, layered between primitives and source) are the substrate, and a module is an extension built from an `.alg` file; `import name` is declarative, with module values provided through extensions rather than loaded at the import site.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: The kernel holds no language; The environment is not a value
-- Significance: 4 — the standard library, grammars and the type system all arrive as extensions
-- Label: foundational — loading, typed module objects and grammar harvesting
-- Units: module-loading
-- Options recorded: none recorded
-- Sources: docs/book/extension/modules.md "Loading (L1)"; docs/book/extension/README.md "Provides"
-- Book home (fragments' proposal): extension/modules
-- Chapter: Modules, the use header and one pipeline
-
-#### Module loading and typed module objects are separate layers
-- Decides: loading (paths, dependency resolution, caching, cycle detection) is L1 and knows nothing of types; typed module objects, export surfaces and encapsulation are L2.
-- Status: settled
-- Type: implementation — a cut between units
-- Rationale kind: technical
-- Depends on: Extensions are the module substrate
-- Significance: 3 — fixes the L1/L2 boundary for modules
-- Label: foundational — typed-modules depends on module-loading
-- Units: module-loading, typed-modules
-- Options recorded: the v1 implicit split (made the contract)
-- Sources: Layer ruling 2 (docs/decisions.md "Standing rulings"); docs/book/layers.md §1; docs/book/extension/README.md "Explicitly NOT in this layer"; docs/book/extension/modules.md header
-- Book home (fragments' proposal): extension/modules
-- Notes: `src/modules.ts` is still mixed (module-loading + typed-modules per scripts/analyze/units.json).
-- Chapter: Modules, the use header and one pipeline
-
-#### Build pipeline as a track, not a layer
-- Decides: the build pipeline is a capability track that may consume any layer's surface and is never a dependency of a layer, and its delivered part, the `pipeline` unit, sits at the top of the unit DAG, the one unit allowed to import any other.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Each decision lives in one replaceable unit of code
-- Significance: 3 — places assembly above everything
-- Label: foundational — introspect and cli depend on the pipeline; every decision found inside the pipeline must belong to another unit
-- Units: pipeline
-- Options recorded: build pipeline as a layer (the old milestone list)
-- Sources: Standing rulings, layer ruling 4 (docs/decisions.md); docs/book/layers.md §2, §3; docs/book/platform/build-pipeline.ir.md C9 to C11
-- Book home (fragments' proposal): Layers, tracks and milestones / The evaluation pipeline
-- Notes: `src/runtime.ts` is still mixed across four units; three moves are owed and unscheduled (C136, C143). Significance calibrated from 4.
-- Chapter: Modules, the use header and one pipeline
-
-#### One evalSource pipeline for programs and libraries
-- Decides: every program, REPL entry, subcommand and library load passes through the same `evalSource` pipeline, so every compile-time check fires inside libraries exactly as in user code.
-- Status: settled
-- Type: implementation — it realises the clause of "Claims are evaluated like everything else" that libraries are checked as user code
-- Rationale kind: mixed
-- Depends on: Extensions are the module substrate; Build pipeline as a track, not a layer
-- Significance: 4 — makes library assurance the same assurance as user code
-- Label: foundational — every halt rule and the owner-module invariant assume it
-- Units: module-loading, pipeline; pipeline, module-loading
-- Options recorded: a separate library loader path (the v1 lesson that motivated the invariant)
-- Sources: docs/book/extension/README.md "Invariants"; docs/book/extension/modules.md "One pipeline"; CLAUDE.md halt invariant; docs/book/extension/modules.md (One pipeline); docs/book/platform/build-pipeline.ir.md C14, C15, C64, C130; docs/book/vivace/planning-dsl.md §6 (compile-time checks inside libraries)
-- Book home (fragments' proposal): extension/modules / The evaluation pipeline
-- Notes: Merged from fragment B ("One pipeline for libraries and programs"), fragment C ("One evalSource pipeline for programs and libraries"). Significance calibrated from 4/5.
-- Chapter: Modules, the use header and one pipeline
-
-#### `use` header for language extension, `import` for module values
-- Decides: a file's top-of-file header activates extensions with `use NAME`, `use import NAME`, `use NAME.MEMBER` and `use grammar { … }`, while `import name` in the body declares a module value supplied as an extension, not loaded imperatively at the site.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Extensions are the module substrate
-- Significance: 3 — the gate between a file and every DSL it speaks
-- Label: foundational — the CLI, the module loader, the sandbox, the pipeline's input contract and every library DSL depend on the split
-- Units: module-loading, cli, grammar-extension
-- Options recorded: `use_grammar` (the Phase 1 spelling, superseded)
-- Sources: docs/book/grammar-formalism.md §6.2; docs/book/extension/modules.md (Loading: Import syntax, One pipeline); docs/book/platform/tooling.ir.md C37 to C44; docs/book/platform/build-pipeline.ir.md C29, C156
-- Book home (fragments' proposal): Module loading and module objects / Surface syntax of Allegro Standard (proposed)
-- Notes: the header is handled by each caller, and the callers disagree: inspect and verify load no module for `use NAME.MEMBER` or inline grammar (tooling C67, C69), the REPL loads none (C60, C61), `prove` leaves the header unstripped and fails (C133 to C135), the sandbox has its own `scanUses` (host C79). `use grammar { … }` inside libraries is rejected (modules.md, Known limit). Assembly: the dependency on "Callers pre-scan and strip the `use` header" was dropped to break a two-entry cycle; the pre-scan implements the header, so the pre-scan depends on the header. Significance calibrated from 4.
-- Chapter: Modules, the use header and one pipeline
-
-#### Activation by a `use` header, per file and not transitive
-- Decides: a top-of-file `use NAME` / `use import NAME` / `use NAME.MEMBER` / `use grammar { … }` header extends the active grammar before the rest of the file parses; the extension holds for that file only, never leaking into the modules it imports, the files that import it or the REPL, and is not re-exported; grammars merge only when one base chain (`allegro`, `empty`, or `extends X`) is a prefix of the other.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Grammar extension never mutates the base; Extensions are the module substrate; `use` header for language extension, `import` for module values
-- Significance: 3 — defines how syntax reaches a program
-- Label: foundational — the use-scanner, module loading of grammars and per-file isolation
+- Depends on: Parsing is evaluation; Every notation stands for an expression; Grammars are values; A system is described in the language of its domain, and that language grows with the understanding
+- Significance: 5 — how a program comes to be written in a language of its own
+- Label: foundational — every notation beyond the first
 - Units: grammar-extension, module-loading
-- Options recorded: `use <expr>` with a combinator whitelist (`combine`/`override`/`without`, `E_USE_EXPR_TOO_COMPLEX`; never shipped); per-block or per-production activation (deferred); single-pass `use` (deferred, pre-scan stays two-pass); modules re-exporting grammars explicitly
-- Sources: docs/book/grammar-formalism.md §6.2 (both), §6.3; docs/book/extension/grammar.md §4; docs/book/extension/modules.md "Known limit"; archive dappled-cascading-cantor.md "use X", "Scope boundaries"; docs/book/grammar-formalism.md §6.3; docs/book/extension/grammar.md §4 (no transitive re-export)
-- Book home (fragments' proposal): extension/grammar / Grammar and parser
-- Notes: Merged from fragment B ("Activation by a `use` header, scoped to one file, compatible by base chain"), fragment C ("Grammar activation is per file and not transitive"). B: `use grammar { … }` inside a lib is rejected (needs a bootstrap `evalSource` recursion).
-- Chapter: Modules, the use header and one pipeline
+- Options recorded: scanning the text for declarations before parsing it (what the code does, so that it can use a simple parser; rejected: a declaration may appear part way through, and grammars define their own forms of the kind); a declaration naming a grammar expression from a fixed list of combinators (never shipped)
+- Sources: docs/book/grammar-formalism.md §6.2, §6.3; docs/book/extension/grammar.md §4; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling; replaces the header half of "`use` header for language extension, `import` for module values" and "Callers pre-scan and strip the `use` header". The maintainer: "our parser starts with an initial grammar and modifies it (augmenting or replacing) at a specific point in the parse, so all following text is parsed with the modified grammar"; it needs a custom engine, and there is prior art to lean on (Lean 4 and SugarJ read a text one item at a time and let an item extend the grammar). If the grammar is not yet available, the rest of the text stays unparsed, as a residual. A changed grammar is a new value; the grammar it came from is untouched (absorbs "Grammar extension never mutates the base").
+- Held finding (2026-11-12, DR3): every caller scans the header itself and strips it before the parse (`src/use-scanner.ts:47`; `src/index.ts:131`, `:385`, `:442`; `web/allegro-web.ts:38`), and the callers disagree: inspect and verify load no module for a member import or an inline grammar, `prove` leaves the header in place and fails, the sandbox has its own scanner.
+- Held finding (2026-11-12, DR3): an inline grammar inside a library is rejected.
+- Chapter: Changing the grammar
 
-#### Module resolution, caching and the session's runtime
-- Decides: the loader resolves local `lib/` first then the system `lib/`, detects circular dependencies, loads each file once per process (cache keyed by resolved path and content) and threads the session's FutureManager into module evaluation; base mode without a manager keeps an explicit configuration error.
-- Status: settled
-- Type: capability — the search order, cycle detection and load-once are what a program sees; threading the future manager is the realising part
-- Rationale kind: technical
-- Depends on: Extensions are the module substrate; A missing value is a cell that is filled once
-- Significance: 2 — load cost and module identity
-- Label: swappable — module-loading internals
-- Units: module-loading
-- Options recorded: per-loader caches (replaced by one per-process cache); treating a missing async runtime as value incompleteness (rejected, CE-R6: it is a configuration error)
-- Sources: B-157 P2 (docs/book/extension/modules.md "Loaded once per process"); CE-R6 (docs/decisions.md; docs/plans/completion-effects.md §3)
-- Book home (fragments' proposal): extension/modules
-- Chapter: Modules, the use header and one pipeline
-
-#### A library's values are immutable after load
-- Decides: a module writes only into values it constructed (the owner module); in-place pipeline writers (member re-keying, the divergence stamp, the precompile effect write) skip library-owned values, and member re-keying is write-once.
-- Status: settled
-- Type: implementation — the owner-module rule for in-place writers
-- Rationale kind: technical
-- Depends on: Module resolution, caching and the session's runtime; One evalSource pipeline for programs and libraries
-- Significance: 3 — makes sharing one loaded library across programs sound
-- Label: foundational — every future in-place writer must consult the library-owned set
-- Units: module-loading, pipeline, type-core
-- Options recorded: none recorded
-- Sources: B-158 (docs/book/extension/modules.md "Owner module", ruled 2026-10-29); CLAUDE.md invariant; test module: B-158 in src/test/modules.ts
-- Book home (fragments' proposal): extension/modules
-- Chapter: Modules, the use header and one pipeline
-
-#### Execution contexts layer as a scope chain
-- Decides: primitives ← extensions ← base (REPL persistence) ← source are real scope-chain layers linked by parent pointers (O(1) extend), not a flat copy; the returned evaluation context is the source layer.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Scopes layer by parent chain; Extensions are the module substrate
-- Significance: 2 — how extensions become visible to source
-- Label: swappable — behind scope lookup
-- Units: module-loading, scope
-- Options recorded: flat copy of bindings (replaced)
-- Sources: C2.3b (docs/book/extension/modules.md "Context layering"); structures.md §4
-- Book home (fragments' proposal): extension/modules
-- Chapter: Modules, the use header and one pipeline
-
-#### Callers pre-scan and strip the `use` header
-- Decides: `evalSource` runs no `use` pre-scan; each caller scans the header, loads the named modules as extensions, and strips the header before the call.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: `use` header for language extension, `import` for module values
-- Significance: 2 — fixes the pipeline's input contract
-- Label: swappable — moving the scan into the pipeline would change one stage
-- Units: pipeline, module-loading, cli
-- Options recorded: none recorded
-- Sources: docs/book/platform/build-pipeline.ir.md C29, C156, R5; src/use-scanner.ts (shared scanner)
-- Book home (fragments' proposal): The evaluation pipeline
-- Notes: the duplication across callers is the source of the inconsistent `use` handling listed under the `use` entry.
-- Chapter: Modules, the use header and one pipeline
-
-#### Conflicts are validated before activation
-- Decides: a cross-fragment validator runs before merging and aborts the `use` with aggregated `E_OPERATOR_CONFLICT`, `E_KEYWORD_CONFLICT`, `E_PRECEDENCE_CYCLE` or `E_INCOMPATIBLE_GRAMMARS`; replacing a base production with `rule NAME =` warns (`W_PRODUCTION_REPLACED`) rather than errors.
+#### Every production can be extended
+- Decides: a change to a grammar is a set of operations on named productions: add one, append an alternative, replace, remove, wrap. Every production is open to them; none must be marked extensible.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Activation by a `use` header, per file and not transitive
-- Significance: 2 — independent extensions fail loudly when they clash
-- Label: swappable — validator
+- Depends on: Grammars are values; A text can change the grammar it is read in
+- Significance: 3 — the one mechanism every change of notation is expressed in
+- Label: swappable — the set of operations could differ
 - Units: grammar-extension
-- Options recorded: replacement as an error (rejected: replacement is a legitimate technique; silent shadowing "has bitten before", so it warns)
-- Sources: W_PRODUCTION_REPLACED ruling (docs/decisions.md "Standing rulings"); docs/book/extension/grammar.md §4; docs/book/grammar-formalism.md §7.5; docs/book/extension/README.md "Invariants"
-- Book home (fragments' proposal): extension/grammar
-- Chapter: Modules, the use header and one pipeline
+- Options recorded: a gate marking which productions may be extended (rejected); a future opt-out to freeze whitespace and core terminals; selecting an alternative by position (allowed, discouraged)
+- Sources: docs/book/grammar-formalism.md §6, §6.1, §11 items 1–2
+- Notes: was "Grammar extension as operation deltas, extensible by default".
+- Chapter: Changing the grammar
+
+#### Grammars combine without regard to order
+- Decides: two changes to a grammar give the same language in either order, or they conflict, and a conflict is a refutation raised before any text is read in the combined grammar. Adding a form is always allowed. Replacing or removing another grammar's form is explicit and names what it replaces.
+- Status: partly built (conflicts between operators, keywords and precedence are found before use; a replacement only warns); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Order of definition carries no meaning; Every production can be extended; Ambiguity is a claim
+- Significance: 4 — independent notations can be used together
+- Label: foundational — a program written in several languages at once
+- Units: grammar-extension
+- Options recorded: replacement as an error (rejected in the sources: replacement is a legitimate technique); replacement with a warning (what the code does; rejected under "Order of definition carries no meaning", where replacing is explicit); grammars that combine only when one's chain of bases is a prefix of the other's (what the code requires today)
+- Sources: W_PRODUCTION_REPLACED ruling (docs/decisions.md "Standing rulings"); docs/book/extension/grammar.md §4; docs/book/grammar-formalism.md §7.5; docs/book/extension/README.md "Invariants"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Conflicts are validated before activation".
+- Held finding (2026-11-12, DR3): replacing a production of the base only warns (`src/grammar2/fragments.ts:154`–`165`).
+- Held finding (2026-11-12, DR3): an appended alternative and a form spliced at the front take their meaning from their position among the alternatives.
+- Chapter: Changing the grammar
+
+#### A grammar change reaches to the end of its block
+- Decides: a change made inside a block ends with the block; a change at the top of a text ends with the text. It never reaches another text: importing a module's bindings does not bring its notation, and a module does not pass a notation on to those that import it.
+- Status: partly built (a change holds for one file and is not passed on; a change local to a block is not built); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A text can change the grammar it is read in
+- Significance: 3 — a reader of a text can see which language each part is in
+- Label: foundational — notations stay local to the text that asks for them
+- Units: grammar-extension, module-loading
+- Options recorded: a change reaching always to the end of the text; modules passing a grammar on explicitly
+- Sources: docs/book/grammar-formalism.md §6.2, §6.3; docs/book/extension/grammar.md §4; docs/book/extension/modules.md "Known limit"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Activation by a `use` header, per file and not transitive".
+- Chapter: Changing the grammar
+
+### The parser engine
+
+#### Any parsing algorithm will do that meets five conditions
+- Decides: the algorithm is free. It must accept left recursion; give no meaning to the order of alternatives; report every parse of a text; settle the parse up to each change of grammar; and carry a state through the parse beside the position.
+- Status: open (the shipped engine meets the first and the last); ruled 2026-11-12 (DR3)
+- Type: capability — the conditions are what a grammar author may rely on
+- Rationale kind: technical
+- Depends on: Ambiguity is a claim; A text can change the grammar it is read in; A terminal is a function, so a grammar can define its own; Scannerless parsing
+- Significance: 3 — which grammars run, and what they may assume
+- Label: swappable — the algorithm, within the conditions
+- Units: grammar-formalism
+- Options recorded: GLL (the specification's stated choice); the shipped engine: recursive descent with memoization, ordered choice and left recursion by growing a seed (Warth, Douglass and Millstein 2008); the retired Pratt and Earley hybrid
+- Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3; B-157 P7 and P5 (docs/book/extension/grammar.md §1); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies", which describe the shipped engine and stop being decisions. The sources disagree on the algorithm (docs/book/grammar-formalism.md §1 says GLL is chosen; docs/book/extension/grammar.md §1 and §4 describe ordered choice); the maintainer: the algorithm stays swappable and ordered choice must not be required. The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for the standalone combinators.
+- Held finding (2026-11-12, DR3): the engine commits to the first alternative that matches (`matchAlt`, `src/grammar2/engine.ts:945`), reports one parse, and cannot change grammar during a parse.
+- Chapter: The parser engine
+
+#### The platform's parser engine ships already built
+- Decides: the engine the platform ships is written in Allegro and delivered as expressions, with its inbuilt grammar definitions as data, so that nothing has to be parsed before a parser exists. There is no parser generator: a parser for one grammar is the engine partially evaluated over that grammar.
+- Status: open (the engine is host code); ruled 2026-11-12 (DR3)
+- Type: implementation — how "No parser is privileged" is realised for the first parser
+- Rationale kind: technical
+- Depends on: No parser is privileged; What the kernel requires of an extension; No interface limits optimization; Any parsing algorithm will do that meets five conditions
+- Significance: 3 — how the first notation arrives
+- Label: swappable — a platform may start from another engine
+- Options recorded: a host-code parser supplied as a capability, used to parse an engine written in Allegro (considered 2026-11-12; set aside for expressions built ahead of time); a separate parser generator (not needed: partial evaluation of the engine over a grammar is one)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: extensions delivered as built expressions should be allowed, to make bootstrapping efficient.
+- Held finding (2026-11-12, DR3): the engine, the base grammar and the tree builder are TypeScript (`src/grammar2/`).
+- Chapter: The parser engine
+
+### Modules and programs
+
+#### A module is an extension that arrives as a file
+- Decides: the module loader is itself an extension: it finds a file, has it parsed, evaluates it and yields an extension. A module refers to another module's bindings by naming the module; the values are handed to it, never fetched at the place of use. Importing bindings and changing the grammar a text is read in are two separate things a file can ask for. A program's main file is loaded as a module, by the same loader.
+- Status: partly built (modules load from files and bindings are handed in; the loader is host code); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel requires of an extension; Parsing is evaluation; A capability is granted, never acquired; A text can change the grammar it is read in
+- Significance: 4 — how a program is made of parts
+- Label: foundational — libraries, the standard language and every program's main file
+- Units: module-loading
+- Options recorded: the keywords for the two cases (`use` and `import` today; the choice of keywords is implementation only); loading at the place of use (rejected in the sources)
+- Sources: docs/book/extension/modules.md "Loading (L1)", Import syntax; docs/book/extension/README.md "Provides"; docs/book/grammar-formalism.md §6.2; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Extensions are the module substrate" and the import half of "`use` header for language extension, `import` for module values". The maintainer: a module is an extension, with the same interface; the kinds of artifact differ because the kernel's mechanism is kept as simple as possible and more sophisticated mechanisms are loaded as extensions. The entry "Module loading and typed module objects are separate layers" is dissolved: layers go, and typed module objects are a decision of the standard language.
+- Held finding (2026-11-12, DR3): the loader is host code (`src/modules.ts`), still mixed with the standard language's typed modules (scripts/analyze/units.json).
+- Chapter: Modules and programs
+
+#### The loader reaches files through a capability
+- Decides: reading a file is an effect. The configuration grants the loader the capability to read; the loader acquires nothing. It looks in the program's own library directory, then the platform's, and a cycle of modules is an error. A browser supplies a different capability to the same loader.
+- Status: partly built (the loader takes its file reader as an option; the browser has its own loading code); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired; A capability is supplied per target; Host code reaches a program only as a capability
+- Significance: 3 — what a module can cause to be read
+- Label: swappable — the search order; the capability itself is fixed by Part II
+- Units: module-loading
+- Options recorded: one cache per loader (replaced); a missing runtime for asynchronous values treated as an incomplete value (rejected: it is a configuration error)
+- Sources: B-157 P2 (docs/book/extension/modules.md "Loaded once per process"); CE-R6 (docs/decisions.md; docs/plans/completion-effects.md §3); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "Module resolution, caching and the session's runtime"; its load-once clause is now in "What the kernel requires of an extension".
+- Held finding (2026-11-12, DR3): the file reader is a host option of the loader (`src/modules.ts:252`), not a capability value, and the browser host scans and loads with code of its own (`web/allegro-web.ts:38`, `:110`–`:125`).
+- Chapter: Modules and programs
+
+#### Running a program is evaluating its main module with a configuration's capabilities
+- Decides: there is no separate act of running. A session at a prompt is a module whose text arrives one entry at a time: each entry is read in the grammar the earlier entries left and sees the bindings they made. At a prompt a name may be bound again; the new binding holds for the entries that follow, and what earlier entries computed is unchanged.
+- Status: partly built; ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is an extension that arrives as a file; Phases are configuration; A text can change the grammar it is read in; Order of definition carries no meaning
+- Significance: 3 — what it means to run
+- Label: foundational — files, scripts and prompts are one case
+- Options recorded: a prompt that forbids rebinding, as a file does (rejected 2026-11-12: a prompt needs to allow it)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: new, by ruling. The review's reading of rebinding, to confirm: each entry opens a scope inside the last, so a later binding hides the earlier one and replaces nothing; the rule that a name is bound once in a scope then holds at a prompt as it does in a file.
+- Held finding (2026-11-12, DR3): a grammar change does not reach the prompt: the REPL loads no module named by a header (tooling claims C60, C61 of docs/book/platform/tooling.ir.md).
+- Chapter: Modules and programs
+
+#### Every program is evaluated the same way, however it arrives
+- Decides: a program may arrive as an extension in the configuration, as parsed text, as an imported module, as a script or a prompt entry, or as an expression built by a running program. The same evaluation and the same checks apply to all: a library is checked exactly as the program that uses it, and a program built by a program is checked like any other.
+- Status: partly built (one pipeline serves programs and libraries; whether a constructed program skips checks is not confirmed); ruled 2026-11-12 (DR3)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel requires of an extension; Parsing is evaluation; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities; Claims are evaluated like everything else; Trust comes from the kernel, not the author
+- Significance: 5 — a library's assurance is the same assurance as a program's
+- Label: foundational — trust in anything a program is built from
+- Units: module-loading, pipeline
+- Options recorded: a separate loading path for libraries (the earlier state whose failures motivated the rule)
+- Sources: docs/book/extension/README.md "Invariants"; docs/book/extension/modules.md "One pipeline"; docs/book/platform/build-pipeline.ir.md C14, C15, C64, C130; docs/book/vivace/planning-dsl.md §6; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
+- Notes: replaces "One evalSource pipeline for programs and libraries" and takes in the proposal the Part I review deferred ("A program built by a program is checked like any other"; `expr_eval` calls the evaluator directly, `src/primitives.ts:405`–`409`). The entries "A library's values are immutable after load", "Build pipeline as a track, not a layer" and "Execution contexts layer as a scope chain" stop being decisions: the first is ruled by "Structures immutable by default; derive, never mutate", the second names a layer vocabulary that goes, the third is "Scopes layer by parent chain" applied.
+- Held finding (2026-11-12, DR3): the pipeline has fixed stages in host code (`src/runtime.ts`, mixed across four units), where the decisions give an extension only functions and fields.
+- Held finding (2026-11-12, DR3): the pipeline writes in place into values after they are built (member re-keying, the divergence stamp, the precompile effects write), and a guard keeps the writers off a library's values (`libraryOwnedValues`, `src/runtime.ts:663`); under "Structures immutable by default; derive, never mutate" the writers are the defect.
+- Held finding (2026-11-12, DR3): a refuted proof halts only after the program has run (carried over from the Part I review).
+- Chapter: Modules and programs
 
 ### Types as values
 
@@ -1995,7 +1988,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Extensions are the module substrate; Evidence is possession
+- Depends on: A module is an extension that arrives as a file; Evidence is possession
 - Significance: 2 — closes a leak route and fixes aliasing behaviour
 - Label: swappable — typed-modules policy
 - Units: typed-modules
@@ -2114,7 +2107,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Grammar extension as operation deltas, extensible by default; Type annotations on parameters and returns
+- Depends on: Every production can be extended; Type annotations on parameters and returns
 - Significance: 3 — lets a DSL declare names with the kernel's halt semantics; the planning `plan NAME:` form needs it
 - Label: swappable — a tree-builder marker; another expansion mechanism could replace it
 - Units: tree-builder, grammar-extension
@@ -2129,7 +2122,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: aesthetic
-- Depends on: The declarative `grammar { … }` block with hygienic templates; Types are values that constrain values; Expression-valued `if then else` with thunked branches
+- Depends on: The `grammar { … }` block; Types are values that constrain values; Expression-valued `if then else` with thunked branches
 - Significance: 2 — the match surface
 - Label: swappable — a grammar form over `eval_when`
 - Units: base-grammar, base-primitives
@@ -2515,7 +2508,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — the clauses and what they lower to are the surface; the chain's stage names are its form
 - Rationale kind: mixed
-- Depends on: The declarative `grammar { … }` block with hygienic templates; Claims are evaluated like everything else; Grammar extension as operation deltas, extensible by default
+- Depends on: The `grammar { … }` block; Claims are evaluated like everything else; Every production can be extended
 - Significance: 3 — every L2 annotation reaches analysers the same way
 - Label: foundational — totality, effects and contracts analysers read properties
 - Units: tree-builder, contracts; tree-builder, grammar-extension, totality
@@ -2835,7 +2828,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Refinement types; Kernel structural equality is the default; Extensions are the module substrate; Rung 2 domain: units of measure over state machines; Correctness and safety are one kind of claim
+- Depends on: Refinement types; Kernel structural equality is the default; A module is an extension that arrives as a file; Rung 2 domain: units of measure over state machines; Correctness and safety are one kind of claim
 - Significance: 3 — the demonstration that a domain check needs no new machinery
 - Label: swappable — a library over the kernel
 - Units: not yet a unit
@@ -2865,7 +2858,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Dimensions as data, named dimensions as refinements over one Quantity; The declarative `grammar { … }` block with hygienic templates; Rules for user-written EBNF
+- Depends on: Dimensions as data, named dimensions as refinements over one Quantity; The `grammar { … }` block
 - Significance: 1 — DSL syntax scope
 - Label: swappable — grammar sugar
 - Units: not yet a unit
@@ -2988,7 +2981,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: A plan is an outcome graph with derived wiring; `use` header for language extension, `import` for module values
+- Depends on: A plan is an outcome graph with derived wiring; A module is an extension that arrives as a file
 - Significance: 3 — hierarchy without a sub-plan notion
 - Label: swappable — within the planning library
 - Units: not yet a unit
@@ -3253,7 +3246,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation
 - Rationale kind: technical
-- Depends on: One evalSource pipeline for programs and libraries; Precompile before the evaluation loop
+- Depends on: Every program is evaluated the same way, however it arrives; Precompile before the evaluation loop
 - Significance: 3 — each stage's assumptions are the next stage's guarantees
 - Label: foundational — the ordering constraints (resolve before tail marking, collapse before precompile, stamp before the effects check) are load-bearing
 - Units: pipeline
@@ -3403,7 +3396,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — what running a file guarantees: futures drained, an error as exit code 1
 - Rationale kind: technical
-- Depends on: `use` header for language extension, `import` for module values; A missing value is a cell that is filled once
+- Depends on: A module is an extension that arrives as a file; A missing value is a cell that is filled once
 - Significance: 2 — the reference way a program runs
 - Label: swappable — `runFile` in the `cli` unit
 - Units: cli, module-loading
@@ -3723,7 +3716,7 @@ The ten hard calls stand, except three put to review; the merge of the incomplet
 
 ### Proposals deferred by DR1 to their parts
 
-- **For DR2, with the expressions chapter**: "A program built by a program is checked like any other" (reflection checked end to end; the review's R-DR1-32). `expr_eval` calls the evaluator directly (`src/primitives.ts:405`–`409`); whether a constructed program skips checks was not confirmed either way by one probe.
+- **Taken in DR3 (2026-11-12)**, as the last clause of "Every program is evaluated the same way, however it arrives"; first deferred to DR2, with the expressions chapter: "A program built by a program is checked like any other" (reflection checked end to end; the review's R-DR1-32). `expr_eval` calls the evaluator directly (`src/primitives.ts:405`–`409`); whether a constructed program skips checks was not confirmed either way by one probe.
 - **For DR5, with Vivace**: "Business rules define the domain" (when a rule has no expressible form, extend the language, never contort the rule; docs/book/vision.md §5 principle 4; the review's R-DR1-36).
 
 ### Unresolved dependencies
