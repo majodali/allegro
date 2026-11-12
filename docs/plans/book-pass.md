@@ -1107,6 +1107,17 @@ its approval.
   I replace it when they are written in phase 2, by a Tier-0 PR with
   the maintainer's sign-off then. The strength vocabulary is four
   words: decided, sampled, assumed, undecided.
+- **R42 — DR2 ruled.** Part II was ruled item by item in the review
+  session on 2026-11-11: the review session read all 74 entries against
+  Part I and brought fifteen conflicts first; no review was delegated.
+  The rulings are in `docs/records/book-pass/dr2-part-2-the-kernel.md`.
+  The kernel as ruled: values in seven kinds, bits it does not compute
+  on, pure primitives, the evaluator, metadata fields with pure bounded
+  rules, authority as unforgeable values, and the record of a claim.
+  An extension is functions and fields; the evaluator calls into no
+  extension except to apply a field's rule. One Part I decision was
+  amended with the maintainer's approval, a refinement inside phase 1,
+  not a return under R28 (the monotonic pass).
 
 ## 7. Record
 
@@ -1286,6 +1297,10 @@ its approval.
   language as privileged host code the largest. Two proposals deferred
   to their parts. Lints: `lint:docs:check` anchors 0 · order 0 · ids
   783.
+- **2026-11-11 — DR2 ruled** (the review session). R42 recorded in §6.
+  Part II of the inventory: 74 decisions in nine chapters became 49 in
+  seven; 231 decisions in all. Lints: `lint:docs:check` anchors 0 ·
+  order 0 · ids 783.
 
 ## 8. Sessions
 
