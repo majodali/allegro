@@ -78,10 +78,20 @@ The grouping below comes from co-change measurement over the last 40
 | **R — the book pass** (added 2026-11-07, B-186 (a lane for the monotonic pass); **stream R, the book pass**, plan `docs/plans/book-pass.md`, filed 2026-11-03, active since PR #154 merged the same day, in lane A until 2026-11-07) | B-174 (the book's existing chapters retrofitted to IR) — the book pass's item, with B-183 to B-186 as its spare ids and B-182 (unit tidy-ups from the book pass) as its hand-off item to the tidy-up stream (lanes D and K, and P or C by file), which the same review session runs since 2026-11-06 (the plan's amendment M3) | **Runs alongside every lane.** Its globs cover the book, its working files and the code (`src/**`, `lib/**`, `tests/**`, `demos/**`); the plan's `boundary` narrows it per chapter to the chapter's documents and the files its decisions change. A chapter's code change in a file an active implementation stream holds, or in code that stream's work rests on, is ruled by the maintainer case by case (the plan's R32 (M3 reconciled with the monotonic pass)). Human-gated; run by its own review session (the plan's §8) |
 | **B — suite split** | ~~Break up `src/test.ts` (12,281 lines, in 88% of source commits)~~ **DONE 2026-08** — `src/test/`, 21 modules behind a thin index | **Lane C is open** |
 | **C — capability tracks** | T-tooling (B-064/065/067, B-102, B-103), T-host (B-070/071), T-backend (B-072) | **Opens after B.** Mostly new files over stable public surfaces |
-| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream. **Stream D, the pilot's findings**, plan `docs/plans/pilot-findings.md`, proposed 2026-11-06, ratified 2026-11-07 at the merge of PR #168, **closed 2026-11-09** at PR #180 with every clause of its outcome met: ~~B-185 (a sampled induction proof reported as discharged)~~ at PR #173, and its reserves ~~B-154~~ at PR #179, ~~B-156~~ at PR #175 and ~~B-183~~ at PR #172 (in lane P); filed B-190 (name capture) for lane D, a plan of its own later, and the carry-overs B-191 (a trailing block comment breaks the dedent) for lane P, B-192 (the backing union of an induction and a `by` proof) and B-193 (`by` read as a unit inside a proposition). **Now: stream D, the planning loop** (B-187 (the planning loop, the next validating demo), plan `docs/plans/planning-loop.md`, drafted 2026-11-06, ratified 2026-11-07 at PR #167 (active), L1 merged at PR #177, L2 at PR #182, L3 at PR #184, L4 at PR #186, L5 at PR #188, the keyed run's transcript at PR #189, L6 dropped, L7 at PR #192; SY1's amendment at its PR; reserves B-188 (a recursive binding or a library-named list stalls the precompile or the load) and B-189 (a self-applied function exhausts the JS stack), filed at L5; asks to widen lane D's globs by `pcp/**`, `demos/rung4/**` and `docs/plans/release-track.md`, the plan's ruling on the lane), after the pilot's findings | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time; concurrent streams in lane D need disjoint boundaries, as R1 (tidy-ups beside stream D) of the book pass's plan `docs/plans/book-pass.md` has it (ruled at the merge of PR #177, 2026-11-09) |
+| **D — L2 semantics** (**stream D, the partial-evaluation rules**, plan `docs/plans/pe-rules.md`, filed 2026-11-03, ratified at the merge of PR #147, **closed 2026-11-03**) | ~~B-172 (the partial-evaluation rules as implemented against the spine)~~ closed 2026-11-03 by stream D, both rules implemented as stated, with its spare ids ~~B-178 and B-179~~ closed unused; then B-089, B-100, B-099, B-101, B-046, B-047, B-050, and the rest of the Standard band; the later reviews B-180 (recursion handling under partial evaluation) and B-181 (the hard-coded precompile and compile-time phases), filed by the stream. **Stream D, the pilot's findings**, plan `docs/plans/pilot-findings.md`, proposed 2026-11-06, ratified 2026-11-07 at the merge of PR #168, **closed 2026-11-09** at PR #180 with every clause of its outcome met: ~~B-185 (a sampled induction proof reported as discharged)~~ at PR #173, and its reserves ~~B-154~~ at PR #179, ~~B-156~~ at PR #175 and ~~B-183~~ at PR #172 (in lane P); filed B-190 (name capture) for lane D, a plan of its own later, and the carry-overs B-191 (a trailing block comment breaks the dedent) for lane P, B-192 (the backing union of an induction and a `by` proof) and B-193 (`by` read as a unit inside a proposition). **Stream D, the planning loop** (~~B-187 (the planning loop, the next validating demo)~~, plan `docs/plans/planning-loop.md`, drafted 2026-11-06, ratified 2026-11-07 at PR #167, **closed 2026-11-13** with the loop delivered and the two further models carried to lane Q, L1 merged at PR #177, L2 at PR #182, L3 at PR #184, L4 at PR #186, L5 at PR #188, the keyed run's transcript at PR #189, L6 dropped, L7 at PR #192; reserves B-188 (a recursive binding or a library-named list stalls the precompile or the load) and B-189 (a self-applied function exhausts the JS stack), filed at L5; asks to widen lane D's globs by `pcp/**`, `demos/rung4/**` and `docs/plans/release-track.md`, the plan's ruling on the lane), after the pilot's findings | **Internally serial, permanently** — these converge on `types-std.ts` / `primitives.ts` / `evaluator.ts`. One item at a time; concurrent streams in lane D need disjoint boundaries, as R1 (tidy-ups beside stream D) of the book pass's plan `docs/plans/book-pass.md` has it (ruled at the merge of PR #177, 2026-11-09) |
 | **S — the pre-stream arc** (added 2026-10-30; **all five chunks landed 2026-10-30**) | ~~B-165, B-166, B-162, B-163, B-164~~ — plan `docs/plans/parallel-streams.md`, closed; the lane stays for process and lane-manifest edits | **Ran alone**: it edited the shared status documents and the process records. Human-gated: not a merge-on-green stream. Streams may now start in any lane; the rules are "Merge policy per stream", "Status documents under streams" and "The lane table as data" below |
 | **K — kernel hygiene** (added 2026-10-30, B-167 (lane K for kernel hygiene)) | The M1 residue, the L0 band that is ratchet and audit work: B-104 (retire the dunder convention), B-110, B-113, B-114, B-118, B-119, B-123, B-124, B-126, B-128 b onward, B-132, B-135/B-137 (the host-plane declaration), B-143, B-147. Each stream plan in K reserves the items it takes; none blocks a rung | **Runs alongside A, C, P and S.** The L0 unit files (`src/structure.ts`, `src/slot-accessors.ts`, `src/metadata.ts`, `src/symbols.ts`, `src/scope.ts`), the boundary battery and its baseline, `scripts/analyze/`, the Allegretto chapters and `docs/book/units.md`. Overlaps D in the evaluator, the primitives and the type files — taken only when D is not in them (the P rule), and a coordinating service refuses the overlap at dispatch. B-104 is the wide one: its stream plan's `boundary` widens per chunk and its PRs need D idle. Globs in `scripts/analyze/lanes.json`, declared from this band, refined when a stream plan opens |
 | **P — performance stream** (added 2026-10-27; B-157 closed 2026-10-29; **stream P, the recursion cutoff restored**, plan `docs/plans/recursive-precompile.md`, filed 2026-10-30, **closed 2026-11-01**) | The follow-ons of B-157 (the performance stream): ~~B-159 (precompile and termination analysis of recursive definitions)~~ closed 2026-11-01 by stream P, the gate's work down about 95%, with ~~B-087 (totality-analyzer performance)~~ closed as superseded; B-160 (Bits decoded to strings per member lookup), B-161 (the CLI's module loading); each needs its own one-chunk plan with an oracle before it runs; ~~B-183 (a trailing comment breaks a contract body's parse)~~ closed 2026-11-07 by the one-chunk human-gated plan `docs/plans/trailing-comment-dedent.md`, chunk PF1 of the pilot-findings stream run in this lane, the plan closing at its PR's merge | **Runs alongside A, C and D.** `src/grammar2/` and `bench/` are disjoint from lane D's monoliths; items in `src/runtime.ts`, `src/evaluator.ts` or `src/totality.ts` are taken only when lane D is not in those files. Oracle: deterministic counts (`npm run lint:load`; `ALLEGRO_EVAL_STATS=1` for evaluation), every `// expect:` pin unchanged, outputs identical over the corpus. The first autonomous lane: ten chunks merged on green (R3, 2026-10-28), implementation delegated per chunk, every diff read before its merge, two stops for a ruling (P6, P10) |
+| **Q — the rebuild's acceptance side** (added 2026-11-13 with the rebuild program, plan `docs/plans/rebuild.md`; **stream Q, the acceptance stream**, plan `docs/plans/rebuild-acceptance.md`, run by the orchestrating session) | B-196 (the rebuild's acceptance side): the acceptance corpus, the bootstrap, the comparison harness, the launcher, the capabilities, the phases, the tools and the models, all in the new tree `next/`; reserves B-197 (evidence against a ruled decision), which is the hand-off item to the review session, B-198 (first out-of-scope finding of the acceptance stream) and B-199 (second out-of-scope finding of the acceptance stream) | Merge on green where a chunk's row says so. Disjoint from lane R by path; the two share `next/decisions.json`, each its own rows |
+
+**The freeze (2026-11-13).** The maintainer ruled that the code is
+rebuilt in a new tree, `next/`, beside the present one
+(`docs/plans/rebuild.md`). Lanes A, C, D, K and P hold only present
+code, and no stream opens in them: the present tree changes only where
+the bootstrap or the comparison with the new kernel needs it, by a PR
+the maintainer merges. Lane R builds the kernel and the standard
+language in `next/`; lane Q builds what tests and uses them. Every open
+item below is classed under the freeze by chunk G2 of that plan.
 
 **What lane B unlocks:** C and D may then run *as lanes in parallel
 with each other* (C touches new/track files, D the L2 monoliths — a
@@ -3492,7 +3502,7 @@ table and the stream plans.
   a change in a file another active stream holds is ruled by the
   maintainer case by case; and the book pass's plan header moved to that lane. Chunk
   P2 (the pilot chapter) waits for it if its decisions change code.
-- [ ] **B-187** (the planning loop, the next validating demo) · L3 ·
+- [x] **B-187** (the planning loop, the next validating demo) · L3 ·
   Track R · lane D · **The AI iteration loop over the rung 3 planning
   model, as the next rung's first demo; then the software system model
   and a documentation or comprehension model composed with it, as the
@@ -3538,8 +3548,12 @@ table and the stream plans.
   where B-188 and B-189 were filed; the keyed run's transcript merged at
   PR #189; L6 (legibility) dropped on L3's and L4's evidence. L7 (the
   demo and packaging: rung 4 scene 1, `demos/rung4/01-loop.alg`) merged
-  at PR #192; (1) delivered; R7 taken as (a) 2026-11-12; SY1 planned by
-  amendment at its PR; DC1 staged, R8 after SY1.
+  at PR #192; (1) delivered; R7 taken as (a) 2026-11-12. **Closed
+  2026-11-13** with (1) delivered: on the maintainer's ruling of that
+  day the software system model and the documentation model are
+  specified first and built on the rebuilt kernel, under B-196 (the
+  rebuild's acceptance side); the amendment that planned SY1 (PR #194)
+  closed unmerged, its measurements kept as the plan's §2b.
   **Pointer**: the plan's §2 (the probes) and §6 (the
   rulings)
 - [ ] **B-188** (a recursive binding or a library-named list stalls the
@@ -3657,6 +3671,47 @@ table and the stream plans.
   **Pointer**: `docs/records/book-pass/dr5-part-5-vivace.md`, "Rulings
   taken"; `docs/plans/book-pass-inventory.md`, "Four strengths, one
   vocabulary"
+- [ ] **B-195** (the rebuild program) · Track R · lane S · **The code
+  rebuilt to the 231 ruled decisions, in a tree beside the present
+  one.** Filed 2026-11-13 on the maintainer's rulings of that day: both
+  sessions turn to the rebuild; the review session builds the kernel,
+  its interface and the standard language in `next/`, chapter by
+  chapter in the inventory's order; the orchestrating session builds
+  the acceptance corpus, the bootstrap, the launcher, the tools and the
+  models; chunks merge on green, with the maintainer's gate on a
+  contract change, on evidence against a ruled decision and on each of
+  nine milestones; the present tree is frozen. Program plan:
+  `docs/plans/rebuild.md` (chunks G1 and G2).
+  **Pointer**: the plan's §5 (the milestones) and §8 (how the two
+  sessions meet)
+- [ ] **B-196** (the rebuild's acceptance side) · Track R · lane Q ·
+  **What the rebuilt kernel must pass, and what runs on it.** Filed
+  2026-11-13 with B-195 (the rebuild program). The decision map, the
+  acceptance corpus with every case classed, the scenarios, the model
+  specifications of the planning and software system pilots, the first
+  notation and the bootstrap emitter, the comparison harness, the
+  minimal launcher, and the speed tests of milestone 3. Carries parts
+  (2) and (3) of B-187 (the planning loop, the next validating demo).
+  Stream plan: `docs/plans/rebuild-acceptance.md` (eight chunks).
+  **Pointer**: the plan's §5
+- [ ] **B-197** (evidence against a ruled decision) · L0 · **The
+  hand-off from either stream of the rebuild to the review session.** A
+  stream that finds a ruled decision of the inventory contradicted by
+  what the new kernel shows appends a numbered line here: the
+  decision's title, what was run, what it showed. It stops the work
+  that depends on the decision. The review session brings each line to
+  the maintainer, records the ruling in
+  `docs/plans/book-pass-inventory.md`, and checks the line off; no
+  other session does. Filed 2026-11-13 by the rebuild program's plan
+  (`docs/plans/rebuild.md` §8). No lines yet.
+- [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
+  L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
+  Filed 2026-11-13 so the plan's header resolves under
+  `npm run lint:streams`.
+- [ ] **B-199** (second out-of-scope finding of the acceptance stream) ·
+  L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
+  Filed 2026-11-13 so the plan's header resolves under
+  `npm run lint:streams`.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

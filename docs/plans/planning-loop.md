@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-187
 lane: D
 merge: human-gated
@@ -37,11 +37,14 @@ boundary:
 
 # The planning loop, the next validating demo — the planning-loop stream
 
-> **Status: active** (K-007 (the plan lifecycle)) — drafted 2026-11-06
-> from the maintainer's direction of that day, on `origin/main` at
-> `a8e19c8`; active since the merge of PR #167 on 2026-11-07, with
-> every recommendation taken (§6). The status line and the header's
-> `status` say the same thing.
+> **Status: closed → B-187** (K-007 (the plan lifecycle)) — closed
+> 2026-11-13 with its first part, the loop, delivered (§7, the closing
+> entry). The software system model and the documentation model are
+> carried to the acceptance stream of the rebuild,
+> `docs/plans/rebuild-acceptance.md`, on the maintainer's ruling of that
+> day. Drafted 2026-11-06 on `origin/main` at `a8e19c8`; active from the
+> merge of PR #167 on 2026-11-07. Kept for its §2, §2b and §7 records.
+> The status line and the header's `status` say the same thing.
 >
 > **Reader**: the maintainer, who ruled on §6 at PR #167; the session that runs the
 > [stream](parallel-streams.md#def-stream). Assumed known: the planning
@@ -434,6 +437,15 @@ stream:
 
 ## 2b. The second model, measured
 
+> **Kept as evidence.** This section was written for an amendment that
+> planned row SY1 as five chunks with eight rulings (PR #194).
+> The amendment closed unmerged on 2026-11-13, when the maintainer
+> ruled that the pilots are specified first and built on the rebuilt
+> kernel (§7). Where the text below names those rows and rulings, it
+> names proposals that were not taken. The measurements stand, and are
+> the evidence for the software system model's specification, a chunk
+> of `docs/plans/rebuild-acceptance.md`.
+
 **Question.** Before row SY1 is designed (R7 (a), taken 2026-11-12):
 what can the planning model say about another model's value today; can
 two grammar-bearing models share a file; does a second model's check
@@ -505,8 +517,8 @@ and a hash over something other than text.
 
 **Finding, out of this stream's scope.** `Type.define`'s field types are
 not checked when a record is built (`Port(42, none)` is a `Port`). A
-candidate for B-195 (first out-of-scope finding of SY1), if the
-maintainer rules it a finding.
+candidate finding, unfiled; the ruled decision "Constructing a refined
+value claims its predicate" covers it on the rebuilt kernel.
 
 ### 2b.2 Two grammars in one file: they compose, and they collide by name
 
@@ -2708,8 +2720,9 @@ R7 and R8 at their rows' time.
   - R7 taken as (a) (§6): components and data first, UI later; the
     composition point a plan's outcome typed by a system model's
     artifact, with a cross-model check whose findings are plan
-    obligations; library-first. Row SY1 is planned by amendment at its
-    own PR (below, when it lands).
+    obligations; library-first. Row SY1 was then planned by an
+    amendment at PR #194, which closed unmerged (the closing entry
+    below).
   - The `verify --transcript` shape ratified, with ask A8 of
     `docs/book/platform/tooling.ir.md`: claims C205 to C210 and clusters
     G28 and G29 are decided, ask A8 resolved.
@@ -2727,3 +2740,39 @@ R7 and R8 at their rows' time.
     halts the accepting turn, because the solved plan's obligation list
     is empty; the loop reports the file's own fault as the proposal's
     refusal (`refused (halt)`). Not filed unless the maintainer asks.
+- **2026-11-13 — closed, with the loop delivered.** The maintainer's
+  rulings of the day, to the orchestrating session:
+  - The hold on pilots stated in the book pass's review of Part V "was
+    directed only at the book pass, since it was incorporating
+    decisions from this session regarding the pilots. This stream
+    should continue with it's work."
+  - After a review of both streams against the 231 decisions that
+    phase 1 of the book pass ruled: "I agree with the
+    recommendations." The pilots are specified first; new pilot code
+    on the present implementation is library-only probes; the code is
+    rebuilt in a tree beside the present one. "The split, gate and
+    freeze are all approved as recommended." The record is §6 of
+    `docs/plans/rebuild.md`.
+  - **What closes.** Part (1) of §1, the loop: delivered at L7, its
+    done-condition checked in the L7 entry above. B-187 closes on it.
+  - **What is carried.** Parts (2) and (3), the software system model
+    and the documentation model, go to the model specifications chunk of
+    `docs/plans/rebuild-acceptance.md`, and are built
+    on the rebuilt kernel at its milestone 7 and after. R7 (a) stands
+    as the model's direction. R8 is asked again there.
+  - **The amendment of PR #194** closed unmerged. Its record of the
+    rulings of 2026-11-12 and its measurements were carried here (the
+    entry above, and §2b). Its five rows, its eight rulings, its seven
+    terms and its two reserve ids were not taken.
+  - **What the stream leaves.** `lib/planning_loop.alg`, the worker's
+    plan kind, the scripted and Claude Code proposers, the ledger, and
+    rung 4 scene 1 with its transcripts, all suite-pinned on the
+    present implementation, which is frozen from this day. They are
+    cases of the acceptance corpus. The engine findings B-188 (a
+    recursive binding or a library-named list stalls the precompile or
+    the load) and B-189 (a self-applied function exhausts the JS stack)
+    stay open as cases for the rebuilt kernel's recursion design;
+    B-194 (one vocabulary of four strengths in the planning loop) is
+    met on the new tree, not by a rename here. The backlog's triage
+    under the freeze (chunk G2 of `docs/plans/rebuild.md`) classes
+    each.
