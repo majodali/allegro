@@ -42,9 +42,11 @@ import {
   DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
 } from "../../pcp/llm-worker.js";
 import { createClaudeCodeClient, claudeCodeArgs } from "../../pcp/llm-worker.js";
+import { formatTranscript, theoremSitePattern, NO_SPLICE_SITE, buildPlanIterationMessage } from "../../pcp/llm-worker.js";
 import {
   collectPlanLedger, planLedgerBindings, planLedgerSource, entryAuthorsFrom, EntryAuthor,
 } from "../pcp.js";
+import { applyTranscriptEntries, entryAuthorsByValue, TranscriptRecord } from "../pcp.js";
 import { scanUses } from "../use-scanner.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
@@ -1510,6 +1512,43 @@ export async function runH4aAsyncTests(): Promise<void> {
     const ship = ledger.find(r => r.binding === "ship")!;
     eq(ship.entries!.find(e => e.node === "Ship")!.author, "the file");
   });
+
+  // --- B-187 L7: an obligation whose splice site is not in the file ---
+  await asyncTest("B-187 L7: the loop skips a theorem the file does not declare (a library's law) before any request; a client without `answers` is never asked", async () => {
+    const asked: string[] = [];
+    const client: LlmClient = {
+      modelId: () => "counting",
+      async send({ obligation }) { asked.push(obligation ?? ""); return "No proposal."; },
+    };
+    const result = await runLlmWorker({
+      filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 1, client, extensions: [typeExt],
+    });
+    // The units library's pending laws: how many depends on what this
+    // process already discharged in the shared library (five in a fresh
+    // process; the CLI test below pins five), so their kind is pinned here.
+    const laws = result.skippedNoSite ?? [];
+    eq(laws.length > 0 && laws.every(n => n.startsWith("Quantity.law_")), true, JSON.stringify(result.skippedNoSite));
+    eq(asked.some(n => n.startsWith("Quantity.law_")), false, `no request about a law: ${JSON.stringify(asked)}`);
+    eq(JSON.stringify(asked), JSON.stringify(["Fulfil: Shipped, which Depot needs", "courier: Labelled, which Courier needs"]),
+       "only the plan obligations are asked about");
+    eq(JSON.stringify(result.skipped), JSON.stringify(laws), "skipped holds the laws, none declined");
+    eq(result.summary.skipped, laws.length);
+    eq(result.perObligation.some(o => o.name.startsWith("Quantity.law_")), false, "a law is not attempted");
+    eq(JSON.stringify(result.transcript.skippedNoSite), JSON.stringify(laws));
+    eq(formatTranscript(result.transcript).includes(`- **Skipped** (no splice site in the file): ${laws.map(n => `\`${n}\``).join(", ")}\n`), true,
+       "the transcript names the reason");
+    // A theorem the file declares is still asked (the H4a tests' PENDING_SRC).
+    const tmp = path.join(os.tmpdir(), `pcp-l7-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      const declared = await runLlmWorker({ filename: tmp, maxAttempts: 1, client, primer: "(mock primer)" });
+      eq(declared.skippedNoSite, undefined);
+      eq(declared.perObligation.map(o => o.name).join(","), "t");
+      eq(asked[asked.length - 1], "t");
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1998,4 +2037,231 @@ test("B-187 L5: a file without a plan value asks nothing and its verdict is as b
   const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", path.resolve("demos/rung1/04-laws.alg")], { encoding: "utf-8" });
   eq(r.stdout.includes("plan ledger"), false, r.stdout);
   eq(r.stdout.includes("promise '"), false, r.stdout);
+});
+
+// --- B-187 L7: the skip and `verify --transcript` ---
+
+test("B-187 L7: the theorem kind's splice site is the `theorem NAME:` line spliceProof reads; a plan obligation has none to check", () => {
+  const theorem = OBLIGATION_KINDS.theorem;
+  const ob = (name: string) => ({ theorem: { name } } as unknown as Obligation);
+  eq(theorem.site!("theorem t: 1 + 1 == 2 by proof_refl(99)\n", ob("t")), undefined, "declared: a site");
+  eq(theorem.site!("use units\nx = 1\n", ob("Quantity.law_refl")), NO_SPLICE_SITE, "a library's law: no site");
+  eq(NO_SPLICE_SITE, "no splice site in the file");
+  eq(theoremSitePattern("Quantity.law_refl").test("theorem QuantityXlaw_refl: 1 == 1"), false, "the name is matched literally");
+  eq(OBLIGATION_KINDS.plan.site, undefined, "a plan obligation's catalog is the splice's to find");
+  // The splice and the site agree: a file with the line splices.
+  eq(spliceProof("theorem t: 1 == 1\n", "t", "proof_refl(1)"), "theorem t: 1 == 1 by proof_refl(1)\n");
+});
+
+test("B-187 L7: CLI `prove --proposer claude-code` skips the five units-library laws on L2's demo with their reason; the fake `claude` is never run for them", () => {
+  const fake = writeFakeClaude({ reply: "```allegro\n" + SHIP.trimEnd() + "\n```", planOnly: true });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l7-skip-"));
+  try {
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const transcript = path.join(dir, "llm.md");
+    const env = { ...process.env, ANTHROPIC_API_KEY: "", PATH: `${fake.dir}${path.delimiter}${process.env.PATH}` };
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposer", "claude-code", "--transcript", transcript, "--json"],
+                        { encoding: "utf-8", env });
+    const out = JSON.parse(r.stdout);
+    const laws = ["Quantity.law_mul_comm", "Quantity.law_conv_roundtrip", "Quantity.law_refl", "Quantity.law_sym", "Quantity.law_trans"];
+    eq(JSON.stringify(out.skippedNoSite), JSON.stringify(laws), r.stdout + r.stderr);
+    eq(JSON.stringify(out.skipped), JSON.stringify(laws));
+    const runs = fake.runs();
+    eq(runs.some(run => run.stdin.startsWith("Attempt 1 for theorem")), false, "zero requests about a law");
+    eq(runs.length, 6, "one run for `Fulfil` (accepted) and five for `courier` (the fake answers it without a code block)");
+    eq(runs.filter(run => run.stdin.startsWith("Attempt 1 for plan obligation `courier")).length, 1);
+    eq(out.perObligation.map((o: any) => o.name).join(" | "), "Fulfil: Shipped, which Depot needs | courier: Labelled, which Courier needs");
+    const md = fs.readFileSync(transcript, "utf-8");
+    eq(md.includes("- **Attempted:** 2; **discharged:** 1\n"), true, md.slice(0, 600));
+    eq(md.includes(`- **Skipped** (no splice site in the file): ${laws.map(n => `\`${n}\``).join(", ")}\n`), true, md.slice(0, 600));
+    eq(md.includes("(the proposer has no answer)"), false, "the Claude Code client declines nothing");
+    // The text form gives each skip its reason.
+    const text = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposer", "claude-code"], { encoding: "utf-8", env });
+    eq(text.stdout.includes("  - Quantity.law_refl (no splice site in the file)\n"), true, text.stdout);
+  } finally {
+    fake.remove();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  // With the scripted proposer the laws are declined first, as before L7:
+  // no prepared proposal, so the reason is that one.
+  const proposals = path.resolve("demos/rung4/transcripts/proposals.md");
+  const text = spawnSync("npx", ["tsx", "src/index.ts", "prove", path.join(testsDir, "planning-loop-proposals.alg"), "--proposals", proposals],
+                         { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+  eq(text.status, 0, text.stderr);
+  eq(text.stdout.includes("  - Quantity.law_refl (no prepared proposal)\n"), true, text.stdout);
+});
+
+const KEYED_TRANSCRIPT = path.resolve("demos/rung4/transcripts/llm-planning-loop-proposals.json");
+
+test("B-187 L7: applyTranscriptEntries splices a transcript's accepted entry back as the loop did, and refuses one for another plan", () => {
+  const file = path.join(testsDir, "planning-loop-proposals.alg");
+  const source = fs.readFileSync(file, "utf-8");
+  const exts = planLoopExts();
+  const ev = runtimeEval(source.slice(scanUses(source).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const pending = extractObligations(ev.evalCtx, ev.compilationReport, { pendingOnly: true, plans: true });
+  const keyed: TranscriptRecord = JSON.parse(fs.readFileSync(KEYED_TRANSCRIPT, "utf-8"));
+  const a = applyTranscriptEntries(source, pending, keyed);
+  eq(JSON.stringify(a.applied), JSON.stringify([
+    { obligation: "Fulfil: Shipped, which Depot needs", node: "Ship", catalog: "yard", author: "claude-code:default", attempts: 2 },
+  ]));
+  eq(JSON.stringify(a.authors), JSON.stringify([{ binding: "Fulfil", node: "Ship", author: "claude-code:default" }]));
+  eq(a.notApplied.length, 0);
+  eq(a.source.includes("    estimate: 60 min, 0.5 person-hours\n  Ship:\n    inputs: Packed\n    outcomes: Shipped\n    estimate: 30 min\n"), true,
+     "the accepted entry, appended to `yard` as the splice appends it");
+  // Only the accepted turn is applied: the refused `ShipOrder` is not.
+  eq(a.source.includes("ShipOrder"), false);
+  // An obligation with another hash (L1's plan, no budget) is refused.
+  const l1 = fs.readFileSync(path.join(testsDir, "planning-loop-obligations.alg"), "utf-8");
+  const evL1 = runtimeEval(l1.slice(scanUses(l1).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const otherPending = extractObligations(evL1.evalCtx, evL1.compilationReport, { pendingOnly: true, plans: true });
+  const b = applyTranscriptEntries(l1, otherPending, keyed);
+  eq(b.applied.length, 0);
+  eq(JSON.stringify(b.notApplied), JSON.stringify([{ obligation: "Fulfil: Shipped, which Depot needs",
+    reason: "the transcript answered the obligation with hash 5444505e, the file's is 421ea754" }]));
+  eq(b.source, l1, "nothing spliced");
+  // A file without the obligation.
+  const c = applyTranscriptEntries("x = 1\n", [], keyed);
+  eq(c.notApplied[0].reason, "the file has no pending plan obligation of that name");
+});
+
+test("B-187 L7: entryAuthorsByValue carries an author to every open plan holding the same entry, and to none holding another of its name", () => {
+  const file = path.join(testsDir, "planning-loop-proposals.alg");
+  const source = fs.readFileSync(file, "utf-8");
+  const exts = planLoopExts();
+  const ev0 = runtimeEval(source.slice(scanUses(source).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const pending = extractObligations(ev0.evalCtx, ev0.compilationReport, { pendingOnly: true, plans: true });
+  const a = applyTranscriptEntries(source, pending, JSON.parse(fs.readFileSync(KEYED_TRANSCRIPT, "utf-8")));
+  const ev = runtimeEval(a.source.slice(scanUses(a.source).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const authors = entryAuthorsByValue(ev.evalCtx, a.applied, a.authors);
+  // `courier` and `freight` are built from `Fulfil` and hold the spliced
+  // `Ship`; `ship` also holds the file's own `Ship`, so it is left alone.
+  eq(JSON.stringify(authors), JSON.stringify([
+    { binding: "Fulfil", node: "Ship", author: "claude-code:default" },
+    { binding: "courier", node: "Ship", author: "claude-code:default" },
+    { binding: "freight", node: "Ship", author: "claude-code:default" },
+  ]));
+});
+
+test("B-187 L7: CLI `verify --transcript` names the loop's author in the plan ledger, and fails a transcript the file cannot take", () => {
+  const file = path.join(testsDir, "planning-loop-proposals.alg");
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", file, "--transcript", KEYED_TRANSCRIPT], { encoding: "utf-8" });
+  eq(r.status, 0, r.stdout + r.stderr);
+  eq(r.stdout.includes("    ✓ Fulfil: open plan Fulfil, solved, well-formed; bound effort 1.25 person-hours, duration 140 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by claude-code:default; rests on no promises\n"), true, r.stdout);
+  eq(r.stdout.includes(`  transcript: ${KEYED_TRANSCRIPT}: 1 accepted entry applied\n    + Ship in \`yard\` for \`Fulfil: Shipped, which Depot needs\`, by claude-code:default in 2 attempt(s)\n`), true, r.stdout);
+  // Without the flag the file is verified as it stands.
+  const plain = spawnSync("npx", ["tsx", "src/index.ts", "verify", file], { encoding: "utf-8" });
+  eq(plain.stdout.includes("transcript:"), false);
+  eq(plain.stdout.includes("by claude-code"), false);
+  // The same transcript on L1's plan: another hash, so nothing applied and the verdict fails.
+  const l1 = spawnSync("npx", ["tsx", "src/index.ts", "verify", path.join(testsDir, "planning-loop-obligations.alg"), "--transcript", KEYED_TRANSCRIPT],
+                       { encoding: "utf-8" });
+  eq(l1.status, 1, l1.stdout + l1.stderr);
+  eq(l1.stdout.startsWith("Verdict (FAILED)"), true, l1.stdout);
+  eq(l1.stdout.includes("    ✗ `Fulfil: Shipped, which Depot needs` not applied: the transcript answered the obligation with hash 5444505e, the file's is 421ea754\n"), true, l1.stdout);
+  // A file that is not a transcript twin.
+  const bad = spawnSync("npx", ["tsx", "src/index.ts", "verify", file, "--transcript", path.resolve("package.json")], { encoding: "utf-8" });
+  eq(bad.status, 1);
+  eq(bad.stderr.includes("is not a transcript twin (transcript/1)"), true, bad.stderr);
+});
+
+// --- B-187 L7: rung 4's transcripts reproduced by a test (B-177 item 5) ---
+//
+// (a) The scripted loop on scene 1 is run again through the CLI with its
+// proposals file and compared with the committed twin, every field but the
+// run's date and the per-attempt times. (b) Each reply of the maintainer's
+// keyed run for `Fulfil` is put through the kernel again, on the file the
+// run was made on, and the kernel's answer compared with the one the
+// transcript records, verbatim, so the record stays true as the kernel
+// changes: a change in the kernel's wording fails here and is listed. No
+// test runs a model; no network.
+
+const RUNG4 = path.resolve("demos", "rung4");
+
+/** A transcript twin without what differs between two runs of the same
+ *  loop: the date, the authorship's time, and each turn's times. */
+function stableTranscript(t: any): any {
+  const out = JSON.parse(JSON.stringify(t));
+  delete out.date;
+  for (const o of out.obligations) {
+    if (o.authorship) delete o.authorship.verifiedAt;
+    for (const turn of o.turns) { delete turn.replyMs; delete turn.kernelMs; }
+  }
+  return out;
+}
+
+test("B-187 L7: the scripted loop on rung 4 scene 1, run again, reproduces its committed transcript twin", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l7-rerun-"));
+  try {
+    const transcript = path.join(dir, "01-loop-scripted.md");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", "demos/rung4/01-loop.alg",
+                                "--proposals", "demos/rung4/transcripts/01-loop-proposals.md", "--transcript", transcript, "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 0, r.stdout + r.stderr);
+    const committed = JSON.parse(fs.readFileSync(path.join(RUNG4, "transcripts", "01-loop-scripted.json"), "utf-8"));
+    const again = JSON.parse(fs.readFileSync(path.join(dir, "01-loop-scripted.json"), "utf-8"));
+    eq(JSON.stringify(stableTranscript(again), null, 2), JSON.stringify(stableTranscript(committed), null, 2),
+       "the transcript twin, but for the date and the times");
+    // What the record says, for a reader of this test.
+    eq(committed.prover, "scripted:01-loop-proposals.md");
+    const f = committed.obligations.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+    eq(f.turns.map((t: any) => t.kernel).join("\n"), [
+      "refused (open): nothing in the catalog produces Labelled, which Messenger needs",
+      "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Dispatch; bound effort 1.5 person-hours, duration 155 min",
+    ].join("\n"));
+    // The Markdown is the same record: equal once the times are masked.
+    const mask = (s: string) => s.replace(/^- \*\*Date:\*\* .*$/m, "").replace(/\(\d+ ms\)/g, "(N ms)").replace(/"verifiedAt": "[^"]*"/, "");
+    eq(mask(fs.readFileSync(transcript, "utf-8")), mask(fs.readFileSync(path.join(RUNG4, "transcripts", "01-loop-scripted.md"), "utf-8")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("B-187 L7: each reply of the keyed run, put through the kernel again, gets the answer the transcript records", () => {
+  const keyed = JSON.parse(fs.readFileSync(path.join(RUNG4, "transcripts", "llm-planning-loop-proposals.json"), "utf-8"));
+  eq(keyed.version, "transcript/1");
+  eq(keyed.file, "tests/planning-loop-proposals.alg");
+  const source = fs.readFileSync(path.resolve(keyed.file), "utf-8");
+  const exts = planLoopExts();
+  const evaluate = (src: string) => runtimeEval(src.slice(scanUses(src).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const first = evaluate(source);
+  const pending = extractObligations(first.evalCtx, first.compilationReport, { pendingOnly: true, plans: true });
+  const record = keyed.obligations.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+  const ob = pending.find(o => o.theorem.name === record.name)!;
+  eq(ob !== undefined, true, "the file still holds the obligation the run answered");
+  eq(ob.plan!.hash, "5444505e", "with the hash the run's requests carry");
+  const changed: string[] = [];
+  const history: Array<{ proofTerm: string; verified: boolean; reason?: string }> = [];
+  for (const turn of record.turns) {
+    const answer = formatPlanProposalAnswer(answerPlanProposal({ source, obligation: ob, proposal: turn.candidate, evaluate }));
+    if (answer !== turn.kernel) changed.push(`attempt ${turn.attempt}: the kernel now says\n  ${answer}\nthe transcript records\n  ${turn.kernel}`);
+    // The request is the loop's own text for that attempt, the refusal fed back.
+    const request = buildPlanIterationMessage(ob, turn.attempt, history as any);
+    if (request !== turn.request) changed.push(`attempt ${turn.attempt}: the request differs:\n${request}\n---\n${turn.request}`);
+    history.push(turn.accepted ? { proofTerm: turn.candidate, verified: true } : { proofTerm: turn.candidate, verified: false, reason: turn.kernel });
+  }
+  eq(changed.join("\n\n"), "", "the kernel's answers and the requests as the keyed transcript records them");
+  eq(record.turns.map((t: any) => `${t.accepted} ${t.candidate.split("\n")[0]}`).join(" | "), "false ShipOrder: | true Ship:");
+  eq(record.authorship.provers[0].prover, "claude-code:default");
+  eq(record.authorship.provers[0].attemptsUsed, 2);
+});
+
+test("B-187 L7: `verify --transcript` on rung 4 scene 1 names the scripted proposer and the language model in the plan ledger", () => {
+  const scene = path.join(RUNG4, "01-loop.alg");
+  const cases: Array<[string, string, string]> = [
+    ["01-loop-scripted.json", "Dispatch for Shipped, by scripted:01-loop-proposals.md", "bound effort 1.5 person-hours, duration 155 min"],
+    ["llm-planning-loop-proposals.json", "Ship for Shipped, by claude-code:default", "bound effort 1.25 person-hours, duration 140 min"],
+  ];
+  for (const [twin, entry, bound] of cases) {
+    const t = path.join("demos", "rung4", "transcripts", twin);
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", scene, "--transcript", t], { encoding: "utf-8" });
+    eq(r.status, 0, r.stdout + r.stderr);
+    eq(r.stdout.includes(`    ✓ Fulfil: open plan Fulfil, solved, well-formed; ${bound}, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; ${entry}; rests on 1 admitted promise: sealed\n`), true, r.stdout);
+    eq(r.stdout.includes("  assumption ledger: rests on 1 admitted, 0 sampled; 5 obligation(s) pending\n    ! admitted promise 'sealed' — backs: Fulfil, express, solved\n"), true, r.stdout);
+    eq(r.stdout.includes(`  transcript: ${t}: 1 accepted entry applied\n`), true, r.stdout);
+  }
+  // Without a transcript, the scene's own entry is the file's and the obligation is pending.
+  const plain = spawnSync("npx", ["tsx", "src/index.ts", "verify", scene], { encoding: "utf-8" });
+  eq(plain.status, 0, plain.stdout + plain.stderr);
+  eq(plain.stdout.includes("    ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs\n"), true, plain.stdout);
+  eq(plain.stdout.includes("Express for Shipped, by the file; rests on 1 admitted promise: sealed"), true, plain.stdout);
 });

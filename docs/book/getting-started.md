@@ -96,6 +96,11 @@ See `docs/book/proving-in-allegro.md` for the full proving guide.
 - `demos/rung3/` — a domain model: a project plan that checks itself as
   it is declared, refuses in planning vocabulary, and is solved over
   its choices and completed from a catalog.
+- `demos/rung4/` — the planning loop: a plan with a hole, which the
+  kernel names as an obligation; a proposer, a script or a language
+  model, answers with one catalog entry, and the kernel refuses it in
+  planning words or solves the plan and records who proposed the entry.
+  One model, no composition yet.
 - [allegrolang.org](https://allegrolang.org) — the live sandbox: edit
   and run every example in the browser, with an Inspect button showing
   the semantic summary.

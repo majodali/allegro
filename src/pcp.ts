@@ -1711,6 +1711,116 @@ export function entryAuthorsFrom(
   return out;
 }
 
+/** B-187 L7: a transcript twin (`transcript/1`, written by `prove
+ *  --transcript` in `pcp/llm-worker.ts`) as `verify --transcript` reads
+ *  it, by shape: per obligation its name, kind, result, authorship and
+ *  turns. */
+export interface TranscriptRecord {
+  version?: string;
+  file?: string;
+  prover?: string;
+  obligations: Array<{
+    name: string; kind?: string; discharged: boolean; authorship?: Authorship;
+    turns: Array<{ accepted: boolean; candidate?: string; request?: string }>;
+  }>;
+}
+
+/** B-187 L7: what `applyTranscriptEntries` did with a transcript's
+ *  accepted catalog entries. */
+export interface AppliedTranscript {
+  /** The file's source with every applied entry spliced in. */
+  source: string;
+  /** The authors of the applied entries, for `collectPlanLedger`. */
+  authors: EntryAuthor[];
+  applied: Array<{ obligation: string; node: string; catalog: string; author: string; attempts: number }>;
+  /** An accepted entry the file cannot take, with the reason. */
+  notApplied: Array<{ obligation: string; reason: string }>;
+}
+
+/** B-187 L7 (ask 4 of PR #188): the transcript's accepted catalog entries
+ *  put back into the file, so `verify` can carry their authors. For each
+ *  plan obligation the transcript records as discharged: the file's
+ *  pending plan obligation of the same name, the same identity hash (read
+ *  from the first request's `**Hash:**` line, when it has one), and the
+ *  accepted turn's node block spliced by `splicePlanProposal`, the loop's
+ *  own splice. Nothing of the transcript is trusted beyond the entry's
+ *  text and its prover's name: the caller evaluates the spliced source,
+ *  and the kernel judges it again. */
+export function applyTranscriptEntries(
+  source: string,
+  obligations: Obligation[],
+  transcript: TranscriptRecord,
+): AppliedTranscript {
+  let src = source;
+  const out: AppliedTranscript = { source, authors: [], applied: [], notApplied: [] };
+  for (const o of transcript.obligations ?? []) {
+    if (o.kind !== "plan" || !o.discharged || !o.authorship) continue;
+    const turn = o.turns.find(t => t.accepted && t.candidate !== undefined);
+    if (!turn) {
+      out.notApplied.push({ obligation: o.name, reason: "the transcript records no accepted entry" });
+      continue;
+    }
+    const ob = obligations.find(x => x.kind === "plan" && x.plan && x.theorem.name === o.name);
+    if (!ob) {
+      out.notApplied.push({ obligation: o.name, reason: "the file has no pending plan obligation of that name" });
+      continue;
+    }
+    const asked = /\*\*Hash:\*\* `([0-9a-f]+)`/.exec(o.turns[0]?.request ?? "")?.[1];
+    if (asked !== undefined && asked !== ob.plan!.hash) {
+      out.notApplied.push({ obligation: o.name,
+        reason: `the transcript answered the obligation with hash ${asked}, the file's is ${ob.plan!.hash}` });
+      continue;
+    }
+    const sp = splicePlanProposal(src, ob.plan!, turn.candidate!);
+    if (!sp.ok) {
+      out.notApplied.push({ obligation: o.name, reason: `refused (${sp.refusal}): ${sp.reason}` });
+      continue;
+    }
+    src = sp.source;
+    const authors = entryAuthorsFrom([{ name: o.name, kind: "plan", discharged: true, finalTerm: turn.candidate, authorship: o.authorship }]);
+    out.authors.push(...authors);
+    for (const a of authors) {
+      out.applied.push({ obligation: o.name, node: a.node, catalog: ob.plan!.catalog ?? "", author: a.author,
+                         attempts: o.authorship.provers[0]?.attemptsUsed ?? 0 });
+    }
+  }
+  out.source = src;
+  return out;
+}
+
+/** B-187 L7: the authors of `applyTranscriptEntries`, carried to every
+ *  open plan of the file that holds the same entry. `plan_ledger` matches
+ *  an author by the open plan's binding and the node's name, and an open
+ *  plan built from the answered one (`with_entry(Fulfil, …)`) holds the
+ *  answered catalog's entries too, so the entry the loop spliced is the
+ *  proposer's there as well. Found by value: the node in the catalog the
+ *  obligation names, the last of its name (the splice appends), and each
+ *  open plan whose catalog holds that same value. An open plan that also
+ *  holds another node of the same name is left as it is, since the
+ *  ledger could not tell the two apart. */
+export function entryAuthorsByValue(
+  evalCtx: StructureValue,
+  applied: Array<{ node: string; catalog: string; author: string }>,
+  authors: EntryAuthor[],
+): EntryAuthor[] {
+  const out = [...authors];
+  const nameOf = (v: Value): string | undefined => isStructure(v) ? _ctxString(v, "name") : undefined;
+  const listOf = (v: Value | undefined): Value[] => v && isStructure(v) ? elementsOf(v) : [];
+  for (const a of applied) {
+    const nodes = listOf(evalCtx.bindings.get(a.catalog)?.value).filter(n => nameOf(n) === a.node);
+    const entry = nodes[nodes.length - 1];
+    if (entry === undefined) continue;
+    for (const b of planLedgerBindings(evalCtx)) {
+      if (out.some(x => x.binding === b && x.node === a.node)) continue;
+      const v = evalCtx.bindings.get(b)?.value;
+      if (!v || !isStructure(v)) continue;
+      const same = listOf(v.bindings.get("catalog")?.value).filter(n => nameOf(n) === a.node);
+      if (same.length === 1 && same[0] === entry) out.push({ binding: b, node: a.node, author: a.author });
+    }
+  }
+  return out;
+}
+
 /** The kernel's answer to one proposal. */
 export interface PlanProposalAnswer {
   accepted: boolean;

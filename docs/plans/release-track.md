@@ -97,7 +97,7 @@ E-R6 proof tier recording, Verdict schema, predicate-set sources.
 | Per-claim tiers on the Verdict (laws, coercions, proofs) | delivered |
 | Proofs record which law tier backed them; admitted renders weaker | delivered |
 | Predicate provenance per source (assert/branch/requires/…) | delivered |
-| Result-level roll-up ("this OUTPUT rests on …", transitive) | **delivered** (B-091: transitive backing sets on proofs + Verdict `assumption ledger` block + inspect `rests on:` lines) |
+| Result-level roll-up ("this OUTPUT rests on …", transitive) | **delivered** (B-091: transitive backing sets on proofs + Verdict `assumption ledger` block + inspect `rests on:` lines; B-187 (the planning loop) L5: a plan value's fixtures as admitted promises in the same block and its `plan ledger:` record, shown on `demos/rung4/01-loop.alg`: "rests on 1 admitted promise: sealed") |
 | Cross-model ledger over a composed solution | hypothesis (needs rung 3-4) |
 
 To advance: extend the roll-up beyond proofs (contracts/effects
@@ -130,6 +130,7 @@ negotiation gradient (C5.2c).
 | Semantic DIFFS (review a change, not a file) | hypothesis (B-068) |
 | Multi-strategy / budgeted prover orchestration | hypothesis (H6/H7) |
 | Counterexamples in domain vocabulary | in-progress (concrete inputs delivered; domain rendering B-081) |
+| The prover loop over a domain model's obligations (plan obligations proposed, kernel-judged, authorship recorded) | demoable (rung 4 scene 1, 2026-11: B-187 (the planning loop); one model, the planning model; a plan's gap listed by `allegro obligations` in planning words, answered by a scripted proposer or a language model through `allegro prove`, each proposal judged by the kernel, the accepted entry's proposer named in the plan ledger by `allegro verify --transcript` — `demos/rung4/`; the language-model run is the maintainer's, on a Claude subscription, recorded once) |
 
 To advance: rung-1 demo script of the full loop; B-068 scoping.
 
@@ -204,8 +205,8 @@ forward-chaining + futures (reactivity), Vivace hypothesis (VISION §4).
 | Simulation runtime; live-model operation | hypothesis |
 | Units/dimensions as refinements | delivered (rung 2; the planning DSL's durations ride it, rung 3) |
 
-To advance: a second model composed with the first (B-082), the AI loop
-over a model (B-083), Shape 2 (execution).
+To advance: a second model composed with the first (B-082), Shape 2
+(execution).
 
 ### D7 — Capstone: mixed-model solution finding with AI collaboration
 
@@ -408,3 +409,19 @@ against a private mental model.
   the landing section, the sandbox preset, `planning` in the web
   library registry, 0.62 to 0.73 s in the vm-loaded bundle; no grade
   changes; deploy pass is the maintainer's.
+- 2026-11: **RUNG 4 SCENE 1 LANDED** (B-187 (the planning loop, the
+  next validating demo), chunks L1 to L7; plan `planning-loop.md`).
+  The loop over one domain model: a plan with a gap, named by the
+  kernel as a plan obligation in planning words, answered by a proposer
+  (a script, or a language model on the maintainer's Claude
+  subscription) with one catalog entry, each proposal refused in
+  planning words or accepted with the plan solved, the accepted
+  entry's proposer named in the plan ledger. `demos/rung4/01-loop.alg`
+  (suite-validated, a break-it halt), its walkthrough and its
+  transcripts, which a test reproduces. Register: D3 gains the row "the
+  prover loop over a domain model's obligations" at demoable; D2's
+  result-level roll-up names the plan's admitted promises as its rung 4
+  receipt; D6's "To advance" loses the AI loop over a model (B-083).
+  The cross-model ledger row and D7 stay hypothesis: the scene holds
+  one model and no composition. No public copy: public demos that need
+  Claude API calls are deferred (ruled 2026-11-11).
