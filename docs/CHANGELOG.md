@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-11 — Part II's decisions ruled.** The kernel's decisions in
+  `docs/plans/book-pass-inventory.md` are ruled: 49 decisions in seven
+  chapters. An extension is made of functions and metadata fields, with
+  no fixed points where the evaluator calls into one; a field's rule is
+  a pure, bounded function; authority is an unforgeable value;
+  capabilities are granted, bounded by claims and supplied per target;
+  machine arithmetic is a capability; every value keeps its origin; a
+  refutation marks everything computed from it; a recursive call is
+  evaluated once for each state of knowledge. Ids 783.
+
 - **2026-11-11 — Part I's decisions ruled.** The first decision review
   is ruled item by item. Part I of the inventory is now a thesis
   statement ("Why a new language, now") and 23 decisions in two
