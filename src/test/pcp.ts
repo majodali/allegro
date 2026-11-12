@@ -37,6 +37,11 @@ import {
 import {
   createScriptedClient, parseProposals, loadPlanPrimer, OBLIGATION_KINDS,
 } from "../../pcp/llm-worker.js";
+import {
+  parseProveArgs, kernelTimeoutReason, formatSeconds, transcriptJsonPath,
+  DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
+} from "../../pcp/llm-worker.js";
+import { createClaudeCodeClient, claudeCodeArgs } from "../../pcp/llm-worker.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
@@ -1288,6 +1293,191 @@ export async function runH4aAsyncTests(): Promise<void> {
     eq(result.summary.skipped, seen.length);
     eq(result.perObligation.length, 0);
   });
+
+  // --- B-187 L4: the time box per turn (docs/plans/planning-loop.md) ---
+  //
+  // Two budgets: the client's reply and the kernel's evaluation of the
+  // spliced source. A kernel budget judges the turn in a worker thread that
+  // the loop terminates when the budget runs out, because `evalSource` is
+  // synchronous and a loop in tail position passes the evaluator's depth
+  // guard. No test reaches the network: every client is the test's own.
+  //
+  // A node block whose estimate is the self-application `(f => f(f))(f =>
+  // f(f))` diverges: the call is in tail position, so the TCO loop runs it
+  // forever and `MAX_DEPTH` never fires (the CLI ran it 40 s without an
+  // answer before this chunk).
+  const RUSH_ENTRY = "Rush:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (f => f(f))(f => f(f))";
+  const HASTE_ENTRY = "Haste:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: (g => g(g))(g => g(g))";
+
+  await asyncTest("B-187 L4: the reply's timeout ends a turn whose client stalls; the attempt counts and the loop goes on", async () => {
+    const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, PENDING_SRC);
+    try {
+      let calls = 0;
+      let aborted = false;
+      const stalling: LlmClient = {
+        modelId: () => "mock-model",
+        send({ signal }) {
+          calls++;
+          if (calls === 1) {
+            // Never resolves on its own: only the box's signal ends it.
+            return new Promise<string>((_, reject) => {
+              signal?.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); });
+            });
+          }
+          return Promise.resolve("```allegro\nproof_refl(2)\n```");
+        },
+      };
+      const result = await runLlmWorker({
+        filename: tmp, maxAttempts: 3, client: stalling, primer: "(mock primer)", replyTimeoutMs: 200,
+      });
+      eq(aborted, true, "the stalled request's signal was aborted");
+      eq(result.allDischarged, true);
+      const ob = result.perObligation[0];
+      eq(ob.attempts, 2, "the stalled turn counts as an attempt");
+      eq(JSON.stringify(ob.history[0]), JSON.stringify({
+        proofTerm: "", verified: false,
+        reason: "refused (timeout): the proposer did not reply within 0.2 s", refusal: "timeout",
+      }));
+      eq(ob.history[1].verified, true);
+      eq(ob.turns[0].reply, undefined, "the transcript records no reply");
+      eq(ob.turns[0].refusal, "timeout");
+      eq(ob.turns[0].replyMs >= 200, true, String(ob.turns[0].replyMs));
+      eq(ob.turns[0].kernelMs, undefined, "the kernel was not asked");
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  await asyncTest("B-187 L4: the kernel's time box ends a turn whose proposal diverges, refused as `timeout`, up to the attempt limit", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l4-"));
+    try {
+      const file = path.join(dir, "fulfil.alg");
+      fs.writeFileSync(file, L1_OPEN_PLAN);
+      const scripted = createScriptedClient({ byObligation: new Map([[GAP, [RUSH_ENTRY, HASTE_ENTRY]]]), unnamed: [] });
+      const asked: string[] = [];
+      const client: LlmClient = {
+        modelId: scripted.modelId, answers: scripted.answers,
+        async send(args) { asked.push(args.userMessage); return scripted.send(args); },
+      };
+      const result = await runLlmWorker({ filename: file, maxAttempts: 2, client, extensions: [typeExt], turnTimeoutMs: 2000 });
+      eq(result.allDischarged, false);
+      eq(result.summary.pending, 1);
+      const ob = result.perObligation[0];
+      eq(ob.name, GAP);
+      eq(ob.attempts, 2, "each diverging turn is one attempt; the loop ends at the limit");
+      const refusal = "refused (timeout): the kernel did not finish within 2 s: the proposal may make the plan's search or a proof diverge";
+      eq(kernelTimeoutReason(2000), refusal);
+      eq(JSON.stringify(ob.history[0]), JSON.stringify({ proofTerm: RUSH_ENTRY, verified: false, reason: refusal, refusal: "timeout" }));
+      eq(JSON.stringify(ob.history[1]), JSON.stringify({ proofTerm: HASTE_ENTRY, verified: false, reason: refusal, refusal: "timeout" }),
+         "a second thread, started after the first was terminated, ends the same way");
+      eq(asked[1].includes(`Last attempt's refusal:\n- ${refusal}\n\nAttempts so far: 1\n- 1: \`Rush\`, ${refusal}\n`), true, asked[1]);
+      eq(ob.turns.every(t => t.refusal === "timeout" && t.kernel === refusal && (t.kernelMs ?? 0) >= 2000), true,
+         JSON.stringify(ob.turns.map(t => [t.refusal, t.kernelMs])));
+      eq(result.sourceAfter, L1_OPEN_PLAN, "no diverging entry is kept");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await asyncTest("B-187 L4: the loop on L2's demo still converges in two attempts with the CLI's default timeouts on, in the worker thread", async () => {
+    const scripted = createScriptedClient({ byObligation: new Map([[GAP, [FREIGHT.trimEnd(), SHIP.trimEnd()]]]), unnamed: [] });
+    const result = await runLlmWorker({
+      filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 5, client: scripted, extensions: [typeExt],
+      turnTimeoutMs: DEFAULT_TURN_TIMEOUT_MS, replyTimeoutMs: DEFAULT_REPLY_TIMEOUT_MS,
+    });
+    eq(DEFAULT_TURN_TIMEOUT_MS, 30_000);
+    eq(DEFAULT_REPLY_TIMEOUT_MS, 120_000);
+    eq(result.summary.discharged, 1);
+    const ob = result.perObligation[0];
+    eq(ob.attempts, 2);
+    eq(ob.history[0].reason, "refused (unsolved): no completion of Fulfil from the catalog fits the budget of Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from Freight, is duration 200 min against 160 min");
+    eq(ob.history[0].refusal, undefined, "a refusal of the kernel's own carries no loop refusal");
+    eq(ob.history[1].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+    eq(ob.authorship!.provers[0].attemptsUsed, 2);
+    eq(result.transcript.turnTimeoutMs, 30_000);
+    eq(result.transcript.obligations[0].turns.map(t => t.accepted).join(","), "false,true");
+  });
+
+  // --- B-187 L4, ruled at its PR: the Claude Code client ---
+  //
+  // `--proposer claude-code` runs `claude -p` per request. No test runs the
+  // real binary: each test writes a fake `claude` into a temp directory and
+  // names it through the binary override (or, for the CLI, PATH).
+  await asyncTest("B-187 L4: the Claude Code client drives the loop on L2's demo through a fake `claude -p` (the proposer claude-code)", async () => {
+    const fake = writeFakeClaude({ reply: "```allegro\n" + SHIP.trimEnd() + "\n```" });
+    try {
+      const client = createClaudeCodeClient({ model: "sonnet", binary: fake.binary });
+      eq(client.modelId(), "claude-code:sonnet");
+      eq(createClaudeCodeClient().modelId(), "claude-code:default");
+      const result = await runLlmWorker({
+        filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 2, client, extensions: [typeExt],
+      });
+      const ob = result.perObligation.find(o => o.name === GAP)!;
+      eq(ob.discharged, true, JSON.stringify(ob.history));
+      eq(ob.attempts, 1);
+      eq(ob.history[0].answer, "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min");
+      eq(ob.authorship!.provers[0].prover, "claude-code:sonnet");
+      eq(result.transcript.prover, "claude-code:sonnet", "the transcript names the prover");
+      // What the fake saw on the run for the plan obligation.
+      const runs = fake.runs();
+      const planRun = runs.find(r => r.stdin.startsWith(`Attempt 1 for plan obligation \`${GAP}\``))!;
+      eq(planRun !== undefined, true, JSON.stringify(runs.map(r => r.stdin.slice(0, 60))));
+      eq(planRun.args.slice(0, 4).join(" "), "-p --output-format json --system-prompt");
+      eq(planRun.args[4], loadPlanPrimer(), "the system prompt is the kind's primer section");
+      eq(JSON.stringify(planRun.args.slice(5)), JSON.stringify(["--tools", "", "--max-turns", "1", "--no-session-persistence", "--model", "sonnet"]));
+      eq(planRun.cwdEmpty, true, "the run's working directory is an empty temp directory");
+      eq(planRun.cwd.startsWith(os.tmpdir()), true, planRun.cwd);
+      eq(planRun.apiKey, "", "ANTHROPIC_API_KEY is not passed to the run");
+      eq(fs.existsSync(planRun.cwd), false, "the temp directory is removed");
+    } finally {
+      fake.remove();
+    }
+  });
+
+  await asyncTest("B-187 L4: a `claude -p` run that exits non-zero is a failed attempt of the worker, its text in the history", async () => {
+    const fake = writeFakeClaude({ exitCode: 3, reply: "Not logged in · Please run /login", stderr: "auth failed" });
+    try {
+      const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+      fs.writeFileSync(tmp, PENDING_SRC);
+      try {
+        const result = await runLlmWorker({ filename: tmp, maxAttempts: 3, client: createClaudeCodeClient({ binary: fake.binary }), primer: "(mock primer)" });
+        const ob = result.perObligation[0];
+        eq(ob.discharged, false);
+        eq(ob.attempts, 1, "a failed run ends the obligation's attempts, as an API error does");
+        eq(ob.history[0].reason!.startsWith("API error: claude-code exited with code 3: "), true, ob.history[0].reason);
+        eq(ob.history[0].reason!.includes("Not logged in · Please run /login") && ob.history[0].reason!.includes("auth failed"), true, ob.history[0].reason);
+      } finally {
+        fs.unlinkSync(tmp);
+      }
+    } finally {
+      fake.remove();
+    }
+  });
+
+  await asyncTest("B-187 L4: the reply's timeout kills a `claude -p` run that does not answer", async () => {
+    const fake = writeFakeClaude({ reply: "```allegro\nproof_refl(2)\n```", sleepSeconds: 30 });
+    try {
+      const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+      fs.writeFileSync(tmp, PENDING_SRC);
+      try {
+        const started = Date.now();
+        const result = await runLlmWorker({ filename: tmp, maxAttempts: 1, client: createClaudeCodeClient({ binary: fake.binary }),
+                                            primer: "(mock primer)", replyTimeoutMs: 500 });
+        eq(result.perObligation[0].history[0].reason, "refused (timeout): the proposer did not reply within 0.5 s");
+        eq(Date.now() - started < 20_000, true, "the loop did not wait for the run");
+        const pid = Number(fs.readFileSync(path.join(fake.dir, "pid"), "utf-8"));
+        await new Promise(r => setTimeout(r, 200));
+        let alive = true;
+        try { process.kill(pid, 0); } catch { alive = false; }
+        eq(alive, false, "the run was killed");
+      } finally {
+        fs.unlinkSync(tmp);
+      }
+    } finally {
+      fake.remove();
+    }
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1373,6 +1563,202 @@ test("B-187 L3: CLI `prove --proposals` runs the loop without a key: the budget 
     ].join("\n")), true, text.stdout);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- B-187 L4: the `prove` command's options and the transcript ---
+
+test("B-187 L4: parseProveArgs reads `--api-key` (B-175 item 6), the two time boxes and `--transcript`", () => {
+  const d = parseProveArgs(["prove", "f.alg"]);
+  eq(JSON.stringify(d), JSON.stringify({ maxAttempts: 5, asJson: false, turnTimeoutMs: 30_000, replyTimeoutMs: 120_000 }),
+     "the defaults: five attempts, a kernel box of 30 s, a reply box of 120 s");
+  const o = parseProveArgs(["prove", "f.alg", "--api-key", "KEY-FROM-THE-COMMAND-LINE", "--turn-timeout", "5000",
+                            "--reply-timeout", "0", "--transcript", "t.md", "--model", "m", "--max-attempts", "3", "--json"]);
+  if ("error" in o) throw new Error(o.error);
+  eq(o.apiKey, "KEY-FROM-THE-COMMAND-LINE", "the key on the command line is passed to the client");
+  eq(o.turnTimeoutMs, 5000);
+  eq(o.replyTimeoutMs, 0, "0 turns a box off");
+  eq(o.transcriptPath, "t.md");
+  eq(o.model, "m");
+  eq(o.maxAttempts, 3);
+  eq(o.asJson, true);
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--api-key"])), JSON.stringify({ error: "--api-key takes a value" }));
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--turn-timeout", "soon"])),
+     JSON.stringify({ error: "--turn-timeout takes milliseconds, a whole number (0: no time box)" }));
+  eq(transcriptJsonPath("demos/rung4/transcripts/x.md"), "demos/rung4/transcripts/x.json");
+  eq(formatSeconds(30_000), "30 s");
+  eq(formatSeconds(1500), "1.5 s");
+});
+
+test("B-187 L4: CLI `prove` refuses a malformed `--turn-timeout` and names `--api-key` beside `ANTHROPIC_API_KEY` without a key", () => {
+  const tmp = path.join(os.tmpdir(), `pcp-l4-${process.pid}-${Date.now()}.alg`);
+  fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
+  try {
+    const bad = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp, "--turn-timeout", "soon"],
+                          { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(bad.status, 1);
+    eq(bad.stderr.includes("allegro prove: --turn-timeout takes milliseconds"), true, bad.stderr);
+    const nokey = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp],
+                            { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(nokey.status, 1);
+    eq(nokey.stderr.includes("Set the environment variable or pass --api-key"), true,
+       "the flag the message offers is the flag `prove` parses");
+  } finally {
+    fs.unlinkSync(tmp);
+  }
+});
+
+test("B-187 L4: CLI `prove --proposals --transcript` writes the scripted loop's transcript and its JSON twin", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l4-cli-"));
+  try {
+    const proposals = path.join(dir, "proposals.md");
+    fs.writeFileSync(proposals, [
+      "## `Fulfil: Shipped, which Depot needs`", "",
+      "```allegro", FREIGHT.trimEnd(), "```", "",
+      "```allegro", SHIP.trimEnd(), "```", "",
+    ].join("\n"));
+    const transcript = path.join(dir, "scripted.md");
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposals", proposals, "--transcript", transcript, "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    const md = fs.readFileSync(transcript, "utf-8");
+    for (const part of [
+      `# Transcript: \`prove ${file}\`\n`,
+      "- **Prover:** `scripted:proposals.md`\n",
+      "- **Date:** ",
+      "- **Attempt limit:** 5 per obligation\n",
+      "- **Time box:** kernel 30 s per turn, reply 120 s\n",
+      "- **Skipped** (the proposer has no answer): `Quantity.law_mul_comm`",
+      "## `Fulfil: Shipped, which Depot needs` (plan)\n\n**Result:** discharged after 2 attempt(s).\n",
+      "### Attempt 1\n\n**Request** (system prompt: §2.9 \"Output contract for a plan proposer\" of `docs/book/vivace/planning-dsl.md`):\n\n````text\nAttempt 1 for plan obligation `Fulfil: Shipped, which Depot needs`.\n",
+      "\n```allegro\n" + FREIGHT.trimEnd() + "\n```\n",
+      "```text\n" + out.perObligation[0].history[0].reason + "\n```\n",
+      "### Attempt 2\n",
+      "```text\naccepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.5 person-hours, duration 155 min\n```\n",
+      "### Authorship\n\n```json\n{\n  \"provers\": [\n",
+    ]) eq(md.includes(part), true, `transcript lacks: ${part}\n---\n${md}`);
+    eq(md.includes("### 2.9 Output contract"), false, "the primer is named, not quoted");
+    eq(/\*\*Reply\*\* \(\d+ ms\), its code block:/.test(md) && /\*\*Kernel\*\* \(\d+ ms\):/.test(md), true, "the time each took");
+    const twin = JSON.parse(fs.readFileSync(path.join(dir, "scripted.json"), "utf-8"));
+    eq(twin.version, "transcript/1");
+    eq(twin.prover, "scripted:proposals.md");
+    eq(twin.obligations.length, 1);
+    eq(twin.obligations[0].kind, "plan");
+    eq(twin.obligations[0].turns.length, 2);
+    eq(twin.obligations[0].turns[0].candidate, FREIGHT.trimEnd());
+    eq(twin.obligations[0].turns[0].kernel, out.perObligation[0].history[0].reason);
+    eq(twin.obligations[0].turns[1].accepted, true);
+    eq(twin.obligations[0].authorship.provers[0].prover, "scripted:proposals.md");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- B-187 L4, ruled at its PR: the Claude Code client's helpers ---
+//
+// A fake `claude` for the tests: it refuses arguments without `-p`,
+// `--output-format json`, `--tools ""` and `--max-turns 1` (exit 2), records
+// its arguments, stdin, working directory and ANTHROPIC_API_KEY, and prints
+// a JSON object whose `result` is the reply. With `planOnly`, it answers
+// the reply only to a plan obligation's request for `Fulfil`, and a reply
+// without a code block otherwise, so the loop's other obligations cost no
+// kernel turn.
+function writeFakeClaude(opts: { reply: string; exitCode?: number; stderr?: string; sleepSeconds?: number; planOnly?: boolean }) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-fake-claude-"));
+  const binary = path.join(dir, "claude");
+  fs.writeFileSync(path.join(dir, "reply.json"), JSON.stringify({ type: "result", is_error: (opts.exitCode ?? 0) !== 0, result: opts.reply, session_id: "fake" }));
+  fs.writeFileSync(path.join(dir, "other.json"), JSON.stringify({ type: "result", is_error: false, result: "No proposal for this one.", session_id: "fake" }));
+  fs.writeFileSync(binary, [
+    "#!/bin/bash",
+    `D=${JSON.stringify(dir)}`,
+    "echo $$ > \"$D/pid\"",
+    "args=(\"$@\"); ok=\"\"",
+    "for ((i=0; i<${#args[@]}; i++)); do a=\"${args[$i]}\"; n=\"${args[$((i+1))]-__none__}\"",
+    "  [ \"$a\" = \"-p\" ] && ok=\"${ok}p\"",
+    "  [ \"$a\" = \"--output-format\" ] && [ \"$n\" = \"json\" ] && ok=\"${ok}j\"",
+    "  [ \"$a\" = \"--tools\" ] && [ \"$n\" = \"\" ] && ok=\"${ok}t\"",
+    "  [ \"$a\" = \"--max-turns\" ] && [ \"$n\" = \"1\" ] && ok=\"${ok}m\"",
+    "done",
+    "if [ \"$ok\" != \"pjtm\" ]; then echo \"fake claude: bad arguments ($ok): $*\" >&2; exit 2; fi",
+    "n=$(ls \"$D\" | grep -c '^run-')",
+    "R=\"$D/run-$n\"; mkdir \"$R\"",
+    "cat > \"$R/stdin\"",
+    "for a in \"$@\"; do printf '%s\\0' \"$a\"; done > \"$R/args\"",
+    "pwd > \"$R/cwd\"; ls -A | wc -l | tr -d ' ' > \"$R/cwdcount\"",
+    "printf '%s' \"${ANTHROPIC_API_KEY-}\" > \"$R/apikey\"",
+    ...(opts.sleepSeconds ? [`exec sleep ${opts.sleepSeconds}`] : []),
+    ...(opts.stderr ? [`echo ${JSON.stringify(opts.stderr)} >&2`] : []),
+    opts.planOnly
+      ? "if head -1 \"$R/stdin\" | grep -q 'for plan obligation `Fulfil'; then cat \"$D/reply.json\"; else cat \"$D/other.json\"; fi"
+      : "cat \"$D/reply.json\"",
+    `exit ${opts.exitCode ?? 0}`,
+    "",
+  ].join("\n"), { mode: 0o755 });
+  return {
+    dir, binary,
+    runs: () => fs.readdirSync(dir).filter(n => n.startsWith("run-")).sort().map(n => {
+      const r = path.join(dir, n);
+      const args = fs.readFileSync(path.join(r, "args"), "utf-8").split("\0");
+      args.pop();
+      return {
+        stdin: fs.readFileSync(path.join(r, "stdin"), "utf-8"), args,
+        cwd: fs.readFileSync(path.join(r, "cwd"), "utf-8").trim(),
+        cwdEmpty: fs.readFileSync(path.join(r, "cwdcount"), "utf-8").trim() === "0",
+        apiKey: fs.readFileSync(path.join(r, "apikey"), "utf-8"),
+      };
+    }),
+    remove: () => fs.rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test("B-187 L4: parseProveArgs reads `--proposer` (anthropic by default, or claude-code); claudeCodeArgs is the run's command line", () => {
+  const d = parseProveArgs(["prove", "f.alg"]);
+  if ("error" in d) throw new Error(d.error);
+  eq(d.proposer, undefined, "absent: the SDK client");
+  const c = parseProveArgs(["prove", "f.alg", "--proposer", "claude-code", "--model", "opus"]);
+  if ("error" in c) throw new Error(c.error);
+  eq(c.proposer, "claude-code");
+  eq(c.model, "opus");
+  const a = parseProveArgs(["prove", "f.alg", "--proposer", "anthropic"]);
+  if ("error" in a) throw new Error(a.error);
+  eq(a.proposer, "anthropic");
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--proposer", "gpt"])),
+     JSON.stringify({ error: "--proposer takes anthropic or claude-code, not gpt" }));
+  eq(JSON.stringify(parseProveArgs(["prove", "f.alg", "--proposer"])), JSON.stringify({ error: "--proposer takes a value" }));
+  eq(JSON.stringify(claudeCodeArgs("PRIMER", "opus")), JSON.stringify(
+    ["-p", "--output-format", "json", "--system-prompt", "PRIMER", "--tools", "", "--max-turns", "1", "--no-session-persistence", "--model", "opus"]));
+  eq(claudeCodeArgs("PRIMER").includes("--model"), false, "no model: Claude Code's default");
+  eq(claudeCodeArgs("PRIMER").includes("--bare"), false, "bare mode reads no subscription login");
+});
+
+test("B-187 L4: CLI `prove --proposer claude-code` runs the loop through `claude` on PATH, with no key; the SDK path names the route", () => {
+  const fake = writeFakeClaude({ reply: "```allegro\n" + SHIP.trimEnd() + "\n```", planOnly: true });
+  try {
+    const file = path.join(testsDir, "planning-loop-proposals.alg");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", file, "--proposer", "claude-code", "--model", "sonnet", "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "", PATH: `${fake.dir}${path.delimiter}${process.env.PATH}` } });
+    const out = JSON.parse(r.stdout);
+    const ob = out.perObligation.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+    eq(ob.discharged, true, r.stdout + r.stderr);
+    eq(ob.attempts, 1);
+    eq(ob.authorship.provers[0].prover, "claude-code:sonnet");
+    eq(r.status, 1, "the laws and `courier`, answered without a code block, stay pending");
+    eq(fake.runs().every(run => run.args.includes("--model") && run.args[run.args.indexOf("--model") + 1] === "sonnet"), true);
+    // The SDK path's missing-key message names the subscription route.
+    const tmp = path.join(os.tmpdir(), `pcp-l4cc-${process.pid}-${Date.now()}.alg`);
+    fs.writeFileSync(tmp, "theorem t: 1 == 1\n");
+    try {
+      const nokey = spawnSync("npx", ["tsx", "src/index.ts", "prove", tmp],
+                              { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+      eq(nokey.status, 1);
+      eq(nokey.stderr.includes("pass --proposer claude-code (Claude Code's scripted mode)"), true, nokey.stderr);
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  } finally {
+    fake.remove();
   }
 });
 

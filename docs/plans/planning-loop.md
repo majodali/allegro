@@ -156,9 +156,20 @@ before it.
   unchanged. Ratified at PR #182's comment, 2026-11-10.
 - <a id="def-refusal-kinds"></a>**Refusal kinds** (`not-a-node-block`,
   `name-reused`, `no-catalog`, `halt`, `plan-missing`, `plan-edited`,
-  `open`, `unsolved`): the names the protocol gives each reason a
-  [proposal](#def-proposal) is refused. Ratified at PR #182's comment,
-  2026-11-10.
+  `open`, `unsolved`, and the loop's `timeout`): the names the protocol
+  gives each reason a [proposal](#def-proposal) is refused. Ratified at
+  PR #182's comment, 2026-11-10; `timeout`, a turn whose time box ran
+  out, added by L4 (`LoopRefusal` in `pcp/llm-worker.ts`), for
+  ratification at L4's PR.
+- <a id="def-kind-registry"></a>**Kind registry** (`OBLIGATION_KINDS`
+  in `pcp/llm-worker.ts`): the per-obligation-kind table of request,
+  splice, success test and primer that [the loop](#def-the-loop) reads,
+  one entry per kind of obligation. Ratified at PR #184's comment,
+  2026-11-11.
+- <a id="def-proposals-file"></a>**Proposals file**: the markdown file
+  of prepared answers, one section per obligation and one fenced block
+  per attempt, that the scripted [proposer](#def-proposer) reads.
+  Ratified at PR #184's comment, 2026-11-11.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -1224,3 +1235,204 @@ R7 and R8 at their rows' time.
     re-synced. C124 (the phantom `--api-key`, B-175 item 6) is L4's and
     stays. The chapter's §9 is updated. B-175 item 5 says L3 closed it.
     The oracle lines are in L3's PR.
+- **2026-11-11 — L3's default, A5 and the two terms ratified at PR
+  #184's comment ('All asks ratified as they are').**
+- **2026-11-11 — L4 landed.** The LLM worker with a time box, on
+  `origin/main` at `116db0c` (the merge of PR #184). No stop. B-154
+  (unit-name shadowing), §2.5's prerequisite, landed at PR #179. The run
+  with a key is owed by the maintainer (below).
+
+  What landed:
+  - **The time box** (B-083's "time-boxing"). `runLlmWorker`
+    (`pcp/llm-worker.ts:884`) takes two optional budgets, both in
+    milliseconds: `turnTimeoutMs`, the kernel's check of a turn (the
+    evaluation of the spliced source and the kind's success test), and
+    `replyTimeoutMs`, the client's reply (`RunWorkerOptions`, `:478`).
+    Two budgets rather than one, because the two waits differ by an
+    order of magnitude and fail differently: a model is slow, a proposal
+    can diverge. `prove` sets them with `--turn-timeout MS` and
+    `--reply-timeout MS`, 0 for none; the defaults are
+    `DEFAULT_TURN_TIMEOUT_MS`, 30 s, and `DEFAULT_REPLY_TIMEOUT_MS`, 120 s
+    (`:509` to `:510`). 30 s is fifteen times L3's slowest measured turn
+    (448,000 evaluates, under 2 s) and no longer than a model's reply;
+    120 s covers a reply of `max_tokens` 2048. Without either budget,
+    as every test before L4 runs it, the loop is L3's.
+  - **How a diverging turn is ended.** The evaluator has no wall-clock
+    or step budget: `MAX_DEPTH` (`src/evaluator.ts:15`) stops a deep
+    recursion; the totality checks judge declared functions, and the
+    recursion cutoff (`inlineCutoff`) residualises speculative calls
+    only, so neither stops a real application. A call in tail position runs in
+    the TCO loop without growing the depth, so it never stops: through
+    `prove --proposals` on `origin/main`, a node block whose estimate is
+    `(f => f(f))(f => f(f))` gave no answer in 40 s. `evalSource` is
+    synchronous, so the turn's check runs in a worker thread instead
+    (`node:worker_threads`): `KernelBox` (`:789`) starts
+    `pcp/turn-worker.ts`, whose `serveTurns` (`:764`) loads the file's
+    modules once through `loadForLoop` and judges one turn per message;
+    when the judgement does not return within the budget the loop
+    terminates the thread (`:836` to `:841`), which ends the
+    evaluation, and the next turn starts a fresh thread. The thread is
+    started while the client is asked (`warm`), so its load overlaps the
+    reply and is not counted against the budget. The thread registers
+    `tsx` itself, because it does not inherit the parent's hooks. No
+    kernel file changed. The reply's box races the client against a
+    timer and aborts the request's signal (`sendWithin`, `:857`;
+    `LlmClient.send` gains `signal`, which `createAnthropicClient` passes
+    to the SDK).
+  - **The refusal kind `timeout`** (`LoopRefusal`, `:422`), added to
+    the term [refusal kinds](#def-refusal-kinds) of §1, for ratification
+    at L4's PR. The attempt counts, the history entry carries
+    `refusal: "timeout"` beside the reason, and the next request gives
+    the reason as "Last attempt's refusal". The texts (`:518` to `:525`):
+
+    ```
+    refused (timeout): the kernel did not finish within 30 s: the proposal may make the plan's search or a proof diverge
+    refused (timeout): the proposer did not reply within 120 s
+    ```
+  - **B-175 item 6 closed.** `prove --api-key KEY` is parsed and passed
+    to `createAnthropicClient`, which reads `ANTHROPIC_API_KEY` only
+    when no key is passed; the missing-key message, which offered the
+    flag, is unchanged. Parsing it was taken over dropping it from the
+    message, because the message promised it and a key on the command
+    line is the owner's choice. The flags are read by `parseProveArgs`
+    (`:1181`), which `runPcpProve` (`src/index.ts:620`) calls; a flag
+    without its value, or a box that is not a whole number, ends `prove`
+    with exit 1 before any client is made.
+  - **The transcript.** Each turn is recorded (`TurnRecord`, `:427`):
+    the request, the primer section by name, the reply and its code
+    block, the kernel's answer verbatim, and the time of the reply and
+    of the kernel's check. `WorkerResult.transcript` (`Transcript`,
+    `:1084`) adds the file, the prover (`modelId()`: the model's name, or
+    `scripted:FILE`), the date, the limits and the skipped obligations.
+    `prove --transcript FILE.md` writes `formatTranscript` (`:1111`), a
+    Markdown page for a stakeholder, and its JSON twin `FILE.json`
+    (`transcript/1`), the same record as data. The twin is for L7's
+    reproducing test, which can replay each reply through the kernel and
+    compare the answers without parsing Markdown or depending on the
+    times. `demos/rung4/transcripts/` opens with `README.md`,
+    `proposals.md` (Freight, then Ship) and the scripted loop on L2's
+    demo, `scripted-planning-loop-proposals.md` and `.json`, written by
+    `npx tsx src/index.ts prove tests/planning-loop-proposals.alg
+    --proposals demos/rung4/transcripts/proposals.md --transcript
+    demos/rung4/transcripts/scripted-planning-loop-proposals.md`: two
+    attempts, refused as `unsolved` then accepted, the kernel's checks
+    2,258 ms and 2,573 ms in the worker thread.
+  - **The Claude Code client** (ruled at the PR, below).
+    `createClaudeCodeClient({ model, binary })` (`pcp/llm-worker.ts:279`)
+    answers each request by one run of Claude Code's scripted mode,
+    which uses the logged-in Claude subscription. The run's command line
+    (`claudeCodeArgs`, `:266`), with the request on stdin:
+
+    ```
+    claude -p --output-format json --system-prompt <primer section> --tools "" --max-turns 1 --no-session-persistence [--model <model>]
+    ```
+
+    It runs in a fresh empty temporary directory, so no `CLAUDE.md`,
+    hook or MCP server of the caller's directory loads, and with
+    `ANTHROPIC_API_KEY` removed from its environment (`:288`), so it
+    cannot fall back to API billing; `--bare` is not passed, because bare
+    mode reads no subscription login. The reply is the JSON output's
+    `result`. A non-zero exit, output that is not JSON, a missing
+    `result` or `is_error` set throws with the run's stdout and stderr,
+    which the loop records as a failed attempt ("API error: claude-code
+    exited with code N: …"), as for the SDK client. The reply's box kills
+    the run (`:295`). The prover is `claude-code:MODEL`, or
+    `claude-code:default` without `--model`, in the authorship and the
+    transcript's `**Prover:**` line. `prove --proposer claude-code`
+    selects it (`--proposer anthropic`, the SDK client, is the default;
+    `--proposals FILE` still selects the scripted proposer); `--model`
+    passes through. The SDK path's missing-key message gains: "To use a
+    Claude subscription instead of API billing, pass --proposer
+    claude-code (Claude Code's scripted mode)."
+  - **The keyed run, owed by the maintainer**, on the maintainer's
+    machine, where Claude Code is logged in with the subscription, from
+    the repository's root:
+
+    ```
+    npx tsx src/index.ts prove tests/planning-loop-proposals.alg --proposer claude-code --transcript demos/rung4/transcripts/llm-planning-loop-proposals.md --json
+    ```
+
+    It writes `demos/rung4/transcripts/llm-planning-loop-proposals.md`
+    and `llm-planning-loop-proposals.json`, with Claude Code's default
+    model; `--model opus` or `--model sonnet` names one. With API
+    billing instead, the same run through the SDK client, with the model
+    default `createAnthropicClient` already has, is `ANTHROPIC_API_KEY=…
+    npx tsx src/index.ts prove tests/planning-loop-proposals.alg
+    --transcript demos/rung4/transcripts/llm-planning-loop-proposals.md
+    --json`. Neither language-model client declines an obligation, so
+    the loop also asks about the units library's five pending laws, each
+    refused at its first splice (the theorem is in `lib/units.alg`, not
+    in the file), and about the demo's second open plan `courier`: up to
+    five requests for each plan obligation and one for each law.
+  - **The tests**, appended to `src/test/pcp.ts`: inside
+    `runH4aAsyncTests` (`:1297` to `:1400`), a client that never replies
+    ended by a 200 ms reply box, its signal aborted, the attempt counted
+    and the next accepted; two diverging entries on L1's open plan (the
+    catalog as a block, as L3 has it) ended by a 2 s kernel box, a fresh
+    thread for the second, the loop ended at its limit of two, with the
+    refusal's text in the history and in the second request; L2's demo
+    converging in two attempts with the CLI's default boxes; at `:1569`
+    to `:1657`, `parseProveArgs` (`--api-key` among the flags, the
+    defaults, the errors), the CLI's refusal of a malformed box and its
+    missing-key message, and `prove --proposals --transcript` writing
+    both files with their sections. The L3 CLI test of `prove
+    --proposals` now runs with the default boxes on and passes
+    unchanged. No test constructs `createAnthropicClient` or reaches the
+    network.
+    For the Claude Code client, appended after them (`:1402` to
+    `:1481` and `:1659` to `:1763`), each over a fake `claude` the test
+    writes into a temp directory, which refuses a command line without
+    `-p`, `--output-format json`, `--tools ""` and `--max-turns 1` and
+    records its arguments, stdin, working directory and key: the loop on
+    L2's demo closing the gap in one attempt through it, the prover
+    `claude-code:sonnet`; a run exiting with code 3 as a failed attempt
+    with its stdout and stderr in the history; the reply's 0.5 s box
+    killing a run that sleeps; `--proposer` parsed; and `prove --proposer
+    claude-code` through the CLI with the fake first on `PATH`, beside
+    the missing-key message naming the route. No test runs the real
+    binary.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (72 files) was run through the CLI as `run`,
+    `inspect`, `verify`, `obligations` and `propose`, before and after,
+    and compared on stdout, stderr (stats lines stripped) and exit code.
+    All 360 runs are identical; the chunk adds no `.alg` file. Run again after the Claude Code client: all 360 identical.
+  - **The counts.** `npm run lint:load` is at or below the baseline.
+    `demos/rung3/02-solve.alg` has 3,794,320 evaluates and 202,129
+    applyComposed before and after.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C124 becomes
+    C186 (`--api-key` parsed), C175 becomes C188 (no key from either
+    source), C182 becomes C187 (the modules loaded again in each worker
+    thread); C189 to C191 (the kernel's and the reply's boxes, the
+    refusal `timeout`), C192 (`--transcript`), C193 (a malformed flag)
+    and C194 (the run that ended a diverging turn) are new; all
+    proposed, clusters G29 and G30 re-proposed, ask A6; evidence E41 to
+    E43 added; E3, E6, E10, E11, E14 to E18, E30, E38, E39 and E40
+    re-synced. For the Claude Code client, under the same ask A6: C180
+    becomes C195 (the prover `claude-code:MODEL` among the three), C196
+    (the `claude -p` run) and C197 (a failed run) are new, C188 and C193
+    are restated (the SDK client only without `--proposer claude-code`;
+    an unknown `--proposer`), evidence E44 added. The chapter's §2.9 names the `timeout` refusal and its §9
+    the chunk. `docs/book/proving-in-allegro.md` states no `prove`
+    option and is unchanged. B-175 item 6 says L4 closed it.
+  - **The oracle lines**, on this branch with the Claude Code client:
+
+    ```
+    bash scripts/typecheck.sh                       typecheck clean (9 TS6059 rootDir-convention diagnostics ignored)
+    ALLEGRO_TEST_FILTER="pcp|planning|obligation|propos|worker|H4a|timeout|transcript|language" npm test
+                                                    Tests: 80 total, 80 passed, 0 failed
+    npm run lint:load                               load lint: counts at or below baseline
+    npm run lint:units                              units-lint: the unit DAG holds at its baseline
+    npm run lint:planes                             plane-lint: the storage plane is reached only through the accessor layer
+    npm run lint:docs:check                         doc-lint: anchors 0 · order 0 · ids 783 — gate passed
+    MTOOL_HOME=… npm run lint:ir                    ir-lint: 7 file(s): clean (2 warnings, CK-03, C171 and C189)
+    npx tsx scripts/doc-ref-lint.ts                 doc-ref-lint: all markdown doc references resolve
+    npm run lint:streams                            stream-plan: 9 plan(s) checked, 0 with findings
+    npx tsx scripts/analyze/lane-lint.ts --base origin/main
+                                                    lane D (B-187 via docs/plans/planning-loop.md): 0 outside
+    MTOOL_HOME=… npm run test:shards                1360 test runs, 1360 passed, 0 failed
+    ```
+- **2026-11-11 — ruled at the PR: the keyed run drives the maintainer's
+  Claude subscription through Claude Code's scripted mode (`--proposer
+  claude-code`), personal use; the SDK client stays for API billing;
+  public demos that need Claude API calls are deferred (the website's
+  loop demo is out of L7's scope until a route exists).**

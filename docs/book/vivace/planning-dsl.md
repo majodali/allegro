@@ -260,7 +260,10 @@ next attempt gets it:
   named as the next dead end ("nothing in the catalog produces
   `Labelled`, which `Courier` needs");
 - unsolved: every gap closes and no completion fits the budget, or the
-  completed plan fails a check, with the cheapest completion named.
+  completed plan fails a check, with the cheapest completion named;
+- a timeout: the kernel did not finish checking the plan with the entry
+  within the worker's time box, as when an estimate is an expression
+  that never returns.
 
 ## 3. The conventions [designed]
 
@@ -848,8 +851,14 @@ worker in `pcp/llm-worker.ts` one loop for theorems and plan
 obligations: it sends §2.9 as the system prompt for a plan obligation,
 splices each reply into the catalog and asks again with the kernel's
 refusal, and `allegro prove --proposals FILE.md` runs it from prepared
-proposals without a key. The ledger entries are the stream's later
-chunks.
+proposals without a key. Chunk L4 gave each turn a time box: a turn
+whose check does not finish in time (30 s by default) is refused as a
+timeout and the loop goes on; `allegro prove --transcript FILE.md`
+records a run turn by turn, and `demos/rung4/transcripts/` holds the
+first, the scripted loop on `tests/planning-loop-proposals.alg`;
+`allegro prove --proposer claude-code` runs the loop through Claude
+Code's scripted mode on a Claude subscription. The
+ledger entries are the stream's later chunks.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

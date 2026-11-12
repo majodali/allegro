@@ -822,6 +822,33 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — The LLM worker with a time box (B-187, chunk L4)
+
+B-187 (the planning loop, the next validating demo), chunk L4 of
+`docs/plans/planning-loop.md`. Each turn of the loop in
+`pcp/llm-worker.ts` has a time box beside the attempt limit, as B-083
+(the AI iteration loop) asks with "time-boxing": the kernel's check of a
+proposal (`allegro prove --turn-timeout MS`, 30 s by default) and the
+proposer's reply (`--reply-timeout MS`, 120 s). The evaluator has no
+wall-clock guard and a loop in tail position passes its depth guard, so
+the check runs in a worker thread (`pcp/turn-worker.ts`) that the loop
+terminates when the box runs out; the kernel is unchanged. The turn is
+then refused as `timeout`, the attempt counts, and the loop goes on. A
+proposal whose estimate applies a function to itself, which ran without
+an answer before, is now refused after the box and the next proposal
+accepted. `prove --api-key KEY` is parsed, the flag the missing-key
+message offered, which closes B-175 (the tooling chapter's findings)
+item 6. `prove --transcript FILE.md` writes a run turn by turn as
+Markdown with a JSON twin; `demos/rung4/transcripts/` opens with the
+scripted loop's transcript on `tests/planning-loop-proposals.alg`. The
+run with a language model is the maintainer's to make (the plan's §7).
+As the maintainer ruled at the PR, it uses a second client, `prove
+--proposer claude-code`, which runs Claude Code's scripted mode
+(`claude -p`) on the maintainer's Claude subscription. The SDK client
+stays for API billing. Public demos that need Claude API calls are
+deferred. `docs/book/platform/tooling.ir.md` replaces C124, C175, C180
+and C182 by C186 to C197 (ask A6).
+
 ### 2026-11 — The LLM-free worker and the scripted proposer (B-187, chunk L3)
 
 B-187 (the planning loop, the next validating demo), chunk L3 of
