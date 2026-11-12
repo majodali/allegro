@@ -1131,6 +1131,20 @@ its approval.
   way, however it arrives. One decision was added to Part II with the
   maintainer's approval ("What the kernel requires of an extension"),
   a refinement inside phase 1 as in R42.
+- **R44 — DR4 ruled.** Part IV was ruled item by item in the review
+  session on 2026-11-12, by the method of R42 (DR2 ruled): thirteen
+  conflicts with Parts I to III were brought first. The rulings are in
+  `docs/records/book-pass/dr4-part-4-the-standard-language.md`. Part IV
+  as ruled: nothing is a claim until someone makes it, and every check
+  of the standard language is a claim; an effect is the use of a
+  capability; termination is a claim and leaves the effects; a private
+  member is one whose key not all code holds, and access rules are
+  claims about where an access was written; knowledge travels with the
+  value; proof rules are functions of the standard extension; one
+  vocabulary of four strengths. Two earlier rulings are promoted: a
+  match that can fall through and a failed construction are
+  refutations. One decision was added to Part II with the maintainer's
+  agreement ("Reading an expression never yields authority").
 
 ## 7. Record
 
@@ -1318,6 +1332,10 @@ its approval.
   Part III of the inventory: 25 decisions in three chapters became 23
   in four, and Part II gained one; 230 decisions in all. Lints:
   `lint:docs:check` anchors 0 · order 0 · ids 783.
+- **2026-11-12 — DR4 ruled** (the review session). R44 recorded in §6.
+  Part IV of the inventory: 83 decisions became 66 in eleven chapters;
+  three moved to Part VI and Part II gained one; 217 decisions in all.
+  Lints: `lint:docs:check` anchors 0 · order 0 · ids 783.
 
 ## 8. Sessions
 
