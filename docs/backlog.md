@@ -3630,6 +3630,25 @@ table and the stream plans.
   `docs/plans/pilot-findings.md`, filed 2026-11-09 by the stream at its
   close, as PR #173's ask 4 defaulted. Owner: lane D (`lib/units.alg`).
   **Pointer**: `docs/plans/pilot-findings.md` §7, the PF2 entry
+- [ ] **B-194** (one vocabulary of four strengths in the planning loop) ·
+  L3 · The planning loop's library, records and documents say
+  "admitted" and "discharged" (`lib/planning_loop.alg`: "admitted
+  promise", the states "discharged" and "unclaimed"; the ledger lines
+  `src/pcp.ts` prints from them; `docs/plans/planning-loop.md`). The
+  book pass ruled one vocabulary for every claim: decided, sampled,
+  assumed, undecided ("Four strengths, one vocabulary" in
+  `docs/plans/book-pass-inventory.md`, ruled 2026-11-12), with
+  "admitted" becoming assumed and "discharged" becoming decided. The
+  book pass changes the rest of the code in its phase 2; this item is
+  for the stream that is still adding uses: write new wording in the
+  four words, and rename the existing uses when a chunk touches them.
+  Output pinned by `// expect:` lines changes with the rename, so each
+  change is discussed first. Filed 2026-11-12 by the book pass, as the
+  maintainer ruled on PR #193. Owner: lane D, the planning-loop stream
+  (`docs/plans/planning-loop.md`).
+  **Pointer**: `docs/records/book-pass/dr5-part-5-vivace.md`, "Rulings
+  taken"; `docs/plans/book-pass-inventory.md`, "Four strengths, one
+  vocabulary"
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

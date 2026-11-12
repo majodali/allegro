@@ -112,4 +112,6 @@ decision review of Part II, the kernel) ·
 `../records/book-pass/dr3-part-3-syntax-and-modules.md` (record: the decision
 review of Part III, syntax and modules) ·
 `../records/book-pass/dr4-part-4-the-standard-language.md` (record: the decision
-review of Part IV, the standard language).
+review of Part IV, the standard language) ·
+`../records/book-pass/dr5-part-5-vivace.md` (record: the decision review of
+Part V, Vivace).
