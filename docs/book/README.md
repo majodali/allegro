@@ -110,4 +110,6 @@ book pass's review of the root `README.md`, chunk F1 of
 Part I, the bet) · `../records/book-pass/dr2-part-2-the-kernel.md` (record: the
 decision review of Part II, the kernel) ·
 `../records/book-pass/dr3-part-3-syntax-and-modules.md` (record: the decision
-review of Part III, syntax and modules).
+review of Part III, syntax and modules) ·
+`../records/book-pass/dr4-part-4-the-standard-language.md` (record: the decision
+review of Part IV, the standard language).
