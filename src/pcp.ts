@@ -22,7 +22,7 @@
 // **Schema version is "pcp/1".** Forward-compatible additions get
 // bumped to pcp/1.1 etc.; breaking changes go to pcp/2.
 
-import type { StructureValue, BitsValue } from "./types.js";
+import type { StructureValue, BitsValue, Value } from "./types.js";
 import { SLOT_KEYS, backingsOf, elementsOf } from "./slot-accessors.js";
 import { isStructure } from "./structure.js";
 import { metaReadRaw } from "./metadata.js";
@@ -195,6 +195,60 @@ export interface Verdict {
    *  Additive optional field; pcp/1 unchanged, and absent unless asked
    *  for, so a verdict without plans reads as before. */
   planObligations?: PlanObligationRecord[];
+  /** B-187 L5 (ruling R4 (a)): what each plan value bound at the top level
+   *  rests on, one record per plan, solution or solved open plan, as
+   *  `plan_ledger` in `lib/planning_loop.alg` answers it: the
+   *  well-formedness check (a discharged obligation), the fixtures (each
+   *  an admitted promise in the assumption ledger, never discharged), and
+   *  for a solution its bound, decisions and catalog entries with their
+   *  authors. Additive optional field; pcp/1 unchanged, and absent unless
+   *  the caller supplies the records (`buildVerdict`'s `planLedger`). */
+  planLedger?: PlanLedgerRecord[];
+}
+
+/** B-187 L5: one plan value's ledger record, read from the library's
+ *  `PlanLedger` record as data (its renderings included, so nothing about
+ *  plans is worded here). */
+export interface PlanLedgerRecord {
+  /** The top-level binding. */
+  binding: string;
+  /** "plan" (a `Plan`), "solution" (a `Solution`) or "open plan" (an
+   *  `OpenPlan` whose state is "solved", recorded as its solution). */
+  kind: "plan" | "solution" | "open plan";
+  /** The plan's own name. */
+  plan: string;
+  /** The well-formedness check: "discharged" when `check_plan` (for a
+   *  solution, `plan_errors` of its plan) has no findings; "unclaimed" for
+   *  a plan built without the `plan NAME:` form's annotation that has one,
+   *  which no check claims well-formed. Never pending: a `plan NAME:`
+   *  binding with a finding has halted. */
+  wellFormed: { status: "discharged" | "unclaimed"; message: string };
+  /** The fixtures on the value's ports, by name: admitted promises (Shape
+   *  1 has no value to check them against), never discharged. */
+  promises: string[];
+  /** A solution's bound, in planning words (effort, duration, money). */
+  bound?: string;
+  /** A solution's decisions ("Test via Quick, …", or "no choices"). */
+  decisions?: string;
+  /** The catalog entries a solution uses, each with the port it fills and
+   *  its author ("the file", or the prover the loop recorded). */
+  entries?: { node: string; port: string; author: string }[];
+  /** The verdict's line, as the library words it. */
+  message: string;
+  /** The lines `inspect` prints under the binding, as the library words
+   *  them. */
+  inspect: string[];
+}
+
+/** B-187 L5: the author of one catalog entry, as the caller hands it to
+ *  `plan_ledger` (the loop's accepted proposals; see `entryAuthorsFrom`). */
+export interface EntryAuthor {
+  /** The open plan's binding the loop answered. */
+  binding: string;
+  /** The catalog entry, by its node's name. */
+  node: string;
+  /** Its prover, as the authorship record names it. */
+  author: string;
 }
 
 /** B-187 L2: a plan obligation as the verdict records it. `discharged`:
@@ -622,6 +676,13 @@ function buildAssumptionLedger(v: Verdict): {
   for (const l of v.liveness ?? []) {
     if (l.tier === "admitted") add("admitted", `liveness of '${l.source}'` + (l.axiom ? ` (${l.axiom})` : ""));
   }
+  // B-187 L5 (ruling R4 (a)): each fixture a plan value relies on is an
+  // admitted promise, backed by the plan values that carry it. Admitted is
+  // the tier in Shape 1, whatever the predicate: no value exists to check
+  // it against, so the ledger never calls one discharged.
+  for (const r of v.planLedger ?? []) {
+    for (const p of r.promises) add("admitted", `promise '${p}'`, r.binding);
+  }
   const pendingCount =
     (v.lawObligations ?? []).filter(o => o.status === "pending").length +
     (v.coercionObligations ?? []).filter(o => o.status === "pending").length +
@@ -632,7 +693,8 @@ function buildAssumptionLedger(v: Verdict): {
     || (v.lawObligations ?? []).length > 0
     || (v.coercionObligations ?? []).length > 0
     || (v.divObligations ?? []).length > 0
-    || (v.liveness ?? []).length > 0;
+    || (v.liveness ?? []).length > 0
+    || (v.planLedger ?? []).length > 0;
   return { entries: list, pendingCount, hasContent };
 }
 
@@ -764,6 +826,24 @@ export function formatVerdict(v: Verdict): string {
       }
     }
   }
+  // B-187 L5: the plan values' ledger records, after the assumption
+  // ledger, which lists their promises (every line above is as before, so
+  // a file without a plan value reads as it did). Each record's line is the
+  // library's; the summary counts the well-formedness checks (discharged,
+  // or not claimed by a plan built without the check) and the distinct
+  // promises.
+  if (v.planLedger && v.planLedger.length > 0) {
+    const discharged = v.planLedger.filter(r => r.wellFormed.status === "discharged").length;
+    const unclaimed  = v.planLedger.length - discharged;
+    const promises   = new Set(v.planLedger.flatMap(r => r.promises)).size;
+    lines.push(
+      `  plan ledger: ${discharged}/${v.planLedger.length} well-formed (discharged)` +
+      (unclaimed > 0 ? `, ${unclaimed} not claimed` : "") +
+      `; ${promises} promise(s) admitted`);
+    for (const r of v.planLedger) {
+      lines.push(`    ${r.wellFormed.status === "discharged" ? "✓" : "-"} ${r.message}`);
+    }
+  }
   if (v.iterationHints) {
     if (v.iterationHints.suggestions.length > 0) {
       lines.push(`  hints:`);
@@ -811,7 +891,7 @@ export function buildVerdict(
   evalCtx: StructureValue,
   report: CompilationReport | undefined,
   obligation?: Obligation,
-  opts?: { plans?: boolean },
+  opts?: { plans?: boolean; planLedger?: PlanLedgerRecord[] },
 ): Verdict {
   const theorems: TheoremResult[] = [];
   for (const [key, binding] of evalCtx.bindings) {
@@ -967,6 +1047,7 @@ export function buildVerdict(
     ...(iterationHints.suggestions.length > 0 || iterationHints.strategiesTried
         ? { iterationHints } : {}),
     ...(planObligations.length > 0 ? { planObligations } : {}),
+    ...(opts?.planLedger && opts.planLedger.length > 0 ? { planLedger: opts.planLedger } : {}),
   };
 }
 
@@ -1504,6 +1585,127 @@ function planObligationRecords(evalCtx: StructureValue): PlanObligationRecord[] 
     } else {
       out.push({ binding: key, gap: "every gap closed", hash: hashProposition(op.surface),
         status: op.state === "solved" ? "discharged" : "pending", state: op.state, message: op.answer });
+    }
+  }
+  return out;
+}
+
+// =============================================================================
+// B-187 L5: the plan ledger (ruling R4 (a))
+// =============================================================================
+//
+// The records come from the planning loop library's query `plan_ledger`
+// (`lib/planning_loop.alg`), which the file need not `use`: the caller
+// evaluates one binding over the file's evaluated scope, with the library
+// loaded, only when `verify` or `inspect` asks. That evaluation is the
+// caller's (`src/index.ts` holds the module loader; this unit imports no
+// evaluator), so the steps are: `planLedgerSource` names the file's plan
+// values and answers the source to evaluate, the caller evaluates it with
+// the file's scope as the base, and `readPlanLedger` reads the records back
+// by the registered `type` field. `collectPlanLedger` runs the three.
+
+/** The binding the ledger's source declares. */
+export const PLAN_LEDGER_BINDING = "plan_ledger_found";
+
+/** The file's top-level plan values: a binding whose value is an instance
+ *  of the planning library's `Plan` or `Solution` or of the planning loop
+ *  library's `OpenPlan`, found by the value's registered `type` field. */
+export function planLedgerBindings(evalCtx: StructureValue): string[] {
+  const scope = scopeAllBindings(evalCtx);
+  const types = new Set<unknown>(
+    ["Plan", "Solution", "OpenPlan"].map(n => scope.get(n)?.value).filter(t => t !== undefined));
+  if (types.size === 0) return [];
+  const out: string[] = [];
+  for (const [key, binding] of evalCtx.bindings) {
+    const v = binding.value;
+    if (v && isStructure(v) && types.has(metaReadRaw(v, "type"))) out.push(key);
+  }
+  return out;
+}
+
+const SAFE_AUTHOR = /[^A-Za-z0-9:._@+ -]/g;
+
+/** The source that asks the library for the records of `bindings`, with
+ *  the authors the caller knows; null when there is nothing to ask. An
+ *  author is written into a string literal, so any character outside a
+ *  prover name's (letters, digits, `:._@+ -`) is replaced by `?`. */
+export function planLedgerSource(bindings: string[], authors: EntryAuthor[] = []): string | null {
+  if (bindings.length === 0) return null;
+  const auth = `[${authors.map(a =>
+    `{binding: "${a.binding.replace(SAFE_AUTHOR, "?")}", node: "${a.node.replace(SAFE_AUTHOR, "?")}", author: "${a.author.replace(SAFE_AUTHOR, "?")}"}`).join(", ")}]`;
+  return `${PLAN_LEDGER_BINDING} = [${bindings.map(b => `plan_ledger("${b}", ${b}, ${auth}, walk_levels)`).join(", ")}]\n`;
+}
+
+/** The records the evaluated ledger source holds, read as data. */
+export function readPlanLedger(ledgerCtx: StructureValue): PlanLedgerRecord[] {
+  const scope = scopeAllBindings(ledgerCtx);
+  const ledgerType = scope.get("PlanLedger")?.value;
+  const list = ledgerCtx.bindings.get(PLAN_LEDGER_BINDING)?.value;
+  if (!ledgerType || !list || !isStructure(list)) return [];
+  const strings = (v: Value | undefined): string[] =>
+    v && isStructure(v) ? elementsOf(v).flatMap(x => {
+      const s = isStructure(x) ? undefined : bitsToString(x as BitsValue);
+      return s === undefined ? [] : [s];
+    }) : [];
+  const out: PlanLedgerRecord[] = [];
+  for (const rec of elementsOf(list)) {
+    if (!isStructure(rec) || metaReadRaw(rec, "type") !== ledgerType) continue;
+    const str = (k: string) => _ctxString(rec, k);
+    const binding = str("binding"), kind = str("kind"), plan = str("plan");
+    const status = str("well_formed"), wfMessage = str("well_formed_message"), message = str("line");
+    if (binding === undefined || plan === undefined || wfMessage === undefined || message === undefined) continue;
+    if (kind !== "plan" && kind !== "solution" && kind !== "open plan") continue;
+    if (status !== "discharged" && status !== "unclaimed") continue;
+    const entriesV = rec.bindings.get("entries")?.value;
+    const entries = entriesV && isStructure(entriesV)
+      ? elementsOf(entriesV).filter(isStructure).map(e => ({
+          node: _ctxString(e, "node") ?? "", port: _ctxString(e, "port") ?? "", author: _ctxString(e, "author") ?? "",
+        }))
+      : [];
+    const bound = str("bound"), decisions = str("decisions");
+    out.push({
+      binding, kind, plan,
+      wellFormed: { status, message: wfMessage },
+      promises: strings(rec.bindings.get("promises")?.value),
+      ...(kind !== "plan" && bound ? { bound } : {}),
+      ...(kind !== "plan" && decisions ? { decisions } : {}),
+      ...(kind !== "plan" ? { entries } : {}),
+      message,
+      inspect: strings(rec.bindings.get("lines")?.value),
+    });
+  }
+  return out;
+}
+
+/** The file's plan ledger: `planLedgerSource` over its plan values,
+ *  evaluated by the caller's `evaluate` (the source, over the file's scope
+ *  with `lib/planning_loop.alg` loaded), read by `readPlanLedger`. No plan
+ *  value, no evaluation. */
+export function collectPlanLedger(
+  evalCtx: StructureValue,
+  evaluate: (source: string) => StructureValue,
+  authors: EntryAuthor[] = [],
+): PlanLedgerRecord[] {
+  const source = planLedgerSource(planLedgerBindings(evalCtx), authors);
+  return source === null ? [] : readPlanLedger(evaluate(source));
+}
+
+/** The authors of the catalog entries the loop accepted: one per
+ *  discharged plan obligation, the open plan's binding from the
+ *  obligation's name (`BINDING: gap`, as `extractPlanObligations` names
+ *  it), the entry named by the node block's first line, the author the
+ *  provers of its authorship record. Takes the worker's per-obligation
+ *  results (`WorkerResult.perObligation` in `pcp/llm-worker.ts`) by shape. */
+export function entryAuthorsFrom(
+  perObligation: { name: string; kind?: string; discharged: boolean; finalTerm?: string; authorship?: Authorship }[],
+): EntryAuthor[] {
+  const out: EntryAuthor[] = [];
+  for (const o of perObligation) {
+    if (o.kind !== "plan" || !o.discharged || !o.finalTerm || !o.authorship) continue;
+    const at = o.name.indexOf(": ");
+    const m = NODE_HEADER.exec(o.finalTerm.split("\n")[0].trim());
+    if (m && at > 0) {
+      out.push({ binding: o.name.slice(0, at), node: m[1], author: o.authorship.provers.map(p => p.prover).join(" + ") });
     }
   }
   return out;
