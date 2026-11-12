@@ -114,4 +114,23 @@ No terms introduced.
 
 ## Rulings taken
 
-None yet.
+**Asks 1 to 4, ruled 2026-11-12.** The maintainer agreed with the
+recommendation on each.
+
+- Ask 1: "Reading an expression never yields authority." Any code can
+  read an expression's structure; where the expression holds an
+  unforgeable value, the reader sees which one it is and cannot obtain
+  it. Closing a function's body to readers was the alternative, set
+  aside because analyses in extensions read expressions.
+- Ask 2: "A private member is one whose key not all code holds." The
+  mediated lookup, the policy hook and the kernel-made capsule
+  dissolve; a module's privacy is what it does not hand out. The
+  maintainer: "we need to determine if common access patterns such as
+  protected fields (visible to a type's subtypes) can be implemented
+  using this approach."
+- Ask 3: the effects chapter shrinks to three decisions: an effect is
+  the use of a capability; a capability can have named parts and
+  narrowed forms; the notation for stating a bound. The lattice of
+  effect values, inference as its own mechanism, effect variables,
+  `opaque` and the `unsafe` hierarchy dissolve.
+- Ask 4: termination is a claim like any other and leaves the effects.
