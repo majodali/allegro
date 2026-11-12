@@ -1145,6 +1145,20 @@ its approval.
   match that can fall through and a failed construction are
   refutations. One decision was added to Part II with the maintainer's
   agreement ("Reading an expression never yields authority").
+- **R45 — DR5 ruled, with the pilots held.** Part V was ruled in the
+  review session on 2026-11-12. The rulings are in
+  `docs/records/book-pass/dr5-part-5-vivace.md`. The part opens with
+  an introduction that is not a list of decisions: what a model and a
+  meta-model are, and Vivace's purpose, narrower than Allegro's. Eight
+  decisions follow: a model is a value; a transformation is a model;
+  two models relate only through a declared mapping; a change to a
+  model is a mapping from the old one; solving is proposing a value
+  for an unknown; a solver sees its problem unevaluated; feasible is
+  decided and best says how strongly it holds; a model's quality is a
+  question for analysis. The maintainer set the pilots aside until the
+  foundations are clear: the planning chapters' entries are held, not
+  ruled, an exception to R37 (two phases), which has phase 1 rule
+  every decision. They are ruled when the pilot is taken up.
 
 ## 7. Record
 
@@ -1336,6 +1350,11 @@ its approval.
   Part IV of the inventory: 83 decisions became 66 in eleven chapters;
   three moved to Part VI and Part II gained one; 217 decisions in all.
   Lints: `lint:docs:check` anchors 0 · order 0 · ids 783.
+- **2026-11-12 — DR5 ruled** (the review session). R45 recorded in §6.
+  Part V of the inventory: an introduction, eight decisions in three
+  chapters, and the worked languages, of which planning's 15 entries
+  are held; 218 decisions in all. Lints: `lint:docs:check` anchors 0 ·
+  order 0 · ids 783.
 
 ## 8. Sessions
 
