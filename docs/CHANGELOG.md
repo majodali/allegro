@@ -848,6 +848,24 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — A solved plan's promises reach the ledger (B-187, chunk L5)
+
+B-187 (the planning loop, the next validating demo), chunk L5 of
+`docs/plans/planning-loop.md`, ruling R4 (a). `allegro verify` now says
+what a plan value rests on. Each fixture on a plan's ports is an
+admitted promise in the assumption ledger, never discharged: in Shape 1
+no value exists to check it against. `demos/rung3/02-solve.alg` rests
+on 6 admitted where it said 0. A new `plan ledger:` block records each
+plan, solution and solved open plan with its well-formedness check
+(discharged) and, for a solution, its bound, its decisions and the
+catalog entries it uses with their authors; `verify --json` carries it
+as the optional `planLedger` field, `pcp/1` unchanged. `allegro inspect`
+prints the same record under the binding. The records are the
+planning loop library's (`plan_ledger` in `lib/planning_loop.alg`); the
+CLI asks for them only in `verify` and `inspect`, so a run of the file
+is unchanged. `docs/book/platform/tooling.ir.md` replaces C72 by C200
+and adds C198, C199, C201 to C204 (ask A7).
+
 ### 2026-11 — The LLM worker with a time box (B-187, chunk L4)
 
 B-187 (the planning loop, the next validating demo), chunk L4 of

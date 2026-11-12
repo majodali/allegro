@@ -1,11 +1,11 @@
 // planning_loop.alg — the planning loop's library (B-187, the planning-loop
-// stream, chunks L1 and L2).
+// stream, chunks L1, L2 and L5).
 //
 // The loop of docs/plans/planning-loop.md asks a proposer to answer what a
 // plan cannot yet do, and has the kernel check the answer. This library
 // holds the model side of it, on top of `use planning` (ruling R10 (a):
 // `lib/planning.alg` stays as rung 3 left it). Chunk L1 built the first two
-// of these three things, chunk L2 the third:
+// of these four things, chunk L2 the third, chunk L5 the fourth:
 //
 //   - the PLAN OBLIGATION (ruling R1 (a)): a gap that completion from the
 //     plan's catalog cannot fill, at the dead end. It is built from the
@@ -17,10 +17,14 @@
 //     file. The plan is checked by `WellFormedPlan` once a catalog entry
 //     closes it (chunk L2);
 //   - the CATALOG's surface form, `catalog NAME:` (ruling R2 (a)), and the
-//     kernel's answer to a catalog entry, stored in the open plan.
+//     kernel's answer to a catalog entry, stored in the open plan;
+//   - the LEDGER RECORD (ruling R4 (a)): what a plan, a solution or a
+//     solved open plan rests on (its fixtures, each an admitted promise),
+//     its well-formedness check, and the catalog entries a solution uses.
 //
 // The prover protocol (`src/pcp.ts`) reads the obligations and the answer
-// an open plan carries; it computes nothing about plans itself.
+// an open plan carries, and the ledger records `plan_ledger` answers; it
+// computes nothing about plans itself.
 use units
 use planning
 
@@ -182,6 +186,170 @@ solve_open(op) => solve_from(op.plan, op.catalog)
 // The kernel's answer, as the open plan stores it.
 open_state(op) => op.state
 open_answer(op) => op.answer
+
+// --- The ledger record (chunk L5, ruling R4 (a)) -------------------------------------
+//
+// What a plan value bound at the top level rests on, for the verdict's
+// assumption ledger and for `inspect`. The protocol calls `plan_ledger`
+// only when `verify` or `inspect` asks (`src/index.ts`), so a run of the
+// file never pays for it. Three kinds of value answer a record:
+//
+//   - a PLAN (the `plan NAME:` form, or one built through the API): its
+//     well-formedness is `plan_errors` (the `WellFormedPlan` predicate's
+//     findings) with none. A `plan NAME:` binding is annotated
+//     `WellFormedPlan`, so one with a finding has already halted; a plan
+//     built without the annotation can carry findings, and its record
+//     says the file does not claim it well-formed;
+//   - a SOLUTION: its plan checked the same way, and the record adds the
+//     bound, the decisions and the catalog entries the solution used;
+//   - an OPEN PLAN whose state is "solved": as its solution.
+//
+// Each fixture on any port of the value (declared inputs and outcomes, the
+// nodes' ports at every depth, options, handlers and borrowed plans) is a
+// PROMISE: in Shape 1 no value exists to check it against (chapter §7), so
+// its tier is admitted, never discharged. Whether a predicate is the
+// trivial `v => true` cannot be told without reading its code, which the
+// language does not offer, so every fixture is reported the same way.
+//
+// A catalog entry's author is "the file" unless the caller names one: the
+// protocol passes the authors the loop recorded (`authors`, a list of
+// `{binding, node, author}` records: the open plan the loop answered, the
+// entry and its prover), since an accepted proposal is spliced into the
+// file and the file alone cannot say who wrote it.
+
+PlanEntryUse = Type.define({ node: String, port: String, author: String, message: String })
+
+PlanLedger = Type.define({
+  binding: String,
+  kind: String,
+  plan: String,
+  well_formed: String,
+  well_formed_message: String,
+  promises: Array,
+  bound: String,
+  decisions: String,
+  entries: Array,
+  line: String,
+  lines: Array
+})
+
+// Every port of a plan, level by level: the declared inputs and outcomes,
+// then each node's ports and a borrowed plan's declared ports, then the
+// next level, which is the nodes' inner nodes, options and handlers' nodes
+// and a borrowed plan's nodes and handlers' nodes.
+//
+// The walk is a fold over a list of levels, not a recursion, and the list
+// is the caller's (`walk_levels`, 32 levels): three engine findings of
+// chunk L5 (plan §7) rule out the other forms here. A binding on a
+// recursion cycle in this library, beside the functions that call
+// `check_plan`, keeps the library's precompile from finishing (a program
+// holding `cnt(n) => if n == 0 then 0 else cnt(n - 1)` and
+// `f(p) => check_plan(p)` does not finish in 60 s). A function handed to
+// itself and called from a lambda in its body exhausts the host's stack
+// three levels down. And this fold over a list the library itself names
+// keeps the library's load from finishing in 60 s, where the same fold
+// over a list the caller passes loads in under a second (the precompile
+// cannot know a parameter's length). A plan nested deeper than the levels
+// reach says so in its record,
+// so a promise below them is never dropped in silence.
+handler_nodes(hs) => hs.reduce((acc, h) => acc.concat(h.nodes), [])
+
+borrowed_ports(n) => if is_uses(n) then n.graph.inputs.concat(n.graph.outcomes) else []
+
+borrowed_nodes(n) => if is_uses(n) then n.graph.nodes.concat(handler_nodes(n.graph.handlers)) else []
+
+node_children(n) => n.nodes.concat(n.options).concat(handler_nodes(n.handlers)).concat(borrowed_nodes(n))
+
+walk_step(st) =>
+  {ports: st.frontier.reduce((acc, n) => acc.concat(n.inputs).concat(n.outcomes).concat(borrowed_ports(n)), st.ports),
+   frontier: st.frontier.reduce((acc, n) => acc.concat(node_children(n)), [])}
+
+walk_eight = [0, 0, 0, 0, 0, 0, 0, 0]
+walk_levels = walk_eight.concat(walk_eight).concat(walk_eight).concat(walk_eight)
+
+plan_walk(p, levels) =>
+  start = {ports: p.inputs.concat(p.outcomes), frontier: p.nodes.concat(handler_nodes(p.handlers))}
+  levels.reduce((st, level) => walk_step(st), start)
+
+// The fixtures' names, first occurrence first.
+walk_promises(w) => dedupe(w.ports.filter(port_constrained).map(q => q.fixture.name))
+
+plan_promises(p, levels) => walk_promises(plan_walk(p, levels))
+
+promises_show(ps) =>
+  if ps.length == 0
+    then "no promises"
+    else "{ps.length} admitted {if ps.length == 1 then "promise" else "promises"}: {join(ps, ", ")}"
+
+// The promises, and a note when the plan nests deeper than the walk went.
+rests_on_show(w, levels) =>
+  if w.frontier.length == 0
+    then promises_show(walk_promises(w))
+    else "{promises_show(walk_promises(w))}, and the nodes below level {levels.length} not walked"
+
+author_of(authors, binding, name) =>
+  found = authors.filter(a => a.binding == binding && a.node == name)
+  if found.length == 0 then "the file" else found[0].author
+
+entry_use(added, authors, binding, name) =>
+  step = added.filter(a => a.node == name)[0]
+  author = author_of(authors, binding, name)
+  PlanEntryUse(name, step.gap.port.type, author, "{name} for {step.gap.port.type}, by {author}")
+
+entries_used(s, authors, binding) =>
+  dedupe(s.added.map(a => a.node)).map(n => entry_use(s.added, authors, binding, n))
+
+entries_show(es) =>
+  if es.length == 0 then "none" else join(es.map(e => e.message), "; ")
+
+bound_line(b) =>
+  "effort {measure_show(b.effort)}, duration {measure_show(b.duration)}, money {measure_show(b.money)}"
+
+decisions_line(ds) => if ds.length == 0 then "no choices" else decisions_show(ds)
+
+well_formed_line(state, msg) =>
+  if state == "discharged" then "discharged (no findings)" else msg
+
+// A plan's record. `errs` are `plan_errors` of the plan.
+plan_record(name, p, errs, levels) =>
+  w = plan_walk(p, levels)
+  rests = rests_on_show(w, levels)
+  state = if errs.length == 0 then "discharged" else "unclaimed"
+  msg = if errs.length == 0
+    then "well-formed"
+    else "not claimed well-formed (bound without the `plan` form's check): {errs[0]}"
+  PlanLedger(name, "plan", p.name, state, msg, walk_promises(w), "", "", [],
+    "{name}: plan {p.name}, {msg}; rests on {rests}",
+    ["well-formed: {well_formed_line(state, msg)}", "rests on: {rests}"])
+
+kind_show(kind, plan_name) =>
+  if kind == "solution" then "solution of {plan_name}" else "open plan {plan_name}, solved"
+
+// A solution's record; `kind` is "solution" or "open plan".
+solution_record(name, kind, s, authors, levels) =>
+  errs = plan_errors(s.plan)
+  w = plan_walk(s.plan, levels)
+  rests = rests_on_show(w, levels)
+  state = if errs.length == 0 then "discharged" else "unclaimed"
+  msg = if errs.length == 0 then "well-formed" else "not well-formed: {errs[0]}"
+  es = entries_used(s, authors, name)
+  b = bound_line(s.bound)
+  d = decisions_line(s.decisions)
+  PlanLedger(name, kind, s.plan.name, state, msg, walk_promises(w), b, d, es,
+    "{name}: {kind_show(kind, s.plan.name)}, {msg}; bound {b}; decisions {d}; catalog entries {entries_show(es)}; rests on {rests}",
+    ["well-formed: {well_formed_line(state, msg)}", "bound: {b}", "decisions: {d}",
+     "catalog entries: {entries_show(es)}", "rests on: {rests}"])
+
+// The query: a record for a plan, a solution or a solved open plan, and
+// `none` for anything else (an open plan not yet solved is the plan
+// obligation's, which the verdict's `plans:` line already reports).
+// `levels` is `walk_levels`, passed by the caller (see the walk above).
+plan_ledger(name, x, authors, levels) =>
+  if x instanceof Solution
+    then solution_record(name, "solution", x, authors, levels)
+    else if x instanceof OpenPlan
+      then (if x.state == "solved" then solution_record(name, "open plan", solve_open(x), authors, levels) else none)
+      else if x instanceof Plan then plan_record(name, x, plan_errors(x), levels) else none
 
 // --- The surface: `catalog NAME:` and `plan NAME from CATALOG:` ---------------------
 //

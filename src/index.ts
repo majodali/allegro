@@ -423,9 +423,39 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
   const summary = summarizeModule(result.evalCtx, result.compilationReport, {
     excludeBindings: excluded,
   });
+  // B-187 L5: under each plan value's binding, the lines its ledger record
+  // carries (well-formedness, and for a solution the bound, the decisions
+  // and the catalog entries, then the promises), as the library words them.
+  const planLedger = isStandard ? await pcpPlanLedger(result.evalCtx, extensions, sourceDir, isStandard) : [];
   console.log(`allegro inspect — ${filename}`);
   console.log("=".repeat(60));
-  console.log(renderModuleSummary(summary));
+  console.log(withPlanLines(renderModuleSummary(summary), planLedger));
+}
+
+/**
+ * B-187 L5: the module summary with each plan value's ledger lines inserted
+ * at the end of its binding's block. A block is the binding's line
+ * (`  NAME`, then ` : Type` or ` [unresolved]`) and the lines indented under
+ * it; `src/introspect.ts` renders it, unchanged.
+ */
+function withPlanLines(rendered: string, ledger: import("./pcp.js").PlanLedgerRecord[]): string {
+  if (ledger.length === 0) return rendered;
+  const byBinding = new Map(ledger.map(r => [r.binding, r.inspect]));
+  const lines = rendered.split("\n");
+  const start = lines.indexOf("bindings:");
+  if (start < 0) return rendered;
+  const out = lines.slice(0, start + 1);
+  let pending: string[] | undefined;
+  for (const line of lines.slice(start + 1)) {
+    const header = /^  (\S+)(?: : .*| \[unresolved\])?$/.exec(line);
+    if (header) {
+      if (pending) out.push(...pending.map(l => `      ${l}`));
+      pending = byBinding.get(header[1]);
+    }
+    out.push(line);
+  }
+  if (pending) out.push(...pending.map(l => `      ${l}`));
+  return out.join("\n");
 }
 
 /**
@@ -435,6 +465,46 @@ async function runInspect(filename: string, isStandard: boolean): Promise<void> 
  * subcommands to convert into PCP shapes.
  */
 async function pcpLoadAndEval(filename: string, isStandard: boolean) {
+  return (await pcpLoad(filename, isStandard)).result;
+}
+
+/**
+ * B-187 L5: the plan ledger of an evaluated file (ruling R4 (a)). The
+ * records are the planning loop library's (`plan_ledger` in
+ * `lib/planning_loop.alg`), asked for by one binding evaluated over the
+ * file's scope, so a file that only `use`s `planning` gets them too; the
+ * library is loaded here, and only here, when the file holds a plan value
+ * and does not already have it. A run of the file never reaches this.
+ */
+async function pcpPlanLedger(
+  evalCtx: StructureValue,
+  extensions: Extension[],
+  sourceDir: string,
+  isStandard: boolean,
+  authors: import("./pcp.js").EntryAuthor[] = [],
+): Promise<import("./pcp.js").PlanLedgerRecord[]> {
+  const { collectPlanLedger, planLedgerBindings } = await import("./pcp.js");
+  const { scopeAllBindings } = await import("./scope.js");
+  if (planLedgerBindings(evalCtx).length === 0) return [];
+  const exts = scopeAllBindings(evalCtx).has("plan_ledger")
+    ? extensions
+    : [...extensions, ...await loadGrammarModules(["planning_loop"], sourceDir, extensions)];
+  const origLog = console.log;
+  console.log = () => {};
+  try {
+    return collectPlanLedger(evalCtx,
+      (ledgerSource) => evalSource(ledgerSource, evalCtx, exts, undefined, isStandard, undefined, true).evalCtx,
+      authors);
+  } finally {
+    console.log = origLog;
+  }
+}
+
+/**
+ * Phase H2 / B-187 L5: `pcpLoadAndEval` with the extensions and the source
+ * directory it loaded with, which the plan ledger evaluates over.
+ */
+async function pcpLoad(filename: string, isStandard: boolean) {
   const source = fs.readFileSync(filename, "utf-8");
   const sourceDir = path.dirname(path.resolve(filename));
   let extensions: Extension[] = isStandard ? [...getStdExtensions()] : [];
@@ -464,7 +534,7 @@ async function pcpLoadAndEval(filename: string, isStandard: boolean) {
   } finally {
     console.log = origLog;
   }
-  return result;
+  return { result, extensions, sourceDir };
 }
 
 async function runPcpVerify(
@@ -475,7 +545,7 @@ async function runPcpVerify(
 ): Promise<void> {
   const { buildVerdict, parseObligation, checkObligationSatisfied,
           serializeVerdict, formatVerdict } = await import("./pcp.js");
-  const result = await pcpLoadAndEval(filename, isStandard);
+  const { result, extensions, sourceDir } = await pcpLoad(filename, isStandard);
   // If an obligation is supplied, pass it through to buildVerdict so
   // iteration hints reflect the lemma context + prior-attempt strategies.
   let obligation = undefined;
@@ -484,8 +554,11 @@ async function runPcpVerify(
     obligation = parseObligation(obligationText);
   }
   // B-187 L2: the verdict also records the plan obligations of the file's
-  // open plans (its `plans` line), as `obligations` lists them.
-  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation, { plans: true });
+  // open plans (its `plans` line), as `obligations` lists them. B-187 L5:
+  // and the plan ledger of the file's plan values (its `plan ledger` line
+  // and the promises in the assumption ledger).
+  const planLedger = await pcpPlanLedger(result.evalCtx, extensions, sourceDir, isStandard);
+  const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation, { plans: true, planLedger });
 
   // Cross-check the obligation: the candidate must satisfy the named
   // theorem with a matching propositionHash (blocks trivial-pass). B-187
