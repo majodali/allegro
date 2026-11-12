@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 230 decisions after DR3's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 50; Part III: 23; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts: 217 decisions after DR4's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 51; Part III: 23; Part IV: 66; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -33,8 +33,8 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
    - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it computes nothing on them; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
 4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; Functions are data: params plus body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
-5. **Authority** (5 decisions). The right to do what not all code may do is an unforgeable value; capabilities are granted, bounded by claims and supplied per target.
-   - Decisions: Authority is an unforgeable value; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a capability that ships with the platform.
+5. **Authority** (6 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
+   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a capability that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
@@ -59,36 +59,30 @@ As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 **Part IV: Allegro Standard**
 
-16. **Types as values** (12 decisions). Types are ordinary values that constrain values: the meta-type, kinds as types, conformance by member symbol, the core types and generics.
-   - Decisions: Types are values that constrain values; Kinds are types, and Type is its own type; Members are keyed by symbol and conformance is membership; Every Standard value has a type, with no implicit fallback; One meta-type with an optional name; One construction surface; Loose conformance for data, selected by anonymity; The core type roster; Generics are memoized type constructors; Function types with bidirectional call-site unification; `distinct` mints a fresh-symbol newtype; The user-facing generics surface and parameter kinds.
-   - Draws on: [concepts.md](../book/concepts.md) T3, [allegretto/structures.md](../book/allegretto/structures.md) §9, [standard/README.md](../book/standard/README.md) the boundary, [standard/type-system.md](../book/standard/type-system.md) §1, §2, §5, §6, [standard/core-types.md](../book/standard/core-types.md).
-17. **Refinement types** (6 decisions). A refinement is a type plus a predicate; shape and knowledge are separate; inheritance dissolves into conformance, refinement and composition.
-   - Decisions: Abstract domains as sound approximations; Refinement types; Shape and knowledge are separate; Declared inheritance dissolves into conformance, refinement and composition; Invariants are refinements; An interface is a type drawn from, not instantiated.
-   - Draws on: [concepts.md](../book/concepts.md) T4, [allegretto/structures.md](../book/allegretto/structures.md) §6, [standard/type-system.md](../book/standard/type-system.md) §3 (refines), [standard/contracts.md](../book/standard/contracts.md) §5.
-18. **Who can see a member** (6 decisions). Member access mediated by the type, privacy in two tiers, evidence as possession, and module objects whose type encapsulates.
-   - Decisions: Mediated member access; Access is what a type's member lookup returns, in two tiers; Evidence is possession; Privacy across readers, reflection and mediation effects; Export marks the binding, and a module with no exports is open; Imported modules are typed objects whose type encapsulates.
-   - Draws on: [language-reference.md](../book/language-reference.md) Private members, [extension/modules.md](../book/extension/modules.md) module objects, [standard/type-system.md](../book/standard/type-system.md) §3, §7.
-19. **The surface language** (11 decisions). The spellings a programmer writes: declarations, conditionals, blocks, annotations, refinements, pattern matching, and the default language.
-   - Decisions: Indentation blocks, with brace and offside both as the goal; Refinement types written `T & predicate` with `_` as the value; Function declarations with `=>`; Expression-valued `if then else` with thunked branches; The `Y of x` component-access form; Type annotations on parameters and returns; Statement forms that declare a binding; `when / is / then` pattern matching; Allegro Standard by default, Allegretto by flag; Combinators before keyword declaration syntax; String interpolation with braces.
-   - Draws on: [language-reference.md](../book/language-reference.md), [grammar-formalism.md](../book/grammar-formalism.md) §5 (layout), [extension/grammar.md](../book/extension/grammar.md) §3, [standard/type-system.md](../book/standard/type-system.md) §3 (combinators), [standard/pattern-matching.md](../book/standard/pattern-matching.md) §1, §2.
-20. **Proofs as values** (7 decisions). Propositions are expressions, proofs are values the kernel checks by evaluation, and the repertoire, primer and term contract provers use.
-   - Decisions: Proofs are values discharged by evaluation; Theorems as statements, proved `by` a term; Discharge mechanisms without search; Bounded sampling for universal claims; Tactics as a pure Allegro library; One primer for human and machine provers; One proof-term contract for human and machine provers.
-   - Draws on: [getting-started.md](../book/getting-started.md) The prover loop, [platform/tooling.ir.md](../book/platform/tooling.ir.md) C130, [proving-in-allegro.md](../book/proving-in-allegro.md) the proof model, strategies, output contract.
-21. **Equality and laws** (4 decisions). Equality by shape, structural equality as the default, lawful interfaces and the tiers at which laws are discharged.
-   - Decisions: Lawful interfaces; Equality dispatches on shape, then coerces, else not-equal; Kernel structural equality is the default; Law discharge tiers and the first strict gate.
-   - Draws on: [allegretto/structures.md](../book/allegretto/structures.md) §7, §8, [proving-in-allegro.md](../book/proving-in-allegro.md) Laws, discharge tiers.
-22. **Effects** (9 decisions). Effects as values in one lattice, inferred by partial evaluation, with declarations as contracts, and the effect surfaces still open.
-   - Decisions: Effects are values in one lattice; Effect inference is driven by partial evaluation, and a declaration is a contract; Parameter effect bounds and explicit effect variables; Effects describe computations, refinements describe data; Labels for observing knowledge and scheduling; Redefining primitives and core types is banned; The `unsafe` hierarchy and safe wrappers; Member and parameterized effects; Open effect surfaces.
-   - Draws on: [concepts.md](../book/concepts.md) T5, [standard/effects.md](../book/standard/effects.md).
-23. **Contracts and the knowledge they give** (7 decisions). A contract is a predicate that becomes knowledge, carried on the value or in the scope, written as body-form clauses.
-   - Decisions: A contract is a predicate that becomes knowledge, discharged by PE; Knowledge has intrinsic and occurrence carriers; Body-form clauses at the head of a body, lowered through one chain; Branch refinement narrows knowledge per region; Contract checks sit at function entry and return; Choosing among refinement, contract, assert and law; Unification and branch refinement in patterns.
-   - Draws on: [standard/pattern-matching.md](../book/standard/pattern-matching.md) §3, [standard/contracts.md](../book/standard/contracts.md) §1 to §4, §6, §8.
-24. **Termination and completion** (9 decisions). Divergence as a computed effect, completion as totality and liveness, the discharge spectrum and termination by bounded decrease.
-   - Decisions: Divergence is a computed effect; Four-tier discharge spectrum; Completion is totality and liveness; Strict at the contract, informational for undeclared code; Termination by bounded decrease; Project severity configuration; Mutual recursion requires every edge to decrease; Totality polymorphism is effect polymorphism; Exhaustiveness checking at info severity.
-   - Draws on: [concepts.md](../book/concepts.md) T5, [allegretto/structures.md](../book/allegretto/structures.md) §10, [standard/totality.md](../book/standard/totality.md) §1 to §5.
-25. **When a check fails** (7 decisions). Which failures halt and which yield error values, purity gates, the construction guard, admitted assumptions, counterexamples and the verdict.
-   - Decisions: Statement contracts halt, construction failure is an error value; Mechanical purity gates; The triggered construction guard; `assume` is the admitted tier, and the silent assume is retired; Every failure carries a legible counterexample; The verdict as accumulated metadata; Contracts in the verdict and the ledger.
-   - Draws on: [standard/totality.md](../book/standard/totality.md) §5 (severity), [standard/contracts.md](../book/standard/contracts.md) §7, §10.
+As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed on PR #191.
+
+14. **Types as values** (14 decisions). Types are ordinary values that constrain values; every value of the language has one; kinds, conformance by member symbol, the core types over bits, exceptions, generics and typed functions.
+   - Decisions: Types are values that constrain values; In the standard language every value has a type; Kinds are types, and Type is its own type; Members are keyed by symbol and conformance is membership; One meta-type with an optional name; One construction surface; Loose conformance for data, selected by anonymity; The standard language's handled failure is an exception; The core types are built over bits; Generics are memoized type constructors; Function types with bidirectional call-site unification; A typed function claims its parameter types on entry and its return type on exit; `distinct` mints a fresh-symbol newtype; The user-facing generics surface and parameter kinds.
+15. **Refinement types** (7 decisions). A refinement is a type plus a predicate; what the extension can decide without search; shape and knowledge; no declared inheritance; construction as a claim.
+   - Decisions: Abstract domains as sound approximations; Refinement types; Shape and knowledge are separate; Declared inheritance dissolves into conformance, refinement and composition; Invariants are refinements; Constructing a refined value claims its predicate; An interface is a type drawn from, not instantiated.
+16. **Reaching a member** (4 decisions). A key for secrecy, a claim about origins for discipline, and what a module hands out.
+   - Decisions: A private member is one whose key not all code holds; Who may use a member is a claim about where the access was written; Export marks the binding, and a module with no exports is open; Imported modules are typed objects whose type encapsulates.
+17. **The surface language** (10 decisions). The spellings a programmer writes: blocks, declarations, conditionals, annotations, pattern matching.
+   - Decisions: Indentation blocks, with brace and offside both as the goal; Refinement types written `T & predicate` with `_` as the value; Function declarations with `=>`; Expression-valued `if then else`; The `Y of x` component-access form; Type annotations on parameters and returns; Statement forms that declare a binding; `when / is / then` pattern matching; Combinators before keyword declaration syntax; String interpolation with braces.
+18. **Claims and proofs** (7 decisions). Nothing is a claim until someone makes it; claims about every value, proof terms as proposals, deciding without search, sampling, and the four strengths.
+   - Decisions: Nothing is a claim until someone makes it; A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Discharge mechanisms without search; Bounded sampling for universal claims; Four strengths, one vocabulary; Tactics as a pure Allegro library.
+19. **Equality and laws** (4 decisions). Equality by shape, the default equality, lawful interfaces and the strength of a law.
+   - Decisions: Lawful interfaces; Equality dispatches on shape, then coerces, else not-equal; Default equality belongs to the standard extension; Law strengths and the transitivity gate.
+20. **Effects** (3 decisions). An effect is the use of a capability; parts and narrowed forms; how a bound is written.
+   - Decisions: An effect is the use of a capability; A capability has named parts and narrowed forms; A bound on capabilities is written in an `effects` clause or a type slot.
+21. **Contracts** (6 decisions). A contract becomes knowledge that travels with the value; clauses as notation; matches that cannot fall through.
+   - Decisions: A contract is a predicate that becomes knowledge, discharged by PE; What is known about a value travels with the value; A match where no arm matches is a refutation; A body clause is a notation; Contract checks sit at function entry and return; Unification in patterns.
+22. **Termination and completion** (4 decisions). Termination as a claim, completion as termination plus arrival, and how a decrease is recognised.
+   - Decisions: Termination is a claim; Completion is totality and liveness; Termination by bounded decrease; Mutual recursion requires every edge to decrease.
+23. **When a check fails** (3 decisions). Purity of equality and invariants, assumptions on the record, and counterexamples.
+   - Decisions: Equality, coercion and invariant predicates hold no capability and terminate; An assumption is always on the record; Every failure carries a legible counterexample.
+24. **Units of measure** (4 decisions). A worked language: dimensions as refinements, laws at their real strengths, quantity literals.
+   - Decisions: Dimensions as data, named dimensions as refinements over one Quantity; Quantity laws at honest tiers; Number-anchored quantity literals; Conversion sugar with `in`.
 
 **Part V: Domains built on the kernel**
 
@@ -132,7 +126,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | `channel_register` accepts any rule string | A field's rule is a pure, bounded function | Metadata | the pilot's review, §7 item 2 |
 | A user-registered viral field stops computation | A field's rule is a pure, bounded function | Metadata | the pilot's review, §7 item 3 |
 | The ownership test never checks owners | An extension registers its own fields; the kernel has two | Metadata | the pilot's review, §7 item 4 |
-| Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; Exhaustiveness checking at info severity | Termination and completion | DR1, rulings of 2026-11-11 |
+| Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; A match where no arm matches is a refutation | Termination and completion | DR1, rulings of 2026-11-11 |
 | `print` is a base primitive | The kernel's primitives are pure and few; Environment capabilities outside the base, effect-labelled | Values; Hosts | DR1, rulings of 2026-11-11 |
 | Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
@@ -144,7 +138,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Housekeeping removed as decisions in DR2, still owed as work: prefixed engine slots, legacy primitives, the host plane's declaration, shared host types that let the kernel see an extension's representation, kind comparisons outside their units | Each decision lives in one replaceable unit of code; An extension is made of functions and metadata fields | Keep it simple; the extension interface | DR2, rulings of 2026-11-11 |
 | The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
 | Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
-| Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; The verdict as accumulated metadata | Proofs as values; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
+| Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; Every result says how strongly it holds | Claims and proofs; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
 | The return check reports a conforming refined return as a mismatch | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A name bound twice wins silently; implicit production replacement; ordered choice | the grammar, module and binding decisions | Parts III and IV | DR1, rulings of 2026-11-11 |
 | Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | Keep it simple | DR1, rulings of 2026-11-11 |
@@ -155,6 +149,14 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | The loader is host code with a host file-reader option; the browser has its own scanner and loading code; the load-once cache is per process | A module is an extension that arrives as a file; The loader reaches files through a capability; What the kernel requires of an extension | Modules and programs; Extensions | DR3, rulings of 2026-11-12 |
 | A grammar change does not reach the prompt | Running a program is evaluating its main module with a configuration's capabilities | Modules and programs | DR3, rulings of 2026-11-12 |
 | The pipeline has fixed host stages and writes in place into built values, with a guard for library values | Every program is evaluated the same way, however it arrives | Modules and programs | DR3, rulings of 2026-11-12 |
+| Member access is mediated through an installed path with a policy hook; privacy asks what a scope can reach | A private member is one whose key not all code holds | Reaching a member | DR4, rulings of 2026-11-12 |
+| Typed calls are checked by the evaluator; body clauses are lowered by host steps | A typed function claims its parameter types on entry and its return type on exit; A body clause is a notation | Types as values; Contracts | DR4, rulings of 2026-11-12 |
+| A failed construction yields an error value; `make_error` and the `error` field are in the kernel | Constructing a refined value claims its predicate; The standard language's handled failure is an exception | Refinement types; Types as values | DR4, rulings of 2026-11-12 |
+| The proof rules are kernel primitives | A proof term is a proposal | Claims and proofs | DR4, rulings of 2026-11-12 |
+| Findings have severities; a match that can fall through is information | Nothing is a claim until someone makes it; A match where no arm matches is a refutation | Claims and proofs; Contracts | DR4, rulings of 2026-11-12 |
+| Effects are label strings checked separately; `is_resolved` is a primitive | An effect is the use of a capability | Effects | DR4, rulings of 2026-11-12 |
+| Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts | DR4, rulings of 2026-11-12 |
+| The verdict is assembled outside evaluation; undecided contracts do not reach it | Every result says how strongly it holds | Keep it simple | DR4, rulings of 2026-11-12 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -205,8 +207,8 @@ They came together over years of exploration into most of what Allegro is today.
 |---|---|
 | [preface.md](../book/preface.md) (How this book is organized) | Stays the preface, unchanged. Goes to: the preface. |
 | [README.md](../../README.md) (Introduction) | Leaves the book's order: it stays the repository's front page; its account of what Allegro is feeds the tour. Goes to: the tour (what Allegro is). |
-| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Proofs as values (The prover loop); Tools over the pipeline (subcommands). |
-| [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Who can see a member (Private members). |
+| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Claims and proofs (The prover loop); Tools over the pipeline (subcommands). |
+| [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Reaching a member (Private members). |
 | [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
 | [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
@@ -225,21 +227,21 @@ They came together over years of exploration into most of what Allegro is today.
 | [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Parsing (the boundary). |
 | [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Parsing (§1 to §5, §7, §8); Changing the grammar (§6); The surface language (§5 (layout)). |
 | [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Parsing (§1, §2); Changing the grammar (§4); Modules and programs (§4 (activation)); The surface language (§3). |
-| [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules and programs (Loading, Loaded once per process); Who can see a member (module objects). |
+| [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules and programs (Loading, Loaded once per process); Reaching a member (module objects). |
 | [standard/README.md](../book/standard/README.md) (L2 Allegro Standard: boundary contract) | Dissolves into Part IV's opening. Goes to: Types as values (the boundary). |
-| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Who can see a member (§3, §7); The surface language (§3 (combinators)). |
+| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
 | [standard/core-types.md](../book/standard/core-types.md) (Core types) | Joins the types chapter. Goes to: Types as values. |
 | [standard/effects.md](../book/standard/effects.md) (Effects) | Becomes the effects chapter; environment capabilities go to the host chapter. Goes to: Effects; Hosts: the terminal and the browser (environment capabilities). |
-| [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts and the knowledge they give (§3). |
+| [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts (§3). |
 | [standard/totality.md](../book/standard/totality.md) (Totality and termination) | Becomes the termination chapter; the cutoff goes to the pipeline chapter. Goes to: Termination and completion (§1 to §5); When a check fails (§5 (severity)); The build pipeline (§7, §8 (the cutoff)). |
-| [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts and the knowledge they give (§1 to §4, §6, §8); When a check fails (§7, §10). |
+| [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts (§1 to §4, §6, §8); When a check fails (§7, §10). |
 | [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Vivace: models as the program. |
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
 | [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Compiling beyond the interpreter (undelivered tracks). |
 | [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules and programs (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
-| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Proofs as values (C130); Tools over the pipeline. |
+| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Claims and proofs (C130); Tools over the pipeline. |
 | [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
-| [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Proofs as values (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
+| [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Claims and proofs (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
 | [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language (the ladder); Units of measure (rung 2); Finding solutions to a model (rung 3, the capstone). |
 | Appendices (registers and records) | Stay appendices, outside the order. |
 
@@ -266,6 +268,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs the principle of "Reviewability through a top-down semantic view"; its concrete half (the safety grade, drill-down, semantic diffs) is read with "Safety grade as the default verification surface" in Part VI.
+
 #### A system is described in the language of its domain, and that language grows with the understanding
 - Decides: code and claims are written in the terms of a domain model, which people and agents can read far more easily than general-purpose code. Nothing is lost by this: a statement in a domain language is checked exactly as strictly as any other. No prewritten domain language is enough. As the people and agents building a system understand it better, they extend its language, and each new concept becomes vocabulary that the kernel checks from then on.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -327,6 +330,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Surface syntax is provisional, reviewed against a corpus"; deprecation paths are a policy question for the surface chapter of Part IV.
+
 #### The kernel holds no language
 - Decides: the kernel is values, pure primitives, the evaluator, metadata with its capabilities, and the extension interface. It has no syntax. Every concrete syntax, the first grammar included, is an extension.
 - Status: settled; ruled 2026-11-11 (DR1)
@@ -445,6 +449,7 @@ They came together over years of exploration into most of what Allegro is today.
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
 - Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
+
 #### An effect consumes only values whose claims are decided
 - Decides: an effect is performed only on values that have passed every claim made about them. A value carrying a refuted claim never reaches an effect. A value carrying an undecided claim has that claim evaluated first. After a phase has refuted a claim, it performs no further effect, though it may go on evaluating to report every refutation.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -490,6 +495,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 - Notes (amended 2026-11-11, DR2, with the maintainer's approval): the return of a capability is not a claim, so it is not "assumed"; a claim decided by calling a capability is decided and names it.
+
 #### Anyone may propose, and the record shows who
 - Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -563,6 +569,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): three tier lists disagree (docs/book/vision.md §1a; `src/pcp.ts:230`–`236`; `src/totality.ts:500`). Held on the proofs, laws and termination decisions of Part IV.
 - Held finding (2026-11-11, DR1): the keyword `proven` names a check made on four samples, and a `proven` clause is absent from the verdict, whose ledger then reads "all proofs rest on proven backing" (`lib/proven.alg:4`–`5`, `src/pcp.ts:1021`). Held on "Bounded sampling for universal claims".
 - Held finding (2026-11-11, DR1): the safety grade reads `proven-safe` whenever nothing complained (`src/introspect.ts:496`–`504`); a verdict resting on sampled backing is headed "Verdict (verified)" (`src/pcp.ts:646`, `959`). Held on "Safety grade as the default verification surface" and "The verdict as accumulated metadata".
+- Held finding (2026-11-12, DR4): the verdict is assembled by a walk of top-level bindings outside evaluation (`buildVerdict`), where the decision makes it the result's own metadata; and contracts that stay undecided reach `inspect` only, not the verdict or the record of assumptions. Formerly the entries "The verdict as accumulated metadata" and "Contracts in the verdict and the ledger".
 - Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
@@ -861,6 +868,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Metadata origination is capability-controlled"; "An extension registers its own fields; the kernel has two", "Authority is an unforgeable value" and, in Part IV, "Evidence is possession" are re-read as its instances. Open under it: privacy by possession of an unforgeable key, the working answer, analysed with "Who can see a member"; its first test is reflection, since every extension can read a value's source expression: what does an expression show of a key to code that does not hold it?
 - Notes (2026-11-11, DR2, leftovers): absorbs "Writers are closures: delegable, attenuable, unforgeable". "Symbols serialise by FQN; deserialisation never mints reachability" moves to the privacy decision of Part IV ("Who can see a member"), as the pilot's review ruled: a symbol's wire form is its fully-qualified name, and reading one back never gives access to anything not exported.
+- Chapter: Authority
+
+#### Reading an expression never yields authority
+- Decides: any code can read an expression's structure. Where the expression holds an unforgeable value, the reader sees which one it is and cannot obtain it. So a function that wraps a capability in a narrower one does not give the wider one away, and a key inside a function's body stays with the function.
+- Status: open; ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Authority is an unforgeable value; Expressions are values, forming a DAG; Functions are data: params plus body
+- Significance: 5 — without it no capability can be narrowed and no key kept
+- Label: foundational — effects, privacy and every field's writer
+- Options recorded: a function's body closed to readers, opened by a key from its owner (rejected: analyses in extensions are functions evaluated over a program's expression)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: new, by ruling, placed in Part II with the maintainer's agreement. It answers the question "Authority is an unforgeable value" left open: what an expression shows of a key to code that does not hold it. The same holds when an expression is reached through a value's origin.
 - Chapter: Authority
 
 #### A capability is granted, never acquired
@@ -1234,6 +1254,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Minimal base surface of about forty primitives" and "Host functions as values with declared evaluation control"; "Primitives receive full values" is a rule of the kernel's own code under it.
 - Held finding (2026-11-11, DR1 and DR2): 178 primitives in one table, 54 of them the standard language's, `print` and other effects among them (`src/primitives.ts:4509` onward).
 - Notes (2026-11-11, DR2, leftovers): "Primitives receive full values" is a rule of the kernel's own code: a primitive receives its arguments with their metadata intact.
+- Notes (2026-11-12, DR4): truth. The kernel recognises two bit values as true and false; a conditional or a claim on anything else is a refutation. The standard language's Bool is those two values with a type, so the kernel's notion of true depends on no extension.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1663,11 +1684,11 @@ They came together over years of exploration into most of what Allegro is today.
 ### Types as values
 
 #### Types are values that constrain values
-- Decides: a type is an ordinary Structure carried in a value's `type` metadata field, built by ordinary calls (`Type.define`), and a type is a predicate over values; a type check is an evaluation.
-- Status: settled
+- Decides: a type is an ordinary structure, carried in a value's type field, which the type extension owns. Types are built by ordinary calls. A type is a predicate over values, and a type check is a claim.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
-- Depends on: One operation: partial evaluation; Metadata is a field on every value; One value universe
+- Depends on: One operation: partial evaluation; Metadata is a field on every value; One value universe; An extension registers its own fields; the kernel has two; Claims are evaluated like everything else
 - Significance: 5 — the type system is an extension and PE-as-discharge applies to it
 - Label: foundational — kinds, refinements, effects as values and every check depend on it
 - Units: type-core
@@ -1677,9 +1698,23 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: concepts §30 delta: the closed type-Context namespace is unstated and unenforced (B-107). Told in the tour.
 - Chapter: Types as values
 
+#### In the standard language every value has a type
+- Decides: the language's notation gives every literal and every constructed value a type. An operator applied to a value with no type is a refutation; nothing falls back to an untyped operation. A function from outside the language enters it wrapped in a type that says so.
+- Status: settled; reworded 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Types are values that constrain values; Every notation stands for an expression; A refutation marks everything computed from it
+- Significance: 4 — no value escapes the language's checks by having no type
+- Label: foundational — every typed operator
+- Units: type-core
+- Options recorded: a mode of the platform in which values are typed (the sources' wording; rejected: the standard language is a set of extensions, and a type is a field its notation supplies)
+- Sources: docs/book/standard/README.md "Invariants"; docs/book/standard/core-types.md; D5 (docs/decisions.md); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Every Standard value has a type, with no implicit fallback". "Standard mode" is not a concept.
+- Chapter: Types as values
+
 #### Kinds are types, and Type is its own type
-- Decides: a kind is a type whose instances are types (`Type`, `Refinement`, `Interface`, `GenericType`, `Effect`, `Proof`), instance-of is shape-of, members live once on the kind, and `Type : Type` is kept with universe stratification left to the proof-export boundary.
-- Status: settled
+- Decides: a kind is a type whose instances are types (`Type`, `Refinement`, `Interface`, `GenericType`, `Proof`), instance-of is shape-of, members live once on the kind, and `Type : Type` is kept with universe stratification left to the proof-export boundary.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
 - Depends on: Types are values that constrain values
@@ -1689,6 +1724,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a reified Kind tower (rejected, D7); a privileged root (rejected)
 - Sources: D40, D7 (docs/decisions.md; structures.md §9); docs/book/concepts.md §31; docs/book/standard/README.md (kind recipe as exit criterion)
 - Book home (fragments' proposal): standard/type-system
+- Notes (2026-11-12, DR4): `Type : Type` is safe here because a claim is decided by evaluation, never by a typing judgment; stratification matters only when a decided claim is translated for an outside checker. `Effect` leaves the list of kinds: an effect is the use of a capability.
 - Chapter: Types as values
 
 #### Members are keyed by symbol and conformance is membership
@@ -1703,20 +1739,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: spelling-based nominal chain-walk (replaced); diamonds dedupe by symbol identity or error
 - Sources: D30 (docs/decisions.md; structures.md §5, §8); docs/book/concepts.md §33; C5.2-R1–R6
 - Book home (fragments' proposal): standard/type-system
-- Chapter: Types as values
-
-#### Every Standard value has a type, with no implicit fallback
-- Decides: in Standard mode every value is typed (base primitives entering the context are wrapped as `UntypedFunction`), and a typed operator with a missing type method is an error.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Types are values that constrain values
-- Significance: 4 — the Standard-layer typing guarantee
-- Label: foundational — operator dispatch and the core roster
-- Units: core-types, type-primitives
-- Options recorded: untyped Allegretto structures (kept for the base, D5)
-- Sources: docs/book/standard/README.md "Invariants"; docs/book/standard/core-types.md; D5 (docs/decisions.md)
-- Book home (fragments' proposal): standard/core-types
 - Chapter: Types as values
 
 #### One meta-type with an optional name
@@ -1762,19 +1784,32 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: the code still tests the `__interface` marker as well as anonymity (`src/slot-accessors.ts:263`); its removal is B-104(g).
 - Chapter: Types as values
 
-#### The core type roster
-- Decides: Standard ships Int (64-bit signed), Float (IEEE double), String (UTF-8 Bits), Bool (Int 0/1 with Bool type), Array (numeric-keyed structure, generic), Object, Function, UntypedFunction, None, Error and Any; Array's map/filter/reduce are Allegro functions so PE sees through them, and operators dispatch through `PRIM_TO_METHOD` on the operand's shape.
-- Status: settled
+#### The standard language's handled failure is an exception
+- Decides: an exception is a value a program raises and handles explicitly. Until it is handled it is carried to every result computed from it, in a field the standard extension owns. It is not a refutation: the program is reporting an outcome.
+- Status: partly built (the code has an error value in a kernel field); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Every Standard value has a type, with no implicit fallback; The kernel's plain data is a sequence of bits, and it computes nothing on them
-- Significance: 3 — the types every program uses
-- Label: swappable — each type behind its member set
+- Depends on: A failure a program can handle is supplied by an extension; Types are values that constrain values; Metadata fields are independent
+- Significance: 3 — how a program reports and recovers
+- Label: swappable — another language on the kernel may choose otherwise
+- Options recorded: an error value in a field of the kernel (what the code does; rejected in the Part II review)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: new, by ruling: the standard language's choice under Part II's decision. The maintainer preferred "exception" to "error".
+- Held finding (2026-11-12, DR4): `make_error` and the `error` field are kernel primitives (`src/primitives.ts:1107`).
+- Chapter: Types as values
+
+#### The core types are built over bits
+- Decides: the standard language ships Int, Float, String, Bool, Array, Object, Function, None, Any, a type for functions from outside the language, and the exception type. Integers and floats compute through the machine arithmetic capability; a string is bits with a type; Bool is the kernel's two truth values with a type. Array's map, filter and reduce are written in the language, so partial evaluation sees through them. An operator is a method of its operand's type.
+- Status: settled; reworded 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a capability that ships with the platform; The standard language's handled failure is an exception
+- Significance: 3 — what every program starts with
+- Label: swappable — the roster
 - Units: core-types, type-primitives
 - Options recorded: host-loop HOFs (rejected: effect and type inference must see through them)
-- Sources: docs/book/standard/core-types.md; docs/book/standard/type-system.md §7; D18 (docs/decisions.md)
-- Book home (fragments' proposal): standard/core-types
-- Notes: core-types.md says "ten core types" and lists eleven.
+- Sources: docs/book/standard/core-types.md; docs/book/standard/type-system.md §7; D18 (docs/decisions.md); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "The core type roster". The source says "ten core types" and lists eleven.
 - Chapter: Types as values
 
 #### Generics are memoized type constructors
@@ -1792,8 +1827,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Types as values
 
 #### Function types with bidirectional call-site unification
-- Decides: typed functions carry `Function[ParamTypes, ReturnType]`; type variables bind progressively at call sites with bidirectional flow, contradictions are call-site type errors, and checks run in `applyComposed` before substitution rather than as wrappers in bodies.
-- Status: settled
+- Decides: a typed function carries `Function[ParamTypes, ReturnType]`; type variables bind progressively at a call, with information flowing both ways, and a contradiction is a refutation at that call.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
 - Depends on: Generics are memoized type constructors
@@ -1803,6 +1838,21 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: `type_check` wrappers inside bodies (rejected)
 - Sources: docs/book/standard/type-system.md §6
 - Book home (fragments' proposal): standard/type-system
+- Notes (2026-11-12, DR4): where the check runs is now "A typed function claims its parameter types on entry and its return type on exit".
+- Chapter: Types as values
+
+#### A typed function claims its parameter types on entry and its return type on exit
+- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there.
+- Status: open (the evaluator checks a typed call itself); ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Function types with bidirectional call-site unification; Claims are evaluated like everything else; A call is evaluated by evaluating the function's body; An extension is made of functions and metadata fields
+- Significance: 4 — a typed call needs nothing from the kernel but a call and a claim
+- Label: foundational — every typed function
+- Options recorded: a check made by the evaluator before it substitutes arguments (what the code does; rejected in the Part II review: the evaluator calls into no extension)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: new, by ruling.
+- Held finding (2026-11-12, DR4): the evaluator checks a typed call before substitution (`applyComposed`, `src/evaluator.ts`), through an installed host function.
 - Chapter: Types as values
 
 #### `distinct` mints a fresh-symbol newtype
@@ -1837,11 +1887,11 @@ They came together over years of exploration into most of what Allegro is today.
 ### Refinement types
 
 #### Abstract domains as sound approximations
-- Decides: predicates are recognised as interval, equality, not-equal, effects or opaque domains that answer "definitely yes" or "cannot tell"; anything unrecognised is opaque and keeps the predicate for a runtime check, and no deeper reasoning runs online.
-- Status: settled
+- Decides: the standard extension recognises a predicate as an interval, an equality, an inequality or opaque, and each recognised form answers a question about a value as decided or undecided. An opaque predicate stays a residual claim. No search runs.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability — it decides what a compile-time check can prove
 - Rationale kind: technical
-- Depends on: One operation: partial evaluation
+- Depends on: One operation: partial evaluation; Claims are evaluated like everything else
 - Significance: 4 — the cheap form of discharge over residuals
 - Label: swappable — a domain set can be extended behind `impliesDomain`
 - Units: refinements
@@ -1849,11 +1899,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md §34b; docs/book/standard/contracts.md §3
 - Book home (fragments' proposal): standard/type-system (proposed "Refinements")
 - Notes: the domain rides the host plane while knowledge is a metadata channel (B-111).
+- Notes (2026-11-12, DR4): the effects domain goes with the effects lattice.
 - Chapter: Refinement types
 
 #### Refinement types
-- Decides: a refinement is a type plus a predicate (`Int & _ > 0`) that shares its parent's member set, carries an abstract domain for compile-time entailment, and is chained left-associatively one layer per clause; its constructor wraps and checks the parent's.
-- Status: settled
+- Decides: a refinement is a type plus a predicate (`Int & _ > 0`) that shares its parent's member set, carries an abstract domain for entailment, and is chained left-associatively one layer per clause; its constructor wraps and checks the parent's.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
 - Depends on: Types are values that constrain values; Abstract domains as sound approximations
@@ -1910,6 +1961,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/contracts
 - Chapter: Refinement types
 
+#### Constructing a refined value claims its predicate
+- Decides: `Positive(-1)` is a refutation. A program that wants to test a value calls the predicate. Where the argument is not yet known the claim is residual, and so is the construction.
+- Status: open (a failed construction yields an error value today); ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Refinement types; Claims are evaluated like everything else; A refutation marks everything computed from it; Invariants are refinements
+- Significance: 3 — a refined value is never built wrong
+- Label: foundational — every refinement and invariant
+- Options recorded: a failed construction as an error value the program may handle (what the code does, by an earlier ruling that reserved the promotion for the maintainer; promoted 2026-11-12)
+- Sources: D32, CE-R8 (docs/decisions.md; docs/plans/completion-effects.md §3); docs/book/standard/contracts.md §5; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "The triggered construction guard" and the construction half of "Statement contracts halt, construction failure is an error value"; the statement half is Part I's rule that a refuted claim halts.
+- Held finding (2026-11-12, DR4): a failed refinement check at construction, and `assert_invariant`, yield an error value (`src/primitives.ts:3228`).
+- Chapter: Refinement types
+
 #### An interface is a type drawn from, not instantiated
 - Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types.
 - Status: partly built
@@ -1925,91 +1990,64 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: `Interface.define` silently discards a method body (B-116); the `__interface` marker and its deletion are open.
 - Chapter: Refinement types
 
-### Who can see a member
+### Reaching a member
 
-#### Mediated member access
-- Decides: member access is one partial-evaluation act in four stages (project, availability, mediate, dispatch) inside `type_dispatch`; `fallbackMember` (3-ary) stays the only user policy hook, and operator and untyped meta-dispatch share the same gated path.
-- Status: settled
-- Type: capability — the user policy hook and one gated path are the surface; the four stages are its form
-- Rationale kind: technical
-- Depends on: Members are keyed by symbol and conformance is membership
-- Significance: 3 — every member read goes through it
-- Label: foundational — privacy, module encapsulation and dispatch
-- Units: type-core
-- Options recorded: a new user-facing mediator slot (rejected); a separate untyped dispatch ladder (unified)
-- Sources: D41 (docs/decisions.md; structures.md §6, §13); V-R1 (docs/plans/visibility.md §3)
-- Book home (fragments' proposal): standard/type-system (proposed "Visibility")
-- Chapter: Who can see a member
-
-#### Access is what a type's member lookup returns, in two tiers
-- Decides: a type exposes exactly what its member-access protocol returns; members may be marked `private(...)` through descriptor combinators (`readonly(...)` reserved), giving two tiers (private, public), with public and names-public as defaults.
-- Status: settled
+#### A private member is one whose key not all code holds
+- Decides: the key is an unforgeable value made where the type is defined. Code that holds it can reach the member; no other code can, by any name. A key cannot be written out and read back into existence. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
+- Status: open (the code mediates each access and asks whether the requesting scope holds a name); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Members are keyed by symbol and conformance is membership; Mediated member access
-- Significance: 3 — encapsulation for types and modules alike
-- Label: swappable — per-kind attribute vocabulary
+- Depends on: Authority is an unforgeable value; Reading an expression never yields authority; Members are keyed by symbol and conformance is membership
+- Significance: 4 — what a type can keep to itself
+- Label: foundational — secrecy, and the base of every access rule
 - Units: type-core
-- Options recorded: `internal` and `protected` (reserved, deferred until a consumer exists); keyword syntax (B-043); name secrecy (later opt-in)
-- Sources: D43 (docs/decisions.md); V-R3, V-R5 (docs/plans/visibility.md §3); docs/book/standard/type-system.md §3
-- Book home (fragments' proposal): standard/type-system (proposed chapter "Visibility")
-- Chapter: Who can see a member
+- Options recorded: a mediated lookup in four stages with one policy hook for user code, and a kernel-made capsule that answers whether a scope holds a name (what the code does; dissolved: the kernel calls into no extension, and the environment is not a value); a member symbol identified by a name, which can be guessed
+- Sources: D41 (docs/decisions.md; structures.md §6, §13); V-R1 (docs/plans/visibility.md §3); D43 (docs/decisions.md); V-R3, V-R5 (docs/plans/visibility.md §3); docs/book/standard/type-system.md §3; D42 (docs/decisions.md; structures.md §13); V-R2 (docs/plans/visibility.md §3); forgery-E criterion (visibility.md §3); V-R6, V-R7, V-R8 (docs/plans/visibility.md §3; docs/decisions.md); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Mediated member access", "Access is what a type's member lookup returns, in two tiers", "Evidence is possession" and "Privacy across readers, reflection and mediation effects", and takes the rule on serialising symbols that the Part II review sent here. Every access pattern is a rule for who is handed the key and in what form: private, the defining module keeps it; shared within a group, the module hands it to the modules it names; read-only, the module hands out a function that reads; protected, the type hands it to any definition that refines or draws from it. Protected is a discipline unless the type also limits who may refine it.
+- Held finding (2026-11-12, DR4): member access runs through an installed mediation path with a policy hook (`type_dispatch`, `fallbackMember`), and privacy asks what the requesting scope can reach.
+- Chapter: Reaching a member
 
-#### Evidence is possession
-- Decides: authorization is what the requesting context holds (symbol reachability), never principal identity; mediators receive an opaque kernel-minted capsule answering only `holds(name)`, never the raw scope.
-- Status: settled
+#### Who may use a member is a claim about where the access was written
+- Decides: private, protected, read-only and caller-based rules are claims over the origins of accesses. Only the kernel writes an origin, so it cannot be forged. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
+- Status: open, a design to prove; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Mediated member access; An extension registers its own fields; the kernel has two
-- Significance: 3 — the ocap basis of privacy and the forgery-E guarantee
-- Label: foundational — private members, export filtering and the wire rule
-- Units: type-core, typed-modules
-- Options recorded: handing mediators the raw scope (rejected, V-R2)
-- Sources: D42 (docs/decisions.md; structures.md §13); V-R2 (docs/plans/visibility.md §3); forgery-E criterion (visibility.md §3)
-- Book home (fragments' proposal): standard/type-system (proposed "Visibility")
-- Chapter: Who can see a member
-
-#### Privacy across readers, reflection and mediation effects
-- Decides: destructuring a private field outside its scope is an error naming privacy, printing omits privates with `…`, conformance counts only reachable members; enumeration and visibility flags stay free while value-bearing reflection needs possession; kernel mediation is pure and folds, and an impure user mediator declares its own effect label.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Access is what a type's member lookup returns, in two tiers; Evidence is possession
-- Significance: 2 — closes the bespoke readers by policy
-- Label: swappable — reader policies
-- Units: type-core
-- Options recorded: silent no-match on private destructuring (rejected); blanket-tagging `type_dispatch` with an effect (rejected); borrowing `observe` for mediation (rejected)
-- Sources: V-R6, V-R7, V-R8 (docs/plans/visibility.md §3; docs/decisions.md)
-- Book home (fragments' proposal): standard/type-system (proposed "Visibility")
-- Chapter: Who can see a member
+- Depends on: A private member is one whose key not all code holds; Every value keeps its origin; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; A function may take an argument unevaluated
+- Significance: 3 — interfaces and design discipline, checked
+- Label: swappable — the access rules a language offers
+- Options recorded: access decided by who is asking at the moment of access (rejected in Part II with authority by identity); a third mechanism for caller-based control (not needed: a key and a claim about origins combine)
+- Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: these access patterns "are not really privacy concerns", they are "about interface, encapsulation and design discipline". To prove: an accessor reading the origin of its call; the four access patterns restated as claims; the cost of deciding such claims on real programs. A trusted module can still be led to access on another's behalf, which is why the key stays the foundation.
+- Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
-- Decides: `export NAME = …` sets a visibility attribute on the scope binding (never the value); a module declaring no exports is fully open, any `export` closes it, and flat `use`-injection is filtered to the same export set.
-- Status: settled
+- Decides: `export NAME = …` marks the binding, never the value. A module hands out what it exports, and what it does not hand out cannot be reached. A module that declares no exports hands out everything.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; Evidence is possession
+- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired
 - Significance: 2 — closes a leak route and fixes aliasing behaviour
 - Label: swappable — typed-modules policy
 - Units: typed-modules
 - Options recorded: an `exported` value-plane channel (deleted: `y = x` copied export-ness)
 - Sources: V-R4 (docs/plans/visibility.md §3; docs/decisions.md); B-097 V1; docs/book/extension/modules.md "Module objects and encapsulation"
 - Book home (fragments' proposal): extension/modules (L2 half)
-- Chapter: Who can see a member
+- Chapter: Reaching a member
 
 #### Imported modules are typed objects whose type encapsulates
-- Decides: an imported module is a typed Object; dot access dispatches through the module's type, whose `fallbackMember` hook exposes only exported fields, and the wire resolves foreign names against the exported registry only.
-- Status: settled
+- Decides: an imported module is a typed object whose members are the module's exports and nothing else.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Export marks the binding, and a module with no exports is open; Mediated member access
+- Depends on: Export marks the binding, and a module with no exports is open; In the standard language every value has a type
 - Significance: 3 — module encapsulation reuses type dispatch instead of a separate mechanism
 - Label: swappable — typed-modules
 - Units: typed-modules
 - Options recorded: none recorded
 - Sources: D41–D43 (docs/decisions.md); V-R1, V-R4 (docs/plans/visibility.md §3); docs/book/extension/modules.md; docs/book/standard/type-system.md §3
 - Book home (fragments' proposal): extension/modules (L2 half)
-- Chapter: Who can see a member
+- Notes (2026-11-12, DR4): the policy hook that filtered members goes with the mediated lookup.
+- Chapter: Reaching a member
 
 ### The surface language
 
@@ -2057,12 +2095,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: no source records the alternatives weighed.
 - Chapter: The surface language
 
-#### Expression-valued `if then else` with thunked branches
-- Decides: `if c then a else b` is an expression whose branches the parser wraps in thunks, so a lazy primitive evaluates only the chosen branch.
-- Status: settled
+#### Expression-valued `if then else`
+- Decides: `if c then a else b` is an expression built on the kernel's one conditional. A branch that may not be taken is evaluated without capabilities.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: A function may take an argument unevaluated
+- Depends on: A branch that may not be taken is evaluated without capabilities; Every notation stands for an expression
 - Significance: 2 — local to the conditional, but its thunking interacts with tail calls
 - Label: swappable — the spelling is base-grammar; the thunking rides the lazy-primitive mechanism
 - Units: base-grammar, tree-builder, base-primitives
@@ -2070,14 +2108,15 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/language-reference.md (If-then-else); docs/book/vivace/planning-dsl.md §6 (the tail-call sentinel finding through a branch thunk)
 - Book home (fragments' proposal): Surface syntax of Allegro Standard (proposed)
 - Notes: planning-dsl.md §6 records two evaluator bugs caused by thunked branches in non-tail positions, fixed in `src/evaluator.ts`.
+- Notes (2026-11-12, DR4): the parser no longer wraps branches in thunks for a lazy primitive.
 - Chapter: The surface language
 
 #### The `Y of x` component-access form
-- Decides: a metadata component of a value is read by the expression form `Y of x` (`type of x`, `error of x`, `source of x`), a general expression feature rather than a pattern feature.
-- Status: settled
+- Decides: a metadata field of a value is read by the expression form `Y of x` (`type of x`, `source of x`). Reading a field is free to any code.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Metadata is a field on every value; A failure a program can handle is supplied by an extension
+- Depends on: Metadata is a field on every value; An extension registers its own fields; the kernel has two
 - Significance: 2 — the reader's view of the metadata plane at the surface
 - Label: swappable — a surface over channel reads
 - Units: base-grammar, metadata
@@ -2088,11 +2127,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### Type annotations on parameters and returns
-- Decides: parameters and returns carry `: Type` annotations, generics are written `Array[Int]`, and a failed annotation check halts compilation.
-- Status: settled
+- Decides: parameters and returns carry `: Type` annotations, and generics are written `Array[Int]`. Each annotation stands for a claim.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Claims are evaluated like everything else
+- Depends on: A typed function claims its parameter types on entry and its return type on exit; Every notation stands for an expression
 - Significance: 2 — spelling of the typing surface
 - Label: swappable — spelling over `typed_function` and `type_check`
 - Units: tree-builder, type-core, type-primitives
@@ -2118,11 +2157,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### `when / is / then` pattern matching
-- Decides: matching uses `when x is P then e` with nominal, structural and nested destructuring and `and`/`or` guards; a type pattern resolves first (value pattern matches the primary, type pattern matches the input's type, or either for a type input).
-- Status: settled
+- Decides: matching uses `when x is P then e` with nominal, structural and nested destructuring and `and`/`or` guards; a type pattern resolves first (value pattern matches the primary, type pattern matches the input's type, or either for a type input). It is built on the kernel's one conditional.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: aesthetic
-- Depends on: The `grammar { … }` block; Types are values that constrain values; Expression-valued `if then else` with thunked branches
+- Depends on: The `grammar { … }` block; Types are values that constrain values; Expression-valued `if then else`
 - Significance: 2 — the match surface
 - Label: swappable — a grammar form over `eval_when`
 - Units: base-grammar, base-primitives
@@ -2132,27 +2171,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: Merged from fragment B ("`when/is/then` pattern matching"), fragment C ("`when / is / then` pattern matching"). C: unification in patterns is deferred (§3).
 - Chapter: The surface language
 
-#### Allegro Standard by default, Allegretto by flag
-- Decides: every host entry (file runner, REPL, subcommands, sandbox) runs Allegro Standard with the type system as its one base extension, and `--base` selects bare Allegretto.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Everything above the kernel is an extension, and there is one way to extend
-- Significance: 2 — which language a user meets
-- Label: swappable — a host default
-- Units: cli
-- Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C29 to C31; docs/book/platform/host.ir.md C69, C72; docs/book/vision.md §1 ("In normal use, 'Allegro' means this tier")
-- Book home (fragments' proposal): Tooling
-- Notes: `prove` ignores `--base` (tooling C31); the sandbox creates a future manager under Allegretto while the CLI does not (host C58, C72).
-- Chapter: The surface language
-
 #### Combinators before keyword declaration syntax
 - Decides: types, interfaces, refinements and member modifiers are declared through combinator calls (`Type.define`, `Interface.define`, `private(...)`), and keyword declaration syntax waits until the API patterns settle, lowering to the same attributes when it lands.
 - Status: open
 - Type: capability
 - Rationale kind: mixed
-- Depends on: One construction surface; Access is what a type's member lookup returns, in two tiers
+- Depends on: One construction surface; A private member is one whose key not all code holds
 - Significance: 2 — every surface keyword (private, effect declarations) waits on it
 - Label: swappable — keyword sugar lowers to the same declaration attributes
 - Units: type-core; type-core, tree-builder
@@ -2176,14 +2200,28 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): Surface syntax of Allegro Standard (proposed)
 - Chapter: The surface language
 
-### Proofs as values
+### Claims and proofs
 
-#### Proofs are values discharged by evaluation
-- Decides: a proposition is an expression reducing to Bool; `theorem` and `verify` lower to `proof_by_eval`, the kernel verifies a proof by partial evaluation (reduction, not search), a failed proof halts with its counterexample, and only the kernel writes the `discharged` mark.
-- Status: settled
+#### Nothing is a claim until someone makes it
+- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
+- Status: partly built; ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Claims are evaluated like everything else; Correctness and safety are one kind of claim
+- Significance: 5 — one rule for every check the language has
+- Label: foundational — every chapter of this part
+- Options recorded: three severities (halt, error value, information) and a per-project configuration that promotes or demotes each finding (what the sources design; rejected: a refuted claim halts and that is not configurable)
+- Sources: T-R1, T-R3 (docs/decisions.md; docs/book/standard/totality.md §5, §8); archive phase-e-totality-plan.md "Design questions" 1; T-R2 (docs/decisions.md); CT-R2; docs/book/standard/totality.md §5, §7; B-099; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Strict at the contract, informational for undeclared code" and "Project severity configuration".
+- Held finding (2026-11-12, DR4): findings have severities, and a project configuration to move them is designed.
+- Chapter: Claims and proofs
+
+#### A claim about every value is decided by evaluating it with the value unknown
+- Decides: a proposition is an expression that evaluates to true or false. A claim about every value is decided by evaluating it with the value unknown: if the residual is true, the claim holds for all values. Enumerating a finite type decides it too. Deciding is reduction, never search, and a refuted claim carries its counterexample.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: One operation: partial evaluation; An extension registers its own fields; the kernel has two; Kinds are types, and Type is its own type
+- Depends on: One operation: partial evaluation; Claims are evaluated like everything else; Only the kernel records the outcome of a claim; Evaluation is total over unresolved information
 - Significance: 4 — the provability thesis in the language
 - Label: foundational — laws, PCP, `proven`, verdict
 - Units: proofs; proofs, evaluator
@@ -2191,28 +2229,31 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md "The proof model", "Stating a theorem"; docs/book/concepts.md §44; docs/book/standard/README.md "Invariants"; docs/book/vision.md §2 (three legs, leg 1), §5 principle 2; docs/book/proving-in-allegro.md (The proof model in one sentence)
 - Book home (fragments' proposal): proposed standard/proofs (planned `proofs.md`, revalidation-gated) / the tour / Proving in Allegro
 - Notes: Merged from fragment B ("Proofs are values discharged by evaluation"), fragment C ("PE-as-discharge as the primary proof strategy"). B: `discharged` is the last metadata field on the binding plane (B-104). The brief's reading list did not include proof sources; this and the next two entries rest on proving-in-allegro.md. C: likely also in another fragment's scope; listed here from the thesis-test side. Significance calibrated from 5/5.
-- Chapter: Proofs as values
+- Notes (2026-11-12, DR4): was "Proofs are values discharged by evaluation". The mark of a decided claim is the kernel's claim-outcome field.
+- Chapter: Claims and proofs
 
-#### Theorems as statements, proved `by` a term
-- Decides: `theorem NAME: proposition` names a referenceable proof and `verify proposition` is an anonymous one-shot, both lowering to `proof_by_eval`, and `by <term>` supplies a proof term that the kernel checks establishes exactly the stated proposition.
-- Status: settled
+#### A proof term is a proposal
+- Decides: a theorem is a named claim, and `verify` makes an anonymous one. `by <term>` offers an expression whose evaluation decides the claim; the kernel checks that it establishes exactly what was stated. Rules such as reflexivity, symmetry, transitivity and congruence are functions of the standard extension, and a result decided with their help names that extension.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Proofs are values discharged by evaluation; Claims are evaluated like everything else
+- Depends on: A claim about every value is decided by evaluating it with the value unknown; Anyone may propose, and the record shows who; Every result says how strongly it holds
 - Significance: 3 — the proof surface every rung and the prover loop splice into
 - Label: swappable — the statements lower to proof primitives
 - Units: proofs, tree-builder
 - Options recorded: none recorded
 - Sources: docs/book/proving-in-allegro.md (Stating a theorem; equational combinators)
 - Book home (fragments' proposal): Proving in Allegro
-- Chapter: Proofs as values
+- Notes (2026-11-12, DR4): was "Theorems as statements, proved `by` a term". The alternative weighed 2026-11-12: a kernel primitive that rewrites by a decided equation, which enlarges the kernel. The cost accepted: a result that used transitivity is trusted as far as the standard extension is.
+- Held finding (2026-11-12, DR4): the proof rules are kernel primitives (`proof_by_eval`, `proof_refl`, `proof_sym`, `proof_trans`, `proof_cong`, `proof_refines` in `src/primitives.ts`).
+- Chapter: Claims and proofs
 
 #### Discharge mechanisms without search
-- Decides: the kernel discharges without search, in order of preference: evaluation (`proof_by_eval`), refinement-domain entailment (`proof_refines`), equational combinators (`proof_refl`/`sym`/`trans`/`cong` via `by`), then quantification (finite enumeration by `prove_for_all_bool`, bounded-sample `prove_induction` and `proven` clauses at K=4), with a tactics library composing them and no SMT.
-- Status: partly built
+- Decides: the standard extension decides claims without search, in order of preference: evaluation; entailment from a refinement's domain; equational rules through `by`; enumeration of a finite type. Bounded sampling gives the strength sampled, not decided. A library of tactics composes them, and there is no outside solver.
+- Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Proofs are values discharged by evaluation; Abstract domains as sound approximations
+- Depends on: A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Abstract domains as sound approximations
 - Significance: 3 — what can be proved today
 - Label: swappable — each strategy is a primitive or library
 - Units: proofs; proofs, refinements
@@ -2220,11 +2261,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md (four strategies, tactics, proven); docs/book/proving-in-allegro.md (The four discharge strategies)
 - Book home (fragments' proposal): proposed standard/proofs / Proving in Allegro
 - Notes: Merged from fragment B ("Discharge strategies without search"), fragment C ("Four discharge mechanisms in order of preference"). B: bounded sampling is recorded as survival, not proof, in the law tiers; the `proven` clause's tier visibility in the ledger is not stated in the primer. C: the primer's "four strategies" and the vision's "three legs" are different lists (mechanisms inside leg 1 versus strategy legs); the book should name both distinctly.
-- Chapter: Proofs as values
+- Chapter: Claims and proofs
 
 #### Bounded sampling for universal claims
-- Decides: `prove_induction` verifies the base and K=4 inductive steps, and a function's `proven` clause is checked at K=4 sampled inputs of its parameter type, halting with the counterexample; full symbolic induction and symbolic-input verification are follow-ons.
-- Status: partly built
+- Decides: induction is checked at the base and four inductive steps, and a function's `proven` clause at four sampled inputs of its parameter type; a failure halts with the counterexample. The result's strength is sampled. Full symbolic induction is a follow-on.
+- Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
 - Depends on: Discharge mechanisms without search; Every result says how strongly it holds
@@ -2235,60 +2276,44 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md (F5, F7); docs/book/platform/build-pipeline.ir.md C74
 - Book home (fragments' proposal): Proving in Allegro
 - Notes: `prove_induction` returns an ordinary discharged Proof (`src/primitives.ts:4377`, `makeProof` in `src/types-std.ts:4681` writes `discharged` 1 and no tier); the sampled strength appears only in the proposition text "[verified base + 4 inductive steps]". That seems to fall short of principle 9 (a sampled check must not borrow a stronger vocabulary). `proven` is limited to one Int, NonNeg, PositiveInt or Bool parameter.
-- Chapter: Proofs as values
+- Chapter: Claims and proofs
+
+#### Four strengths, one vocabulary
+- Decides: every claim of the standard language carries one of the four strengths: decided, sampled, assumed, undecided. How a claim was decided is found in its origin.
+- Status: open (the code has three vocabularies); ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Every result says how strongly it holds; Bounded sampling for universal claims; Every value keeps its origin
+- Significance: 3 — one answer to how far a result can be trusted
+- Label: foundational — laws, termination and the report a tool gives
+- Options recorded: six tiers for laws and four for termination (what the code has)
+- Sources: D34, CE-R2, CE-R3 (docs/decisions.md); docs/book/standard/totality.md §1–§2; docs/plans/completion-effects.md §3; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Four-tier discharge spectrum". The mapping: kernel, enumerated, auto and witnessed become decided; sampled stays; admitted becomes assumed; pending and undischarged become undecided.
+- Held finding (2026-11-12, DR4): three strength vocabularies, and a sampled induction reported as discharged (carried over from the Part I review).
+- Chapter: Claims and proofs
 
 #### Tactics as a pure Allegro library
 - Decides: reusable proof strategies (`same`, `flip`, `step`, `chain`, `rewrite`) are a library of plain Allegro over the kernel's combinators, adding no primitive.
 - Status: settled
 - Type: capability — where tactics live is what a prover imports
 - Rationale kind: vision
-- Depends on: Theorems as statements, proved `by` a term; Everything above the kernel is an extension, and there is one way to extend
+- Depends on: A proof term is a proposal; Everything above the kernel is an extension, and there is one way to extend
 - Significance: 2 — shows proof strategy as user-extensible
 - Label: swappable — a library
 - Units: not yet a unit (`lib/tactics.alg`)
 - Options recorded: none recorded
 - Sources: docs/book/proving-in-allegro.md (The tactics library)
 - Book home (fragments' proposal): Proving in Allegro
-- Chapter: Proofs as values
-
-#### One primer for human and machine provers
-- Decides: the proving guide is one participant-neutral document, and the `prove` loop sends that same file to the language model as its primer.
-- Status: settled
-- Type: capability — it decides what a machine prover is told
-- Rationale kind: vision
-- Depends on: Anyone may propose, and the record shows who
-- Significance: 2 — makes the protocol's neutrality literal
-- Label: swappable — the primer is data to the worker
-- Units: not yet a unit (`pcp/llm-worker.ts` has no unit)
-- Options recorded: none recorded
-- Sources: docs/book/proving-in-allegro.md (opening); docs/book/platform/tooling.ir.md C129, C19
-- Book home (fragments' proposal): Proving in Allegro
-- Notes: the worker reads the primer relative to the current working directory (tooling C129).
-- Chapter: Proofs as values
-
-#### One proof-term contract for human and machine provers
-- Decides: humans and LLM provers supply the same proof terms: an LLM prover answers with a fenced `allegro` block holding only the term, which the worker splices into the theorem's `by` slot and re-verifies through `evalSource`, keeping it only when the theorem discharges, for at most `--max-attempts` attempts (five by default); the kernel accepts or rejects every term alike.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Proofs are values discharged by evaluation; One primer for human and machine provers; Theorems as statements, proved `by` a term
-- Significance: 2 — the machine interface of the loop
-- Label: swappable — the worker is replaceable behind the obligation and verdict schemas
-- Units: pcp; not yet a unit (`pcp/llm-worker.ts`)
-- Options recorded: none recorded
-- Sources: docs/book/proving-in-allegro.md "Output contract for an LLM prover"; vision.md §1–§2 (not read here); docs/book/proving-in-allegro.md (Output contract for an LLM prover); docs/book/platform/tooling.ir.md C123 to C136
-- Book home (fragments' proposal): proposed standard/pcp (planned `pcp.md`) / Proving in Allegro / Tooling
-- Notes: Merged from fragment B ("Participant-neutral proof terms"), fragment C ("Proof-term output contract for an LLM prover"). C: with an API key set, `prove` fails on any file with a `use` header (tooling C133 to C135, R4). Significance calibrated from 3/2.
-- Chapter: Proofs as values
+- Chapter: Claims and proofs
 
 ### Equality and laws
 
 #### Lawful interfaces
-- Decides: any member set may carry `law_`-prefixed members whose `for_all` propositions are schemas at declaration and become one pending Obligation per law when a type draws the set; laws attach to scopes because a law may reference several members.
-- Status: settled
+- Decides: any member set may carry laws: members whose propositions over all values are schemas at declaration, and become one claim per law when a type draws the set. Until decided, each is undecided. Laws attach to the set because a law may reference several members.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
-- Depends on: Members are keyed by symbol and conformance is membership; Proofs are values discharged by evaluation
+- Depends on: Members are keyed by symbol and conformance is membership; A claim about every value is decided by evaluating it with the value unknown
 - Significance: 4 — the mechanism that makes "lawful" checkable
 - Label: foundational — equality, units laws and the strict gate
 - Units: equality-laws, proofs
@@ -2312,9 +2337,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: confirmed `Coercion.declare` in `src/types-std.ts:1981`.
 - Chapter: Equality and laws
 
-#### Kernel structural equality is the default
-- Decides: every structure-backed type gets a kernel `equals` (same shape, then field-wise or element-wise protocol equality), proven lawful once parametrically; a user override bears the three law obligations; None and Error keep identity semantics, and Bool is not equal to Int.
-- Status: settled
+#### Default equality belongs to the standard extension
+- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Its laws are decided once for all types. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
 - Depends on: Equality dispatches on shape, then coerces, else not-equal
@@ -2324,14 +2349,15 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: declaring a Bool→Int coercion (recommended against: Bool is not a number)
 - Sources: E-R1 (docs/plans/equality-and-laws.md §3, §6 items 1–2, 7–8)
 - Book home (fragments' proposal): proposed "Equality and laws"
+- Notes (2026-11-12, DR4): was "Kernel structural equality is the default"; the kernel has no part in equality beyond telling bits apart.
 - Chapter: Equality and laws
 
-#### Law discharge tiers and the first strict gate
-- Decides: law obligations discharge at a recorded tier (kernel, enumerated, witnessed, sampled, admitted via `Law.assume`, pending), proofs record the equality and tier they rest on, and `proof_trans` refuses a custom equality whose transitivity is neither proven nor admitted.
-- Status: settled
+#### Law strengths and the transitivity gate
+- Decides: each law claim carries one of the four strengths, and a proof records the equality and the strength it rests on. The transitivity rule refuses a custom equality whose transitivity is neither decided nor assumed.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Lawful interfaces; Every result says how strongly it holds
+- Depends on: Lawful interfaces; Four strengths, one vocabulary; A proof term is a proposal
 - Significance: 3 — "no boolean verified anywhere"
 - Label: swappable — tier policy and gate list
 - Units: equality-laws, proofs
@@ -2343,229 +2369,128 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### Effects
 
-#### Effects are values in one lattice
-- Decides: effects are values of kind `Effect`, composed by conjunction with the dedicated `&` operator, with `pure` (bottom) and `opaque` (top) fixed in the core and all other labels defined by libraries; lattice operations are typed methods.
-- Status: partly built
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Kinds are types, and Type is its own type; Metadata is a field on every value
-- Significance: 4 — effect tracking reuses value, type and member machinery
-- Label: foundational — effect polymorphism, `div`, `sched`, `unsafe`
-- Units: effects, type-core
-- Options recorded: a parallel effect namespace or flat string labels (the degenerate case); `&&` for conjunction (superseded by `&`); a separate effect-set data type (rejected)
-- Sources: docs/book/standard/effects.md §1–§3; docs/book/concepts.md §40; archive harmonic-grounding-tarski.md "Settled architectural commitments"
-- Book home (fragments' proposal): standard/effects
-- Notes: the code represents an effect set as `Set<string>` (`src/effects.ts:41`) merged by union, while effects.md says "there is no separate effect-set data type". Anonymous conjunctions are not built; non-trivial unions coerce to `opaque` (interim).
-- Chapter: Effects
-
-#### Effect inference is driven by partial evaluation, and a declaration is a contract
-- Decides: effects are inferred automatically through PE propagation (no separate walker); an `effects` declaration is optional and verified, never trusted, and an inferred effect the declaration does not admit halts compilation.
-- Status: settled
-- Type: capability
-- Rationale kind: vision
-- Depends on: Effects are values in one lattice; One operation: partial evaluation
-- Significance: 4 — the falsifiable "one engine" claim applied to effects
-- Label: foundational — totality, purity gates and the halt rule
-- Units: effects, pipeline
-- Options recorded: a standalone effect walker (deleted); declarations as hints (rejected)
-- Sources: CE-R1 (docs/decisions.md); docs/book/standard/effects.md §1 item 3, §2 "Declaration surfaces", §6 (applyComposed hypothesis resolved); docs/book/concepts.md §41
-- Book home (fragments' proposal): standard/effects
-- Notes: the inferred set rides the host plane (B-107).
-- Chapter: Effects
-
-#### Parameter effect bounds and explicit effect variables
-- Decides: a parameter's effect bound is written in the type slot (`f: pure`) or a `param_effects` body form and discharged at call sites; effect polymorphism needs an explicit `[e: Effect]`, and an unannotated function-typed parameter is `opaque`.
-- Status: settled
+#### An effect is the use of a capability
+- Decides: what a function may do is read from the capabilities it holds: those it is given and those in its body. A function that holds none is pure. A function that takes a function can do what its own capabilities and its argument's allow. An operation the platform cannot analyse is a capability a configuration supplies.
+- Status: open (the code infers sets of effect labels and checks them in a pass of its own); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract; Generics are memoized type constructors
-- Significance: 3 — precise effects through higher-order code
-- Label: swappable — surface and binding rules
-- Units: effects, generics
-- Options recorded: auto-promoting each unannotated parameter to a fresh effect variable (the D1 plan; rejected: a bare lowercase name would silently capture a binding)
-- Sources: docs/book/standard/effects.md §2 "Declaration surfaces"; archive harmonic-grounding-tarski.md "Effect polymorphism"
-- Book home (fragments' proposal): standard/effects
-- Chapter: Effects
-
-#### Effects describe computations, refinements describe data
-- Decides: effects ride their own metadata field and parameter effect bounds use `Param.effectBound`; refinement predicate sets stay a separate lattice.
-- Status: settled
-- Type: implementation — where effect and knowledge information is stored
-- Rationale kind: technical
-- Depends on: Effects are values in one lattice; Refinement types
-- Significance: 2 — keeps the two lattices from mixing
-- Label: swappable — storage placement
-- Units: effects, refinements
-- Options recorded: effect bounds in `Param.predicates` (moved out)
-- Sources: docs/book/standard/effects.md §1 item 4; docs/book/standard/type-system.md §8
-- Book home (fragments' proposal): standard/effects
-- Chapter: Effects
-
-#### Labels for observing knowledge and scheduling
-- Decides: observing knowledge or source (`certificate_peek`, `observe`) carries `observe`, and asking whether a value is resolved (`is_resolved`) carries `sched`; blocking reads need no label under PE because reads residualize.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Effects are values in one lattice; A missing value is a cell that is filled once
-- Significance: 2 — quarantines nondeterminism and knowledge-dependence from pure code
-- Label: swappable — label roster
+- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Reading an expression never yields authority; Host code reaches a program only as a capability
+- Significance: 4 — what a piece of code can touch is visible in what it holds
+- Label: foundational — safety claims about any program
 - Units: effects
-- Options recorded: a blocking-read label (rejected)
-- Sources: CE-R4 (docs/decisions.md; docs/plans/completion-effects.md §3); docs/book/standard/effects.md §2–§3; E-R5; D47
-- Book home (fragments' proposal): standard/effects
+- Options recorded: effect labels as values in a lattice, inferred by propagation, with effect variables for polymorphism, `opaque` for the unknown and an `unsafe` hierarchy accepted on the author's word (what the sources design and the code partly builds; dissolved: an effect is a capability call, and capabilities are granted); asking whether a value is resolved yet (`is_resolved`; removed 2026-11-12: no use case, and behaviour that differs by phase can be had by other means)
+- Sources: docs/book/standard/effects.md §1–§3; docs/book/concepts.md §40; archive harmonic-grounding-tarski.md "Settled architectural commitments"; CE-R1 (docs/decisions.md); docs/book/standard/effects.md §1 item 3, §2 "Declaration surfaces", §6 (applyComposed hypothesis resolved); docs/book/concepts.md §41; docs/book/standard/effects.md §4–§5; archive harmonic-grounding-tarski.md "The unsafe hierarchy"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Effects are values in one lattice", "Effect inference is driven by partial evaluation, and a declaration is a contract", "Effects describe computations, refinements describe data", "Labels for observing knowledge and scheduling", "The `unsafe` hierarchy and safe wrappers", "Open effect surfaces" and the effect variables of "Parameter effect bounds and explicit effect variables". A new capability is declared by an extension (Part I). "Redefining primitives and core types is banned" dissolves into Part I's rule that replacing is explicit.
+- Held finding (2026-11-12, DR4): effects are sets of label strings merged by union (`src/effects.ts:41`) and checked by a separate checker (carried over from the Part I review).
+- Held finding (2026-11-12, DR4): `is_resolved` is a primitive (`src/primitives.ts:4676`).
 - Chapter: Effects
 
-#### Redefining primitives and core types is banned
-- Decides: extensions cannot replace primitives or core types, so no "replaces primitive" effect is needed.
-- Status: open
+#### A capability has named parts and narrowed forms
+- Decides: `files.read` is a part of the `files` capability, and reading one path is a narrowed form of `files.read`. Holding a capability means holding its parts; holding a part or a narrowed form gives nothing wider.
+- Status: open; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Effects are values in one lattice
-- Significance: 2 — closes one subversion vector by construction
-- Label: swappable — a loader/extension rule
-- Units: not yet a unit
-- Options recorded: an effect tracking replacement (rejected: the operation does not exist)
-- Sources: docs/book/standard/effects.md §1 item 5, §4
-- Book home (fragments' proposal): standard/effects
-- Notes: tagged [designed]; I found no record of enforcement. Status "open" means designed but unbuilt.
-- Chapter: Effects
-
-#### The `unsafe` hierarchy and safe wrappers
-- Decides: unanalyzable operations sit under `unsafe.*` (memory, executable, codegen, ffi) between specific labels and `opaque`, accepted on author authority; a wrapper may claim a tighter effect, so callers do not inherit `unsafe`.
-- Status: open
-- Type: capability
-- Rationale kind: technical
-- Depends on: Effects are values in one lattice
-- Significance: 2 — the honest boundary for FFI and codegen
-- Label: swappable — library labels plus a wrap mechanism
-- Units: effects
-- Options recorded: wrap mechanics as an `effect_claim` body form, a re-tagging primitive, or a PE-discharged predicate claim (open)
-- Sources: docs/book/standard/effects.md §4–§5; archive harmonic-grounding-tarski.md "The unsafe hierarchy"
-- Book home (fragments' proposal): standard/effects
-- Chapter: Effects
-
-#### Member and parameterized effects
-- Decides: `files.read` is property access on an Effect whose members are Effects, and `files.read_from "X"` is memoized generic application specialized by ordinary PE; prefix paths imply their parents.
-- Status: open
-- Type: capability
-- Rationale kind: technical
-- Depends on: Effects are values in one lattice; Generics are memoized type constructors
-- Significance: 2 — parametric capabilities
-- Label: swappable — effect schema
-- Units: effects
+- Depends on: An effect is the use of a capability; Authority is an unforgeable value
+- Significance: 2 — a bound can be as fine as the task
+- Label: swappable — how capabilities are divided
 - Options recorded: none recorded
-- Sources: docs/book/standard/effects.md §2 (Phase D2, [designed])
-- Book home (fragments' proposal): standard/effects
+- Sources: docs/book/standard/effects.md §2 (Phase D2, [designed]); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Member and parameterized effects".
 - Chapter: Effects
 
-#### Open effect surfaces
-- Decides: open — how new effects are declared (value bindings or an `effect files { … }` form), the module-init effect surface, and a runtime effect-check fallback (`allow | warn | error`).
-- Status: open
+#### A bound on capabilities is written in an `effects` clause or a type slot
+- Decides: a function states its bound with an `effects` clause; a parameter's bound is written in its type slot (`f: pure`). Each stands for the claim Part II defines. A function-typed parameter with no bound makes no claim.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Effects are values in one lattice; Combinators before keyword declaration syntax
-- Significance: 1 — surface choices
-- Label: swappable — surfaces
-- Units: effects, typed-modules
-- Options recorded: value bindings versus keyword form; per-binding notification suppression (project config only)
-- Sources: docs/book/standard/effects.md §6
-- Book home (fragments' proposal): standard/effects
+- Depends on: An effect is the use of a capability; What code may do is bounded by the capabilities it is given, and that bound is a claim; Every notation stands for an expression
+- Significance: 2 — how a bound is written
+- Label: swappable — the notation
+- Options recorded: auto-promoting each unannotated parameter to a fresh effect variable (the D1 plan; rejected: a bare lowercase name would silently capture a binding)
+- Sources: docs/book/standard/effects.md §2 "Declaration surfaces"; archive harmonic-grounding-tarski.md "Effect polymorphism"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces the notation half of "Parameter effect bounds and explicit effect variables".
 - Chapter: Effects
 
-### Contracts and the knowledge they give
+### Contracts
 
 #### A contract is a predicate that becomes knowledge, discharged by PE
-- Decides: `assert`, `requires` and `ensures` attach their predicate to the knowledge set on success, so later checks of the same property are free; there is no separate contract checker, and entailment against available knowledge removes the runtime check.
-- Status: settled
+- Decides: `assert`, `requires` and `ensures` are claims, and a claim that holds becomes knowledge of the value, so a later claim of the same property is decided by what is known. There is no separate contract checker.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
-- Depends on: Shape and knowledge are separate; One operation: partial evaluation
+- Depends on: Shape and knowledge are separate; One operation: partial evaluation; Nothing is a claim until someone makes it
 - Significance: 4 — compile-time and runtime checking are one mechanism
 - Label: foundational — contract discharge, branch refinement and mechanism choice
 - Units: contracts, refinements
 - Options recorded: a standalone contract checker (rejected)
 - Sources: CT-R5 (docs/decisions.md); docs/book/standard/contracts.md §1 items 1–3, §6; docs/book/concepts.md §46
 - Book home (fragments' proposal): standard/contracts
-- Chapter: Contracts and the knowledge they give
+- Notes (2026-11-12, DR4): guidance kept for the chapter, formerly the entry "Choosing among refinement, contract, assert and law": prefer a refinement when the property is intrinsic, a contract when it concerns a function's relation to its callers, `assert` for local knowledge, a theorem or law when the claim is over all inputs.
+- Chapter: Contracts
 
-#### Knowledge has intrinsic and occurrence carriers
-- Decides: intrinsic facts ride the value (refinement certificates, passing checks), occurrence facts live in the scope facts plane, and a check consults their meet; predicate sets are small ordered lists with dedup, opaque to user code.
-- Status: partly built
-- Type: capability — the two carriers decide where knowledge holds; the list form is a realising detail
-- Rationale kind: technical
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; The environment is not a value
-- Significance: 3 — how facts reach a check
-- Label: swappable — carrier representation
-- Units: refinements, contracts
-- Options recorded: v1's standalone `predicates` component (superseded); user-visible predicate-set values (rejected, resolved opaque)
-- Sources: CT-R5, D36 (docs/decisions.md); docs/book/standard/contracts.md §1 items 4–5, §3, §9
-- Book home (fragments' proposal): standard/contracts
-- Notes: the legacy `domain` component is still read (B-101); the facts plane narrows in place rather than through the designed `scope_assume` layering.
-- Chapter: Contracts and the knowledge they give
-
-#### Body-form clauses at the head of a body, lowered through one chain
-- Decides: contracts and analysis declarations (`requires`, `ensures`, `effects`, `decreases`, `total`, `partial`, `assume terminates`, `proven`) are leading statements of a function body, recognised at parse time and lowered as marker primitive, then tree-builder attach, then `collapseBodyMetadata`, then function property; `requires` is hoisted ahead of the body and `ensures` wraps the result as `ensures_check(result, λ_)`, forwarding tail calls.
-- Status: settled
-- Type: capability — the clauses and what they lower to are the surface; the chain's stage names are its form
-- Rationale kind: mixed
-- Depends on: The `grammar { … }` block; Claims are evaluated like everything else; Every production can be extended
-- Significance: 3 — every L2 annotation reaches analysers the same way
-- Label: foundational — totality, effects and contracts analysers read properties
-- Units: tree-builder, contracts; tree-builder, grammar-extension, totality
-- Options recorded: `assert`-at-entry plus a let-binding wrapper (v1, reshaped); an eval-time magic `_` (rejected for a parse-time lambda); bespoke peelers per analyser (forbidden); none recorded for the position; a misplaced `ensures` is a no-op, not an error (the `effects_decl_marker` precedent)
-- Sources: docs/book/standard/contracts.md §2, §9; CE-R3; docs/plans/completion-effects.md §3; CLAUDE.md "Body wrappers" invariant; docs/book/standard/contracts.md §2; docs/book/language-reference.md (discharge spectrum); docs/book/platform/build-pipeline.ir.md C37, C38, C55, C157
-- Book home (fragments' proposal): standard/contracts (or extension/grammar) / Contracts and invariants / Surface syntax of Allegro Standard (proposed)
-- Notes: Merged from fragment B ("Body-form clauses lower through one chain"), fragment C ("Body-form clauses at the head of a function body"). B: `ensures_decl` outside a function body is a deliberate no-op. C: the clauses come from libraries (`use contracts`, `use totality`, `use proven`), so the surface is extension-supplied, not base.
-- Chapter: Contracts and the knowledge they give
-
-#### Branch refinement narrows knowledge per region
-- Decides: an `if` arm narrows knowledge for that arm only from literal comparisons and conjunctions, layered on scope and discarded on exit; `assert` and `requires` narrow the rest of the enclosing scope.
-- Status: partly built
+#### What is known about a value travels with the value
+- Decides: knowledge is a field of the standard extension. Inside a branch, the names tested are rebound to values that carry the extra fact; after `assert` or `requires`, for the rest of the scope. The arms of a pattern match narrow knowledge as the branches of `if` do.
+- Status: partly built (the code keeps a second set of facts on the scope and narrows it in place); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Knowledge has intrinsic and occurrence carriers
-- Significance: 2 — flow-sensitive knowledge
-- Label: swappable — recogniser
-- Units: refinements, contracts
-- Options recorded: relational conditions (`a < b`) narrowing both bindings (designed, B-057)
-- Sources: docs/book/standard/contracts.md §4; B-057
-- Book home (fragments' proposal): standard/contracts
-- Chapter: Contracts and the knowledge they give
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; An extension registers its own fields; the kernel has two; Expression-valued `if then else`; `when / is / then` pattern matching
+- Significance: 4 — a check made once is not made again
+- Label: foundational — contracts, refinements and matches
+- Options recorded: two carriers, the value and a set of facts on the scope (what the code does; dissolved in the Part II review); arms of a pattern match that do not narrow (one source says so, another says they do; ruled 2026-11-12: they narrow)
+- Sources: CT-R5, D36 (docs/decisions.md); docs/book/standard/contracts.md §1 items 4–5, §3, §9; docs/book/standard/contracts.md §4; B-057; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Knowledge has intrinsic and occurrence carriers" and "Branch refinement narrows knowledge per region". Branch knowledge is the case Part II named to prove first.
+- Held finding (2026-11-12, DR4): occurrence facts live on the scope and narrow in place; the legacy `domain` component is still read.
+- Chapter: Contracts
+
+#### A match where no arm matches is a refutation
+- Decides: falling through a pattern match is a wrong program, so a match that can fall through refutes the program, and exhaustiveness needs no analysis of its own. An `else`, a wildcard or a pattern that binds anything covers a match. Where the subject's possible values are not known, the claim is undecided.
+- Status: open (a match that can fall through is reported as information today); ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: `when / is / then` pattern matching; A refutation on a path that may be taken refutes the program; What is known about a value travels with the value
+- Significance: 3 — no case is silently missed
+- Label: foundational — every match
+- Options recorded: a separate analysis reporting at the level of information until a project promotes it (what the code does, by an earlier ruling that reserved the promotion for the maintainer; promoted 2026-11-12)
+- Sources: CE-R8, T-R3 (docs/decisions.md); docs/book/standard/totality.md §4; archive phase-e-totality-plan.md question 2; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Exhaustiveness checking at info severity". A finding carries a witness: a value no arm matches. Closed sums, record destructuring and dead cases under refinements are designed, not built.
+- Held finding (2026-11-12, DR4): exhaustiveness is a privileged host pass that reports at the level of information (carried over from the Part I review).
+- Chapter: Contracts
+
+#### A body clause is a notation
+- Decides: `requires`, `ensures`, a bound on capabilities, `decreases` and `total` are leading statements of a function's body, and each stands for a claim placed in the body.
+- Status: partly built (the clauses exist; they are lowered by host steps); ruled 2026-11-12 (DR4)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The `grammar { … }` block; Every notation stands for an expression; Claims are evaluated like everything else
+- Significance: 3 — every declaration about a function is written the same way
+- Label: swappable — the clauses' notation
+- Options recorded: `assert`-at-entry plus a let-binding wrapper (v1, reshaped); an eval-time magic `_` (rejected for a parse-time lambda); bespoke peelers per analyser (forbidden); none recorded for the position; a misplaced `ensures` is a no-op, not an error (the `effects_decl_marker` precedent)
+- Sources: docs/book/standard/contracts.md §2, §9; CE-R3; docs/plans/completion-effects.md §3; CLAUDE.md "Body wrappers" invariant; docs/book/standard/contracts.md §2; docs/book/language-reference.md (discharge spectrum); docs/book/platform/build-pipeline.ir.md C37, C38, C55, C157; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Body-form clauses at the head of a body, lowered through one chain".
+- Held finding (2026-11-12, DR4): a clause is lowered through a marker primitive, an attach step in the host tree builder and `collapseBodyMetadata` into a function property.
+- Chapter: Contracts
 
 #### Contract checks sit at function entry and return
-- Decides: `requires` checks at function entry and `ensures` at return; per-call-site discharge already happens through PE, and relocating an undischarged check to the call site remains open.
-- Status: partly built
+- Decides: `requires` is claimed on entry and `ensures` on return. Both are part of the body, so each is evaluated wherever a call is evaluated, with what is known there.
+- Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; A body clause is a notation; A call is evaluated by evaluating the function's body
 - Significance: 2 — where residual checks are emitted
 - Label: swappable — codegen placement
 - Units: contracts
 - Options recorded: v1's sink-based relocation to each call site (open, B-057)
 - Sources: CT-R1 (docs/decisions.md); docs/book/standard/contracts.md §6, §10
 - Book home (fragments' proposal): standard/contracts
-- Chapter: Contracts and the knowledge they give
+- Notes (2026-11-12, DR4): the open question of moving a check to the call site dissolves: a call is evaluated by evaluating the body.
+- Chapter: Contracts
 
-#### Choosing among refinement, contract, assert and law
-- Decides: prefer a refinement when the property is intrinsic, a contract when it concerns a function's relation to callers, `assert` for local knowledge, and a theorem or law when the claim is quantified over inputs; formal work concentrates in libraries.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Refinement types; A contract is a predicate that becomes knowledge, discharged by PE; Lawful interfaces
-- Significance: 2 — guidance that ties the mechanisms together
-- Label: swappable — guidance only
-- Units: none
-- Options recorded: none recorded
-- Sources: docs/book/standard/contracts.md §8
-- Book home (fragments' proposal): standard/contracts
-- Chapter: Contracts and the knowledge they give
-
-#### Unification and branch refinement in patterns
-- Decides: open — full unification in pattern mode, and narrowing predicate sets in `when` arms as `if` branches do.
+#### Unification in patterns
+- Decides: open — full unification in pattern mode.
 - Status: open
 - Type: capability
 - Rationale kind: technical
-- Depends on: `when / is / then` pattern matching; Branch refinement narrows knowledge per region
+- Depends on: `when / is / then` pattern matching
 - Significance: 1 — precision of matching
 - Label: swappable — pattern evaluation
 - Units: base-primitives, refinements
@@ -2573,45 +2498,31 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/standard/pattern-matching.md §3
 - Book home (fragments' proposal): standard/pattern-matching
 - Notes: contradiction — pattern-matching.md §3 says `when` arms do not narrow; contracts.md §4 says `when/is/then` arms lift the matched pattern tagged `match-case`, and contracts.md §9 says chunk 2 shipped "with `when/is/then` arms included". One of the two is stale; code not checked.
-- Chapter: Contracts and the knowledge they give
+- Notes (2026-11-12, DR4): the narrowing half is ruled in "What is known about a value travels with the value".
+- Chapter: Contracts
 
 ### Termination and completion
 
-#### Divergence is a computed effect
-- Decides: possible non-termination is the effect `div`, written into inferred sets by the termination analysis before the declaration check, so totality uses the effect calculus with no parallel machinery; no primitive carries it and no handler exists; kernel primitives are axiomatically total.
-- Status: settled
+#### Termination is a claim
+- Decides: that a function terminates is a claim, made by `total` or wholesale by a project. It is decided by a function of the standard extension evaluated over the function's expression. `decreases` offers a measure; `assume terminates` gives the strength assumed; `partial` makes no claim. A function that takes a function terminates if its argument does, and says so.
+- Status: open (the code computes divergence as an effect, in a host pass); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract
-- Significance: 4 — totality becomes one more effect
-- Label: foundational — totality polymorphism, purity gates, `total`
-- Units: totality, effects
-- Options recorded: separate totality machinery (rejected)
-- Sources: D31, CE-R1 (docs/decisions.md); docs/book/standard/totality.md §1 item 1; docs/book/concepts.md §43
-- Book home (fragments' proposal): standard/totality
-- Chapter: Termination and completion
-
-#### Four-tier discharge spectrum
-- Decides: every obligation is recorded per binding at one of auto, witnessed (kernel-checked `decreases`), admitted (`assume terminates` or an unverifiable metric) or undischarged (`partial`), verdict-visible and exported; surface forms `decreases`, `assume terminates`, `partial` and `total` are body forms in `lib/totality.alg`.
-- Status: settled
-- Type: capability
-- Rationale kind: vision
-- Depends on: Divergence is a computed effect; Body-form clauses at the head of a body, lowered through one chain
-- Significance: 4 — "nothing is silently trusted" made operational
-- Label: foundational — laws, verdict, ledger
-- Units: totality, pcp
-- Options recorded: silently trusting unrecognized metrics (the pre-F3 state, rejected)
-- Sources: D34, CE-R2, CE-R3 (docs/decisions.md); docs/book/standard/totality.md §1–§2; docs/plans/completion-effects.md §3
-- Book home (fragments' proposal): standard/totality
-- Notes: `admitted` blocks inherited `div`; `witnessed` transmits it.
+- Depends on: Nothing is a claim until someone makes it; One operation: partial evaluation; A body clause is a notation; Four strengths, one vocabulary
+- Significance: 4 — whether a program finishes is checked like everything else
+- Label: foundational — purity of equality and invariants, completion
+- Options recorded: possible non-termination as an effect, `div`, so that totality reuses the effect calculus (what the code does; rejected: an effect is the use of a capability, and not terminating is not one)
+- Sources: D31, CE-R1 (docs/decisions.md); docs/book/standard/totality.md §1 item 1; docs/book/concepts.md §43; T-R5 (docs/decisions.md; docs/book/standard/totality.md §3, §6, §8); archive phase-e-totality-plan.md question 5; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
+- Notes: replaces "Divergence is a computed effect" and "Totality polymorphism is effect polymorphism", and takes the surface forms of "Four-tier discharge spectrum".
+- Held finding (2026-11-12, DR4): termination is a privileged host pass that writes `div` into inferred effect sets (carried over from the Part I review).
 - Chapter: Termination and completion
 
 #### Completion is totality and liveness
-- Decides: incompleteness has two sources, divergence and blocking external reads; external sources discharge liveness by declared axiom (delay: live; fetch: admitted, ledger-visible), never by inference.
-- Status: settled
+- Decides: a program completes if it terminates and every value it waits for arrives. A capability's supplier declares whether its values arrive (a delay does; a fetch is assumed to), and that is never inferred.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Divergence is a computed effect; A missing value is a cell that is filled once
+- Depends on: Termination is a claim; A missing value is a cell that is filled once; Four strengths, one vocabulary
 - Significance: 3 — frames what "the program completes" means
 - Label: foundational — liveness ledger and `sched`
 - Units: totality, futures
@@ -2620,45 +2531,17 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/totality
 - Chapter: Termination and completion
 
-#### Strict at the contract, informational for undeclared code
-- Decides: discharge accounting is always strict and a declaration (effect set, `total`, an annotation) is strict when it exists, while undeclared code gets info-tier findings; making undeclared code strict is per-project configuration, never a global change.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: Four-tier discharge spectrum
-- Significance: 3 — the severity policy for every analysis
-- Label: foundational — contracts' failure semantics and exhaustiveness severity
-- Units: totality, pipeline
-- Options recorded: (a) strict by default, (b) opt-in `total`, (c) notify by default — v1 chose (c), D34 said strict; T-R1 composes them
-- Sources: T-R1, T-R3 (docs/decisions.md; docs/book/standard/totality.md §5, §8); archive phase-e-totality-plan.md "Design questions" 1
-- Book home (fragments' proposal): standard/totality
-- Chapter: Termination and completion
-
 #### Termination by bounded decrease
 - Decides: a recursive call decreases when an argument is `param - K` (literal K > 0) and the callee's parameter type has a non-negative lower bound read from refinement domains; a detected decrease on an untyped parameter stays silent.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Abstract domains as sound approximations; Divergence is a computed effect
+- Depends on: Abstract domains as sound approximations; Termination is a claim
 - Significance: 3 — automatic termination proof over refined types
 - Label: swappable — analyzer criterion
 - Units: totality
 - Options recorded: always requiring `decreases`/`partial`; auto-detect structural with everything else `partial`; sized types (rejected for abstract domains)
 - Sources: docs/book/standard/totality.md §1 item 5, §3, §6; archive phase-e-totality-plan.md questions 3–4
-- Book home (fragments' proposal): standard/totality
-- Chapter: Termination and completion
-
-#### Project severity configuration
-- Decides: open in shape — one per-project surface for `total`-by-default, per-notification promotion, blanket axiom patterns, and the construction-failure and exhaustiveness severity knobs (absorbing v1's `--strict`).
-- Status: open
-- Type: capability
-- Rationale kind: technical
-- Depends on: Strict at the contract, informational for undeclared code
-- Significance: 2 — the relief valve for strictness
-- Label: swappable — configuration surface
-- Units: not yet a unit
-- Options recorded: a manifest read at session start versus a body form; a global `--strict` flag (discarded)
-- Sources: T-R2 (docs/decisions.md); CT-R2; docs/book/standard/totality.md §5, §7; B-099
 - Book home (fragments' proposal): standard/totality
 - Chapter: Termination and completion
 
@@ -2676,57 +2559,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/totality
 - Chapter: Termination and completion
 
-#### Totality polymorphism is effect polymorphism
-- Decides: callback divergence propagates through effect propagation and effect variables; no `[t: Totality]` marker system exists, and a narrow stdlib-HOF structural check remains as a precision aid.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Divergence is a computed effect; Parameter effect bounds and explicit effect variables
-- Significance: 2 — avoids a parallel polymorphism
-- Label: swappable — analyzer precision aid
-- Units: totality
-- Options recorded: `[t: Totality]` markers (discarded)
-- Sources: T-R5 (docs/decisions.md; docs/book/standard/totality.md §3, §6, §8); archive phase-e-totality-plan.md question 5
-- Book home (fragments' proposal): standard/totality
-- Chapter: Termination and completion
-
-#### Exhaustiveness checking at info severity
-- Decides: each `when` chain is analysed; `else`, wildcard or a bind-anything pattern covers it, Bool coverage is checked with a witness, unknown subject types stay silent, and findings are info until project configuration promotes them.
-- Status: partly built
-- Type: capability
-- Rationale kind: technical
-- Depends on: `when / is / then` pattern matching; Strict at the contract, informational for undeclared code
-- Significance: 2 — coverage of matches
-- Label: swappable — analyzer
-- Units: totality
-- Options recorded: always demanding `else` (rejected: statically covered finite domains need neither); halting on non-exhaustive finite matches (a maintainer decision, not taken)
-- Sources: CE-R8, T-R3 (docs/decisions.md); docs/book/standard/totality.md §4; archive phase-e-totality-plan.md question 2
-- Book home (fragments' proposal): standard/totality
-- Notes: closed sums, record destructuring and refinement-aware dead cases are designed, not built.
-- Chapter: Termination and completion
-
 ### When a check fails
 
-#### Statement contracts halt, construction failure is an error value
-- Decides: a false `assert`, `requires` or `ensures` halts compilation, while a failed refinement check at construction or `assert_invariant` yields an error value in the error channel; promoting either path is a maintainer decision through project configuration.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: A failure a program can handle is supplied by an extension; Strict at the contract, informational for undeclared code
-- Significance: 3 — failure semantics of all contract forms
-- Label: foundational — the halt invariant cited across the project
-- Units: contracts
-- Options recorded: a warning tier for `assert` (v1, rejected); a global `--strict` flag (discarded)
-- Sources: CT-R2, CE-R8 (docs/decisions.md); docs/book/standard/contracts.md §6–§7
-- Book home (fragments' proposal): standard/contracts
-- Chapter: When a check fails
-
-#### Mechanical purity gates
-- Decides: an `equals` or coercion implementation, and a value-inspecting invariant predicate, must infer an empty effect set, including `observe` and `div`; a violation is a compile error naming the label.
-- Status: settled
+#### Equality, coercion and invariant predicates hold no capability and terminate
+- Decides: the implementation of an equality or a coercion, and an invariant predicate that inspects its value, hold no capability and carry a termination claim. A violation is a refutation that names what was held.
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Effect inference is driven by partial evaluation, and a declaration is a contract; Divergence is a computed effect
+- Depends on: An effect is the use of a capability; Termination is a claim
 - Significance: 2 — keeps equality knowledge-independent and guards from hanging
 - Label: swappable — a consumer of inferred effects
 - Units: equality-laws, contracts
@@ -2735,26 +2575,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): proposed "Equality and laws"
 - Chapter: When a check fails
 
-#### The triggered construction guard
-- Decides: a refinement constructor checks its predicate on the built value; an unresolved check residualizes construction itself, a prior error propagates untouched, and only opaque (value-inspecting) predicates pay the div-freedom gate.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Invariants are refinements; A failure a program can handle is supplied by an extension; Mechanical purity gates
-- Significance: 3 — an instance never exists tagged valid before its invariant holds
-- Label: swappable — the mint's guard
-- Units: refinements, type-core
-- Options recorded: tagging construction valid under an unresolved predicate (the pre-CE-R8 bug)
-- Sources: D32, CE-R8 (docs/decisions.md; docs/plans/completion-effects.md §3); docs/book/standard/contracts.md §5
-- Book home (fragments' proposal): standard/contracts
-- Chapter: When a check fails
-
-#### `assume` is the admitted tier, and the silent assume is retired
-- Decides: trust boundaries are recorded, ledger-visible admissions (`Law.assume`, `assume terminates`, a future `assumes` form); `assume_invariant`, which attaches a fact without recording it, is retired.
-- Status: partly built
+#### An assumption is always on the record
+- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired.
+- Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
-- Depends on: Four-tier discharge spectrum
+- Depends on: Four strengths, one vocabulary
 - Significance: 2 — removes the one silent trust path
 - Label: swappable — one primitive and one surface form
 - Units: contracts
@@ -2769,7 +2595,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Abstract domains as sound approximations; Termination by bounded decrease
+- Depends on: Abstract domains as sound approximations; Termination by bounded decrease; A refutation marks everything computed from it
 - Significance: 2 — diagnostics speak the program's terms
 - Label: swappable — rendering
 - Units: totality, contracts, refinements
@@ -2779,56 +2605,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: call-site origin and known facts in messages do not ship (B-057); `false || error "…"` does not pass the error value through. Related: "A refinement predicate explains its own refusal" (Plans as outcome graphs) is the kernel channel this entry's predicate-message clause rests on.
 - Chapter: When a check fails
 
-#### The verdict as accumulated metadata
-- Decides: open — the verdict should be the top-level value's accumulated metadata (each channel defining its accumulation), replacing `buildVerdict`'s out-of-band walk of top-level bindings.
-- Status: open
-- Type: implementation — how the verdict is computed; what it reports is "Every result says how strongly it holds"
-- Rationale kind: technical
-- Depends on: Four-tier discharge spectrum; An extension registers its own fields; the kernel has two
-- Significance: 2 — how obligations reach the verdict
-- Label: swappable — verdict assembly
-- Units: pcp
-- Options recorded: a requirement-level gap (candidate R15, withdrawn)
-- Sources: docs/book/concepts.md §45; B-117
-- Book home (fragments' proposal): proposed standard/pcp
-- Chapter: When a check fails
-
-#### Contracts in the verdict and the ledger
-- Decides: open — undischarged contracts should reach the verdict and assumption ledger; contracts reach only `inspect` today.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Every result says how strongly it holds
-- Significance: 2 — closes a "silently trusted" gap
-- Label: swappable — verdict assembly
-- Units: contracts, pcp
-- Options recorded: a new case in `buildVerdict` versus a contracts field with `union` propagation (concepts §45)
-- Sources: CT-R6 (docs/decisions.md); docs/book/standard/contracts.md §7; docs/book/concepts.md §45–§46; B-057, B-117
-- Book home (fragments' proposal): standard/contracts
-- Chapter: When a check fails
-
 ### Units of measure
-
-#### Rung 2 domain: units of measure over state machines
-- Decides: rung 2's provable DSL is units-of-measure physics, chosen over state machines for the bridge to rung 3 and the mixed-model trajectory, built as a library with zero host code.
-- Status: settled
-- Type: capability — it decides which domain the thesis is shown in
-- Rationale kind: mixed
-- Depends on: A language inherits every check of what it is built on
-- Significance: 3 — fixes the seriousness proof and the rung-3 measures
-- Label: swappable — another domain would replace one library
-- Units: not yet a unit (`lib/units.alg`)
-- Options recorded: state machines (reachability and deadlock obligations; event-driven preview)
-- Sources: R-R4; docs/plans/release-track.md §5, §7; docs/book/demo-ladder.ir.md C26, C28, C65 to C67
-- Book home (fragments' proposal): The demo ladder and the rung-3 pilot / Rung 2: the units DSL (proposed chapter)
-- Chapter: Units of measure
 
 #### Dimensions as data, named dimensions as refinements over one Quantity
 - Decides: a dimension is structural data (the full seven-vector of SI base dimensions) and each named dimension is a refinement over one `Quantity` record, so dimensional soundness is refinement discharge, with a mechanics-focused shipped unit set.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Refinement types; Kernel structural equality is the default; A module is an extension that arrives as a file; Rung 2 domain: units of measure over state machines; Correctness and safety are one kind of claim
+- Depends on: Refinement types; Default equality belongs to the standard extension; A module is an extension that arrives as a file; A language inherits every check of what it is built on; Correctness and safety are one kind of claim
 - Significance: 3 — the demonstration that a domain check needs no new machinery
 - Label: swappable — a library over the kernel
 - Units: not yet a unit
@@ -2839,11 +2623,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Units of measure
 
 #### Quantity laws at honest tiers
-- Decides: the quantity laws are shown at their real tiers (sampled, admitted, pending), loudly, rather than restricting the demo to laws the kernel discharges.
+- Decides: the quantity laws are shown at their real strengths (sampled, assumed, undecided), loudly, rather than restricting the demonstration to laws that are decided.
 - Status: settled
 - Type: capability
 - Rationale kind: vision
-- Depends on: Law discharge tiers and the first strict gate; Every result says how strongly it holds; Dimensions as data, named dimensions as refinements over one Quantity
+- Depends on: Law strengths and the transitivity gate; Every result says how strongly it holds; Dimensions as data, named dimensions as refinements over one Quantity
 - Significance: 2 — principle 9 applied to a demo
 - Label: swappable — library policy
 - Units: not yet a unit
@@ -3172,7 +2956,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — where the bound is computed; the answer is the same
 - Rationale kind: technical
-- Depends on: Completion from a catalog; Proofs are values discharged by evaluation
+- Depends on: Completion from a catalog; A claim about every value is decided by evaluating it with the value unknown
 - Significance: 3 — where Vivace search sits relative to the falsifiable constraint
 - Label: swappable — the search can move to the kernel later
 - Units: not yet a unit
@@ -3289,7 +3073,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: implementation — a cutoff for a precompile performance pathology
 - Rationale kind: technical
-- Depends on: A call is evaluated by evaluating the function's body; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
+- Depends on: A call is evaluated by evaluating the function's body; Definition and memo entries in the precompile context; Termination is a claim; Mutual recursion requires every edge to decrease
 - Significance: 3 — without it precompile unfolds recursion until the stack overflows
 - Label: swappable — one injected predicate
 - Units: evaluator, pipeline; pipeline, evaluator; totality, pipeline
@@ -3345,6 +3129,38 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The build pipeline
 
 ### Tools over the pipeline
+
+#### One primer for human and machine provers
+- Decides: the proving guide is one participant-neutral document, and the `prove` loop sends that same file to the language model as its primer.
+- Status: settled
+- Type: capability — it decides what a machine prover is told
+- Rationale kind: vision
+- Depends on: Anyone may propose, and the record shows who
+- Significance: 2 — makes the protocol's neutrality literal
+- Label: swappable — the primer is data to the worker
+- Units: not yet a unit (`pcp/llm-worker.ts` has no unit)
+- Options recorded: none recorded
+- Sources: docs/book/proving-in-allegro.md (opening); docs/book/platform/tooling.ir.md C129, C19
+- Book home (fragments' proposal): Proving in Allegro
+- Notes: the worker reads the primer relative to the current working directory (tooling C129).
+- Notes (2026-11-12, DR4): moved from Part IV: it is a decision about a tool.
+- Chapter: Tools over the pipeline
+
+#### One proof-term contract for human and machine provers
+- Decides: humans and LLM provers supply the same proof terms: an LLM prover answers with a fenced `allegro` block holding only the term, which the worker splices into the theorem's `by` slot and re-verifies through `evalSource`, keeping it only when the theorem discharges, for at most `--max-attempts` attempts (five by default); the kernel accepts or rejects every term alike.
+- Status: settled
+- Type: capability
+- Rationale kind: mixed
+- Depends on: A claim about every value is decided by evaluating it with the value unknown; One primer for human and machine provers; A proof term is a proposal
+- Significance: 2 — the machine interface of the loop
+- Label: swappable — the worker is replaceable behind the obligation and verdict schemas
+- Units: pcp; not yet a unit (`pcp/llm-worker.ts`)
+- Options recorded: none recorded
+- Sources: docs/book/proving-in-allegro.md "Output contract for an LLM prover"; vision.md §1–§2 (not read here); docs/book/proving-in-allegro.md (Output contract for an LLM prover); docs/book/platform/tooling.ir.md C123 to C136
+- Book home (fragments' proposal): proposed standard/pcp (planned `pcp.md`) / Proving in Allegro / Tooling
+- Notes: Merged from fragment B ("Participant-neutral proof terms"), fragment C ("Proof-term output contract for an LLM prover"). C: with an API key set, `prove` fails on any file with a `use` header (tooling C133 to C135, R4). Significance calibrated from 3/2.
+- Notes (2026-11-12, DR4): moved from Part IV: it is a decision about a tool.
+- Chapter: Tools over the pipeline
 
 #### Inspect reports only what the pipeline computed
 - Decides: `inspect` adds no analysis of its own: each binding summary (type, refinements, contract, declared and inferred effects, totality notices, proof backings, promotion hints) is read from what parsing, resolution, precompile and evaluation already computed.
@@ -3453,12 +3269,28 @@ They came together over years of exploration into most of what Allegro is today.
 
 ### Hosts: the terminal and the browser
 
+#### The platform's default configuration is the standard language
+- Decides: every entry of the platform (file runner, prompt, subcommands, sandbox) starts, unless told otherwise, with the configuration that is the standard language. A configuration with no extension is the bare kernel.
+- Status: settled
+- Type: capability
+- Rationale kind: mixed
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+- Significance: 2 — which language a user meets
+- Label: swappable — a host default
+- Units: cli
+- Options recorded: none recorded
+- Sources: docs/book/platform/tooling.ir.md C29 to C31; docs/book/platform/host.ir.md C69, C72; docs/book/vision.md §1 ("In normal use, 'Allegro' means this tier")
+- Book home (fragments' proposal): Tooling
+- Notes: `prove` ignores `--base` (tooling C31); the sandbox creates a future manager under Allegretto while the CLI does not (host C58, C72).
+- Notes (2026-11-12, DR4): moved from Part IV and renamed from "Allegro Standard by default, Allegretto by flag"; a mode and a flag are not concepts.
+- Chapter: Hosts: the terminal and the browser
+
 #### Environment capabilities outside the base, effect-labelled
 - Decides: `print`, `fetch` and `delay` are environment-provided capabilities, not base primitives, each carrying an effect label (`io`, `net`, `time`), with the relocation of every non-base primitive out of the base registry as future work.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
-- Depends on: The kernel's primitives are pure and few; Effect inference is driven by partial evaluation, and a declaration is a contract
+- Depends on: The kernel's primitives are pure and few; An effect is the use of a capability
 - Significance: 3 — makes I/O visible to the effect system
 - Label: swappable — the host can offer a different set
 - Units: not yet a unit (T-host track); base-primitives, futures (today; a `host` unit is proposed)
@@ -3503,7 +3335,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — the page-facing API and the library registry; the bundle format is its form
 - Rationale kind: technical
-- Depends on: Allegro Standard by default, Allegretto by flag
+- Depends on: The platform's default configuration is the standard language
 - Significance: 3 — the public sandbox and the maintainer's primary sandbox
 - Label: swappable — `web/allegro-web.ts`, outside the unit DAG
 - Units: none (no file of `web/` is mapped)
@@ -3533,7 +3365,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Asynchronous host results arrive as future cells; Four-tier discharge spectrum; Completion is totality and liveness
+- Depends on: Asynchronous host results arrive as future cells; Four strengths, one vocabulary; Completion is totality and liveness
 - Significance: 2 — how the ledger records I/O assumptions
 - Label: swappable — per-capability declarations
 - Units: base-primitives, pcp

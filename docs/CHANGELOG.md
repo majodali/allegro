@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-12 — Part IV's decisions ruled.** The standard language's
+  decisions in `docs/plans/book-pass-inventory.md` are ruled: 66
+  decisions in eleven chapters. Every check of the language is a
+  claim, and nothing is a claim until someone makes it; an effect is
+  the use of a capability; termination is a claim; a private member is
+  one whose key not all code holds, and access rules are claims about
+  where an access was written; knowledge travels with the value; the
+  proof rules are functions of the standard extension; one vocabulary
+  of four strengths. A match that can fall through and a failed
+  construction become refutations. Part II gains "Reading an
+  expression never yields authority". Where the code differs, the
+  difference is a held finding on its decision. No code changed.
+  Record: `docs/records/book-pass/dr4-part-4-the-standard-language.md`.
 - **2026-11-12 — Part III's decisions ruled.** The decisions on syntax
   and modules in `docs/plans/book-pass-inventory.md` are ruled: 23
   decisions in four chapters (Parsing; Changing the grammar; The parser
