@@ -105,4 +105,31 @@ No terms introduced.
 
 ## Rulings taken
 
-None yet.
+**Asks 1 to 4, ruled 2026-11-12.**
+
+- Ask 1: "Parsing is evaluation" is correct. The platform ships a
+  bootstrap parser as a capability. It also ships a parser generator
+  and a parser engine written as Allegro functions, so that partial
+  evaluation can work on them. The maintainer: "There's nothing
+  privileged about the bootstrap parser we provide"; a platform may
+  load more than one parser module, or use another bootstrap parser.
+- Ask 2: the first grammar arrives in a built package: a parser
+  generator, its engine, and a set of grammars as input data. The
+  maintainer: extensions that build Allegro expressions directly were
+  not discussed before and should be allowed, to make bootstrapping
+  efficient.
+- Where a parsed expression came from in its text is recorded outside
+  the kernel. The maintainer: "Source attachment is not a promise the
+  kernel needs to know about." The parser module provides the parser
+  function and the registered writer of its own field; the parse tree
+  stays internal to the parser.
+- Ask 3: a module is an extension, with the same interface. The kinds
+  of artifact differ for the bootstrapping reason: the kernel's
+  mechanism is as simple as possible and more sophisticated mechanisms
+  are loaded as extensions. A grammar definition is a value to the
+  kernel, not a third kind of extension item. The module loader is an
+  extension, and it handles grammar definitions and the `use`
+  declaration.
+- Ask 4: two cases are foundational: importing value bindings, and
+  importing a grammar for immediate use in parsing the current text.
+  The choice of keywords is implementation only.
