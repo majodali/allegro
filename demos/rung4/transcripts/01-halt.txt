@@ -1,0 +1,12 @@
+$ # 01-loop.alg with the open plan declared by the strict form,
+$ # `plan Fulfil:` in place of `plan Fulfil from yard:`:
+$ allegro demos/rung4/01-loop.alg
+
+Error in demos/rung4/01-loop.alg: Type error: refinement predicate failed for WellFormedPlan: Fulfil is not well-formed: outcome Delivered of Fulfil is declared but no node produces it; outcome Packed of Pack is neither consumed by a node of Fulfil nor declared as its outcome
+
+# The build halts. `plan Fulfil:` declares the name as a WellFormedPlan,
+# and a plan with a hole is not one: the hole is a halt, every command
+# stops, and no proposer can be asked. `plan Fulfil from yard:` binds the
+# same plan with its catalog and without the annotation, so the hole is
+# the open plan's obligation, which `allegro obligations` lists and the
+# loop answers; the solved plan is checked as a WellFormedPlan then.
