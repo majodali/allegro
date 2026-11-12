@@ -1926,4 +1926,21 @@ R7 and R8 at their rows' time.
     C107 stays: it is still true. The chapter's §7 says the ledger names
     a fixture's promise, and its §9 the chunk;
     `docs/book/proving-in-allegro.md` gains one sentence beside the
-    ledger's admitted laws. The oracle lines are in L5's PR.
+    ledger's admitted laws.
+  - **The oracle lines**, on this branch:
+
+    ```
+    bash scripts/typecheck.sh                       typecheck clean (9 TS6059 rootDir-convention diagnostics ignored)
+    ALLEGRO_TEST_FILTER="pcp|planning|obligation|propos|ledger|verdict|inspect|language" npm test
+                                                    Tests: 84 total, 84 passed, 0 failed
+    npm run lint:load                               load lint: counts at or below baseline; 7 sources and 8 precompile sources, parse 0.3 s, check 3.3 s (clock not gated)
+    npm run lint:units                              units-lint: the unit DAG holds at its baseline (docs/book/units.md §8)
+    npm run lint:planes                             plane-lint: the storage plane is reached only through the accessor layer
+    npm run lint:docs:check                         doc-lint: anchors 0 · order 0 · ids 783 — gate passed
+    MTOOL_HOME=… npm run lint:ir                    ir-lint: 7 file(s) via …/methodology-tools: clean (0 violations, 4 warnings, CK-03: C198, C201, C171, C189)
+    npx tsx scripts/doc-ref-lint.ts                 doc-ref-lint: all markdown doc references resolve
+    npm run lint:streams                            stream-plan: 9 plan(s) checked, 0 with findings
+    PR_TITLE="B-187: a solved plan's promises reach the ledger (L5)" npx tsx scripts/analyze/lane-lint.ts --base origin/main
+                                                    lane-lint: lane D (B-187 via docs/plans/planning-loop.md): 11 file(s), 0 outside
+    MTOOL_HOME=… npm run test:shards                Aggregate: 1368 test runs, 1368 passed, 0 failed; GATE: PASSED
+    ```
