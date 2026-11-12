@@ -180,3 +180,20 @@ models relate only through a declared mapping". Units of measure
 moves to Part V with the worked languages. Asks 5 and 7 concern the
 planning pilot and are recorded as known conflicts on the held
 chapters.
+
+**On PR #193, 2026-11-12.** The maintainer reviewed Part V: it looks
+good; the introduction is good and takes a polishing pass later.
+
+- "A solver sees its problem unevaluated": the review's reading is
+  correct and `is_resolved` is not. The wording changes to "an unknown
+  may be represented by an unbound symbol", since different grammars
+  may handle unknowns differently.
+- Confirmed: the move of "A predicate can explain its refusal" to
+  Part IV; the two composition entries absorbed; units of measure in
+  Part V; the chapter titles.
+- The planning-loop stream's use of "admitted" and "discharged" is
+  filed for the orchestrating session as B-194 (one vocabulary of four
+  strengths in the planning loop) in `docs/backlog.md`.
+- The terms model and meta-model are ratified.
+
+Every ask is ruled or, for the planning pilot, held.

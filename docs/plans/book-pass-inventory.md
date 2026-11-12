@@ -84,7 +84,7 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 **Part V: Vivace**
 
-As ruled in DR5 (2026-11-12). The part opens with the introduction "What Vivace is for", which is not a list of decisions. The worked languages are evidence; planning's entries are held, not ruled.
+As ruled in DR5 (2026-11-12), with the chapter titles the maintainer confirmed on PR #193. The part opens with the introduction "What Vivace is for", which is not a list of decisions. The worked languages are evidence; planning's entries are held, not ruled.
 
 25. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
    - Decisions: A model is a value; A transformation is a model; Two models relate only through a declared mapping; A change to a model is a mapping from the old one.
@@ -2705,7 +2705,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Search and optimization
 
 #### A solver sees its problem unevaluated
-- Decides: an unknown is an unbound symbol, and ordinary evaluation of an expression that holds one gives a residual. A solver takes its problem unevaluated, evaluates what it chooses, and reads the result: which parts are resolved and which are not. Vivace supplies functions that return the two.
+- Decides: an unknown may be represented by an unbound symbol, and ordinary evaluation of an expression that holds one gives a residual. A solver takes its problem unevaluated, evaluates what it chooses, and reads the result: which parts are resolved and which are not. Vivace supplies functions that return the two.
 - Status: open, a design to prove; ruled 2026-11-12 (DR5)
 - Type: capability
 - Rationale kind: technical
@@ -2714,7 +2714,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Label: foundational — search and optimization written in Allegro, open to partial evaluation
 - Options recorded: a primitive that asks of any value whether it is resolved (`is_resolved`, removed in the Part IV review: it makes any function's behaviour depend on the phase; here only a function that declares an unevaluated argument sees a residual, and it sees it by reading an expression)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
-- Notes: new, by ruling. The maintainer: unknowns may be represented by unbound symbols, and normal evaluation turns those, and hence a solver function, into a residual; solver functions can take unevaluated arguments, "but this may be a use case for something akin to `is_resolved`"; "Vivace should provide functions that parse expressions and return resolved and unresolved parts." The review's reading: reading the residual of an expression the solver evaluated itself gives what `is_resolved` would, so the removal stands; to confirm as the design is proved. A second use case for unevaluated arguments, after `if` with knowledge in its branches. A candidate is tried by evaluating the problem with the unknown's name rebound, a kernel primitive.
+- Notes: new, by ruling. The maintainer: unknowns may be represented by unbound symbols, and normal evaluation turns those, and hence a solver function, into a residual; solver functions can take unevaluated arguments, "but this may be a use case for something akin to `is_resolved`"; "Vivace should provide functions that parse expressions and return resolved and unresolved parts." The maintainer confirmed on PR #193: reading the residual of an expression the solver evaluated itself is correct, and `is_resolved` is not; different grammars may handle unknowns differently, so an unbound symbol is one representation. A second use case for unevaluated arguments, after `if` with knowledge in its branches. A candidate is tried by evaluating the problem with the unknown's name rebound, a kernel primitive.
 - Chapter: Search and optimization
 
 #### Feasible is decided; best says how strongly it holds
