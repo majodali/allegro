@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-12 — Part III's decisions ruled.** The decisions on syntax
+  and modules in `docs/plans/book-pass-inventory.md` are ruled: 23
+  decisions in four chapters (Parsing; Changing the grammar; The parser
+  engine; Modules and programs). Parsing is evaluation; a grammar is a
+  value and every notation stands for an expression; no parser is
+  privileged; a text can change the grammar it is read in, with no scan
+  ahead of the parse; ambiguity is a claim; grammars combine without
+  regard to order; a module is an extension that arrives as a file;
+  every program is evaluated the same way, however it arrives. Part II
+  gains "What the kernel requires of an extension". Where the code
+  differs, the difference is a held finding on its decision. No code
+  changed. Record:
+  `docs/records/book-pass/dr3-part-3-syntax-and-modules.md`.
 - **2026-11-11 — Part II's decisions ruled.** The kernel's decisions in
   `docs/plans/book-pass-inventory.md` are ruled: 49 decisions in seven
   chapters. An extension is made of functions and metadata fields, with
