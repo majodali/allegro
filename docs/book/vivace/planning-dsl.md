@@ -599,7 +599,10 @@ readings were settled on the way, both by the worked example:
   promises nothing. The promise is established when the outcome is
   produced (Shape 2). A fixture on an **input**, by contrast, is a
   requirement: its producer must carry the same fixture, or the edge is
-  incompatible.
+  incompatible. Since chunk L5 of B-187 (the planning loop, the next
+  validating demo), `allegro verify` names each fixture of a plan value
+  in the assumption ledger as an admitted promise, never discharged
+  (`plan_ledger` in `lib/planning_loop.alg`).
 - **Every node outcome is consumed or declared.** An outcome a sibling
   does not consume and the scope does not declare is reported; the
   example has none, and a plan that wants a side outcome declares it.
@@ -857,8 +860,15 @@ timeout and the loop goes on; `allegro prove --transcript FILE.md`
 records a run turn by turn, and `demos/rung4/transcripts/` holds the
 first, the scripted loop on `tests/planning-loop-proposals.alg`;
 `allegro prove --proposer claude-code` runs the loop through Claude
-Code's scripted mode on a Claude subscription. The
-ledger entries are the stream's later chunks.
+Code's scripted mode on a Claude subscription. Chunk L5 brought the
+plan values to the verdict: `plan_ledger` in `lib/planning_loop.alg`
+answers, for a plan, a solution or a solved open plan, its
+well-formedness check, its fixtures as promises, and a solution's bound,
+decisions and catalog entries with their authors; `allegro verify` lists
+the fixtures in the assumption ledger as admitted promises ("rests on 6
+admitted" on `demos/rung3/02-solve.alg`) and the records under `plan
+ledger:`, and `allegro inspect` prints each record's lines under its
+binding.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),

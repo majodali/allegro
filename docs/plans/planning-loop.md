@@ -1456,3 +1456,474 @@ R7 and R8 at their rows' time.
 - **2026-11-12 — L4's A6, the refusal kind `timeout`, the four terms and
   the obligation filter's default (none in this stream) ratified at PR
   #186's merge.**
+- **2026-11-12 — L5 landed.** The ledger (R4 (a)), on `origin/main` at
+  `8a06b0a` (the merge of PR #186). No stop of the brief's list; one
+  finding of the engine's, below, which the library works around inside
+  the boundary and which goes to the maintainer as an ask.
+
+  What landed:
+  - **The records** (`lib/planning_loop.alg:190` to `:352`). The query
+    `plan_ledger(name, x, authors, levels)` answers a `PlanLedger` record
+    (`:222`) for a `Plan`, a `Solution` or an `OpenPlan` whose state is
+    "solved", and `none` otherwise. Its fields: `binding`, `kind`
+    ("plan", "solution" or "open plan"), `plan` (the plan's name),
+    `well_formed` ("discharged" when `plan_errors`, the
+    `WellFormedPlan` predicate's findings, has none; "unclaimed" for a
+    plan built without the `plan NAME:` form's annotation that has one,
+    since an annotated one has halted), `well_formed_message`,
+    `promises` (the fixtures' names), `bound`, `decisions`, `entries`
+    (a list of `PlanEntryUse` records, `:220`: `node`, `port`,
+    `author`, `message`), and the renderings `line` (the verdict's) and
+    `lines` (`inspect`'s). A solution's entries are the distinct nodes of
+    its `added` steps, each by "the file" unless `authors` (a list of
+    `{binding, node, author}` records the caller passes) names the open
+    plan and the entry. Every fixture on any port at any depth
+    (declared inputs and outcomes, nodes, options, handlers' nodes, a
+    borrowed plan's ports and nodes) is a promise. Whether a predicate is
+    the trivial `v => true` cannot be told without reading its code,
+    which the language does not offer, so every fixture is reported as a
+    promise, admitted, as R4 (a) allows; a real predicate is worded the
+    same and never discharged.
+  - **The engine finding.** The walk over a plan's ports is a fold over
+    `walk_levels` (32 levels, `:268`), passed by the caller, because
+    three plainer forms do not load. A recursive binding in
+    `lib/planning_loop.alg` beside the functions that call `check_plan`
+    keeps the precompile from finishing: a program holding only `use
+    units`, `use planning`, `f(p) => check_plan(p)` and `cnt(n) => if
+    n == 0 then 0 else cnt(n - 1)` does not finish in 60 s, where either
+    line alone runs in under a second. A function handed to itself and
+    called from a lambda in its body exhausts the host's stack three
+    levels down (`w(self, t) => t.kids.reduce((acc, m) => acc + self(self,
+    m), 1)` over a tree of depth 3). And the fold over a list the library
+    names itself keeps the library's load from finishing in 60 s, where
+    the same fold over a list passed in loads in under a second. The
+    files that own these are `src/runtime.ts` and `src/evaluator.ts`,
+    outside the boundary. A plan nested deeper than 32 levels says so in
+    its record ("…, and the nodes below level 32 not walked").
+  - **The verdict** (`src/pcp.ts`). `Verdict` gains the optional
+    `planLedger` (`:206`), a list of `PlanLedgerRecord` (`:212`):
+    `binding`, `kind`, `plan`, `wellFormed` (`status` "discharged" or
+    "unclaimed", `message`), `promises`, and for a solution `bound`,
+    `decisions` and `entries` (`node`, `port`, `author`), then
+    `message` and `inspect`, the library's renderings; `pcp/1` is
+    unchanged, and the field is absent unless `buildVerdict`'s
+    `planLedger` option supplies records. `buildAssumptionLedger` adds
+    each promise as an admitted entry `promise 'NAME'`, backed by the plan
+    values that carry it (`:680` to `:685`): one entry per fixture, so
+    rung 3's solving demo rests on 6 and not on one per plan.
+    `formatVerdict` prints `plan ledger:` and one line per record after
+    the assumption ledger (`:829` to `:846`), so every existing line,
+    and L2's pinned block from the coercions to the ledger, reads as
+    before. `planLedgerBindings`, `planLedgerSource`, `readPlanLedger`,
+    `collectPlanLedger` and `entryAuthorsFrom` (`:1594` to `:1712`)
+    find the plan values by the registered `type` field, write the one
+    binding `plan_ledger_found = [plan_ledger("B", B, AUTHORS,
+    walk_levels), …]`, read the records back as data, and turn the loop's
+    accepted proposals into authors.
+  - **The CLI** (`src/index.ts`). `pcpPlanLedger` (`:479`) does
+    nothing without a plan value; otherwise it loads
+    `lib/planning_loop.alg` when the scope lacks `plan_ledger` and
+    evaluates the binding over the file's scope, prints silenced and
+    `softFail` set. `verify` passes the records to `buildVerdict`
+    (`:560` to `:561`); `inspect` prints each record's `lines` at the
+    end of its binding's block through `withPlanLines` (`:441`), over
+    `renderModuleSummary`'s text, so `src/introspect.ts` is untouched
+    (deliverable 3 needed no stop). A run of a file never reaches it.
+  - **The tests**, appended to `src/test/pcp.ts`, eight: inside
+    `runH4aAsyncTests` (`:1486` to `:1512`), the scripted loop on L2's
+    demo, after which the solved open plan `Fulfil` lists `Ship for
+    Shipped, by scripted` and the file's own `ship` keeps `by the file`;
+    at `:1863` to `:2001`, `verify` on `demos/rung3/02-solve.alg`
+    (rests on 6 admitted with the six names, every promise admitted, both
+    plans well-formed, the theorem count line and the laws as before),
+    `verify --json`'s `planLedger`, `inspect`'s lines, L2's demo's
+    entries by the file, a fixture `v => v > 0` admitted and never
+    discharged, the ledger's source and its literals, and a file without
+    a plan value (no evaluation asked, the verdict identical, `verify` on
+    `demos/rung1/04-laws.alg` without a plan line). No existing assertion
+    changed; no demo added, so `src/test/language.ts` is unchanged.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (72 files) through the CLI as `run`, `inspect`,
+    `verify`, `obligations` and `propose`, before and after, on stdout,
+    stderr (stats lines stripped) and exit code: 336 runs identical, 24
+    different, all of them `verify` and `inspect` on the twelve files
+    holding a plan value; every `run`, `obligations` and `propose`
+    identical; exit codes and stderr identical everywhere. Every
+    difference adds lines, except the assumption ledger's summary line,
+    which changes on the nine files with a fixture (eight from "rests on 0
+    admitted", one from "clean"). The lines, verbatim ("was:" the line
+    replaced; for `inspect`, the binding they print under):
+
+    ```
+    demos/rung3/01-model.alg, inspect:
+      under BuildPipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under SoftwareRelease : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under unwired : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs
+            rests on: no promises
+      under idle : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs
+            rests on: no promises
+
+    demos/rung3/01-model.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: SoftwareRelease
+          ! admitted promise 'signed_and_version_stamped' — backs: BuildPipeline, SoftwareRelease
+          ! admitted promise 'tagged_with_version' — backs: BuildPipeline, SoftwareRelease
+          ! admitted promise 'traffic_handling_capable' — backs: SoftwareRelease
+          ! admitted promise 'valid_semver' — backs: SoftwareRelease
+          ! admitted promise 'version_matches_release_version' — backs: SoftwareRelease
+        plan ledger: 2/4 well-formed (discharged), 2 not claimed; 6 promise(s) admitted
+          ✓ BuildPipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - unwired: plan Unwired, not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs; rests on no promises
+          - idle: plan Unwired, not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs; rests on no promises
+
+    demos/rung3/02-solve.alg, inspect:
+      under BuildPipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under SoftwareRelease : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under best : Solution:
+            well-formed: discharged (no findings)
+            bound: effort 20.75 person-hours, duration 1460 min, money none
+            decisions: Test via Quick, Deploy via Direct
+            catalog entries: none
+            rests on: 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version
+      under on_time : Solution:
+            well-formed: discharged (no findings)
+            bound: effort 22.5 person-hours, duration 1205 min, money none
+            decisions: Test via Quick, Deploy via BlueGreen
+            catalog entries: none
+            rests on: 5 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, traffic_handling_capable
+      under fulfil : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): outcome Delivered of Fulfil is declared but no node produces it
+            rests on: no promises
+      under last_mile : Plan:
+            well-formed: discharged (no findings)
+            rests on: no promises
+
+    demos/rung3/02-solve.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: SoftwareRelease
+          ! admitted promise 'signed_and_version_stamped' — backs: BuildPipeline, SoftwareRelease, best, on_time
+          ! admitted promise 'tagged_with_version' — backs: BuildPipeline, SoftwareRelease, best, on_time
+          ! admitted promise 'traffic_handling_capable' — backs: SoftwareRelease, on_time
+          ! admitted promise 'valid_semver' — backs: SoftwareRelease, best, on_time
+          ! admitted promise 'version_matches_release_version' — backs: SoftwareRelease, best, on_time
+        plan ledger: 5/6 well-formed (discharged), 1 not claimed; 6 promise(s) admitted
+          ✓ BuildPipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ best: solution of SoftwareRelease, well-formed; bound effort 20.75 person-hours, duration 1460 min, money none; decisions Test via Quick, Deploy via Direct; catalog entries none; rests on 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version
+          ✓ on_time: solution of SoftwareRelease, well-formed; bound effort 22.5 person-hours, duration 1205 min, money none; decisions Test via Quick, Deploy via BlueGreen; catalog entries none; rests on 5 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, traffic_handling_capable
+          - fulfil: plan Fulfil, not claimed well-formed (bound without the `plan` form's check): outcome Delivered of Fulfil is declared but no node produces it; rests on no promises
+          ✓ last_mile: plan LastMile, well-formed; rests on no promises
+
+    tests/planning-budget-demo.alg, inspect:
+      under build_pipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under release : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under ok : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under tight : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): budget of SoftwareRelease: effort 24 person-hours exceeds 8 person-hours
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under rushed : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): budget of Deploy: duration 165 min exceeds 2 h
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under hire : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): budget of Hire: money 1400 USD exceeds 1000 USD
+            rests on: no promises
+
+    tests/planning-budget-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: release, ok, tight, rushed
+          ! admitted promise 'signed_and_version_stamped' — backs: build_pipeline, release, ok, tight, rushed
+          ! admitted promise 'tagged_with_version' — backs: build_pipeline, release, ok, tight, rushed
+          ! admitted promise 'traffic_handling_capable' — backs: release, ok, tight, rushed
+          ! admitted promise 'valid_semver' — backs: release, ok, tight, rushed
+          ! admitted promise 'version_matches_release_version' — backs: release, ok, tight, rushed
+        plan ledger: 3/6 well-formed (discharged), 3 not claimed; 6 promise(s) admitted
+          ✓ build_pipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ release: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ ok: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - tight: plan SoftwareRelease, not claimed well-formed (bound without the `plan` form's check): budget of SoftwareRelease: effort 24 person-hours exceeds 8 person-hours; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - rushed: plan SoftwareRelease, not claimed well-formed (bound without the `plan` form's check): budget of Deploy: duration 165 min exceeds 2 h; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - hire: plan Hire, not claimed well-formed (bound without the `plan` form's check): budget of Hire: money 1400 USD exceeds 1000 USD; rests on no promises
+
+    tests/planning-checks-demo.alg, inspect:
+      under build_pipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under release : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under ok : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under unwired : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs
+            rests on: no promises
+      under cyclic : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): cycle through A, B in Cyclic
+            rests on: no promises
+      under ambiguous : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input Out of C3 is ambiguous: produced by C1 and C2
+            rests on: no promises
+      under unpromised : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts [tagged_with_version] of Sign requires tagged_with_version, but Package provides PackagedArtifacts unconstrained
+            rests on: 1 admitted promise: tagged_with_version
+      under nested : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): outcome ValidatedBuild of Test is declared but no node produces it
+            rests on: no promises
+
+    tests/planning-checks-demo.alg, verify:
+      was:   assumption ledger: clean — all proofs rest on proven backing; no pending obligations
+        assumption ledger: rests on 6 admitted, 0 sampled
+          ! admitted promise 'all_tests_pass' — backs: release, ok
+          ! admitted promise 'signed_and_version_stamped' — backs: build_pipeline, release, ok
+          ! admitted promise 'tagged_with_version' — backs: build_pipeline, release, ok, unpromised
+          ! admitted promise 'traffic_handling_capable' — backs: release, ok
+          ! admitted promise 'valid_semver' — backs: release, ok
+          ! admitted promise 'version_matches_release_version' — backs: release, ok
+        plan ledger: 3/8 well-formed (discharged), 5 not claimed; 6 promise(s) admitted
+          ✓ build_pipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ release: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ ok: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - unwired: plan Unwired, not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts of Sign is not produced by any node of Unwired or by its inputs; rests on no promises
+          - cyclic: plan Cyclic, not claimed well-formed (bound without the `plan` form's check): cycle through A, B in Cyclic; rests on no promises
+          - ambiguous: plan Ambiguous, not claimed well-formed (bound without the `plan` form's check): input Out of C3 is ambiguous: produced by C1 and C2; rests on no promises
+          - unpromised: plan Unpromised, not claimed well-formed (bound without the `plan` form's check): input PackagedArtifacts [tagged_with_version] of Sign requires tagged_with_version, but Package provides PackagedArtifacts unconstrained; rests on 1 admitted promise: tagged_with_version
+          - nested: plan Nested, not claimed well-formed (bound without the `plan` form's check): outcome ValidatedBuild of Test is declared but no node produces it; rests on no promises
+
+    tests/planning-complete-demo.alg, inspect:
+      under fulfil : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): outcome Delivered of Fulfil is declared but no node produces it
+            rests on: no promises
+      under last_mile : Plan:
+            well-formed: discharged (no findings)
+            rests on: no promises
+      under best : Solution:
+            well-formed: discharged (no findings)
+            bound: effort 1.75 person-hours, duration 235 min, money none
+            decisions: Label via PrintLabel
+            catalog entries: LastMile for Delivered, by the file; Ship for Shipped, by the file; Label for Labelled, by the file
+            rests on: no promises
+      under shipping : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): input Packed of Ship is not produced by any node of Shipping or by its inputs
+            rests on: no promises
+
+    tests/planning-complete-demo.alg, verify:
+        plan ledger: 2/4 well-formed (discharged), 2 not claimed; 0 promise(s) admitted
+          - fulfil: plan Fulfil, not claimed well-formed (bound without the `plan` form's check): outcome Delivered of Fulfil is declared but no node produces it; rests on no promises
+          ✓ last_mile: plan LastMile, well-formed; rests on no promises
+          ✓ best: solution of Fulfil, well-formed; bound effort 1.75 person-hours, duration 235 min, money none; decisions Label via PrintLabel; catalog entries LastMile for Delivered, by the file; Ship for Shipped, by the file; Label for Labelled, by the file; rests on no promises
+          - shipping: plan Shipping, not claimed well-formed (bound without the `plan` form's check): input Packed of Ship is not produced by any node of Shipping or by its inputs; rests on no promises
+
+    tests/planning-core-demo.alg, inspect:
+      under build_pipeline : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): handler on CompilationError in BuildPipeline: no node beneath BuildPipeline raises CompilationError
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under release : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): outcome DeployedRelease of SoftwareRelease is declared but no node produces it
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under again : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): outcome DeployedRelease of SoftwareRelease is declared but no node produces it
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+
+    tests/planning-core-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 2 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'signed_and_version_stamped' — backs: build_pipeline, release, again
+          ! admitted promise 'tagged_with_version' — backs: build_pipeline, release, again
+        plan ledger: 0/3 well-formed (discharged), 3 not claimed; 2 promise(s) admitted
+          - build_pipeline: plan BuildPipeline, not claimed well-formed (bound without the `plan` form's check): handler on CompilationError in BuildPipeline: no node beneath BuildPipeline raises CompilationError; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          - release: plan SoftwareRelease, not claimed well-formed (bound without the `plan` form's check): outcome DeployedRelease of SoftwareRelease is declared but no node produces it; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          - again: plan SoftwareRelease, not claimed well-formed (bound without the `plan` form's check): outcome DeployedRelease of SoftwareRelease is declared but no node produces it; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+
+    tests/planning-handlers-demo.alg, inspect:
+      under build_pipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under release : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under ok : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under reviewed : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under fragile_build : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under caught_above : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under small : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): handler on Nope in Small: no node beneath Small raises Nope
+            rests on: no promises
+
+    tests/planning-handlers-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: release, ok, reviewed, caught_above
+          ! admitted promise 'signed_and_version_stamped' — backs: build_pipeline, release, ok, reviewed, fragile_build, caught_above
+          ! admitted promise 'tagged_with_version' — backs: build_pipeline, release, ok, reviewed, fragile_build, caught_above
+          ! admitted promise 'traffic_handling_capable' — backs: release, ok, reviewed, caught_above
+          ! admitted promise 'valid_semver' — backs: release, ok, reviewed, caught_above
+          ! admitted promise 'version_matches_release_version' — backs: release, ok, reviewed, caught_above
+        plan ledger: 6/7 well-formed (discharged), 1 not claimed; 6 promise(s) admitted
+          ✓ build_pipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ release: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ ok: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ reviewed: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ fragile_build: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ caught_above: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - small: plan Small, not claimed well-formed (bound without the `plan` form's check): handler on Nope in Small: no node beneath Small raises Nope; rests on no promises
+
+    tests/planning-loop-obligations.alg, inspect:
+      under closed : OpenPlan:
+            well-formed: discharged (no findings)
+            bound: effort 1.5 person-hours, duration 155 min, money none
+            decisions: no choices
+            catalog entries: Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by the file
+            rests on: no promises
+      under solved : Plan:
+            well-formed: discharged (no findings)
+            rests on: no promises
+      under Courier : Plan:
+            well-formed: discharged (no findings)
+            rests on: no promises
+
+    tests/planning-loop-obligations.alg, verify:
+        plan ledger: 3/3 well-formed (discharged); 0 promise(s) admitted
+          ✓ closed: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by the file; rests on no promises
+          ✓ solved: plan Fulfil, well-formed; rests on no promises
+          ✓ Courier: plan Courier, well-formed; rests on no promises
+
+    tests/planning-loop-proposals.alg, inspect:
+      under ship : OpenPlan:
+            well-formed: discharged (no findings)
+            bound: effort 1.5 person-hours, duration 155 min, money none
+            decisions: no choices
+            catalog entries: Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by the file
+            rests on: no promises
+      under solved : Plan:
+            well-formed: discharged (no findings)
+            rests on: no promises
+
+    tests/planning-loop-proposals.alg, verify:
+        plan ledger: 2/2 well-formed (discharged); 0 promise(s) admitted
+          ✓ ship: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by the file; rests on no promises
+          ✓ solved: plan Fulfil, well-formed; rests on no promises
+
+    tests/planning-release-demo.alg, inspect:
+      under BuildPipeline : Plan:
+            well-formed: discharged (no findings)
+            rests on: 2 admitted promises: signed_and_version_stamped, tagged_with_version
+      under SoftwareRelease : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+
+    tests/planning-release-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: SoftwareRelease
+          ! admitted promise 'signed_and_version_stamped' — backs: BuildPipeline, SoftwareRelease
+          ! admitted promise 'tagged_with_version' — backs: BuildPipeline, SoftwareRelease
+          ! admitted promise 'traffic_handling_capable' — backs: SoftwareRelease
+          ! admitted promise 'valid_semver' — backs: SoftwareRelease
+          ! admitted promise 'version_matches_release_version' — backs: SoftwareRelease
+        plan ledger: 2/2 well-formed (discharged); 6 promise(s) admitted
+          ✓ BuildPipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version
+          ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+
+    tests/planning-solve-demo.alg, inspect:
+      under SoftwareRelease : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under best : Solution:
+            well-formed: discharged (no findings)
+            bound: effort 20.75 person-hours, duration 1460 min, money none
+            decisions: Test via Quick, Deploy via Direct
+            catalog entries: none
+            rests on: 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version
+      under on_time : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under rushed : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): no choice of Test and Deploy fits the budget of SoftwareRelease; the cheapest, Test via Quick, Deploy via Direct, is duration 1460 min against 21 h
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+      under guarded : Plan:
+            well-formed: not claimed well-formed (bound without the `plan` form's check): handler on PackingError in Fulfil has open options; a recovery is not a choice
+            rests on: no promises
+
+    tests/planning-solve-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: SoftwareRelease, on_time, rushed
+          ! admitted promise 'signed_and_version_stamped' — backs: SoftwareRelease, best, on_time, rushed
+          ! admitted promise 'tagged_with_version' — backs: SoftwareRelease, best, on_time, rushed
+          ! admitted promise 'traffic_handling_capable' — backs: SoftwareRelease, on_time, rushed
+          ! admitted promise 'valid_semver' — backs: SoftwareRelease, best, on_time, rushed
+          ! admitted promise 'version_matches_release_version' — backs: SoftwareRelease, best, on_time, rushed
+        plan ledger: 3/5 well-formed (discharged), 2 not claimed; 6 promise(s) admitted
+          ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          ✓ best: solution of SoftwareRelease, well-formed; bound effort 20.75 person-hours, duration 1460 min, money none; decisions Test via Quick, Deploy via Direct; catalog entries none; rests on 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version
+          ✓ on_time: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - rushed: plan SoftwareRelease, not claimed well-formed (bound without the `plan` form's check): no choice of Test and Deploy fits the budget of SoftwareRelease; the cheapest, Test via Quick, Deploy via Direct, is duration 1460 min against 21 h; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+          - guarded: plan Fulfil, not claimed well-formed (bound without the `plan` form's check): handler on PackingError in Fulfil has open options; a recovery is not a choice; rests on no promises
+
+    tests/planning-split-demo.alg, inspect:
+      under SoftwareRelease : Plan:
+            well-formed: discharged (no findings)
+            rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+
+    tests/planning-split-demo.alg, verify:
+      was:   assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+        assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending
+          ! admitted promise 'all_tests_pass' — backs: SoftwareRelease
+          ! admitted promise 'signed_and_version_stamped' — backs: SoftwareRelease
+          ! admitted promise 'tagged_with_version' — backs: SoftwareRelease
+          ! admitted promise 'traffic_handling_capable' — backs: SoftwareRelease
+          ! admitted promise 'valid_semver' — backs: SoftwareRelease
+          ! admitted promise 'version_matches_release_version' — backs: SoftwareRelease
+        plan ledger: 1/1 well-formed (discharged); 6 promise(s) admitted
+          ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable
+    ```
+  - **The counts.** `npm run lint:load` is at or below the baseline
+    (`lib/planning_loop.alg` is not in the load corpus).
+    `demos/rung3/02-solve.alg` has 3,794,320 evaluates and 202,129
+    applyComposed before and after: the query runs only when `verify` or
+    `inspect` asks, and `run` never does. The two files that `use
+    planning_loop` load the larger library: L1's demo rises from
+    1,033,607 to 1,047,609 evaluates and L2's from 1,491,712 to
+    1,505,714; neither is gated. `verify` on `02-solve.alg` took 4.3 s
+    and 4.4 s of wall clock, against 3.1 s and 2.8 s before: the
+    library's load and the query.
+  - **The records.** `docs/book/platform/tooling.ir.md`: C72 becomes
+    C200 (`inspect`'s second evaluation, with `softFail` set); C198 (a
+    fixture an admitted promise in the assumption ledger, never
+    discharged), C199, C201 and C204 (the `planLedger` field and its
+    records), C202 (the library loaded only for a file with a plan value)
+    and C203 (`inspect`'s lines) are new; all proposed, clusters G13 and
+    G28 re-proposed, ask A7; relation R2 restated on C200; evidence E45
+    added; E3, E6, E10 to E16, E30, E32, E38 to E42 and E44 re-synced.
+    C107 stays: it is still true. The chapter's §7 says the ledger names
+    a fixture's promise, and its §9 the chunk;
+    `docs/book/proving-in-allegro.md` gains one sentence beside the
+    ledger's admitted laws. The oracle lines are in L5's PR.

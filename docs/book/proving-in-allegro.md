@@ -208,7 +208,9 @@ A prover should prefer `Law.witness` with a real proof
 `Law.assume` only when instructed — an admitted law marks every
 downstream proof `[resting on admitted 'trans' of 'Cell']` in the
 verdict, and the assumption ledger lists it with the proofs that rest
-on it. Kernel equalities (Int, String, records with default equality)
+on it. The ledger also lists each fixture of a plan value as an
+admitted promise, with the plans that rest on it (B-187 (the planning
+loop, the next validating demo), chunk L5). Kernel equalities (Int, String, records with default equality)
 pass the gate automatically at tier `kernel`.
 
 ## Failure modes and how to respond
