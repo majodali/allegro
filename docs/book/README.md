@@ -108,4 +108,6 @@ book pass's review of the root `README.md`, chunk F1 of
 (record: the review of the pilot chapter, metadata and the capability to write it) ·
 `../records/book-pass/dr1-part-1-the-bet.md` (record: the decision review of
 Part I, the bet) · `../records/book-pass/dr2-part-2-the-kernel.md` (record: the
-decision review of Part II, the kernel).
+decision review of Part II, the kernel) ·
+`../records/book-pass/dr3-part-3-syntax-and-modules.md` (record: the decision
+review of Part III, syntax and modules).

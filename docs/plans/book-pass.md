@@ -1118,6 +1118,19 @@ its approval.
   extension except to apply a field's rule. One Part I decision was
   amended with the maintainer's approval, a refinement inside phase 1,
   not a return under R28 (the monotonic pass).
+- **R43 — DR3 ruled.** Part III was ruled item by item in the review
+  session on 2026-11-12, by the method of R42 (DR2 ruled): fourteen
+  conflicts with Parts I and II were brought first. The rulings are in
+  `docs/records/book-pass/dr3-part-3-syntax-and-modules.md`. Part III
+  as ruled: parsing is evaluation; a grammar is a value and a notation
+  stands for an expression; no parser is privileged and the platform's
+  engine ships already built; a text can change the grammar it is read
+  in, with no scan ahead of the parse; grammars combine without regard
+  to order; a module is an extension that arrives as a file and the
+  loader is itself an extension; every program is evaluated the same
+  way, however it arrives. One decision was added to Part II with the
+  maintainer's approval ("What the kernel requires of an extension"),
+  a refinement inside phase 1 as in R42.
 
 ## 7. Record
 
@@ -1301,6 +1314,10 @@ its approval.
   Part II of the inventory: 74 decisions in nine chapters became 49 in
   seven; 231 decisions in all. Lints: `lint:docs:check` anchors 0 ·
   order 0 · ids 783.
+- **2026-11-12 — DR3 ruled** (the review session). R43 recorded in §6.
+  Part III of the inventory: 25 decisions in three chapters became 23
+  in four, and Part II gained one; 230 decisions in all. Lints:
+  `lint:docs:check` anchors 0 · order 0 · ids 783.
 
 ## 8. Sessions
 
