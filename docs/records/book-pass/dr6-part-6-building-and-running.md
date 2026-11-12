@@ -83,4 +83,28 @@ No terms introduced.
 
 ## Rulings taken
 
-None yet.
+**The shape of Part VI, 2026-11-12.** The maintainer's response to
+the first recommendations:
+
+- The pipeline chapter becomes "Phases": it gives a definition, the
+  three phases the platform ships, and then how to define a new phase
+  or extend an existing one.
+- Something is missing, as it was in Part V: an introductory section
+  on usage patterns and the roles host components and extensions
+  play. "Most importantly we need to cover the host launcher and its
+  role in loading configuration and capabilities and passing them to
+  the kernel. We should define the invocation/startup process in
+  detail (not in the introduction), so people understand how it all
+  hangs together."
+- Trust needs a chapter of its own, covering "specifics like host
+  code, loaded capabilities, and stored programs", with the cases and
+  risks defined so they can be countered. On stored programs: "I tend
+  to agree that fully rechecking on load will likely be opt-in."
+- Export: the terms are "target", "target platform" or "export
+  target", not "backend". A target platform is a model, and exporting
+  is a transformation from a residual expression to that model,
+  "including target specific exported capabilities for post-export
+  phases (deploy, load, run, invoke, etc)".
+- Every decision needs example use cases, "which I suppose is true
+  for every decision in the book, but is especially true for here
+  where the rubber hits the road".
