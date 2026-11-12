@@ -835,6 +835,32 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — Rung 4 scene 1: the planning loop demonstrated (B-187, chunk L7)
+
+B-187 (the planning loop, the next validating demo), chunk L7 of
+`docs/plans/planning-loop.md`, the last chunk of its outcome (1). Rung 4
+opens with one scene, `demos/rung4/01-loop.alg`: an open plan with a
+hole and its `catalog yard:` block, the hole as an obligation in
+planning words, three proposals with the kernel's answers (the next
+dead end, the budget missed, the plan solved), and the solved plan's
+ledger record with the promise it rests on. It is pinned by eleven
+`// expect:` lines, with a break-it halt in `transcripts/`. The
+walkthrough `01-loop.md` runs `obligations`, `propose`, the scripted
+loop (refused once, accepted once) and quotes the maintainer's run with
+a language model (refused once, accepted once). A test reproduces the
+transcripts: the scripted loop is run again and compared with its twin,
+and each reply of the keyed run is put through the kernel again and
+compared with the recorded answer. Two CLI changes: `allegro prove`
+skips a theorem the file does not declare, such as a library's law,
+before any request ("no splice site in the file"), and `allegro verify
+--transcript T.json` puts a transcript's accepted entries back into the
+catalog and names their proposers in the plan ledger. The claims
+register of `docs/plans/release-track.md` is re-graded for what the
+scene shows: D3 (participant-neutral collaboration) gains the prover
+loop over a domain model's obligations at demoable. L6 was dropped: both loops converged from the refusal text
+alone. `docs/book/platform/tooling.ir.md` adds C205 to C210 (ask A8).
+No public copy: public demos that need Claude API calls are deferred.
+
 ### 2026-11 — A solved plan's promises reach the ledger (B-187, chunk L5)
 
 B-187 (the planning loop, the next validating demo), chunk L5 of

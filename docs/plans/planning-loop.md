@@ -722,7 +722,35 @@ R7 and R8 at their rows' time.
     deferred. Cheaper; tests composition across two models but not
     within one.
   - **Recommended: (a)**, at L7's merge, on (1)'s evidence.
-  - **Taken:** at L7's merge.
+  - **Recommendation at L7, on (1)'s evidence.** Take (a), with
+    components and data as the first two DSLs and UI later, all from
+    B-080's roster, and the composition point as recommended above: a
+    plan's outcome typed by a system model's artifact, and a cross-model
+    check listing the artifacts no plan produces, each a plan obligation
+    for the same loop. What the loop needed from the planning model was
+    four things, all in its own library: a dead end as records
+    (`Completion` and `Gap`), an identity over what the author wrote
+    (the plan surface's hash), a splice site in the surface (the
+    `catalog NAME:` block), and the kernel's answer in the model's words
+    stored in the value. A cross-model check that answers in the same
+    records reuses the kind registry's plan kind unchanged, so the
+    first composition point costs the check and its records, not a new
+    protocol. What the ledger said: well-formedness, each fixture as an
+    admitted promise, a solution's bound, decisions and catalog
+    entries, and who proposed each. What it could not say: anything
+    about another model's values, since a port's type is a `String`
+    (`Port`, `lib/planning.alg:46`), so the first chunk needs a port
+    typed by another library's type; and an author bound by a node's
+    name is ambiguous when two entries share it (`entryAuthorsByValue`
+    at L7 leaves such a plan "by the file"), which a second model's
+    entries make likelier. Library-first, as the planning model was:
+    the catalog's surface form came only when a demo needed it. Two
+    risks on the evidence: B-188 (a recursive binding beside a function
+    that calls `check_plan` stalls the precompile) is likely to meet a
+    component graph's check, so it is worth taking before SY1's first
+    chunk or in it; and R5 (a)'s note to revisit a lane of the Vivace
+    models' own falls due here, with a second library in lane D.
+  - **Taken:**
 - **R8** — **What the documentation or comprehension model is for.** A
   question for the maintainer; no design is offered. Readings the raw
   material of §5 supports:
@@ -1970,3 +1998,335 @@ R7 and R8 at their rows' time.
   converged in two attempts from the refusal text alone, so the loop
   needed neither the call-site origin nor a rendered refused value;
   B-081's residue stays where `docs/plans/planning-pilot.md` holds it.**
+- **2026-11-12 — L7 landed.** The demo and packaging, on `origin/main`
+  at `9fdb4bf` (the merge of PR #188; the keyed transcript of PR #189
+  in the tree). One finding of the brief's premises, no stop of its
+  list: the brief expected the scripted transcript of L2's demo to
+  change its "Attempted" count under the skip, but it reads 1 before
+  and after, because the scripted proposer declines the laws before the
+  splice site is asked (below); re-run, it differs from the committed
+  one only in its date and times, so it is not refreshed.
+
+  What landed:
+  - **The skip** (ruled at PR #189's merge). The theorem kind of the
+    [kind registry](#def-kind-registry) gains its splice site: the
+    `theorem NAME:` line `spliceProof` reads, now `theoremSitePattern`
+    (`pcp/llm-worker.ts:81`), and the kind's optional `site`
+    (`:645` to `:655`, `NO_SPLICE_SITE`, "no splice site in the file").
+    `runLlmWorker` skips a theorem the file does not declare before any
+    request (`:948` to `:954`). A client that declines an obligation is
+    asked first, as before (`:944`), so for the scripted proposer the
+    laws are still declined for want of a prepared proposal and nothing
+    it prints changes; a client without `answers` (the SDK client, the
+    Claude Code client) is never asked about them. The result and the
+    transcript gain the optional `skippedNoSite` (`:478`, `:1131`);
+    `formatTranscript` prints a second Skipped line with the reason
+    (`:1155` to `:1162`), and `prove`'s text form gives each skip its
+    reason (`src/index.ts:811`). The theorem kind's order (declined
+    first, then the site) keeps L3's assertion at `src/test/pcp.ts:1298`
+    (the client's `answers` sees the laws) and L4's transcript pin at
+    `:1704` ("(the proposer has no answer): `Quantity.law_mul_comm`")
+    true; the
+    other order would change both (ask 2).
+  - **`verify --transcript T.json`** (ask 4 of PR #188), the shape the
+    brief recommended with one addition. `applyTranscriptEntries`
+    (`src/pcp.ts:1749`) reads a [transcript twin](#def-transcript-twin)'s
+    discharged plan obligations; for each, the file's pending plan
+    obligation of the same name and the hash the transcript's first
+    request names, the accepted turn's node block is spliced by
+    `splicePlanProposal`, the loop's own splice. The CLI evaluates the
+    spliced file and hands the authors to `collectPlanLedger` through
+    `entryAuthorsFrom` (`src/index.ts:547` to `:637`). The addition:
+    the scene, as every file holding an open plan, keeps its hole, so
+    the authors have nothing to attach to unless the entry is put back;
+    and an open plan built from the answered one (`express =
+    with_entry(Fulfil, …)`) holds the spliced entry too, which L5's
+    binding-keyed authors would have credited to "the file".
+    `entryAuthorsByValue` (`src/pcp.ts:1801`) carries each author to
+    every open plan whose catalog holds the same node value, and to
+    none that holds another node of the name. An entry the file cannot
+    take, or one whose obligation the spliced file leaves pending,
+    fails the verdict, with a line per entry. Nothing of the transcript
+    is trusted beyond the entry's text and the prover's name.
+  - **The scene**, `demos/rung4/01-loop.alg`, registered at
+    `src/test/language.ts:709` to `:710`. The plan surface and catalog
+    are `tests/planning-loop-proposals.alg`'s (hash `5444505e`), with
+    one fixture added inside the plan's body (`Packed [ sealed ]` on
+    `Pack`, line 22 and `:39`), outside the surface, so the ledger has
+    a promise to show. Its eleven pins: the open state (`:48`); the
+    obligation's gap, stop and steps (`:50` to `:54`); the surface
+    (`:57`); `Courier` refused as open (`:83`); `Freight` refused as
+    unsolved with the budget missed (`:88`); `Express` solved with its
+    bound (`:95`); the solved plan as a `WellFormedPlan` (`:98`); the
+    surface unchanged by every proposal (`:102`); the ledger record,
+    "rests on 1 admitted promise: sealed" (`:110`). The obligation is
+    read as a list, so the file still evaluates once the loop has
+    closed it (an indexed `[0]` halted the loop's accepting turn with
+    "Array.get: index 0 out of bounds", found while writing the scene).
+    The in-file proposals are a `catalog proposals:` block and the
+    refusals are read without top-level bindings, so the file holds one
+    open plan with an obligation. Break it: `plan Fulfil:` in place of
+    the open form, the halt in `transcripts/01-halt.txt`.
+  - **The walkthrough** `demos/rung4/01-loop.md` and `README.md`; the
+    proposals file `transcripts/01-loop-proposals.md` (`Messenger`,
+    then `Dispatch`); the transcript `01-loop-scripted.md` and its
+    twin, written by the run below. The four outputs, verbatim:
+
+    ```
+    $ allegro obligations demos/rung4/01-loop.alg --pending
+    Obligation: theorem `Quantity.law_mul_comm`
+      proposition: for_all over Quantity: law 'mul_comm' holds
+      hash:        5514d15e
+    ----------------------------------------
+    Obligation: theorem `Quantity.law_conv_roundtrip`
+      proposition: for_all over Quantity: law 'conv_roundtrip' holds
+      hash:        adaa70c1
+    ----------------------------------------
+    Obligation: theorem `Quantity.law_refl`
+      proposition: for_all over Quantity: law 'refl' holds
+      hash:        02045bce
+    ----------------------------------------
+    Obligation: theorem `Quantity.law_sym`
+      proposition: for_all over Quantity: law 'sym' holds
+      hash:        2dcd441e
+    ----------------------------------------
+    Obligation: theorem `Quantity.law_trans`
+      proposition: for_all over Quantity: law 'trans' holds
+      hash:        d4e259ed
+    ----------------------------------------
+    Obligation: plan `Fulfil`: Shipped, which Depot needs
+      stop:        nothing in the catalog produces Shipped, which Depot needs
+      steps:       Delivered from Van, Sorted from Depot
+      catalog:     yard
+      hash:        5444505e
+    ----------------------------------------
+    ```
+
+    ````
+    $ allegro propose demos/rung4/01-loop.alg
+    # Proof TODO — `demos/rung4/01-loop.alg`
+
+    **6 pending** of 20 obligation(s).
+
+    ## `Quantity.law_mul_comm`
+
+    **Proposition:**
+
+    ```allegro
+    for_all over Quantity: law 'mul_comm' holds
+    ```
+
+    ---
+
+    ## `Quantity.law_conv_roundtrip`
+
+    **Proposition:**
+
+    ```allegro
+    for_all over Quantity: law 'conv_roundtrip' holds
+    ```
+
+    ---
+
+    ## `Quantity.law_refl`
+
+    **Proposition:**
+
+    ```allegro
+    for_all over Quantity: law 'refl' holds
+    ```
+
+    ---
+
+    ## `Quantity.law_sym`
+
+    **Proposition:**
+
+    ```allegro
+    for_all over Quantity: law 'sym' holds
+    ```
+
+    ---
+
+    ## `Quantity.law_trans`
+
+    **Proposition:**
+
+    ```allegro
+    for_all over Quantity: law 'trans' holds
+    ```
+
+    ---
+
+    ## `Fulfil: Shipped, which Depot needs`
+
+    **Gap:** nothing in the catalog produces Shipped, which Depot needs
+
+    **Search so far:** Delivered from Van, Sorted from Depot
+
+    **Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.
+
+    **Hash:** `5444505e` (over: plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot)
+
+    ---
+
+    _When done, run `allegro verify` on the source file to confirm._
+    ````
+
+    ```
+    $ allegro prove demos/rung4/01-loop.alg --proposals demos/rung4/transcripts/01-loop-proposals.md --transcript demos/rung4/transcripts/01-loop-scripted.md --json
+    {"filename":"demos/rung4/01-loop.alg","allDischarged":true,"summary":{"discharged":1,"pending":0,"skipped":5},"perObligation":[{"name":"Fulfil: Shipped, which Depot needs","kind":"plan","discharged":true,"attempts":2,"finalTerm":"Dispatch:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours","authorship":{"provers":[{"prover":"scripted:01-loop-proposals.md","attemptsUsed":2,"effortBudgetUsed":{"attempts":2},"role":"primary"}],"verifiedAt":"2026-11-12T18:08:05.087Z"},"history":[{"proofTerm":"Messenger:\n  inputs: Labelled\n  outcomes: Shipped\n  estimate: 40 min, 0.25 person-hours","verified":false,"reason":"refused (open): nothing in the catalog produces Labelled, which Messenger needs"},{"proofTerm":"Dispatch:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours","verified":true,"answer":"accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Dispatch; bound effort 1.5 person-hours, duration 155 min"}]}],"skipped":["Quantity.law_mul_comm","Quantity.law_conv_roundtrip","Quantity.law_refl","Quantity.law_sym","Quantity.law_trans"]}
+    ```
+
+    The keyed run (`transcripts/llm-planning-loop-proposals.json`,
+    obligation `Fulfil: Shipped, which Depot needs`), quoted:
+
+    ```
+    --- attempt 1, reply's code block ---
+    ShipOrder:
+      inputs: Order
+      outcomes: Shipped
+      estimate: 30 min, 0.25 person-hours
+    --- kernel ---
+    refused (unsolved): no completion of Fulfil from the catalog is well-formed for Fulfil; the cheapest, Delivered from Van, Sorted from Depot, Shipped from ShipOrder, fails: outcome Packed of Pack is neither consumed by a node of Fulfil nor declared as its outcome
+    --- attempt 2, reply's code block ---
+    Ship:
+      inputs: Packed
+      outcomes: Shipped
+      estimate: 30 min
+    --- kernel ---
+    accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Ship; bound effort 1.25 person-hours, duration 140 min
+    --- authorship ---
+    {"provers": [{"prover": "claude-code:default", "attemptsUsed": 2, "effortBudgetUsed": {"attempts": 2}, "role": "primary"}], "verifiedAt": "2026-11-12T06:32:51.351Z"}
+    ```
+  - **The scene's `verify` lines.** Without a transcript, the obligation
+    pending and the scene's own entry by the file:
+
+    ```
+        ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs
+        ✓ express: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Express for Shipped, by the file; rests on 1 admitted promise: sealed
+    ```
+
+    With `--transcript transcripts/01-loop-scripted.json`, and with
+    `--transcript transcripts/llm-planning-loop-proposals.json`:
+
+    ```
+        ✓ Fulfil: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Dispatch for Shipped, by scripted:01-loop-proposals.md; rests on 1 admitted promise: sealed
+      transcript: demos/rung4/transcripts/01-loop-scripted.json: 1 accepted entry applied
+        + Dispatch in `yard` for `Fulfil: Shipped, which Depot needs`, by scripted:01-loop-proposals.md in 2 attempt(s)
+
+        ✓ Fulfil: open plan Fulfil, solved, well-formed; bound effort 1.25 person-hours, duration 140 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by claude-code:default; rests on 1 admitted promise: sealed
+      transcript: demos/rung4/transcripts/llm-planning-loop-proposals.json: 1 accepted entry applied
+        + Ship in `yard` for `Fulfil: Shipped, which Depot needs`, by claude-code:default in 2 attempt(s)
+    ```
+  - **The transcript tests** (B-177 item 5 for this rung), appended to
+    `src/test/pcp.ts` (`:2167` to `:2267`). (a) The scripted loop on
+    the scene is run again through the CLI with its proposals file;
+    the twin it writes is compared with the committed
+    `01-loop-scripted.json` on every field but `date`, the
+    authorship's `verifiedAt` and each turn's `replyMs` and `kernelMs`,
+    and the Markdown with those masked. (b) The keyed run: for each
+    turn of `Fulfil`, the reply's code block is put through
+    `answerPlanProposal` on `tests/planning-loop-proposals.alg` and
+    `formatPlanProposalAnswer`'s text compared with the turn's `kernel`
+    verbatim; the request the loop builds for that attempt
+    (`buildPlanIterationMessage`, the refusal fed back) is compared with
+    the turn's `request` too. Every difference is listed in the failure
+    message, attempt by attempt. (c) `verify --transcript` on the scene
+    with both transcripts. No test runs a model; no network. The skip
+    and `verify --transcript` have their own tests (`:1516` to `:1550`
+    in process, `:2042` to `:2165` through the CLI, the five laws on
+    L2's demo skipped with no run of a fake `claude` for them).
+  - **The register** (`docs/plans/release-track.md`), each line against
+    the scene's:
+    - D3, new row (`:133`), "the prover loop over a domain model's
+      obligations (plan obligations proposed, kernel-judged, authorship
+      recorded)" at demoable: the obligation, `01-loop.alg:50` to
+      `:54`; kernel-judged, `:83`, `:88`, `:95`; proposed by a script
+      or a language model, `01-loop.md` steps 3 and 4; authorship,
+      `verify --transcript` (the lines above), pinned at
+      `src/test/pcp.ts:2248`.
+    - D2, the result-level roll-up row (`:100`) gains the plan's
+      admitted promises: `01-loop.alg:110`, "rests on 1 admitted
+      promise: sealed", and `verify`'s "! admitted promise 'sealed'".
+    - D6's "To advance" (`:208`) loses "the AI loop over a model
+      (B-083)": the scene is that loop over the planning model.
+    - §8 gains the rung 4 scene 1 entry. The cross-model ledger row
+      and D7 stay hypothesis: the scene holds one model.
+  - **The chapter and the tour.** `docs/book/vivace/planning-dsl.md`
+    §2.8 gains "The loop, as delivered" (the open plan, the protocol,
+    the two proposers, the ledger, `verify --transcript`, the scene,
+    what is deferred) and §9 the chunk; `docs/book/getting-started.md`
+    the `demos/rung4/` entry after rung 3's.
+  - **Stale in `docs/book/demo-ladder.ir.md`**, outside the boundary,
+    for the review session: the Purpose line ("the three delivered
+    rungs under `demos/`"); C1 ("covers the three delivered rungs");
+    C12 ("`demos/` holds three rungs: `demos/rung1/`, `demos/rung2/`,
+    `demos/rung3/`"); C115 ("Rung 4 is named in this chapter as
+    direction, not as a claim"), now that a rung 4 scene exists; C116
+    ("The suite runs no part of `05-prover-loop.md` and no file under a
+    rung's `transcripts/` directory"), false for `demos/rung4/transcripts/`,
+    whose JSON twins the suite reads; C117 (the halts checked by hand)
+    holds for `01-halt.txt` but no longer for the rung's transcripts;
+    E31 ("rung 4 remains internal direction until then").
+  - **The tooling IR.** C205, C209, C206 and C207 (`verify
+    --transcript`) and C208 and C210 (the skip), proposed, clusters G28
+    and G29 re-proposed, ask A8; evidence E46 added, E11 and E17
+    re-synced. No ratified claim is false: C185 still holds.
+  - **The outputs comparison.** Every `tests/*.alg` and `demos/**/*.alg`
+    on `origin/main` (72 files) through the CLI as `run`, `inspect`,
+    `verify`, `obligations` and `propose`, before and after, on stdout,
+    stderr (stats lines stripped) and exit code: all 360 runs
+    identical; the new scene's five runs exit 0. `prove`, the one
+    command the skip changes, is not in the corpus.
+  - **The counts.** `npm run lint:load` is at or below the baseline.
+    `demos/rung3/02-solve.alg` has 3,794,320 evaluates and 202,129
+    applyComposed before and after. The scene has 2,698,559 evaluates
+    and 139,414 applyComposed (not gated).
+  - **The done-condition for (1)**, bullet by bullet against §1:
+    - "A runnable scene, `demos/rung4/01-loop.alg` as R6 recommends,
+      suite-pinned by its `// expect:` lines, with a walkthrough
+      `demos/rung4/01-loop.md` and its transcripts, and the transcripts
+      themselves reproduced by a test": held. The scene's eleven pins
+      run as `file: 01-loop.alg` (`src/test/language.ts:710`); the
+      walkthrough and `transcripts/` (the scripted run, the keyed run,
+      the halt); the scripted twin re-run and the keyed answers
+      replayed by the tests at `src/test/pcp.ts:2192` and `:2219`. The
+      halt `01-halt.txt` is still checked by hand, as rung 3's are.
+    - "An LLM-free path through the same loop: the obligations listed
+      by `allegro obligations`, rendered by `allegro propose`, answered
+      by a scripted proposer and verified by the kernel, so that the
+      suite and the demo run without a key and without the network":
+      held. Steps 1 to 3 of the walkthrough on the scene; the scripted
+      loop runs with `ANTHROPIC_API_KEY` empty in the tests, and no test
+      constructs a language-model client or reaches the network.
+    - "The same loop with the language-model worker, run once with a
+      key and its transcript captured": held, with the ruling of
+      2026-11-11 in place of a key: the maintainer's run on a Claude
+      subscription through `--proposer claude-code`, captured in
+      `transcripts/llm-planning-loop-proposals.md` and `.json` (PR
+      #189), quoted in step 4 and replayed through the kernel by a test.
+    - "The claims register of `docs/plans/release-track.md` re-graded
+      only for what is delivered (R6)": held, the three lines above,
+      each against the scene's lines; no public copy written.
+  - **The oracle lines**, on this branch:
+
+    ```
+    bash scripts/typecheck.sh                       typecheck clean (9 TS6059 rootDir-convention diagnostics ignored)
+    ALLEGRO_TEST_FILTER="pcp|planning|obligation|propos|rung4|rung3|transcript|language" npm test
+                                                    Tests: 67 total, 67 passed, 0 failed
+    npm run lint:load                               load lint: counts at or below baseline; 7 sources and 8 precompile sources, parse 0.4 s, check 4.1 s (clock not gated)
+    npm run lint:units                              units-lint: the unit DAG holds at its baseline (docs/book/units.md §8)
+    npm run lint:planes                             plane-lint: the storage plane is reached only through the accessor layer
+    npm run lint:docs:check                         doc-lint: anchors 0 · order 0 · ids 782 — gate passed
+    MTOOL_HOME=… npm run lint:ir                    ir-lint: 7 file(s) via …/methodology-tools: clean (0 violations, 4 warnings, CK-03: C198, C201, C171, C189)
+    npx tsx scripts/doc-ref-lint.ts                 doc-ref-lint: all markdown doc references resolve
+    npm run lint:streams                            stream-plan: 9 plan(s) checked, 0 with findings
+    PR_TITLE="B-187: rung 4 scene 1, the planning loop demonstrated (L7)" npx tsx scripts/analyze/lane-lint.ts --base origin/main
+                                                    lane-lint: lane D (B-187 via docs/plans/planning-loop.md): 22 file(s), 0 outside
+    MTOOL_HOME=… npm run test:shards                Aggregate: 1378 test runs, 1378 passed, 0 failed; GATE: PASSED
+    ```
+
+    The filter matches no test name of the scene's file test (`file:
+    01-loop.alg`); the shards run it, and `ALLEGRO_TEST_FILTER="file:
+    01-loop"` runs it alone: 1 passed.
