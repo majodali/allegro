@@ -46,7 +46,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 
 **Part III: Syntax and modules**
 
-As ruled in DR3 (2026-11-12).
+As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed on PR #190.
 
 10. **Parsing** (13 decisions). A parser is a function, a grammar is a value, and a notation stands for an expression; how grammars read characters, layout and precedence, and what ambiguity is.
    - Decisions: Parsing is evaluation; No parser is privileged; Grammars are values; Every notation stands for an expression; The `grammar { … }` block; A parser records where each expression came from in its text; Scannerless parsing; A terminal is a function, so a grammar can define its own; Offside rule through stateful indent terminals; Guards and reserved words separate keywords from identifiers; Named, partially ordered precedence levels; Ambiguity is a claim; Parse failure reporting and recovery.
@@ -1639,7 +1639,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Label: foundational — files, scripts and prompts are one case
 - Options recorded: a prompt that forbids rebinding, as a file does (rejected 2026-11-12: a prompt needs to allow it)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
-- Notes: new, by ruling. The review's reading of rebinding, to confirm: each entry opens a scope inside the last, so a later binding hides the earlier one and replaces nothing; the rule that a name is bound once in a scope then holds at a prompt as it does in a file.
+- Notes: new, by ruling. Rebinding, as the maintainer confirmed on PR #190: each entry opens a scope inside the last, so a later binding hides the earlier one and replaces nothing; the rule that a name is bound once in a scope then holds at a prompt as it does in a file.
 - Held finding (2026-11-12, DR3): a grammar change does not reach the prompt: the REPL loads no module named by a header (tooling claims C60, C61 of docs/book/platform/tooling.ir.md).
 - Chapter: Modules and programs
 

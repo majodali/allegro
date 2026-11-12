@@ -229,7 +229,11 @@ agreed with the recommendation on each.
 - The prompt: "Running a program is evaluating its main module with a
   configuration's capabilities." The maintainer: a prompt needs to
   allow rebinding. The entry reads this as each entry opening a scope
-  inside the last, so a later binding hides the earlier one; that
-  reading is the review's and awaits the maintainer's confirmation.
+  inside the last, so a later binding hides the earlier one.
+
+**On PR #190, 2026-11-12.** The maintainer reviewed Part III: it looks
+good. Confirmed: the reading of rebinding at a prompt, the wording of
+"What the kernel requires of an extension", and the four chapter
+titles.
 
 Every ask is ruled.
