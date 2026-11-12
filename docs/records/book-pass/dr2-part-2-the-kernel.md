@@ -217,10 +217,14 @@ one-shot registration; how propagation is applied; primitives
 receiving full values; untyped structures; empty array and record);
 the serialisation rule for symbols moves to the privacy decision of
 Part IV; "Trust in a value needs no seal" is reworded and kept. Part II
-is regrouped into seven chapters in dependency order, with provisional
+is regrouped into seven chapters in dependency order, with
 titles: Values; Programs as values; Authority; Metadata; Evaluation;
-What an extension is built from; When a program is wrong. 49
+Extensions; Correctness. 49
 decisions, every dependency pointing to an earlier decision. Ask 14 is
 done with the regrouping.
+
+**On PR #187, 2026-11-12.** The maintainer reviewed Part II: all
+chapters and decisions make sense. The last two chapters are titled
+"Extensions" and "Correctness".
 
 Every ask is ruled.

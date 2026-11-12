@@ -27,7 +27,7 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
 
 **Part II: The kernel**
 
-As ruled in DR2 (2026-11-11); chapter titles are provisional. Implementation decisions sit at the end of the chapter whose decisions they realise.
+As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
 
 3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
    - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it computes nothing on them; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
@@ -39,9 +39,9 @@ As ruled in DR2 (2026-11-11); chapter titles are provisional. Implementation dec
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
    - Decisions: Evaluation is total over unresolved information; The environment is not a value; A function may take an argument unevaluated; A call is evaluated by evaluating the function's body; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
-8. **What an extension is built from** (2 decisions). Functions and metadata fields, and the few pure primitives beneath them.
+8. **Extensions** (2 decisions). Functions and metadata fields, and the few pure primitives beneath them.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few.
-9. **When a program is wrong** (5 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
+9. **Correctness** (5 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
    - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; A failure a program can handle is supplied by an extension; Evaluation stops early for two reasons only.
 
 **Part III: Syntax and modules**
@@ -139,7 +139,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; A failure a program can handle is supplied by an extension | Hosts; Metadata | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
-| Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | What an extension is built from | DR1, rulings of 2026-11-11 |
+| Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Extensions | DR1, rulings of 2026-11-11 |
 | Housekeeping removed as decisions in DR2, still owed as work: prefixed engine slots, legacy primitives, the host plane's declaration, shared host types that let the kernel see an extension's representation, kind comparisons outside their units | Each decision lives in one replaceable unit of code; An extension is made of functions and metadata fields | Keep it simple; the extension interface | DR2, rulings of 2026-11-11 |
 | The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
 | Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
@@ -201,18 +201,18 @@ They came together over years of exploration into most of what Allegro is today.
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Who can see a member (Private members). |
 | [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
-| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); What an extension is built from (plane interface). |
+| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
 | [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
 | [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values (§3, §3.2); Metadata (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
-| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Four planes (T1 §11, §18, §22); What an extension is built from (§23, §24); Scopes (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
-| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values (the minimal base); What an extension is built from (the install surface). |
+| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Four planes (T1 §11, §18, §22); Extensions (§23, §24); Scopes (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
+| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values (the minimal base); Extensions (the install surface). |
 | [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Structures (§1, §2); Metadata (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
 | Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values; Programs as values. |
-| [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata (§1 to §4, §6, §9); Metadata (§5, §8); What an extension is built from (§7). |
+| [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata (§1 to §4, §6, §9); Metadata (§5, §8); Extensions (§7). |
 | Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
-| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); What an extension is built from (§7, §8); Evaluation (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
+| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
 | Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; Hosts: the terminal and the browser. |
 | [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Grammars as values (the boundary). |
 | [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Grammars as values (§1 to §5, §7, §8); Extending the grammar (§6); The surface language (§5 (layout)). |
@@ -1197,7 +1197,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: nothing checks that a wrapper forwards the sentinel (B-113).
 - Chapter: Evaluation
 
-### What an extension is built from
+### Extensions
 
 #### An extension is made of functions and metadata fields
 - Decides: the kernel gives an extension two things to build with: ordinary functions, and metadata fields, each with a rule the extension supplies for how the field travels through evaluation. Every feature above the kernel is built from these: a typed call, an operator on typed values, a check on a member.
@@ -1211,7 +1211,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "The layer installs; the base never imports" and dissolves the entries on gated installs, the check hook, the dispatch hook, handles, knowledge propagation inside the evaluator, installed projections, analysis results crossing upward, and the facts plane. How today's uses fare: a typed literal is a value the extension's syntax maps to; an operator is the extension's own function; a check at a call is a claim at the top of the function's body; a computed field is an ordinary function; knowledge inside a branch is the extension's own `if` evaluating each branch with names rebound to values carrying the extra fact, using the kernel's ordinary operation of evaluating an expression with names rebound. Branch knowledge is the case to prove first.
 - Held finding (2026-11-11, DR2): the evaluator calls installed host functions for merge, check, dispatch, projection, analysis and facts merge (`src/capability.ts:96`–`144`), and imports the standard language's units (`src/evaluator.ts:9`–`10`). Held here; the largest change Part II names.
-- Chapter: What an extension is built from
+- Chapter: Extensions
 
 #### The kernel's primitives are pure and few
 - Decides: the kernel's primitives cover six things: telling bits apart; building and reading structures and expressions; one conditional; evaluating an expression with names rebound; registering a metadata field; evaluating a claim. None performs an effect. An effect is always a capability.
@@ -1226,9 +1226,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Minimal base surface of about forty primitives" and "Host functions as values with declared evaluation control"; "Primitives receive full values" is a rule of the kernel's own code under it.
 - Held finding (2026-11-11, DR1 and DR2): 178 primitives in one table, 54 of them the standard language's, `print` and other effects among them (`src/primitives.ts:4509` onward).
 - Notes (2026-11-11, DR2, leftovers): "Primitives receive full values" is a rule of the kernel's own code: a primitive receives its arguments with their metadata intact.
-- Chapter: What an extension is built from
+- Chapter: Extensions
 
-### When a program is wrong
+### Correctness
 
 #### Only the kernel records the outcome of a claim
 - Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
@@ -1241,7 +1241,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a claim as an ordinary function of some extension, writing the outcome into its own field (rejected: it does not remove the trusted operation, it moves it into that extension)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. The kernel's contents are then values, pure primitives, the evaluator, metadata with its fields and rules, authority, and this operation.
-- Chapter: When a program is wrong
+- Chapter: Correctness
 
 #### A refutation marks everything computed from it
 - Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, a name that nothing declares, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
@@ -1255,7 +1255,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. With it an effect never consumes a refuted value, and a phase goes on evaluating what does not depend on one, then ends refuted. A test for the mark is itself computed from the refuted value, so it is refuted too.
 - Held finding (2026-11-11, DR2): the kernel throws on an ill-formed application and on some type errors instead of recording a refutation (the five abort classes of the former "Specified aborts").
-- Chapter: When a program is wrong
+- Chapter: Correctness
 
 #### A refutation on a path that may be taken refutes the program
 - Decides: if a claim is refuted in a branch whose condition cannot be decided, the program is wrong, unless what is known already rules that branch out. A program that means to handle the bad case uses a handled failure.
@@ -1268,7 +1268,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: leaving the refutation conditional until the condition is known (rejected: a function with a failing path would pass until run on the bad input)
 - Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling.
-- Chapter: When a program is wrong
+- Chapter: Correctness
 
 #### A failure a program can handle is supplied by an extension
 - Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
@@ -1283,7 +1283,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Errors as a viral metadata field". The maintainer: "exception" probably fits better than "error", and the choice is left to each extension. To be placed with the standard language in Part IV when that part is reviewed.
 - Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
 - Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
-- Chapter: When a program is wrong
+- Chapter: Correctness
 
 #### Evaluation stops early for two reasons only
 - Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
@@ -1296,7 +1296,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: five classes of abort, capability denial and ill-formed application among them (what the inventory listed; three of the five are refutations or cannot arise)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
-- Chapter: When a program is wrong
+- Chapter: Correctness
 
 ### Grammars as values
 
