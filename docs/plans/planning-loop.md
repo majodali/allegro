@@ -159,8 +159,8 @@ before it.
   `open`, `unsolved`, and the loop's `timeout`): the names the protocol
   gives each reason a [proposal](#def-proposal) is refused. Ratified at
   PR #182's comment, 2026-11-10; `timeout`, a turn whose time box ran
-  out, added by L4 (`LoopRefusal` in `pcp/llm-worker.ts`), for
-  ratification at L4's PR.
+  out, added by L4 (`LoopRefusal` in `pcp/llm-worker.ts`), ratified
+  at the merge of PR #186, 2026-11-12.
 - <a id="def-kind-registry"></a>**Kind registry** (`OBLIGATION_KINDS`
   in `pcp/llm-worker.ts`): the per-obligation-kind table of request,
   splice, success test and primer that [the loop](#def-the-loop) reads,
@@ -170,6 +170,23 @@ before it.
   of prepared answers, one section per obligation and one fenced block
   per attempt, that the scripted [proposer](#def-proposer) reads.
   Ratified at PR #184's comment, 2026-11-11.
+- <a id="def-kernel-time-box"></a>**Kernel time box**: the per-turn
+  limit on the kernel's check of the spliced source (`--turn-timeout`);
+  a check that outlasts it ends the turn with the refusal `timeout`.
+  Ratified at the merge of PR #186, 2026-11-12.
+- <a id="def-reply-time-box"></a>**Reply time box**: the per-turn limit
+  on the client's reply (`--reply-timeout`); a reply that outlasts it
+  ends the turn with the refusal `timeout`. Ratified at the merge of PR
+  #186, 2026-11-12.
+- <a id="def-transcript-twin"></a>**Transcript twin**: the JSON file
+  beside a markdown transcript of [the loop](#def-the-loop), holding the
+  same record as data, for L7's reproducing test. Ratified at the merge
+  of PR #186, 2026-11-12.
+- <a id="def-claude-code-client"></a>**Claude Code client**: the second
+  language-model client, `createClaudeCodeClient` in
+  `pcp/llm-worker.ts`, which answers each request with one `claude -p`
+  run on the logged-in subscription. Ratified at the merge of PR #186,
+  2026-11-12.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -1436,3 +1453,6 @@ R7 and R8 at their rows' time.
   claude-code`), personal use; the SDK client stays for API billing;
   public demos that need Claude API calls are deferred (the website's
   loop demo is out of L7's scope until a route exists).**
+- **2026-11-12 — L4's A6, the refusal kind `timeout`, the four terms and
+  the obligation filter's default (none in this stream) ratified at PR
+  #186's merge.**

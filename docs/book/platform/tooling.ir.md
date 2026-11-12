@@ -338,11 +338,11 @@ C122. `propose` exits with code 0 whatever the obligations' state. evidence: E15
 
 ### The `prove` subcommand [implemented]
 
-C188. Without `--proposals` or `--proposer claude-code`, `prove` creates the SDK client before reading the file, exiting with code 1 when neither `--api-key` nor `ANTHROPIC_API_KEY` gives a key. evidence: E16, E24, E41. [proposed: this IR]
+C188. Without `--proposals` or `--proposer claude-code`, `prove` creates the SDK client before reading the file, exiting with code 1 when neither `--api-key` nor `ANTHROPIC_API_KEY` gives a key. evidence: E16, E24, E41. [decided: owner, 2026-11-12]
 
 C176. With `--proposals FILE.md`, `prove` answers from the file through the scripted proposer of `pcp/llm-worker.ts`, reading no key. evidence: E3, E40. [decided: owner, 2026-11-11]
 
-C186. `prove --api-key KEY` passes the key to `createAnthropicClient`, which reads `ANTHROPIC_API_KEY` only when no key is passed. evidence: E16, E41. [proposed: this IR]
+C186. `prove --api-key KEY` passes the key to `createAnthropicClient`, which reads `ANTHROPIC_API_KEY` only when no key is passed. evidence: E16, E41. [decided: owner, 2026-11-12]
 
 C125. `prove` runs `runLlmWorker` in `pcp/llm-worker.ts` with at most `--max-attempts` attempts per pending obligation, five by default. evidence: E3, E17. [decided: owner, 2026-11-02]
 
@@ -356,35 +356,35 @@ C178. `runLlmWorker` evaluates the spliced source once through `evalSource`, kee
 
 C179. The system prompt is `docs/book/proving-in-allegro.md` for a theorem and section 2.9 of `docs/book/vivace/planning-dsl.md` for a plan obligation, each read relative to the current working directory. evidence: E18. [decided: owner, 2026-11-11]
 
-C195. A discharged obligation's authorship names the client's `modelId()` as the prover, with the attempts used: the model's name, `claude-code:MODEL`, or `scripted:FILE`. evidence: E17, E40, E44. [proposed: this IR]
+C195. A discharged obligation's authorship names the client's `modelId()` as the prover, with the attempts used: the model's name, `claude-code:MODEL`, or `scripted:FILE`. evidence: E17, E40, E44. [decided: owner, 2026-11-12]
 
-C196. `prove --proposer claude-code` answers each request by one `claude -p` run, with the primer as the system prompt, no tools and one turn, in an empty temporary directory, without `ANTHROPIC_API_KEY`. evidence: E44. [proposed: this IR]
+C196. `prove --proposer claude-code` answers each request by one `claude -p` run, with the primer as the system prompt, no tools and one turn, in an empty temporary directory, without `ANTHROPIC_API_KEY`. evidence: E44. [decided: owner, 2026-11-12]
 
-C197. A `claude -p` run that exits non-zero, or prints no JSON `result`, is a failed attempt recorded with the run's output, ending that obligation's attempts as an SDK error does. evidence: E44. [proposed: this IR]
+C197. A `claude -p` run that exits non-zero, or prints no JSON `result`, is a failed attempt recorded with the run's output, ending that obligation's attempts as an SDK error does. evidence: E44. [decided: owner, 2026-11-12]
 
-C189. With `--turn-timeout MS`, 30,000 by default and 0 for none, `runLlmWorker` judges each turn in a worker thread, terminates the thread when the judgement outlasts the box, and refuses that attempt as `timeout`. evidence: E41, E42. [proposed: this IR]
+C189. With `--turn-timeout MS`, 30,000 by default and 0 for none, `runLlmWorker` judges each turn in a worker thread, terminates the thread when the judgement outlasts the box, and refuses that attempt as `timeout`. evidence: E41, E42. [decided: owner, 2026-11-12]
 
-C190. An attempt refused as `timeout` counts against `--max-attempts`, and the next request carries the refusal's text. evidence: E42, E43. [proposed: this IR]
+C190. An attempt refused as `timeout` counts against `--max-attempts`, and the next request carries the refusal's text. evidence: E42, E43. [decided: owner, 2026-11-12]
 
-C191. With `--reply-timeout MS`, 120,000 by default and 0 for none, `runLlmWorker` aborts a client request that does not answer within the box, refusing the attempt with the refusal kind `timeout`. evidence: E41, E42. [proposed: this IR]
+C191. With `--reply-timeout MS`, 120,000 by default and 0 for none, `runLlmWorker` aborts a client request that does not answer within the box, refusing the attempt with the refusal kind `timeout`. evidence: E41, E42. [decided: owner, 2026-11-12]
 
 C131. `prove --output FILE.alg` writes the source with every kept proof term spliced in. evidence: E3. [decided: owner, 2026-11-02]
 
-C192. `prove --transcript FILE.md` writes the run's transcript as Markdown to `FILE.md` and as JSON to `FILE.json`. evidence: E41, E42. [proposed: this IR]
+C192. `prove --transcript FILE.md` writes the run's transcript as Markdown to `FILE.md` and as JSON to `FILE.json`. evidence: E41, E42. [decided: owner, 2026-11-12]
 
 C181. `prove` exits with code 0 when every obligation the loop attempted discharged, code 1 otherwise. evidence: E3, E17. [decided: owner, 2026-11-11]
 
-C193. A `prove` flag without its value, a time box that is not a whole number of milliseconds, or an unknown `--proposer`, ends `prove` with code 1 before any client is created. evidence: E41. [proposed: this IR]
+C193. A `prove` flag without its value, a time box that is not a whole number of milliseconds, or an unknown `--proposer`, ends `prove` with code 1 before any client is created. evidence: E41. [decided: owner, 2026-11-12]
 
 C185. `runLlmWorker` skips an obligation the client declines, as the scripted proposer declines one its file holds no answer for, attempting it never. evidence: E17, E40. [decided: owner, 2026-11-11]
 
-C187. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once for the run and once per worker thread of a kernel time box, evaluating each turn's source with its `use` header stripped. evidence: E17, E42. [proposed: this IR]
+C187. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once for the run and once per worker thread of a kernel time box, evaluating each turn's source with its `use` header stripped. evidence: E17, E42. [decided: owner, 2026-11-12]
 
 C134. In a run on 2026-11-01, `evalSource` over a source opening with `use contracts`, the type system the one extension, threw a parse error. evidence: E28. [decided: owner, 2026-11-02]
 
 C183. In a run on 2026-11-10, `prove --proposals` over `tests/planning-loop-proposals.alg`, whose header holds three `use` directives, discharged its plan obligation in two attempts. evidence: E40. [decided: owner, 2026-11-11]
 
-C194. In a run on 2026-11-11, `prove --proposals --turn-timeout 5000` over `tests/planning-loop-proposals.alg` refused as `timeout` after 5 s a first proposal whose estimate applies a function to itself, then discharged the obligation. evidence: E43. [proposed: this IR]
+C194. In a run on 2026-11-11, `prove --proposals --turn-timeout 5000` over `tests/planning-loop-proposals.alg` refused as `timeout` after 5 s a first proposal whose estimate applies a function to itself, then discharged the obligation. evidence: E43. [decided: owner, 2026-11-12]
 
 C136. `src/test/pcp.ts` pins the worker's helpers, one loop of `runLlmWorker` with a mock client, and the missing-key failure of `prove`. evidence: E30. [decided: owner, 2026-11-02]
 
@@ -500,9 +500,9 @@ G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: own
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G29. cluster: C188, C176, C186, C196, C197, C125, C126, C177, C184, C178, C179, C195, C189, C190, C191, C131, C192, C181, C193, C185 [proposed: this IR]
+G29. cluster: C188, C176, C186, C196, C197, C125, C126, C177, C184, C178, C179, C195, C189, C190, C191, C131, C192, C181, C193, C185 [decided: owner, 2026-11-12]
 
-G30. cluster: C187, C134, C183, C194, C136 [proposed: this IR]
+G30. cluster: C187, C134, C183, C194, C136 [decided: owner, 2026-11-12]
 
 G22. cluster: C137, C138, C139 [decided: owner, 2026-11-02]
 
@@ -649,3 +649,5 @@ A5. Ratify the re-proposed claims about `prove` and the worker as chunk L3 of B-
 A5 resolved: ratified by the owner at PR #184's comment, 2026-11-11; the statuses are flipped.
 
 A6. Ratify the re-proposed claims about `prove` and the worker as chunk L4 of B-187 (the planning loop, the next validating demo) left the code, with their clusters G29 and G30 re-proposed: C186, which replaces C124 (`--api-key` parsed, B-175 item 6); C188, which replaces C175 (no key from either source); C187, which replaces C182 (the modules loaded again in each worker thread); C189, C190 and C191 (the kernel's and the reply's time boxes, and the refusal kind `timeout`); C192 (`--transcript`); C193 (a malformed flag); C194 (a run ending a diverging turn); and, ruled at the PR, C196 and C197 (the Claude Code client, `--proposer claude-code`) and C195, which replaces C180 (the prover `claude-code:MODEL`). Depends: C186, C187, C188, C189, C190, C191, C192, C193, C194, C195, C196, C197.
+
+A6 resolved: ratified by the owner at the merge of PR #186, 2026-11-12; the statuses are flipped.
