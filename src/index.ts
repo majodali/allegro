@@ -303,15 +303,22 @@ if (flagless[0] === "inspect") {
 } else if (flagless[0] === "verify") {
   const filename = flagless[1];
   if (!filename) {
-    console.error("usage: allegro verify <file> [--obligation O.json] [--json]");
+    console.error("usage: allegro verify <file> [--obligation O.json] [--transcript T.json] [--json]");
     process.exit(1);
   }
   const obligationPath = (() => {
     const i = argv.indexOf("--obligation");
     return i >= 0 ? argv[i + 1] : undefined;
   })();
+  // B-187 L7: `--transcript T.json`, a transcript twin of `prove
+  // --transcript`: its accepted catalog entries are put back into the file
+  // and the plan ledger names their authors.
+  const transcriptPath = (() => {
+    const i = argv.indexOf("--transcript");
+    return i >= 0 ? argv[i + 1] : undefined;
+  })();
   const asJson = argv.includes("--json");
-  runPcpVerify(filename, standard, obligationPath, asJson).catch(e => {
+  runPcpVerify(filename, standard, obligationPath, asJson, transcriptPath).catch(e => {
     console.error(e.message);
     process.exit(1);
   });
@@ -504,8 +511,8 @@ async function pcpPlanLedger(
  * Phase H2 / B-187 L5: `pcpLoadAndEval` with the extensions and the source
  * directory it loaded with, which the plan ledger evaluates over.
  */
-async function pcpLoad(filename: string, isStandard: boolean) {
-  const source = fs.readFileSync(filename, "utf-8");
+async function pcpLoad(filename: string, isStandard: boolean, sourceText?: string) {
+  const source = sourceText ?? fs.readFileSync(filename, "utf-8");
   const sourceDir = path.dirname(path.resolve(filename));
   let extensions: Extension[] = isStandard ? [...getStdExtensions()] : [];
 
@@ -542,10 +549,30 @@ async function runPcpVerify(
   isStandard: boolean,
   obligationPath: string | undefined,
   asJson: boolean,
+  transcriptPath?: string,
 ): Promise<void> {
   const { buildVerdict, parseObligation, checkObligationSatisfied,
-          serializeVerdict, formatVerdict } = await import("./pcp.js");
-  const { result, extensions, sourceDir } = await pcpLoad(filename, isStandard);
+          serializeVerdict, formatVerdict, extractObligations, applyTranscriptEntries,
+          entryAuthorsByValue } = await import("./pcp.js");
+  let loaded = await pcpLoad(filename, isStandard);
+  // B-187 L7 (ask 4 of PR #188): with `--transcript T.json`, the
+  // transcript's accepted catalog entries are spliced back into the file
+  // as the loop spliced them, the file is evaluated again with them, and
+  // their authors reach the plan ledger (`entryAuthorsFrom`). The kernel
+  // judges the spliced file afresh; an entry the file cannot take, or one
+  // that no longer closes its obligation, fails the verdict.
+  let applied: import("./pcp.js").AppliedTranscript | undefined;
+  if (transcriptPath) {
+    const transcript = JSON.parse(fs.readFileSync(transcriptPath, "utf-8"));
+    if (transcript?.version !== "transcript/1" || !Array.isArray(transcript.obligations)) {
+      throw new Error(`allegro verify: ${transcriptPath} is not a transcript twin (transcript/1)`);
+    }
+    const pending = extractObligations(loaded.result.evalCtx, loaded.result.compilationReport,
+                                       { pendingOnly: true, sourceFile: filename, plans: true });
+    applied = applyTranscriptEntries(fs.readFileSync(filename, "utf-8"), pending, transcript);
+    if (applied.applied.length > 0) loaded = await pcpLoad(filename, isStandard, applied.source);
+  }
+  const { result, extensions, sourceDir } = loaded;
   // If an obligation is supplied, pass it through to buildVerdict so
   // iteration hints reflect the lemma context + prior-attempt strategies.
   let obligation = undefined;
@@ -557,7 +584,8 @@ async function runPcpVerify(
   // open plans (its `plans` line), as `obligations` lists them. B-187 L5:
   // and the plan ledger of the file's plan values (its `plan ledger` line
   // and the promises in the assumption ledger).
-  const planLedger = await pcpPlanLedger(result.evalCtx, extensions, sourceDir, isStandard);
+  const authors = applied ? entryAuthorsByValue(result.evalCtx, applied.applied, applied.authors) : [];
+  const planLedger = await pcpPlanLedger(result.evalCtx, extensions, sourceDir, isStandard, authors);
   const verdict = buildVerdict(result.evalCtx, result.compilationReport, obligation, { plans: true, planLedger });
 
   // Cross-check the obligation: the candidate must satisfy the named
@@ -573,6 +601,29 @@ async function runPcpVerify(
     }
   }
 
+  // B-187 L7: each applied entry must still close its obligation.
+  const transcriptLines: string[] = [];
+  if (applied && transcriptPath) {
+    const mismatches = [...applied.notApplied.map(n => `\`${n.obligation}\` not applied: ${n.reason}`)];
+    for (const a of applied.applied) {
+      const binding = a.obligation.slice(0, a.obligation.indexOf(": "));
+      const rec = verdict.planObligations?.find(r => r.binding === binding);
+      if (rec?.status !== "discharged") {
+        mismatches.push(`\`${a.obligation}\` is not closed by the entry \`${a.node}\`: ${rec?.message ?? "the obligation is gone"}`);
+      }
+    }
+    transcriptLines.push(`  transcript: ${transcriptPath}: ${applied.applied.length} accepted entr${applied.applied.length === 1 ? "y" : "ies"} applied`);
+    for (const a of applied.applied) {
+      transcriptLines.push(`    + ${a.node} in ${a.catalog ? `\`${a.catalog}\`` : "the catalog"} for \`${a.obligation}\`, by ${a.author} in ${a.attempts} attempt(s)`);
+    }
+    for (const m of mismatches) transcriptLines.push(`    ✗ ${m}`);
+    if (mismatches.length > 0) {
+      (verdict as any).verified = false;
+      (verdict as any).transcriptMismatch = mismatches;
+    }
+    (verdict as any).transcript = { file: transcriptPath, applied: applied.applied, notApplied: applied.notApplied };
+  }
+
   if (asJson) {
     console.log(serializeVerdict(verdict));
   } else {
@@ -580,6 +631,7 @@ async function runPcpVerify(
     if ((verdict as any).obligationMismatch) {
       console.log(`  obligation mismatch: ${(verdict as any).obligationMismatch}`);
     }
+    for (const line of transcriptLines) console.log(line);
   }
   process.exit(verdict.verified ? 0 : 1);
 }
@@ -734,6 +786,7 @@ async function runPcpProve(filename: string, argv: string[]): Promise<void> {
         history: o.history,
       })),
       ...(result.skipped ? { skipped: result.skipped } : {}),
+      ...(result.skippedNoSite ? { skippedNoSite: result.skippedNoSite } : {}),
     }));
   } else {
     console.log(`allegro prove — ${filename}`);
@@ -755,7 +808,10 @@ async function runPcpProve(filename: string, argv: string[]): Promise<void> {
         if (last.reason) console.log(`      last failure: ${last.reason}`);
       }
     }
-    for (const name of result.skipped ?? []) console.log(`  - ${name} (no prepared proposal)`);
+    const noSite = new Set(result.skippedNoSite ?? []);
+    for (const name of result.skipped ?? []) {
+      console.log(`  - ${name} (${noSite.has(name) ? "no splice site in the file" : "no prepared proposal"})`);
+    }
     if (outputPath) console.log(`Wrote proved source to ${outputPath}`);
     if (transcriptPath) console.log(`Wrote the transcript to ${transcriptPath} and ${transcriptJsonPath(transcriptPath)}`);
   }

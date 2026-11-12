@@ -73,6 +73,19 @@ export function extractCodeBlocks(text: string): string[] {
   return out;
 }
 
+/** The `theorem NAME:` line a proof term is spliced into. Allows leading
+ *  whitespace; the proposition may continue across the rest of the line
+ *  (and not beyond: the splicer does not support multi-line propositions).
+ *  B-187 L7: the loop also reads it as the theorem kind's splice site, so
+ *  a theorem the file does not declare (a library's law) is skipped. */
+export function theoremSitePattern(theoremName: string): RegExp {
+  const escName = theoremName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `^([ \\t]*theorem\\s+${escName}\\s*:[^\\n]*?)(\\s+by\\s+[^\\n]+)?(\\s*)$`,
+    "m",
+  );
+}
+
 /** Splice a proof term into a theorem declaration in the source. The
  *  theorem may already have a `by` clause — we replace it; or it may
  *  not — we append `by <term>` before any trailing newline / next
@@ -82,14 +95,7 @@ export function extractCodeBlocks(text: string): string[] {
  *  Returns the new source. Throws if the theorem declaration can't be
  *  located uniquely. */
 export function spliceProof(source: string, theoremName: string, proofTerm: string): string {
-  // Match a `theorem NAME:` line. Allow leading whitespace.
-  // The proposition may continue across the rest of the line (and not
-  // beyond — we don't support multi-line propositions in the splicer).
-  const escName = theoremName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const lineRe = new RegExp(
-    `^([ \\t]*theorem\\s+${escName}\\s*:[^\\n]*?)(\\s+by\\s+[^\\n]+)?(\\s*)$`,
-    "m",
-  );
+  const lineRe = theoremSitePattern(theoremName);
   const m = source.match(lineRe);
   if (!m) {
     throw new Error(`spliceProof: could not locate \`theorem ${theoremName}\` declaration in source`);
@@ -463,8 +469,13 @@ export interface WorkerResult {
     turns:       TurnRecord[];
   }>;
   /** B-187 L3: the pending obligations the client has no answer for
-   *  (`LlmClient.answers` false), by name; not attempted, not pending. */
+   *  (`LlmClient.answers` false), by name; not attempted, not pending.
+   *  B-187 L7: and those the file holds no splice site for. */
   skipped?: string[];
+  /** B-187 L7: the skipped obligations the file holds no splice site for
+   *  (`NO_SPLICE_SITE`), by name, a subset of `skipped`; absent when none.
+   *  An obligation the client declines is skipped for that reason first. */
+  skippedNoSite?: string[];
   /** Aggregated authorship summary. */
   summary: {
     discharged: number;
@@ -631,7 +642,17 @@ export interface ObligationKindSpec {
   primer(repoRoot?: string): string;
   /** B-187 L4: the primer section's name, as the transcript names it. */
   primerName: string;
+  /** B-187 L7: the reason the file holds no splice site for the
+   *  obligation, so the loop skips it before any request; absent when it
+   *  holds one. A kind without it is always asked. */
+  site?(source: string, ob: Obligation): string | undefined;
 }
+
+/** B-187 L7 (ruled at PR #189's merge): the reason a theorem the file does
+ *  not declare is skipped. A library's law (`lib/units.alg`'s, for a file
+ *  with `use units`) has no `theorem NAME` line in the file, so no proof
+ *  term could be spliced; the loop asks no proposer about it. */
+export const NO_SPLICE_SITE = "no splice site in the file";
 
 /** Theorems: the H4a worker's parts, unchanged. */
 export const theoremKind: ObligationKindSpec = {
@@ -671,6 +692,7 @@ export const theoremKind: ObligationKindSpec = {
   },
   primer: (repoRoot) => loadPrimer(repoRoot),
   primerName: "`docs/book/proving-in-allegro.md`, whole",
+  site: (source, ob) => theoremSitePattern(ob.theorem.name).test(source) ? undefined : NO_SPLICE_SITE,
 };
 
 /** The request text of one attempt at a plan obligation: the words of the
@@ -909,6 +931,7 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
 
   const perObligation: WorkerResult["perObligation"] = [];
   const skipped: string[] = [];
+  const skippedNoSite: string[] = [];
   // B-187 L4: the kernel's box, opened at the first turn it judges. The
   // thread loads the source as it stood before the loop: the modules are
   // the header's, which a proposal does not change.
@@ -920,6 +943,13 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
       const spec = OBLIGATION_KINDS[kind];
       if (client?.answers && !client.answers(ob.theorem.name)) {
         skipped.push(ob.theorem.name);
+        continue;
+      }
+      // B-187 L7: no splice site in the file (a library's law): skipped
+      // before any request, whatever the client.
+      if (spec.site?.(source, ob) !== undefined) {
+        skipped.push(ob.theorem.name);
+        skippedNoSite.push(ob.theorem.name);
         continue;
       }
       const so: AttemptsSoFar = { history: [], priorAttempts: [] };
@@ -1053,6 +1083,7 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
     ...(opts.turnTimeoutMs  ? { turnTimeoutMs:  opts.turnTimeoutMs }  : {}),
     ...(opts.replyTimeoutMs ? { replyTimeoutMs: opts.replyTimeoutMs } : {}),
     skipped,
+    ...(skippedNoSite.length > 0 ? { skippedNoSite } : {}),
     obligations: perObligation.map(o => ({
       name: o.name, kind: o.kind ?? "theorem", discharged: o.discharged, attempts: o.attempts,
       ...(o.authorship ? { authorship: o.authorship } : {}),
@@ -1064,6 +1095,7 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
     allDischarged: summary.pending === 0,
     perObligation,
     ...(skipped.length > 0 ? { skipped } : {}),
+    ...(skippedNoSite.length > 0 ? { skippedNoSite } : {}),
     summary,
     transcript,
   };
@@ -1091,8 +1123,12 @@ export interface Transcript {
   maxAttempts:     number;
   turnTimeoutMs?:  number;
   replyTimeoutMs?: number;
-  /** The obligations the proposer declined. */
+  /** The obligations the proposer declined, and (B-187 L7) those the file
+   *  holds no splice site for. */
   skipped:         string[];
+  /** B-187 L7: the skipped obligations the file holds no splice site for;
+   *  absent when none, so a transcript without such a skip reads as before. */
+  skippedNoSite?:  string[];
   obligations: Array<{
     name: string; kind: ObligationKind; discharged: boolean; attempts: number;
     authorship?: Authorship;
@@ -1116,8 +1152,13 @@ export function formatTranscript(t: Transcript): string {
   out.push(`- **Attempt limit:** ${t.maxAttempts} per obligation`);
   out.push(`- **Time box:** kernel ${t.turnTimeoutMs ? formatSeconds(t.turnTimeoutMs) : "none"} per turn, reply ${t.replyTimeoutMs ? formatSeconds(t.replyTimeoutMs) : "none"}`);
   out.push(`- **Attempted:** ${t.obligations.length}; **discharged:** ${t.obligations.filter(o => o.discharged).length}`);
-  if (t.skipped.length > 0) {
-    out.push(`- **Skipped** (the proposer has no answer): ${t.skipped.map(n => `\`${n}\``).join(", ")}`);
+  const noSite = new Set(t.skippedNoSite ?? []);
+  const declined = t.skipped.filter(n => !noSite.has(n));
+  if (declined.length > 0) {
+    out.push(`- **Skipped** (the proposer has no answer): ${declined.map(n => `\`${n}\``).join(", ")}`);
+  }
+  if (noSite.size > 0) {
+    out.push(`- **Skipped** (${NO_SPLICE_SITE}): ${[...noSite].map(n => `\`${n}\``).join(", ")}`);
   }
   for (const o of t.obligations) {
     out.push("", `## \`${o.name}\` (${o.kind})`, "");
