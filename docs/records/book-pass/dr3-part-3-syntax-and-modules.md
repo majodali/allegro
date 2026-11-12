@@ -133,3 +133,37 @@ No terms introduced.
 - Ask 4: two cases are foundational: importing value bindings, and
   importing a grammar for immediate use in parsing the current text.
   The choice of keywords is implementation only.
+
+**On the first drafts, ruled 2026-11-12.**
+
+- "Parsing is evaluation" drops its sentence on phases: when a parser
+  runs follows from the partial-evaluation decisions already given.
+- "No parser is privileged" and "A parser records where each
+  expression came from in its text" are confirmed. The kernel's origin
+  field and the parser's source field are two fields: the kernel sets
+  the expression an expression came from; a parser annotates a parsed
+  expression with its source information.
+- The draft "The kernel takes expressions, never text" is replaced.
+  The maintainer: set out the extension mechanism's requirements,
+  likely with requirements for configuration and the startup process;
+  requirements, not implementation decisions. The extension mechanism,
+  parsing, module import and script execution each get a foundational
+  decision, and one statement says that programs entering by any of
+  these channels are evaluated by the same mechanism. The proposal DR1
+  deferred (a program built by a program is checked like any other)
+  folds into that statement.
+- The platform ships no parser as such and no parser generator as a
+  concept. It ships a parser engine built ahead of time, which takes a
+  grammar and a text and returns an expression, and inbuilt grammar
+  definitions.
+- A grammar may change part way through a text. The maintainer: "our
+  parser starts with an initial grammar and modifies it (augmenting or
+  replacing) at a specific point in the parse, so all following text
+  is parsed with the modified grammar." Scanning a text ahead of the
+  parse is rejected: the declaration may appear part way through, and
+  grammars may define their own features of the kind. The shipped
+  implementation scans so that it can use a simple parser; the
+  inventory states the original goal, which needs a custom engine.
+- The draft on modules splits in two: one decision on modules, one on
+  grammar extension. A program's main file is loaded by the module
+  loader as well.
