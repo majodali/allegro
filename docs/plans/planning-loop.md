@@ -1966,3 +1966,7 @@ R7 and R8 at their rows' time.
   addressed; A7 ratified; whether `verify` carries the loop's authors
   waits for L7; the four terms ratified; the not-claimed wording and the
   `verify` time accepted for this pilot.**
+- **2026-11-12 — L6 dropped: L3's scripted loop and L4's keyed run each
+  converged in two attempts from the refusal text alone, so the loop
+  needed neither the call-site origin nor a rendered refused value;
+  B-081's residue stays where `docs/plans/planning-pilot.md` holds it.**
