@@ -105,8 +105,18 @@ already recorded on Part IV's entries.
 
 ## What changed
 
-Nothing yet. Part IV of `docs/plans/book-pass-inventory.md` is
-rewritten as the asks are ruled, and "Rulings taken" records each.
+Part IV of `docs/plans/book-pass-inventory.md`, from 83 decisions in
+eleven chapters to 66 in eleven: Types as values; Refinement types;
+Reaching a member; The surface language; Claims and proofs; Equality
+and laws; Effects; Contracts and the knowledge they give; Termination
+and completion; When a check fails; Units of measure. One decision is
+added to Part II's "Authority" chapter ("Reading an expression never
+yields authority") and a note on truth to "The kernel's primitives are
+pure and few". Three entries move to Part VI. New held findings are on
+the entries that name them and in the table at the inventory's top.
+Every dependency of Parts I to IV points to an earlier decision, and
+no capability decision depends on an implementation decision. The
+inventory holds 217 decisions.
 
 ## Terms introduced
 
@@ -187,3 +197,31 @@ recommendation on each.
 - Ask 8: "What is known about a value travels with the value." One
   carrier; inside a branch the names tested are rebound; the arms of a
   pattern match narrow as the branches of `if` do.
+
+**Asks 9 to 13, ruled 2026-11-12.** The maintainer agreed with the
+recommendation on each.
+
+- Ask 9: "In the standard language every value has a type"; "The core
+  types are built over bits"; "Default equality belongs to the
+  standard extension". A mode and a flag for the bare kernel stop
+  being concepts; the default configuration moves to Part VI.
+- Ask 10: "A typed function claims its parameter types on entry and
+  its return type on exit"; "A body clause is a notation".
+- Ask 11: the prover's primer and the proof-term contract move to
+  Part VI, with the default configuration. These stop being
+  decisions: the choice of units of measure as a demonstration; the
+  ban on redefining core types (Part I's rule that replacing is
+  explicit); the two verdict entries (held findings on "Every result
+  says how strongly it holds"); the guidance on choosing among
+  refinement, contract, assertion and law (kept as material for the
+  chapter); the labels for observing knowledge and scheduling.
+- `is_resolved` is removed from the language. The maintainer: "I
+  don't have a good use case for `is_resolved`. Phase specific
+  behavior can be provided through other mechanisms, if needed"; a
+  use case found later reopens the decision, as with every decision.
+- Ask 12: a note on Part II's "The kernel's primitives are pure and
+  few": the kernel recognises two bit values as true and false, and a
+  conditional or a claim on anything else is a refutation.
+- Ask 13: the remaining entries stay, reworded.
+
+Every ask is ruled.
