@@ -207,6 +207,10 @@ before it.
   that a finding of the composed program can name both. This plan uses
   it for (2) and (3) only. B-082 (model composition) holds the general
   question.
+- <a id="def-splice-site"></a>**Splice site**: the place in a file where
+  the loop puts a proposal: a theorem's `theorem NAME:` line, or the
+  `catalog NAME:` block an obligation names. Ratified on the
+  maintainer's review of PR #192, 2026-11-12.
 
 **Reserved ids.** The header reserves B-188 (first out-of-scope finding
 of the planning-loop stream) and B-189 (second out-of-scope finding of
@@ -750,7 +754,11 @@ R7 and R8 at their rows' time.
     component graph's check, so it is worth taking before SY1's first
     chunk or in it; and R5 (a)'s note to revisit a lane of the Vivace
     models' own falls due here, with a second library in lane D.
-  - **Taken:**
+  - **Taken:** (a), on the maintainer's review of PR #192, 2026-11-12:
+    components and data first, UI later, all from B-080's roster; the
+    composition point a plan's outcome typed by a system model's
+    artifact, with a cross-model check whose findings are plan
+    obligations for the same loop; library-first.
 - **R8** — **What the documentation or comprehension model is for.** A
   question for the maintainer; no design is offered. Readings the raw
   material of §5 supports:
@@ -2330,3 +2338,28 @@ R7 and R8 at their rows' time.
     The filter matches no test name of the scene's file test (`file:
     01-loop.alg`); the shards run it, and `ALLEGRO_TEST_FILTER="file:
     01-loop"` runs it alone: 1 passed.
+- **2026-11-12 — L7's asks ruled.** The maintainer, on the review of
+  PR #192: "PR#192 reviewed and ratified. Go with recommendation on
+  R7."
+  - R7 taken as (a) (§6): components and data first, UI later; the
+    composition point a plan's outcome typed by a system model's
+    artifact, with a cross-model check whose findings are plan
+    obligations; library-first. Row SY1 is planned by amendment at its
+    own PR (below, when it lands).
+  - The `verify --transcript` shape ratified, with ask A8 of
+    `docs/book/platform/tooling.ir.md`: claims C205 to C210 and clusters
+    G28 and G29 are decided, ask A8 resolved.
+  - The skip's order and scope ratified as the default: a theorem the
+    client declines is asked about first, then the splice site; a plan
+    obligation whose catalog is not a top-level binding is still asked
+    once (its splice refuses it as `no-catalog`).
+  - The four register lines of `docs/plans/release-track.md` ratified:
+    D3's new row, D2's result-level roll-up, D6's "to advance", and §8's
+    rung 4 scene 1 entry. None carried a "to ratify" clause.
+  - The stale claims of `docs/book/demo-ladder.ir.md` (the L7 entry's
+    list) go to the review session; this stream does not edit them.
+  - The term [splice site](#def-splice-site) ratified and added to §1.
+  - The finding's cause confirmed: an indexed `open_obligations(Fulfil)[0]`
+    halts the accepting turn, because the solved plan's obligation list
+    is empty; the loop reports the file's own fault as the proposal's
+    refusal (`refused (halt)`). Not filed unless the maintainer asks.
