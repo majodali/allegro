@@ -59,7 +59,7 @@ As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 **Part IV: Allegro Standard**
 
-As ruled in DR4 (2026-11-12).
+As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed on PR #191.
 
 14. **Types as values** (14 decisions). Types are ordinary values that constrain values; every value of the language has one; kinds, conformance by member symbol, the core types over bits, exceptions, generics and typed functions.
    - Decisions: Types are values that constrain values; In the standard language every value has a type; Kinds are types, and Type is its own type; Members are keyed by symbol and conformance is membership; One meta-type with an optional name; One construction surface; Loose conformance for data, selected by anonymity; The standard language's handled failure is an exception; The core types are built over bits; Generics are memoized type constructors; Function types with bidirectional call-site unification; A typed function claims its parameter types on entry and its return type on exit; `distinct` mints a fresh-symbol newtype; The user-facing generics surface and parameter kinds.
@@ -75,7 +75,7 @@ As ruled in DR4 (2026-11-12).
    - Decisions: Lawful interfaces; Equality dispatches on shape, then coerces, else not-equal; Default equality belongs to the standard extension; Law strengths and the transitivity gate.
 20. **Effects** (3 decisions). An effect is the use of a capability; parts and narrowed forms; how a bound is written.
    - Decisions: An effect is the use of a capability; A capability has named parts and narrowed forms; A bound on capabilities is written in an `effects` clause or a type slot.
-21. **Contracts and the knowledge they give** (6 decisions). A contract becomes knowledge that travels with the value; clauses as notation; matches that cannot fall through.
+21. **Contracts** (6 decisions). A contract becomes knowledge that travels with the value; clauses as notation; matches that cannot fall through.
    - Decisions: A contract is a predicate that becomes knowledge, discharged by PE; What is known about a value travels with the value; A match where no arm matches is a refutation; A body clause is a notation; Contract checks sit at function entry and return; Unification in patterns.
 22. **Termination and completion** (4 decisions). Termination as a claim, completion as termination plus arrival, and how a decrease is recognised.
    - Decisions: Termination is a claim; Completion is totality and liveness; Termination by bounded decrease; Mutual recursion requires every edge to decrease.
@@ -150,12 +150,12 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | A grammar change does not reach the prompt | Running a program is evaluating its main module with a configuration's capabilities | Modules and programs | DR3, rulings of 2026-11-12 |
 | The pipeline has fixed host stages and writes in place into built values, with a guard for library values | Every program is evaluated the same way, however it arrives | Modules and programs | DR3, rulings of 2026-11-12 |
 | Member access is mediated through an installed path with a policy hook; privacy asks what a scope can reach | A private member is one whose key not all code holds | Reaching a member | DR4, rulings of 2026-11-12 |
-| Typed calls are checked by the evaluator; body clauses are lowered by host steps | A typed function claims its parameter types on entry and its return type on exit; A body clause is a notation | Types as values; Contracts and the knowledge they give | DR4, rulings of 2026-11-12 |
+| Typed calls are checked by the evaluator; body clauses are lowered by host steps | A typed function claims its parameter types on entry and its return type on exit; A body clause is a notation | Types as values; Contracts | DR4, rulings of 2026-11-12 |
 | A failed construction yields an error value; `make_error` and the `error` field are in the kernel | Constructing a refined value claims its predicate; The standard language's handled failure is an exception | Refinement types; Types as values | DR4, rulings of 2026-11-12 |
 | The proof rules are kernel primitives | A proof term is a proposal | Claims and proofs | DR4, rulings of 2026-11-12 |
-| Findings have severities; a match that can fall through is information | Nothing is a claim until someone makes it; A match where no arm matches is a refutation | Claims and proofs; Contracts and the knowledge they give | DR4, rulings of 2026-11-12 |
+| Findings have severities; a match that can fall through is information | Nothing is a claim until someone makes it; A match where no arm matches is a refutation | Claims and proofs; Contracts | DR4, rulings of 2026-11-12 |
 | Effects are label strings checked separately; `is_resolved` is a primitive | An effect is the use of a capability | Effects | DR4, rulings of 2026-11-12 |
-| Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts and the knowledge they give | DR4, rulings of 2026-11-12 |
+| Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts | DR4, rulings of 2026-11-12 |
 | The verdict is assembled outside evaluation; undecided contracts do not reach it | Every result says how strongly it holds | Keep it simple | DR4, rulings of 2026-11-12 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
@@ -232,9 +232,9 @@ They came together over years of exploration into most of what Allegro is today.
 | [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
 | [standard/core-types.md](../book/standard/core-types.md) (Core types) | Joins the types chapter. Goes to: Types as values. |
 | [standard/effects.md](../book/standard/effects.md) (Effects) | Becomes the effects chapter; environment capabilities go to the host chapter. Goes to: Effects; Hosts: the terminal and the browser (environment capabilities). |
-| [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts and the knowledge they give (§3). |
+| [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts (§3). |
 | [standard/totality.md](../book/standard/totality.md) (Totality and termination) | Becomes the termination chapter; the cutoff goes to the pipeline chapter. Goes to: Termination and completion (§1 to §5); When a check fails (§5 (severity)); The build pipeline (§7, §8 (the cutoff)). |
-| [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts and the knowledge they give (§1 to §4, §6, §8); When a check fails (§7, §10). |
+| [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts (§1 to §4, §6, §8); When a check fails (§7, §10). |
 | [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Vivace: models as the program. |
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a model (choices, catalogs, search). |
 | [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Compiling beyond the interpreter (undelivered tracks). |
@@ -2411,7 +2411,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces the notation half of "Parameter effect bounds and explicit effect variables".
 - Chapter: Effects
 
-### Contracts and the knowledge they give
+### Contracts
 
 #### A contract is a predicate that becomes knowledge, discharged by PE
 - Decides: `assert`, `requires` and `ensures` are claims, and a claim that holds becomes knowledge of the value, so a later claim of the same property is decided by what is known. There is no separate contract checker.
@@ -2426,7 +2426,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: CT-R5 (docs/decisions.md); docs/book/standard/contracts.md §1 items 1–3, §6; docs/book/concepts.md §46
 - Book home (fragments' proposal): standard/contracts
 - Notes (2026-11-12, DR4): guidance kept for the chapter, formerly the entry "Choosing among refinement, contract, assert and law": prefer a refinement when the property is intrinsic, a contract when it concerns a function's relation to its callers, `assert` for local knowledge, a theorem or law when the claim is over all inputs.
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 #### What is known about a value travels with the value
 - Decides: knowledge is a field of the standard extension. Inside a branch, the names tested are rebound to values that carry the extra fact; after `assert` or `requires`, for the rest of the scope. The arms of a pattern match narrow knowledge as the branches of `if` do.
@@ -2440,7 +2440,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: CT-R5, D36 (docs/decisions.md); docs/book/standard/contracts.md §1 items 4–5, §3, §9; docs/book/standard/contracts.md §4; B-057; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: replaces "Knowledge has intrinsic and occurrence carriers" and "Branch refinement narrows knowledge per region". Branch knowledge is the case Part II named to prove first.
 - Held finding (2026-11-12, DR4): occurrence facts live on the scope and narrow in place; the legacy `domain` component is still read.
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 #### A match where no arm matches is a refutation
 - Decides: falling through a pattern match is a wrong program, so a match that can fall through refutes the program, and exhaustiveness needs no analysis of its own. An `else`, a wildcard or a pattern that binds anything covers a match. Where the subject's possible values are not known, the claim is undecided.
@@ -2454,7 +2454,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: CE-R8, T-R3 (docs/decisions.md); docs/book/standard/totality.md §4; archive phase-e-totality-plan.md question 2; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: replaces "Exhaustiveness checking at info severity". A finding carries a witness: a value no arm matches. Closed sums, record destructuring and dead cases under refinements are designed, not built.
 - Held finding (2026-11-12, DR4): exhaustiveness is a privileged host pass that reports at the level of information (carried over from the Part I review).
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 #### A body clause is a notation
 - Decides: `requires`, `ensures`, a bound on capabilities, `decreases` and `total` are leading statements of a function's body, and each stands for a claim placed in the body.
@@ -2468,7 +2468,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/standard/contracts.md §2, §9; CE-R3; docs/plans/completion-effects.md §3; CLAUDE.md "Body wrappers" invariant; docs/book/standard/contracts.md §2; docs/book/language-reference.md (discharge spectrum); docs/book/platform/build-pipeline.ir.md C37, C38, C55, C157; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: replaces "Body-form clauses at the head of a body, lowered through one chain".
 - Held finding (2026-11-12, DR4): a clause is lowered through a marker primitive, an attach step in the host tree builder and `collapseBodyMetadata` into a function property.
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 #### Contract checks sit at function entry and return
 - Decides: `requires` is claimed on entry and `ensures` on return. Both are part of the body, so each is evaluated wherever a call is evaluated, with what is known there.
@@ -2483,7 +2483,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: CT-R1 (docs/decisions.md); docs/book/standard/contracts.md §6, §10
 - Book home (fragments' proposal): standard/contracts
 - Notes (2026-11-12, DR4): the open question of moving a check to the call site dissolves: a call is evaluated by evaluating the body.
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 #### Unification in patterns
 - Decides: open — full unification in pattern mode.
@@ -2499,7 +2499,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/pattern-matching
 - Notes: contradiction — pattern-matching.md §3 says `when` arms do not narrow; contracts.md §4 says `when/is/then` arms lift the matched pattern tagged `match-case`, and contracts.md §9 says chunk 2 shipped "with `when/is/then` arms included". One of the two is stale; code not checked.
 - Notes (2026-11-12, DR4): the narrowing half is ruled in "What is known about a value travels with the value".
-- Chapter: Contracts and the knowledge they give
+- Chapter: Contracts
 
 ### Termination and completion
 

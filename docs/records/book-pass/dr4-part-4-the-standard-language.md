@@ -108,7 +108,7 @@ already recorded on Part IV's entries.
 Part IV of `docs/plans/book-pass-inventory.md`, from 83 decisions in
 eleven chapters to 66 in eleven: Types as values; Refinement types;
 Reaching a member; The surface language; Claims and proofs; Equality
-and laws; Effects; Contracts and the knowledge they give; Termination
+and laws; Effects; Contracts; Termination
 and completion; When a check fails; Units of measure. One decision is
 added to Part II's "Authority" chapter ("Reading an expression never
 yields authority") and a note on truth to "The kernel's primitives are
@@ -223,5 +223,14 @@ recommendation on each.
   few": the kernel recognises two bit values as true and false, and a
   conditional or a claim on anything else is a refutation.
 - Ask 13: the remaining entries stay, reworded.
+
+**On PR #191, 2026-11-12.** The maintainer reviewed Part IV: it looks
+good. The chapter "Contracts and the knowledge they give" is renamed
+"Contracts". Confirmed: the place of "Reading an expression never
+yields authority" in Part II's "Authority" chapter; the rename of
+"Proofs as values" to "Claims and proofs"; the placement of "A match
+where no arm matches is a refutation" in "Contracts" and of "The
+standard language's handled failure is an exception" in "Types as
+values".
 
 Every ask is ruled.
