@@ -167,3 +167,29 @@ No terms introduced.
 - The draft on modules splits in two: one decision on modules, one on
   grammar extension. A program's main file is loaded by the module
   loader as well.
+
+**Five redrafts agreed, 2026-11-12.**
+
+1. "What the kernel requires of an extension": requirements for the
+   mechanism, the configuration and startup. It goes to Part II's
+   "Extensions" chapter, with the maintainer's approval.
+2. "The platform's parser engine ships already built"
+   (implementation).
+3. "A module is an extension that arrives as a file." The loader is an
+   extension; a program's main file is loaded as a module.
+4. "A text can change the grammar it is read in."
+5. "Every program is evaluated the same way, however it arrives."
+
+Also agreed:
+
+- Running a program is evaluating its main module with the
+  capabilities a configuration supplies. The maintainer: the case of
+  text entered at a prompt bears considering too.
+- A form that changes the grammar stands for an expression; the engine
+  evaluates it at once and its value is the new grammar. Parsing and
+  evaluation interleave.
+- A grammar change reaches to the end of the enclosing block, and
+  never past the end of its text. Importing a module's bindings never
+  brings its notation.
+- The parse must be settled up to the point of a grammar change: a
+  condition on any parsing algorithm.
