@@ -2323,7 +2323,7 @@ R7 and R8 at their rows' time.
     npx tsx scripts/doc-ref-lint.ts                 doc-ref-lint: all markdown doc references resolve
     npm run lint:streams                            stream-plan: 9 plan(s) checked, 0 with findings
     PR_TITLE="B-187: rung 4 scene 1, the planning loop demonstrated (L7)" npx tsx scripts/analyze/lane-lint.ts --base origin/main
-                                                    lane-lint: lane D (B-187 via docs/plans/planning-loop.md): 22 file(s), 0 outside
+                                                    lane-lint: lane D (B-187 via docs/plans/planning-loop.md): 21 file(s), 0 outside
     MTOOL_HOME=… npm run test:shards                Aggregate: 1378 test runs, 1378 passed, 0 failed; GATE: PASSED
     ```
 
