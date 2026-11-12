@@ -187,6 +187,21 @@ before it.
   `pcp/llm-worker.ts`, which answers each request with one `claude -p`
   run on the logged-in subscription. Ratified at the merge of PR #186,
   2026-11-12.
+- <a id="def-plan-ledger"></a>**Plan ledger**: the verdict's
+  `planLedger` field and its `plan ledger:` block: one record per plan
+  value bound at the top level. Ratified at PR #188's ruling,
+  2026-11-12.
+- <a id="def-promise"></a>**Promise** (of a plan value): a fixture on
+  any port of a plan value, listed in the assumption ledger at the
+  admitted tier and never discharged. Ratified at PR #188's ruling,
+  2026-11-12.
+- <a id="def-not-claimed"></a>**Not claimed** (well-formed;
+  "unclaimed"): the well-formedness status of a plan bound without the
+  `plan NAME:` form's annotation that has findings. Ratified at PR
+  #188's ruling, 2026-11-12.
+- <a id="def-walk-levels"></a>**Walk levels** (`walk_levels`): the
+  32-level bound the caller passes to `plan_ledger` for the fold over a
+  plan's ports. Ratified at PR #188's ruling, 2026-11-12.
 - <a id="def-model-composition"></a>**Model composition**: two models
   in one program, where a check of one reads a value of the other, so
   that a finding of the composed program can name both. This plan uses
@@ -1944,3 +1959,10 @@ R7 and R8 at their rows' time.
                                                     lane-lint: lane D (B-187 via docs/plans/planning-loop.md): 11 file(s), 0 outside
     MTOOL_HOME=… npm run test:shards                Aggregate: 1368 test runs, 1368 passed, 0 failed; GATE: PASSED
     ```
+- **2026-11-12 — ruled at PR #188: the three engine findings filed as
+  B-188 (a recursive binding or a library-named list stalls the
+  precompile or the load) and B-189 (a self-applied function exhausts
+  the JS stack); the 32-level walk bound stands until they are
+  addressed; A7 ratified; whether `verify` carries the loop's authors
+  waits for L7; the four terms ratified; the not-claimed wording and the
+  `verify` time accepted for this pilot.**

@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0; edited 2026-11-10: the worker generalised by obligation kind and the scripted proposer by B-187, chunk L3 (claims C175 to C185 and clusters G29 and G30, ask A5; C123, C127, C128, C129, C130, C132, C133 and C135, relation R4 and clusters G20 and G21 removed; the seven decided ones also dropped from ask A1; evidence E40 added; E3, E16, E17, E18, E30 and E39 re-synced), unratified terms 0; edited 2026-11-11: the time box per turn, `--api-key` and the transcript by B-187, chunk L4 (claims C186 to C194, ask A6, clusters G29 and G30 re-proposed; C124, C175 and C182 removed; C124 also dropped from ask A1, C175 and C182 from ask A5; evidence E41, E42 and E43 added; E3, E6, E10, E11, E14, E15, E16, E17, E18, E30, E38, E39 and E40 re-synced; then, ruled at L4's PR, the Claude Code client: claims C195 to C197 under ask A6, C180 removed and dropped from ask A5, C188 and C193 restated, evidence E44 added, E16, E17, E18, E30, E38, E39, E40, E41 and E42 re-synced), unratified terms 0; edited 2026-11-12: ask A6 resolved at the merge of PR #186; then the plan ledger by B-187, chunk L5 (claims C198 to C204, ask A7, clusters G13 and G28 re-proposed; C72 removed and dropped from ask A1, relation R2 restated on C200; evidence E45 added; E3, E6, E10, E11, E12, E13, E14, E15, E16, E30, E32, E38, E39, E40, E41, E42 and E44 re-synced), unratified terms 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0; edited 2026-11-10: the worker generalised by obligation kind and the scripted proposer by B-187, chunk L3 (claims C175 to C185 and clusters G29 and G30, ask A5; C123, C127, C128, C129, C130, C132, C133 and C135, relation R4 and clusters G20 and G21 removed; the seven decided ones also dropped from ask A1; evidence E40 added; E3, E16, E17, E18, E30 and E39 re-synced), unratified terms 0; edited 2026-11-11: the time box per turn, `--api-key` and the transcript by B-187, chunk L4 (claims C186 to C194, ask A6, clusters G29 and G30 re-proposed; C124, C175 and C182 removed; C124 also dropped from ask A1, C175 and C182 from ask A5; evidence E41, E42 and E43 added; E3, E6, E10, E11, E14, E15, E16, E17, E18, E30, E38, E39 and E40 re-synced; then, ruled at L4's PR, the Claude Code client: claims C195 to C197 under ask A6, C180 removed and dropped from ask A5, C188 and C193 restated, evidence E44 added, E16, E17, E18, E30, E38, E39, E40, E41 and E42 re-synced), unratified terms 0; edited 2026-11-12: ask A6 resolved at the merge of PR #186; then the plan ledger by B-187, chunk L5 (claims C198 to C204, ask A7, clusters G13 and G28 re-proposed; C72 removed and dropped from ask A1, relation R2 restated on C200; evidence E45 added; E3, E6, E10, E11, E12, E13, E14, E15, E16, E30, E32, E38, E39, E40, E41, E42 and E44 re-synced), unratified terms 0; edited 2026-11-12: ask A7 resolved at PR #188's ruling, unratified terms 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -224,11 +224,11 @@ C70. `inspect` passes no future manager to `evalSource`. evidence: E6. [decided:
 
 C71. `inspect` silences `console.log` during the evaluation, discarding the program's printed output. evidence: E6. [decided: owner, 2026-11-02]
 
-C200. `inspect` runs `evalSource` over the file with the `softFail` flag unset, and, when the file binds a plan value, over the plan ledger's one binding with the flag set. evidence: E6, E45. [proposed: this IR]
+C200. `inspect` runs `evalSource` over the file with the `softFail` flag unset, and, when the file binds a plan value, over the plan ledger's one binding with the flag set. evidence: E6, E45. [decided: owner, 2026-11-12]
 
 C73. A halting post-pass ends `inspect` with the post-pass's error message and exit code 1, before any summary prints. evidence: E6, E24. [decided: owner, 2026-11-02]
 
-C203. `inspect` prints the lines of a plan value's ledger record, as `lib/planning_loop.alg` words them, at the end of the value's binding block. evidence: E6, E45. [proposed: this IR]
+C203. `inspect` prints the lines of a plan value's ledger record, as `lib/planning_loop.alg` words them, at the end of the value's binding block. evidence: E6, E45. [decided: owner, 2026-11-12]
 
 C74. `inspect` leaves out of the summary every binding name that a primitive or an extension provides. evidence: E6. [decided: owner, 2026-11-02]
 
@@ -302,15 +302,15 @@ C106. The text form of a verdict prints the assumption ledger after the theorems
 
 C107. The assumption ledger lists the admitted and sampled backings, each with the proofs resting on the backing, and counts the pending obligations. evidence: E13. [decided: owner, 2026-11-02]
 
-C198. The assumption ledger lists each fixture of a plan value the file binds as an admitted promise, with the plan values resting on it, and never as discharged. evidence: E13, E45. [proposed: this IR]
+C198. The assumption ledger lists each fixture of a plan value the file binds as an admitted promise, with the plan values resting on it, and never as discharged. evidence: E13, E45. [decided: owner, 2026-11-12]
 
-C199. `verify` records in the verdict's optional `planLedger` field one record per plan, solution or solved open plan the file binds, read from `plan_ledger` in `lib/planning_loop.alg`. evidence: E12, E45. [proposed: this IR]
+C199. `verify` records in the verdict's optional `planLedger` field one record per plan, solution or solved open plan the file binds, read from `plan_ledger` in `lib/planning_loop.alg`. evidence: E12, E45. [decided: owner, 2026-11-12]
 
-C201. A plan ledger record holds the value's well-formedness check, discharged, or not claimed for a plan bound without the `plan` form's annotation, and the value's fixtures as promises. evidence: E45. [proposed: this IR]
+C201. A plan ledger record holds the value's well-formedness check, discharged, or not claimed for a plan bound without the `plan` form's annotation, and the value's fixtures as promises. evidence: E45. [decided: owner, 2026-11-12]
 
-C204. The plan ledger record of a solution or a solved open plan also holds its bound, its decisions and the catalog entries it uses, each with its author. evidence: E45. [proposed: this IR]
+C204. The plan ledger record of a solution or a solved open plan also holds its bound, its decisions and the catalog entries it uses, each with its author. evidence: E45. [decided: owner, 2026-11-12]
 
-C202. `verify` and `inspect` load `lib/planning_loop.alg` for the plan ledger only when the file binds a plan value and has not loaded the library. evidence: E45. [proposed: this IR]
+C202. `verify` and `inspect` load `lib/planning_loop.alg` for the plan ledger only when the file binds a plan value and has not loaded the library. evidence: E45. [decided: owner, 2026-11-12]
 
 C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [decided: owner, 2026-11-02]
 
@@ -498,7 +498,7 @@ G11. cluster: C51, C52, C53, C54, C55, C56, C57, C58, C59 [decided: owner, 2026-
 
 G12. cluster: C60, C61, C62, C63, C64, C65 [decided: owner, 2026-11-02]
 
-G13. cluster: C66, C67, C68, C69, C70, C71, C200, C73, C203 [proposed: this IR]
+G13. cluster: C66, C67, C68, C69, C70, C71, C200, C73, C203 [decided: owner, 2026-11-12]
 
 G14. cluster: C74, C75, C76, C77, C78, C79, C80, C81, C82, C83, C84 [decided: owner, 2026-11-02]
 
@@ -506,7 +506,7 @@ G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [decided: owner, 
 
 G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
-G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C198, C199, C201, C204, C202, C108, C173, C174, C110 [proposed: this IR]
+G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C198, C199, C201, C204, C202, C108, C173, C174, C110 [decided: owner, 2026-11-12]
 
 G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-09]
 
@@ -667,3 +667,5 @@ A6. Ratify the re-proposed claims about `prove` and the worker as chunk L4 of B-
 A6 resolved: ratified by the owner at the merge of PR #186, 2026-11-12; the statuses are flipped.
 
 A7. Ratify the re-proposed claims about `verify` and `inspect` as chunk L5 of B-187 (the planning loop, the next validating demo) left the code, with their clusters G13 and G28 re-proposed: C198 (the assumption ledger lists each fixture of a plan value as an admitted promise, never discharged); C199, C201 and C204 (the verdict's `planLedger` and its records); C202 (the planning loop library loaded only for a file with a plan value); C200, which replaces C72 (the plan ledger's evaluation with `softFail` set); and C203 (`inspect` prints the ledger lines under the binding). Depends: C198, C199, C200, C201, C202, C203, C204.
+
+A7 resolved: ratified by the owner at PR #188's ruling, 2026-11-12; the statuses are flipped.
