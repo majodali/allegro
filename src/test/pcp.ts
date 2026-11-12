@@ -42,7 +42,7 @@ import {
   DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
 } from "../../pcp/llm-worker.js";
 import { createClaudeCodeClient, claudeCodeArgs } from "../../pcp/llm-worker.js";
-import { formatTranscript, theoremSitePattern, NO_SPLICE_SITE } from "../../pcp/llm-worker.js";
+import { formatTranscript, theoremSitePattern, NO_SPLICE_SITE, buildPlanIterationMessage } from "../../pcp/llm-worker.js";
 import {
   collectPlanLedger, planLedgerBindings, planLedgerSource, entryAuthorsFrom, EntryAuthor,
 } from "../pcp.js";
@@ -2162,4 +2162,106 @@ test("B-187 L7: CLI `verify --transcript` names the loop's author in the plan le
   const bad = spawnSync("npx", ["tsx", "src/index.ts", "verify", file, "--transcript", path.resolve("package.json")], { encoding: "utf-8" });
   eq(bad.status, 1);
   eq(bad.stderr.includes("is not a transcript twin (transcript/1)"), true, bad.stderr);
+});
+
+// --- B-187 L7: rung 4's transcripts reproduced by a test (B-177 item 5) ---
+//
+// (a) The scripted loop on scene 1 is run again through the CLI with its
+// proposals file and compared with the committed twin, every field but the
+// run's date and the per-attempt times. (b) Each reply of the maintainer's
+// keyed run for `Fulfil` is put through the kernel again, on the file the
+// run was made on, and the kernel's answer compared with the one the
+// transcript records, verbatim, so the record stays true as the kernel
+// changes: a change in the kernel's wording fails here and is listed. No
+// test runs a model; no network.
+
+const RUNG4 = path.resolve("demos", "rung4");
+
+/** A transcript twin without what differs between two runs of the same
+ *  loop: the date, the authorship's time, and each turn's times. */
+function stableTranscript(t: any): any {
+  const out = JSON.parse(JSON.stringify(t));
+  delete out.date;
+  for (const o of out.obligations) {
+    if (o.authorship) delete o.authorship.verifiedAt;
+    for (const turn of o.turns) { delete turn.replyMs; delete turn.kernelMs; }
+  }
+  return out;
+}
+
+test("B-187 L7: the scripted loop on rung 4 scene 1, run again, reproduces its committed transcript twin", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-l7-rerun-"));
+  try {
+    const transcript = path.join(dir, "01-loop-scripted.md");
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "prove", "demos/rung4/01-loop.alg",
+                                "--proposals", "demos/rung4/transcripts/01-loop-proposals.md", "--transcript", transcript, "--json"],
+                        { encoding: "utf-8", env: { ...process.env, ANTHROPIC_API_KEY: "" } });
+    eq(r.status, 0, r.stdout + r.stderr);
+    const committed = JSON.parse(fs.readFileSync(path.join(RUNG4, "transcripts", "01-loop-scripted.json"), "utf-8"));
+    const again = JSON.parse(fs.readFileSync(path.join(dir, "01-loop-scripted.json"), "utf-8"));
+    eq(JSON.stringify(stableTranscript(again), null, 2), JSON.stringify(stableTranscript(committed), null, 2),
+       "the transcript twin, but for the date and the times");
+    // What the record says, for a reader of this test.
+    eq(committed.prover, "scripted:01-loop-proposals.md");
+    const f = committed.obligations.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+    eq(f.turns.map((t: any) => t.kernel).join("\n"), [
+      "refused (open): nothing in the catalog produces Labelled, which Messenger needs",
+      "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Dispatch; bound effort 1.5 person-hours, duration 155 min",
+    ].join("\n"));
+    // The Markdown is the same record: equal once the times are masked.
+    const mask = (s: string) => s.replace(/^- \*\*Date:\*\* .*$/m, "").replace(/\(\d+ ms\)/g, "(N ms)").replace(/"verifiedAt": "[^"]*"/, "");
+    eq(mask(fs.readFileSync(transcript, "utf-8")), mask(fs.readFileSync(path.join(RUNG4, "transcripts", "01-loop-scripted.md"), "utf-8")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("B-187 L7: each reply of the keyed run, put through the kernel again, gets the answer the transcript records", () => {
+  const keyed = JSON.parse(fs.readFileSync(path.join(RUNG4, "transcripts", "llm-planning-loop-proposals.json"), "utf-8"));
+  eq(keyed.version, "transcript/1");
+  eq(keyed.file, "tests/planning-loop-proposals.alg");
+  const source = fs.readFileSync(path.resolve(keyed.file), "utf-8");
+  const exts = planLoopExts();
+  const evaluate = (src: string) => runtimeEval(src.slice(scanUses(src).headerEnd), undefined, exts, undefined, true, undefined, true);
+  const first = evaluate(source);
+  const pending = extractObligations(first.evalCtx, first.compilationReport, { pendingOnly: true, plans: true });
+  const record = keyed.obligations.find((o: any) => o.name === "Fulfil: Shipped, which Depot needs");
+  const ob = pending.find(o => o.theorem.name === record.name)!;
+  eq(ob !== undefined, true, "the file still holds the obligation the run answered");
+  eq(ob.plan!.hash, "5444505e", "with the hash the run's requests carry");
+  const changed: string[] = [];
+  const history: Array<{ proofTerm: string; verified: boolean; reason?: string }> = [];
+  for (const turn of record.turns) {
+    const answer = formatPlanProposalAnswer(answerPlanProposal({ source, obligation: ob, proposal: turn.candidate, evaluate }));
+    if (answer !== turn.kernel) changed.push(`attempt ${turn.attempt}: the kernel now says\n  ${answer}\nthe transcript records\n  ${turn.kernel}`);
+    // The request is the loop's own text for that attempt, the refusal fed back.
+    const request = buildPlanIterationMessage(ob, turn.attempt, history as any);
+    if (request !== turn.request) changed.push(`attempt ${turn.attempt}: the request differs:\n${request}\n---\n${turn.request}`);
+    history.push(turn.accepted ? { proofTerm: turn.candidate, verified: true } : { proofTerm: turn.candidate, verified: false, reason: turn.kernel });
+  }
+  eq(changed.join("\n\n"), "", "the kernel's answers and the requests as the keyed transcript records them");
+  eq(record.turns.map((t: any) => `${t.accepted} ${t.candidate.split("\n")[0]}`).join(" | "), "false ShipOrder: | true Ship:");
+  eq(record.authorship.provers[0].prover, "claude-code:default");
+  eq(record.authorship.provers[0].attemptsUsed, 2);
+});
+
+test("B-187 L7: `verify --transcript` on rung 4 scene 1 names the scripted proposer and the language model in the plan ledger", () => {
+  const scene = path.join(RUNG4, "01-loop.alg");
+  const cases: Array<[string, string, string]> = [
+    ["01-loop-scripted.json", "Dispatch for Shipped, by scripted:01-loop-proposals.md", "bound effort 1.5 person-hours, duration 155 min"],
+    ["llm-planning-loop-proposals.json", "Ship for Shipped, by claude-code:default", "bound effort 1.25 person-hours, duration 140 min"],
+  ];
+  for (const [twin, entry, bound] of cases) {
+    const t = path.join("demos", "rung4", "transcripts", twin);
+    const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", scene, "--transcript", t], { encoding: "utf-8" });
+    eq(r.status, 0, r.stdout + r.stderr);
+    eq(r.stdout.includes(`    ✓ Fulfil: open plan Fulfil, solved, well-formed; ${bound}, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; ${entry}; rests on 1 admitted promise: sealed\n`), true, r.stdout);
+    eq(r.stdout.includes("  assumption ledger: rests on 1 admitted, 0 sampled; 5 obligation(s) pending\n    ! admitted promise 'sealed' — backs: Fulfil, express, solved\n"), true, r.stdout);
+    eq(r.stdout.includes(`  transcript: ${t}: 1 accepted entry applied\n`), true, r.stdout);
+  }
+  // Without a transcript, the scene's own entry is the file's and the obligation is pending.
+  const plain = spawnSync("npx", ["tsx", "src/index.ts", "verify", scene], { encoding: "utf-8" });
+  eq(plain.status, 0, plain.stdout + plain.stderr);
+  eq(plain.stdout.includes("    ? Fulfil: Shipped, which Depot needs — nothing in the catalog produces Shipped, which Depot needs\n"), true, plain.stdout);
+  eq(plain.stdout.includes("Express for Shipped, by the file; rests on 1 admitted promise: sealed"), true, plain.stdout);
 });
