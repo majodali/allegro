@@ -213,8 +213,9 @@ open_answer(op) => op.answer
 //
 // A catalog entry's author is "the file" unless the caller names one: the
 // protocol passes the authors the loop recorded (`authors`, a list of
-// `{node, author}` records), since an accepted proposal is spliced into
-// the file and the file alone cannot say who wrote it.
+// `{binding, node, author}` records: the open plan the loop answered, the
+// entry and its prover), since an accepted proposal is spliced into the
+// file and the file alone cannot say who wrote it.
 
 PlanEntryUse = Type.define({ node: String, port: String, author: String, message: String })
 
@@ -245,10 +246,11 @@ PlanLedger = Type.define({
 // holding `cnt(n) => if n == 0 then 0 else cnt(n - 1)` and
 // `f(p) => check_plan(p)` does not finish in 60 s). A function handed to
 // itself and called from a lambda in its body exhausts the host's stack
-// three levels down. And a fold over a list the library itself names is
-// unrolled by the precompile, which then does not finish either; a list
-// the caller passes is not known to the precompile, so the fold stays a
-// fold. A plan nested deeper than the levels reach says so in its record,
+// three levels down. And this fold over a list the library itself names
+// keeps the library's load from finishing in 60 s, where the same fold
+// over a list the caller passes loads in under a second (the precompile
+// cannot know a parameter's length). A plan nested deeper than the levels
+// reach says so in its record,
 // so a promise below them is never dropped in silence.
 handler_nodes(hs) => hs.reduce((acc, h) => acc.concat(h.nodes), [])
 
@@ -285,17 +287,17 @@ rests_on_show(w, levels) =>
     then promises_show(walk_promises(w))
     else "{promises_show(walk_promises(w))}, and the nodes below level {levels.length} not walked"
 
-author_of(authors, name) =>
-  found = authors.filter(a => a.node == name)
+author_of(authors, binding, name) =>
+  found = authors.filter(a => a.binding == binding && a.node == name)
   if found.length == 0 then "the file" else found[0].author
 
-entry_use(added, authors, name) =>
+entry_use(added, authors, binding, name) =>
   step = added.filter(a => a.node == name)[0]
-  author = author_of(authors, name)
+  author = author_of(authors, binding, name)
   PlanEntryUse(name, step.gap.port.type, author, "{name} for {step.gap.port.type}, by {author}")
 
-entries_used(s, authors) =>
-  dedupe(s.added.map(a => a.node)).map(n => entry_use(s.added, authors, n))
+entries_used(s, authors, binding) =>
+  dedupe(s.added.map(a => a.node)).map(n => entry_use(s.added, authors, binding, n))
 
 entries_show(es) =>
   if es.length == 0 then "none" else join(es.map(e => e.message), "; ")
@@ -330,7 +332,7 @@ solution_record(name, kind, s, authors, levels) =>
   rests = rests_on_show(w, levels)
   state = if errs.length == 0 then "discharged" else "unclaimed"
   msg = if errs.length == 0 then "well-formed" else "not well-formed: {errs[0]}"
-  es = entries_used(s, authors)
+  es = entries_used(s, authors, name)
   b = bound_line(s.bound)
   d = decisions_line(s.decisions)
   PlanLedger(name, kind, s.plan.name, state, msg, walk_promises(w), b, d, es,

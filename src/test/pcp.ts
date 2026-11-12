@@ -42,6 +42,10 @@ import {
   DEFAULT_TURN_TIMEOUT_MS, DEFAULT_REPLY_TIMEOUT_MS,
 } from "../../pcp/llm-worker.js";
 import { createClaudeCodeClient, claudeCodeArgs } from "../../pcp/llm-worker.js";
+import {
+  collectPlanLedger, planLedgerBindings, planLedgerSource, entryAuthorsFrom, EntryAuthor,
+} from "../pcp.js";
+import { scanUses } from "../use-scanner.js";
 import { testsDir, libExtensions } from "./alg-files.js";
 import { primitives as primRegistry } from "../primitives.js";
 import {
@@ -1478,6 +1482,34 @@ export async function runH4aAsyncTests(): Promise<void> {
       fake.remove();
     }
   });
+
+  // --- B-187 L5: the plan ledger names the loop's author of an entry ---
+  await asyncTest("B-187 L5: after the scripted loop on L2's demo, the solved open plan's ledger names the entry's author scripted", async () => {
+    const scripted = createScriptedClient({ byObligation: new Map([[GAP, [FREIGHT.trimEnd(), SHIP.trimEnd()]]]), unnamed: [] });
+    const result = await runLlmWorker({
+      filename: path.join(testsDir, "planning-loop-proposals.alg"), maxAttempts: 5, client: scripted, extensions: [typeExt],
+    });
+    eq(result.summary.discharged, 1);
+    const authors = entryAuthorsFrom(result.perObligation);
+    eq(JSON.stringify(authors), JSON.stringify([{ binding: "Fulfil", node: "Ship", author: "scripted" }]));
+    const after = result.sourceAfter.slice(scanUses(result.sourceAfter).headerEnd);
+    const exts = planLoopExts();
+    const ev = runtimeEval(after, undefined, exts, undefined, true, undefined, true);
+    const ledger = collectPlanLedger(ev.evalCtx, src => runtimeEval(src, ev.evalCtx, exts, undefined, true, undefined, true).evalCtx, authors);
+    const fulfil = ledger.find(r => r.binding === "Fulfil")!;
+    eq(fulfil.kind, "open plan");
+    eq(fulfil.wellFormed.status, "discharged");
+    eq(JSON.stringify(fulfil.entries), JSON.stringify([
+      { node: "Van", port: "Delivered", author: "the file" },
+      { node: "Depot", port: "Sorted", author: "the file" },
+      { node: "Ship", port: "Shipped", author: "scripted" },
+    ]));
+    eq(fulfil.message, "Fulfil: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by scripted; rests on no promises");
+    // The entry `with_entry` added in the file is the file's, though it has
+    // the same name: an author belongs to the open plan the loop answered.
+    const ship = ledger.find(r => r.binding === "ship")!;
+    eq(ship.entries!.find(e => e.node === "Ship")!.author, "the file");
+  });
 }
 
 test("Phase H4a: CLI `prove` reports missing API key cleanly", () => {
@@ -1828,3 +1860,142 @@ test("Phase A: renderModuleSummary produces readable text", () => {
   eq(text.includes("f"), true);
 });
 
+// --- B-187 L5: the plan ledger (ruling R4 (a)) ---
+//
+// What a plan value rests on reaches the verdict: each fixture an admitted
+// promise in the assumption ledger, never discharged; the well-formedness a
+// discharged obligation in the verdict's `planLedger`; a solution's bound,
+// decisions and catalog entries with their authors. `inspect` prints the
+// record's lines under the binding. The records are `plan_ledger`'s, in
+// `lib/planning_loop.alg`, asked for by the CLI only for `verify` and
+// `inspect`.
+
+const SOLVE_DEMO = path.resolve("demos/rung3/02-solve.alg");
+const SIX_PROMISES = ["all_tests_pass", "signed_and_version_stamped", "tagged_with_version",
+  "traffic_handling_capable", "valid_semver", "version_matches_release_version"];
+
+test("B-187 L5: CLI `verify` on rung 3's solving demo rests on 6 admitted promises, both plans' well-formedness discharged", () => {
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", SOLVE_DEMO], { encoding: "utf-8" });
+  eq(r.status, 0, r.stderr);
+  const lines = r.stdout.split("\n");
+  eq(lines[0], "Verdict (verified): 0/0 discharged", "the theorem count line is unchanged");
+  eq(lines.includes("  assumption ledger: rests on 6 admitted, 0 sampled; 5 obligation(s) pending"), true, r.stdout);
+  const entries = lines.filter(l => l.includes("promise '"));
+  eq(entries.map(l => /promise '([a-z_]+)'/.exec(l)![1]).join(","), SIX_PROMISES.join(","));
+  eq(entries.every(l => l.startsWith("    ! admitted promise '")), true, "every promise admitted, none discharged");
+  eq(lines.includes("    ! admitted promise 'valid_semver' — backs: SoftwareRelease, best, on_time"), true, r.stdout);
+  eq(lines.includes("  plan ledger: 5/6 well-formed (discharged), 1 not claimed; 6 promise(s) admitted"), true, r.stdout);
+  eq(lines.includes("    ✓ BuildPipeline: plan BuildPipeline, well-formed; rests on 2 admitted promises: signed_and_version_stamped, tagged_with_version"), true, r.stdout);
+  eq(lines.includes("    ✓ SoftwareRelease: plan SoftwareRelease, well-formed; rests on 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable"), true, r.stdout);
+  eq(lines.includes("    ✓ best: solution of SoftwareRelease, well-formed; bound effort 20.75 person-hours, duration 1460 min, money none; decisions Test via Quick, Deploy via Direct; catalog entries none; rests on 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version"), true, r.stdout);
+  eq(lines.includes("    - fulfil: plan Fulfil, not claimed well-formed (bound without the `plan` form's check): outcome Delivered of Fulfil is declared but no node produces it; rests on no promises"), true, r.stdout);
+  // The laws and coercions read as before.
+  eq(lines.includes("  laws: 12/17 discharged, 5 pending"), true);
+  eq(lines.includes("  coercions: 2/2 obligations discharged"), true);
+});
+
+test("B-187 L5: CLI `verify --json` carries the plan ledger as the optional `planLedger` field", () => {
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", SOLVE_DEMO, "--json"], { encoding: "utf-8" });
+  eq(r.status, 0, r.stderr);
+  const v = parseVerdict(r.stdout);
+  eq(v.version, PCP_VERSION);
+  eq(v.planLedger!.map(x => `${x.binding}:${x.kind}:${x.wellFormed.status}`).join(" "),
+     "BuildPipeline:plan:discharged SoftwareRelease:plan:discharged best:solution:discharged on_time:solution:discharged fulfil:plan:unclaimed last_mile:plan:discharged");
+  const release = v.planLedger!.find(x => x.binding === "SoftwareRelease")!;
+  eq(release.plan, "SoftwareRelease");
+  eq([...release.promises].sort().join(","), SIX_PROMISES.join(","));
+  eq(release.bound, undefined, "a plan has no bound; a solution has");
+  const onTime = v.planLedger!.find(x => x.binding === "on_time")!;
+  eq(onTime.bound, "effort 22.5 person-hours, duration 1205 min, money none");
+  eq(onTime.decisions, "Test via Quick, Deploy via BlueGreen");
+  eq(JSON.stringify(onTime.entries), "[]");
+  eq(onTime.inspect[0], "well-formed: discharged (no findings)");
+});
+
+test("B-187 L5: CLI `inspect` prints a plan's and a solution's ledger lines under the binding", () => {
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "inspect", SOLVE_DEMO], { encoding: "utf-8" });
+  eq(r.status, 0, r.stderr);
+  eq(r.stdout.includes([
+    "  SoftwareRelease : Plan",
+    "      Plan object",
+    "      well-formed: discharged (no findings)",
+    "      rests on: 6 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version, all_tests_pass, traffic_handling_capable",
+    "  best : Solution",
+    "      Solution object",
+    "      well-formed: discharged (no findings)",
+    "      bound: effort 20.75 person-hours, duration 1460 min, money none",
+    "      decisions: Test via Quick, Deploy via Direct",
+    "      catalog entries: none",
+    "      rests on: 4 admitted promises: valid_semver, version_matches_release_version, signed_and_version_stamped, tagged_with_version",
+    "  on_time : Solution",
+  ].join("\n")), true, r.stdout);
+  eq(r.stdout.includes("  valid_semver : Fixture\n      Fixture object\n  version_matches_release_version : Fixture"), true,
+     "a binding that is not a plan value prints as before");
+});
+
+test("B-187 L5: CLI `verify` on L2's demo names the catalog entries a solved open plan uses, by the file", () => {
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", path.join(testsDir, "planning-loop-proposals.alg")], { encoding: "utf-8" });
+  eq(r.status, 0, r.stderr);
+  eq(r.stdout.includes("    ✓ ship: open plan Fulfil, solved, well-formed; bound effort 1.5 person-hours, duration 155 min, money none; decisions no choices; catalog entries Van for Delivered, by the file; Depot for Sorted, by the file; Ship for Shipped, by the file; rests on no promises"), true, r.stdout);
+  eq(r.stdout.includes("  assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending"), true, r.stdout);
+});
+
+const promiseSource = [
+  "positive = fixture(\"positive\", v => v > 0)",
+  "trusted  = fixture(\"trusted\", v => true)",
+  "plan Count:",
+  "  inputs:   Reading [ positive ]",
+  "  outcomes: Tally [ trusted ]",
+  "  Add:",
+  "    inputs:   Reading",
+  "    outcomes: Tally",
+  "    estimate: 5 min, 0.25 person-hours",
+  "tally = solve(Count)",
+  "",
+].join("\n");
+
+function promiseLedger() {
+  const exts = planLoopExts();
+  const ev = runtimeEval(promiseSource, undefined, exts, undefined, true, undefined, true);
+  const planLedger = collectPlanLedger(ev.evalCtx, src => runtimeEval(src, ev.evalCtx, exts, undefined, true, undefined, true).evalCtx);
+  return { ev, planLedger };
+}
+
+test("B-187 L5: a fixture with a real predicate is an admitted promise, never discharged", () => {
+  const { ev, planLedger } = promiseLedger();
+  eq(planLedger.map(r => `${r.binding}:${r.kind}:${r.promises.join("+")}`).join(" "), "Count:plan:positive+trusted tally:solution:positive+trusted");
+  const v = buildVerdict(ev.evalCtx, ev.compilationReport, undefined, { plans: true, planLedger });
+  const text = formatVerdict(v);
+  eq(text.includes("    ! admitted promise 'positive' — backs: Count, tally"), true, text);
+  eq(text.includes("    ! admitted promise 'trusted' — backs: Count, tally"), true, text);
+  eq(text.split("\n").filter(l => l.includes("promise '")).every(l => l.includes("! admitted promise")), true, text);
+  eq(/discharged[^\n]*promise '|promise '[^\n]*discharged/.test(text), false, "no promise is reported discharged");
+  eq(v.verified, true);
+});
+
+test("B-187 L5: the ledger's source asks only for plan values, with the authors made safe as literals", () => {
+  const { ev } = promiseLedger();
+  eq(planLedgerBindings(ev.evalCtx).join(","), "Count,tally", "the fixtures are not plan values");
+  eq(planLedgerSource([]), null);
+  const authors: EntryAuthor[] = [{ binding: "op", node: "Ship", author: "scripted:P.md" }, { binding: "op", node: "Odd", author: "a\"{b}" }];
+  eq(planLedgerSource(["tally"], authors),
+     'plan_ledger_found = [plan_ledger("tally", tally, [{binding: "op", node: "Ship", author: "scripted:P.md"}, {binding: "op", node: "Odd", author: "a??b?"}], walk_levels)]\n');
+});
+
+test("B-187 L5: a file without a plan value asks nothing and its verdict is as before", () => {
+  const src = "theorem t: 1 + 1 == 2 by proof_refl(2)\n";
+  const ev = runtimeEval(src, undefined, [typeExt], undefined, true, undefined, true);
+  let asked = 0;
+  const planLedger = collectPlanLedger(ev.evalCtx, src2 => { asked++; return ev.evalCtx; });
+  eq(asked, 0, "no evaluation without a plan value");
+  eq(planLedger.length, 0);
+  const before = buildVerdict(ev.evalCtx, ev.compilationReport, undefined, { plans: true });
+  const after = buildVerdict(ev.evalCtx, ev.compilationReport, undefined, { plans: true, planLedger });
+  const untimed = (v: Verdict) => serializeVerdict(v).replace(/"verifiedAt":"[^"]*"/g, "");
+  eq(untimed(after), untimed(before));
+  eq(formatVerdict(after), formatVerdict(before));
+  eq("planLedger" in after, false);
+  const r = spawnSync("npx", ["tsx", "src/index.ts", "verify", path.resolve("demos/rung1/04-laws.alg")], { encoding: "utf-8" });
+  eq(r.stdout.includes("plan ledger"), false, r.stdout);
+  eq(r.stdout.includes("promise '"), false, r.stdout);
+});
