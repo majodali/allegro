@@ -2,7 +2,7 @@
 
 Reader: RD-4
 Purpose: document. The book's chapter on the `introspect` unit (unit 34) and the `cli` unit (unit 35): the file runner, the REPL, the subcommands `inspect`, `verify`, `obligations`, `propose` and `prove`, the safety grades, and the four diagnostic variables, with tracing and the IDE integration stated as not built.
-Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0; edited 2026-11-10: the worker generalised by obligation kind and the scripted proposer by B-187, chunk L3 (claims C175 to C185 and clusters G29 and G30, ask A5; C123, C127, C128, C129, C130, C132, C133 and C135, relation R4 and clusters G20 and G21 removed; the seven decided ones also dropped from ask A1; evidence E40 added; E3, E16, E17, E18, E30 and E39 re-synced), unratified terms 0; edited 2026-11-11: the time box per turn, `--api-key` and the transcript by B-187, chunk L4 (claims C186 to C194, ask A6, clusters G29 and G30 re-proposed; C124, C175 and C182 removed; C124 also dropped from ask A1, C175 and C182 from ask A5; evidence E41, E42 and E43 added; E3, E6, E10, E11, E14, E15, E16, E17, E18, E30, E38, E39 and E40 re-synced; then, ruled at L4's PR, the Claude Code client: claims C195 to C197 under ask A6, C180 removed and dropped from ask A5, C188 and C193 restated, evidence E44 added, E16, E17, E18, E30, E38, E39, E40, E41 and E42 re-synced), unratified terms 0; edited 2026-11-12: ask A6 resolved at the merge of PR #186; then the plan ledger by B-187, chunk L5 (claims C198 to C204, ask A7, clusters G13 and G28 re-proposed; C72 removed and dropped from ask A1, relation R2 restated on C200; evidence E45 added; E3, E6, E10, E11, E12, E13, E14, E15, E16, E30, E32, E38, E39, E40, E41, E42 and E44 re-synced), unratified terms 0; edited 2026-11-12: ask A7 resolved at PR #188's ruling, unratified terms 0; edited 2026-11-12: `verify --transcript` and the splice site by B-187, chunk L7 (claims C205 to C210, ask A8, clusters G28 and G29 re-proposed; evidence E46 added; E11 and E17 re-synced), unratified terms 0)
+Status: delivered IR-only (ratified at the merge of PR #137, 2026-11-02; unratified terms 0; footprint: declared 7, changed 7, surprises 0, misses 0; edited 2026-11-07: plan obligations by B-187 (the planning loop, the next validating demo), chunk L1 (claims C171 and C172 and cluster G27; C111 and cluster G18 removed; C111 also dropped from ask A1; evidence E38 added; E14 and E30 re-synced), unratified terms 0; edited 2026-11-09: the proposal protocol by B-187, chunk L2 (claims C173 and C174 and cluster G28, ask A4; C109 and cluster G17 removed; C109 also dropped from ask A1; evidence E39 added; E11, E12, E30 and E38 re-synced), unratified terms 0; edited 2026-11-10: the worker generalised by obligation kind and the scripted proposer by B-187, chunk L3 (claims C175 to C185 and clusters G29 and G30, ask A5; C123, C127, C128, C129, C130, C132, C133 and C135, relation R4 and clusters G20 and G21 removed; the seven decided ones also dropped from ask A1; evidence E40 added; E3, E16, E17, E18, E30 and E39 re-synced), unratified terms 0; edited 2026-11-11: the time box per turn, `--api-key` and the transcript by B-187, chunk L4 (claims C186 to C194, ask A6, clusters G29 and G30 re-proposed; C124, C175 and C182 removed; C124 also dropped from ask A1, C175 and C182 from ask A5; evidence E41, E42 and E43 added; E3, E6, E10, E11, E14, E15, E16, E17, E18, E30, E38, E39 and E40 re-synced; then, ruled at L4's PR, the Claude Code client: claims C195 to C197 under ask A6, C180 removed and dropped from ask A5, C188 and C193 restated, evidence E44 added, E16, E17, E18, E30, E38, E39, E40, E41 and E42 re-synced), unratified terms 0; edited 2026-11-12: ask A6 resolved at the merge of PR #186; then the plan ledger by B-187, chunk L5 (claims C198 to C204, ask A7, clusters G13 and G28 re-proposed; C72 removed and dropped from ask A1, relation R2 restated on C200; evidence E45 added; E3, E6, E10, E11, E12, E13, E14, E15, E16, E30, E32, E38, E39, E40, E41, E42 and E44 re-synced), unratified terms 0; edited 2026-11-12: ask A7 resolved at PR #188's ruling, unratified terms 0; edited 2026-11-12: `verify --transcript` and the splice site by B-187, chunk L7 (claims C205 to C210, ask A8, clusters G28 and G29 re-proposed; evidence E46 added; E11 and E17 re-synced), unratified terms 0; edited 2026-11-12: ask A8 resolved on the maintainer's review of PR #192, unratified terms 0)
 Source: chunk A3 of docs/plans/book-chapters-now.md (stream A, B-170); src/index.ts and src/introspect.ts as the files of units 35 and 34
 Footprint: docs/book/platform/tooling.ir.md; docs/book/README.md; docs/reading-order.json; docs/book/units.md; docs/book/platform/README.md; docs/documentation-census.md; docs/CHANGELOG.md; docs/plans/book-chapters-now.md
 
@@ -314,13 +314,13 @@ C202. `verify` and `inspect` load `lib/planning_loop.alg` for the plan ledger on
 
 C108. `verify --json` prints the verdict as one JSON object. evidence: E11. [decided: owner, 2026-11-02]
 
-C205. `verify --transcript T.json` builds the verdict from the file with each accepted catalog entry of a transcript twin spliced in by `splicePlanProposal`. evidence: E11, E46. [proposed: this IR]
+C205. `verify --transcript T.json` builds the verdict from the file with each accepted catalog entry of a transcript twin spliced in by `splicePlanProposal`. evidence: E11, E46. [decided: owner, 2026-11-12]
 
-C209. `verify --transcript` applies an entry only when the file has a pending plan obligation of the entry's obligation's name, with the hash the transcript's first request names. evidence: E46. [proposed: this IR]
+C209. `verify --transcript` applies an entry only when the file has a pending plan obligation of the entry's obligation's name, with the hash the transcript's first request names. evidence: E46. [decided: owner, 2026-11-12]
 
-C206. With `--transcript`, the plan ledger names an applied entry's prover as its author in each open plan whose catalog holds that entry by value and no other node of its name. evidence: E11, E46. [proposed: this IR]
+C206. With `--transcript`, the plan ledger names an applied entry's prover as its author in each open plan whose catalog holds that entry by value and no other node of its name. evidence: E11, E46. [decided: owner, 2026-11-12]
 
-C207. With `--transcript`, an accepted entry the file cannot take, or one whose plan obligation the spliced file leaves undischarged, fails the verdict. evidence: E11, E46. [proposed: this IR]
+C207. With `--transcript`, an accepted entry the file cannot take, or one whose plan obligation the spliced file leaves undischarged, fails the verdict. evidence: E11, E46. [decided: owner, 2026-11-12]
 
 C173. `verify --obligation O.json` fails the verdict unless the obligation's theorem is discharged with a matching proposition hash, for an obligation without a kind. evidence: E11, E12. [decided: owner, 2026-11-10]
 
@@ -398,9 +398,9 @@ C193. A `prove` flag without its value, a time box that is not a whole number of
 
 C185. `runLlmWorker` skips an obligation the client declines, as the scripted proposer declines one its file holds no answer for, attempting it never. evidence: E17, E40. [decided: owner, 2026-11-11]
 
-C208. `runLlmWorker` skips a theorem whose `theorem NAME:` line the file does not hold, such as a library's law, before any request to the client. evidence: E17, E46. [proposed: this IR]
+C208. `runLlmWorker` skips a theorem whose `theorem NAME:` line the file does not hold, such as a library's law, before any request to the client. evidence: E17, E46. [decided: owner, 2026-11-12]
 
-C210. The worker's result, the transcript and `prove`'s text form give a theorem skipped for want of that line the reason "no splice site in the file", unless the client declined it first. evidence: E46. [proposed: this IR]
+C210. The worker's result, the transcript and `prove`'s text form give a theorem skipped for want of that line the reason "no splice site in the file", unless the client declined it first. evidence: E46. [decided: owner, 2026-11-12]
 
 C187. `runLlmWorker` loads the file's modules as `pcpLoadAndEval` does, once for the run and once per worker thread of a kernel time box, evaluating each turn's source with its `use` header stripped. evidence: E17, E42. [decided: owner, 2026-11-12]
 
@@ -518,13 +518,13 @@ G15. cluster: C85, C86, C87, C88, C89, C90, C91, C92, C93, C94 [decided: owner, 
 
 G16. cluster: C95, C96, C97, C98 [decided: owner, 2026-11-02]
 
-G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C198, C199, C201, C204, C202, C108, C205, C209, C206, C207, C173, C174, C110 [proposed: this IR]
+G28. cluster: C99, C100, C101, C102, C103, C104, C105, C106, C107, C198, C199, C201, C204, C202, C108, C205, C209, C206, C207, C173, C174, C110 [decided: owner, 2026-11-12]
 
 G27. cluster: C171, C172, C112, C113, C114, C115, C168, C116, C117 [decided: owner, 2026-11-09]
 
 G19. cluster: C118, C119, C120, C121, C122 [decided: owner, 2026-11-02]
 
-G29. cluster: C188, C176, C186, C196, C197, C125, C126, C177, C184, C178, C179, C195, C189, C190, C191, C131, C192, C181, C193, C185, C208, C210 [proposed: this IR]
+G29. cluster: C188, C176, C186, C196, C197, C125, C126, C177, C184, C178, C179, C195, C189, C190, C191, C131, C192, C181, C193, C185, C208, C210 [decided: owner, 2026-11-12]
 
 G30. cluster: C187, C134, C183, C194, C136 [decided: owner, 2026-11-12]
 
@@ -685,3 +685,5 @@ A7. Ratify the re-proposed claims about `verify` and `inspect` as chunk L5 of B-
 A7 resolved: ratified by the owner at PR #188's ruling, 2026-11-12; the statuses are flipped.
 
 A8. Ratify the claims about `verify --transcript` and the splice site of chunk L7 of B-187 (the planning loop, the next validating demo), with their clusters G28 and G29 re-proposed: C205, C209, C206 and C207 (`verify --transcript T.json`: the accepted entries spliced back when the obligation's name and hash match, their authors in the plan ledger, a transcript the file cannot take failing the verdict), ask 4 of PR #188; and C208 and C210 (a theorem without a `theorem NAME:` line in the file skipped before any request, with its reason), ruled at the merge of PR #189. No ratified claim is made false by the chunk: C185 (a declined obligation skipped) still holds and is checked first. Depends: C205, C206, C207, C208, C209, C210.
+
+A8 resolved: ratified by the owner on the review of PR #192, 2026-11-12; the statuses are flipped.
