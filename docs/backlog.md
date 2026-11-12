@@ -1457,7 +1457,7 @@ table and the stream plans.
     the planning model: plan obligations from the checks, proposals
     verified by the kernel, an LLM-free path and the LLM worker,
     authorship and the ledger; first slice delivered by the
-    planning-loop stream at L7, at its PR.
+    planning-loop stream at L7, PR #192.
 - [ ] **B-084** · Constraint-set completeness — organizational process
   research (external interviews; longest critical path), as described in
   Vision §4 (one of the seven gaps)
