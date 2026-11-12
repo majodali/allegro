@@ -36,6 +36,18 @@
 // `docs/book/vivace/planning-dsl.md`. The file is loaded as the CLI's
 // `pcpLoadAndEval` loads it (B-175 item 5), once, and each turn is one
 // `evalSource`.
+//
+// B-187 L4: a time box per turn, beside the attempt limit (B-083's
+// "time-boxing"). Two budgets, each optional: the client's reply
+// (`replyTimeoutMs`) and the kernel's evaluation of the spliced source
+// (`turnTimeoutMs`). `evalSource` is synchronous, and the evaluator has no
+// wall-clock or step budget: its one guard, `MAX_DEPTH`, stops a deep
+// recursion but not a loop in tail position, which the TCO loop runs
+// forever. So with a kernel budget the turn's judgement runs in a worker
+// thread (`pcp/turn-worker.ts`) that loads the file's modules once and is
+// terminated when the budget runs out; the turn ends with the refusal kind
+// `timeout`, the attempt counts, and the loop goes on. The kernel is not
+// changed.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -172,6 +184,8 @@ export function classifyStrategy(proofTerm: string): string[] {
 // -----------------------------------------------------------------------------
 
 export interface LlmClientOptions {
+  /** The key; `ANTHROPIC_API_KEY` when absent. B-187 L4: `prove --api-key
+   *  KEY` passes it (B-175 item 6). */
   apiKey?: string;
   model?:  string;
 }
@@ -182,7 +196,9 @@ export interface LlmClient {
    *  treats as a failed attempt). B-187 L3: `obligation` names the
    *  obligation the message is about (its `theorem.name`), for a client
    *  that answers by name, as the scripted proposer does. */
-  send(args: { systemPrompt: string; userMessage: string; obligation?: string }): Promise<string>;
+  send(args: { systemPrompt: string; userMessage: string; obligation?: string;
+               /** B-187 L4: aborted when the reply's time box runs out. */
+               signal?: AbortSignal }): Promise<string>;
   /** Model identifier currently in use: the prover the authorship names. */
   modelId(): string;
   /** B-187 L3: whether the client answers the named obligation at all.
@@ -199,26 +215,100 @@ export async function createAnthropicClient(opts: LlmClientOptions = {}): Promis
   if (!apiKey) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Set the environment variable or pass --api-key, " +
-      "or use `allegro propose` (the human-interactive worker) instead.");
+      "or use `allegro propose` (the human-interactive worker) instead. " +
+      "To use a Claude subscription instead of API billing, pass --proposer claude-code (Claude Code's scripted mode).");
   }
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey });
   const model = opts.model ?? "claude-opus-4-5";
   return {
     modelId: () => model,
-    async send({ systemPrompt, userMessage }) {
+    async send({ systemPrompt, userMessage, signal }) {
       const resp = await client.messages.create({
         model,
         max_tokens: 2048,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: userMessage }],
-      });
+      }, signal ? { signal } : undefined);
       // Concatenate text blocks from the response.
       const text = resp.content
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text)
         .join("");
       return text;
+    },
+  };
+}
+
+// -----------------------------------------------------------------------------
+// The Claude Code client (B-187 L4, ruled at its PR)
+// -----------------------------------------------------------------------------
+//
+// A second language-model client, for a proposer who has a Claude
+// subscription and no API billing: each request is one run of Claude Code's
+// scripted mode, `claude -p`, which uses the logged-in subscription. The
+// run has the primer as its whole system prompt, no tools and one turn, and
+// keeps no session on disk. It runs in an empty temporary directory, so no
+// CLAUDE.md, hook or MCP server of the caller's working directory loads
+// (`--bare` is not used: bare mode reads no subscription login). The
+// child's environment drops `ANTHROPIC_API_KEY`, so the run cannot fall back
+// to API billing.
+
+export interface ClaudeCodeClientOptions {
+  /** `--model`: an alias (`opus`, `sonnet`) or a full name; Claude Code's
+   *  default when absent. */
+  model?:  string;
+  /** The executable; `claude` (found on PATH) by default. */
+  binary?: string;
+}
+
+/** The arguments of one `claude -p` run. */
+export function claudeCodeArgs(systemPrompt: string, model?: string): string[] {
+  return [
+    "-p", "--output-format", "json", "--system-prompt", systemPrompt,
+    "--tools", "", "--max-turns", "1", "--no-session-persistence",
+    ...(model ? ["--model", model] : []),
+  ];
+}
+
+/** An `LlmClient` over Claude Code's scripted mode. `send` writes the
+ *  request to the run's stdin and answers the `result` field of its JSON
+ *  output; a non-zero exit, output that is not JSON, a missing `result` or
+ *  `is_error` set throws with the run's text, which the loop records as a
+ *  failed attempt. An aborted signal (the reply's time box) kills the run. */
+export function createClaudeCodeClient(opts: ClaudeCodeClientOptions = {}): LlmClient {
+  const binary = opts.binary ?? "claude";
+  return {
+    modelId: () => `claude-code:${opts.model ?? "default"}`,
+    async send({ systemPrompt, userMessage, signal }) {
+      const { spawn } = await import("node:child_process");
+      const os = await import("node:os");
+      const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "allegro-claude-code-"));
+      const env = { ...process.env };
+      delete env.ANTHROPIC_API_KEY;
+      try {
+        const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+          const child = spawn(binary, claudeCodeArgs(systemPrompt, opts.model), { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+          let out = "", err = "";
+          child.stdout.on("data", (d) => { out += d; });
+          child.stderr.on("data", (d) => { err += d; });
+          const onAbort = () => { child.kill("SIGKILL"); reject(new Error("claude-code: the run was aborted")); };
+          if (signal?.aborted) onAbort(); else signal?.addEventListener("abort", onAbort, { once: true });
+          child.on("error", (e) => { signal?.removeEventListener("abort", onAbort); reject(new Error(`claude-code: could not run \`${binary}\`: ${e.message}`)); });
+          child.on("close", (c) => { signal?.removeEventListener("abort", onAbort); resolve({ code: c, stdout: out, stderr: err }); });
+          child.stdin.on("error", () => { /* the run may exit before reading */ });
+          child.stdin.end(userMessage);
+        });
+        const text = [stdout.trim(), stderr.trim()].filter(t => t.length > 0).join("\n");
+        if (code !== 0) throw new Error(`claude-code exited with code ${code}: ${text}`);
+        let parsed: any;
+        try { parsed = JSON.parse(stdout); } catch { throw new Error(`claude-code printed no JSON: ${text}`); }
+        if (typeof parsed?.result !== "string") throw new Error(`claude-code printed no result: ${text}`);
+        if (parsed.is_error === true) throw new Error(`claude-code reported an error: ${parsed.result}`);
+        return parsed.result;
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
     },
   };
 }
@@ -311,6 +401,7 @@ import { createTypeSystem } from "../src/types-std.js";
 import { ModuleLoader } from "../src/modules.js";
 import { scanUses, scanImports } from "../src/use-scanner.js";
 import { fileURLToPath } from "url";
+import { Worker } from "node:worker_threads";
 
 /** One attempt as the worker records it: the candidate the proposer sent
  *  (a proof term, or a node block), whether the kernel accepted it, and the
@@ -320,6 +411,37 @@ export interface AttemptRecord {
   /** The kernel's answer on acceptance, when the kind gives one (a plan
    *  obligation's: the solution). */
   answer?: string;
+  /** B-187 L4: a refusal the loop itself makes, when a time box ran out
+   *  (the kernel's evaluation, or the client's reply). The kernel's own
+   *  refusals are named in `reason`, as `refused (KIND): …`. */
+  refusal?: LoopRefusal;
+}
+
+/** B-187 L4: the refusal kinds the loop adds to the protocol's: `timeout`,
+ *  a turn whose time box ran out. */
+export type LoopRefusal = "timeout";
+
+/** B-187 L4: one turn as the transcript records it: the request sent, the
+ *  reply and its code block, the kernel's answer verbatim, and the time
+ *  each took. */
+export interface TurnRecord {
+  attempt:   number;
+  /** The request text (the user message). */
+  request:   string;
+  /** The system prompt by name: the primer section, not its text. */
+  primer:    string;
+  /** The client's reply, whole; absent when it did not reply. */
+  reply?:    string;
+  /** The reply's first code block: the candidate the kernel judged. */
+  candidate?: string;
+  /** The kernel's answer: `accepted: …` or the refusal's text. */
+  kernel:    string;
+  accepted:  boolean;
+  refusal?:  LoopRefusal;
+  /** Wall clock of the client's reply, and of the kernel's judgement
+   *  (absent when the kernel was not asked). */
+  replyMs:   number;
+  kernelMs?: number;
 }
 
 export interface WorkerResult {
@@ -337,6 +459,8 @@ export interface WorkerResult {
     finalTerm?:  string;
     authorship?: Authorship;
     history:     AttemptRecord[];
+    /** B-187 L4: the turns, for the transcript. */
+    turns:       TurnRecord[];
   }>;
   /** B-187 L3: the pending obligations the client has no answer for
    *  (`LlmClient.answers` false), by name; not attempted, not pending. */
@@ -347,6 +471,8 @@ export interface WorkerResult {
     pending:    number;
     skipped:    number;
   };
+  /** B-187 L4: the run's transcript (`formatTranscript` renders it). */
+  transcript: Transcript;
 }
 
 export interface RunWorkerOptions {
@@ -362,6 +488,40 @@ export interface RunWorkerOptions {
    *  system alone by default, as the CLI's `pcpLoadAndEval` has it. A test
    *  passes its own, so the libraries the suite already loaded are shared. */
   extensions?:     Extension[];
+  /** B-187 L4: the kernel's time box per turn, in milliseconds: the
+   *  evaluation of the spliced source and the success test. Absent or 0:
+   *  no box, the turn is judged in this thread (as before L4). Set: the
+   *  turn is judged in a worker thread, terminated when the box runs out.
+   *  `extensions` does not reach that thread, which loads the file's
+   *  modules over the type system alone, as the CLI does. */
+  turnTimeoutMs?:  number;
+  /** B-187 L4: the client's time box per reply, in milliseconds. Absent or
+   *  0: no box. */
+  replyTimeoutMs?: number;
+}
+
+/** B-187 L4: the CLI's defaults. A kernel turn on the planning demos
+ *  takes under 2 s (L3 measured 448,000 evaluates for the accepted turn,
+ *  1.7 s for the whole scripted loop), so 30 s is fifteen times the
+ *  slowest turn measured, room for a slow machine, and still no longer
+ *  than a model's reply. A model's reply takes seconds to a minute at
+ *  `max_tokens` 2048, so the reply's box is two minutes. */
+export const DEFAULT_TURN_TIMEOUT_MS  = 30_000;
+export const DEFAULT_REPLY_TIMEOUT_MS = 120_000;
+
+/** A duration in seconds, as the refusals say it. */
+export function formatSeconds(ms: number): string {
+  return `${Number((ms / 1000).toFixed(3))} s`;
+}
+
+/** B-187 L4: the refusal's text when the kernel's box runs out. */
+export function kernelTimeoutReason(ms: number): string {
+  return `refused (timeout): the kernel did not finish within ${formatSeconds(ms)}: the proposal may make the plan's search or a proof diverge`;
+}
+
+/** B-187 L4: the refusal's text when the client's box runs out. */
+export function replyTimeoutReason(ms: number): string {
+  return `refused (timeout): the proposer did not reply within ${formatSeconds(ms)}`;
 }
 
 // --- Loading the file as the CLI does (B-175 item 5) -------------------------
@@ -469,6 +629,8 @@ export interface ObligationKindSpec {
                 attemptNumber: number; evaluate: Evaluate }): KindJudgement;
   /** The system prompt: this kind's primer section. */
   primer(repoRoot?: string): string;
+  /** B-187 L4: the primer section's name, as the transcript names it. */
+  primerName: string;
 }
 
 /** Theorems: the H4a worker's parts, unchanged. */
@@ -508,6 +670,7 @@ export const theoremKind: ObligationKindSpec = {
     };
   },
   primer: (repoRoot) => loadPrimer(repoRoot),
+  primerName: "`docs/book/proving-in-allegro.md`, whole",
 };
 
 /** The request text of one attempt at a plan obligation: the words of the
@@ -560,6 +723,7 @@ export const planKind: ObligationKindSpec = {
       : { discharged: false, reason: formatPlanProposalAnswer(a) };
   },
   primer: (repoRoot) => loadPlanPrimer(repoRoot),
+  primerName: "§2.9 \"Output contract for a plan proposer\" of `docs/book/vivace/planning-dsl.md`",
 };
 
 /** The kind registry: an obligation without a kind is a theorem (pcp/1). */
@@ -568,15 +732,158 @@ export const OBLIGATION_KINDS: Record<ObligationKind, ObligationKindSpec> = {
   plan:    planKind,
 };
 
+// --- The kernel's time box (B-187 L4) -----------------------------------------
+//
+// A turn's judgement (the evaluation of the spliced source and the kind's
+// success test) runs in a worker thread when the kernel has a budget. The
+// thread loads the file's modules once, as `loadForLoop` does, and answers
+// one judgement per message; when a judgement does not come back within the
+// budget the thread is terminated, which ends any evaluation, and the next
+// turn starts a fresh one. Loading the modules is not counted against the
+// budget: it is the run's fixed cost, not the proposal's.
+
+/** What the loop sends the thread for one turn. */
+export interface TurnRequest {
+  id:            number;
+  kind:          ObligationKind;
+  source:        string;
+  spliced:       string;
+  ob:            Obligation;
+  candidate:     string;
+  attemptNumber: number;
+}
+
+/** What the thread answers: the kind's judgement, or the error its
+ *  evaluation threw. */
+export type TurnReply =
+  | { id: number; judgement: KindJudgement }
+  | { id: number; error: string };
+
+/** The thread's side: load the file once, then judge each turn. Called by
+ *  `pcp/turn-worker.ts`, the thread's entry. */
+export async function serveTurns(
+  port: { postMessage(m: unknown): void; on(ev: "message", f: (m: TurnRequest) => void): unknown },
+  data: { filename: string; source: string },
+): Promise<void> {
+  const evaluate = await loadForLoop(data.filename, data.source);
+  port.on("message", (m) => {
+    let reply: TurnReply;
+    try {
+      const judgement = OBLIGATION_KINDS[m.kind].judge({
+        source: m.source, spliced: m.spliced, ob: m.ob, candidate: m.candidate,
+        attemptNumber: m.attemptNumber, evaluate,
+      });
+      reply = { id: m.id, judgement };
+    } catch (e: any) {
+      reply = { id: m.id, error: e?.message ?? String(e) };
+    }
+    port.postMessage(reply);
+  });
+  port.postMessage({ ready: true });
+}
+
+/** The loop's side of the thread. `judge` answers the judgement, or
+ *  `"timeout"` when the budget ran out (the thread is then terminated),
+ *  with the time from the request to the answer. `warm` starts a thread
+ *  ahead of the turn, so its load overlaps the client's reply. */
+class KernelBox {
+  private worker?: Worker;
+  private ready?: Promise<void>;
+  private pending = new Map<number, { resolve: (r: TurnReply) => void; reject: (e: Error) => void }>();
+  private nextId = 1;
+
+  constructor(private filename: string, private source: string, private budgetMs: number) {}
+
+  private start(): Promise<void> {
+    const worker = new Worker(new URL("./turn-worker.ts", import.meta.url),
+                              { workerData: { filename: this.filename, source: this.source } });
+    this.worker = worker;
+    this.ready = new Promise<void>((resolve, reject) => {
+      worker.on("message", (m: any) => {
+        if (m?.ready) { resolve(); return; }
+        const p = this.pending.get(m.id);
+        if (p) { this.pending.delete(m.id); p.resolve(m as TurnReply); }
+      });
+      worker.on("error", (e: Error) => {
+        reject(e);
+        for (const p of this.pending.values()) p.reject(e);
+        this.pending.clear();
+      });
+      worker.on("exit", () => { if (this.worker === worker) { this.worker = undefined; this.ready = undefined; } });
+    });
+    return this.ready;
+  }
+
+  warm(): void {
+    if (!this.worker) this.start().catch(() => { /* reported by the next judge */ });
+  }
+
+  async judge(req: Omit<TurnRequest, "id">): Promise<{ result: KindJudgement | "timeout"; ms: number }> {
+    if (!this.worker || !this.ready) await this.start(); else await this.ready;
+    const worker = this.worker!;
+    const id = this.nextId++;
+    const postedAt = performance.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reply = new Promise<TurnReply>((resolve, reject) => this.pending.set(id, { resolve, reject }));
+    const timeout = new Promise<"timeout">(resolve => { timer = setTimeout(() => resolve("timeout"), this.budgetMs); });
+    worker.postMessage({ ...req, id });
+    let r: TurnReply | "timeout";
+    try {
+      r = await Promise.race([reply, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (r === "timeout") {
+      this.pending.delete(id);
+      this.worker = undefined;
+      this.ready = undefined;
+      await worker.terminate();
+      return { result: "timeout", ms: Math.round(performance.now() - postedAt) };
+    }
+    if ("error" in r) throw new Error(r.error);
+    return { result: r.judgement, ms: Math.round(performance.now() - postedAt) };
+  }
+
+  async close(): Promise<void> {
+    const w = this.worker;
+    this.worker = undefined;
+    this.ready = undefined;
+    if (w) await w.terminate();
+  }
+}
+
+/** The client's reply within its box: the text, or `"timeout"` (the
+ *  request's signal is then aborted). */
+async function sendWithin(
+  client: LlmClient,
+  args: { systemPrompt: string; userMessage: string; obligation?: string },
+  budgetMs: number | undefined,
+): Promise<string | "timeout"> {
+  if (!budgetMs) return client.send(args);
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const sent = client.send({ ...args, signal: abort.signal });
+  const timeout = new Promise<"timeout">(resolve => { timer = setTimeout(() => resolve("timeout"), budgetMs); });
+  try {
+    const r = await Promise.race([sent, timeout]);
+    if (r === "timeout") { sent.catch(() => {}); abort.abort(); }
+    return r;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Drive the loop end-to-end. For each pending obligation, by its kind:
  *   1. Build the request text.
- *   2. Ask the client.
+ *   2. Ask the client (within the reply's box, if any).
  *   3. Extract the candidate (the first fenced block).
  *   4. Splice it into the source.
- *   5. Judge it: one `evalSource` over the spliced source, `softFail` set.
+ *   5. Judge it: one `evalSource` over the spliced source, `softFail` set
+ *      (within the kernel's box, if any, in a worker thread).
  *   6. On failure, record the attempt and retry with the kernel's reason. */
 export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult> {
   const maxAttempts = opts.maxAttempts ?? 5;
+  const startedAt = new Date().toISOString();
   let source = fs.readFileSync(opts.filename, "utf-8");
   // B-175 item 5: the file is loaded as the CLI loads it, its `use` header
   // included; the modules load once, and each turn evaluates the body.
@@ -597,85 +904,139 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
     if (!primers.has(kind)) primers.set(kind, OBLIGATION_KINDS[kind].primer());
     return primers.get(kind)!;
   };
+  const primerNameOf = (kind: ObligationKind): string =>
+    opts.primer !== undefined ? "the caller's primer" : OBLIGATION_KINDS[kind].primerName;
 
   const perObligation: WorkerResult["perObligation"] = [];
   const skipped: string[] = [];
+  // B-187 L4: the kernel's box, opened at the first turn it judges. The
+  // thread loads the source as it stood before the loop: the modules are
+  // the header's, which a proposal does not change.
+  const box = opts.turnTimeoutMs ? new KernelBox(opts.filename, source, opts.turnTimeoutMs) : undefined;
 
-  for (const ob of pending) {
-    const kind: ObligationKind = ob.kind ?? "theorem";
-    const spec = OBLIGATION_KINDS[kind];
-    if (client?.answers && !client.answers(ob.theorem.name)) {
-      skipped.push(ob.theorem.name);
-      continue;
-    }
-    const so: AttemptsSoFar = { history: [], priorAttempts: [] };
-    const history = so.history;
-    let discharged = false;
-    let finalTerm: string | undefined;
-    let authorship: Authorship | undefined;
-
-    for (let attempt = 1; attempt <= maxAttempts && !discharged; attempt++) {
-      const userMessage = spec.request(ob, attempt, so);
-
-      // Ask the client (or fail fast if disabled).
-      if (!client) {
-        throw new Error("runLlmWorker: client missing");
-      }
-      let responseText: string;
-      try {
-        responseText = await client.send({ systemPrompt: primerOf(kind), userMessage, obligation: ob.theorem.name });
-      } catch (e: any) {
-        history.push({ proofTerm: "", verified: false, reason: `API error: ${e.message}` });
-        break;
-      }
-
-      const blocks = extractCodeBlocks(responseText);
-      if (blocks.length === 0) {
-        history.push({ proofTerm: responseText, verified: false, reason: "no fenced code block in response" });
-        so.priorAttempts.push({
-          attemptNumber: attempt, candidate: responseText,
-          verdict: { version: PCP_VERSION, verified: false, theorems: [] },
-          strategiesUsed: [],
-        });
+  try {
+    for (const ob of pending) {
+      const kind: ObligationKind = ob.kind ?? "theorem";
+      const spec = OBLIGATION_KINDS[kind];
+      if (client?.answers && !client.answers(ob.theorem.name)) {
+        skipped.push(ob.theorem.name);
         continue;
       }
-      const candidate = blocks[0];
+      const so: AttemptsSoFar = { history: [], priorAttempts: [] };
+      const history = so.history;
+      const turns: TurnRecord[] = [];
+      let discharged = false;
+      let finalTerm: string | undefined;
+      let authorship: Authorship | undefined;
 
-      // Splice + judge.
-      const sp = spec.splice(source, ob, candidate);
-      if (!sp.ok) {
-        history.push({ proofTerm: candidate, verified: false, reason: sp.reason });
-        if (sp.final) break;
-        continue;
-      }
-      const j = spec.judge({ source, spliced: sp.source, ob, candidate, attemptNumber: attempt, evaluate });
+      for (let attempt = 1; attempt <= maxAttempts && !discharged; attempt++) {
+        const userMessage = spec.request(ob, attempt, so);
+        const turn: TurnRecord = { attempt, request: userMessage, primer: primerNameOf(kind),
+                                   kernel: "", accepted: false, replyMs: 0 };
+        turns.push(turn);
 
-      if (j.discharged) {
-        discharged = true;
-        finalTerm  = candidate;
-        source     = sp.source;
-        authorship = makeAuthorship({
-          prover:           client.modelId(),
-          attemptsUsed:     attempt,
-          role:             "primary",
-          effortBudgetUsed: { attempts: attempt },
-        });
-        history.push({ proofTerm: candidate, verified: true, ...(j.answer ? { answer: j.answer } : {}) });
-      } else {
-        history.push({ proofTerm: candidate, verified: false, reason: j.reason ?? "verification failed" });
-        if (j.prior) so.priorAttempts.push(j.prior);
+        // Ask the client (or fail fast if disabled).
+        if (!client) {
+          throw new Error("runLlmWorker: client missing");
+        }
+        let responseText: string | "timeout";
+        box?.warm();
+        const sentAt = performance.now();
+        try {
+          responseText = await sendWithin(client,
+            { systemPrompt: primerOf(kind), userMessage, obligation: ob.theorem.name }, opts.replyTimeoutMs);
+        } catch (e: any) {
+          turn.replyMs = Math.round(performance.now() - sentAt);
+          turn.kernel = `API error: ${e.message}`;
+          history.push({ proofTerm: "", verified: false, reason: `API error: ${e.message}` });
+          break;
+        }
+        turn.replyMs = Math.round(performance.now() - sentAt);
+        if (responseText === "timeout") {
+          // B-187 L4: the reply's box ran out; the attempt counts.
+          const reason = replyTimeoutReason(opts.replyTimeoutMs!);
+          turn.kernel = reason;
+          turn.refusal = "timeout";
+          history.push({ proofTerm: "", verified: false, reason, refusal: "timeout" });
+          continue;
+        }
+        turn.reply = responseText;
+
+        const blocks = extractCodeBlocks(responseText);
+        if (blocks.length === 0) {
+          turn.kernel = "no fenced code block in response";
+          history.push({ proofTerm: responseText, verified: false, reason: "no fenced code block in response" });
+          so.priorAttempts.push({
+            attemptNumber: attempt, candidate: responseText,
+            verdict: { version: PCP_VERSION, verified: false, theorems: [] },
+            strategiesUsed: [],
+          });
+          continue;
+        }
+        const candidate = blocks[0];
+        turn.candidate = candidate;
+
+        // Splice + judge.
+        const sp = spec.splice(source, ob, candidate);
+        if (!sp.ok) {
+          turn.kernel = sp.reason;
+          history.push({ proofTerm: candidate, verified: false, reason: sp.reason });
+          if (sp.final) break;
+          continue;
+        }
+        const judgeArgs = { source, spliced: sp.source, ob, candidate, attemptNumber: attempt };
+        let j: KindJudgement | "timeout";
+        if (box) {
+          const boxed = await box.judge({ kind, ...judgeArgs });
+          j = boxed.result;
+          turn.kernelMs = boxed.ms;
+        } else {
+          const judgedAt = performance.now();
+          j = spec.judge({ ...judgeArgs, evaluate });
+          turn.kernelMs = Math.round(performance.now() - judgedAt);
+        }
+
+        if (j === "timeout") {
+          // B-187 L4: the kernel's box ran out: the proposal may diverge.
+          const reason = kernelTimeoutReason(opts.turnTimeoutMs!);
+          turn.kernel = reason;
+          turn.refusal = "timeout";
+          history.push({ proofTerm: candidate, verified: false, reason, refusal: "timeout" });
+          continue;
+        }
+        if (j.discharged) {
+          discharged = true;
+          finalTerm  = candidate;
+          source     = sp.source;
+          authorship = makeAuthorship({
+            prover:           client.modelId(),
+            attemptsUsed:     attempt,
+            role:             "primary",
+            effortBudgetUsed: { attempts: attempt },
+          });
+          turn.accepted = true;
+          turn.kernel = j.answer ?? "accepted: the theorem is discharged";
+          history.push({ proofTerm: candidate, verified: true, ...(j.answer ? { answer: j.answer } : {}) });
+        } else {
+          turn.kernel = j.reason ?? "verification failed";
+          history.push({ proofTerm: candidate, verified: false, reason: j.reason ?? "verification failed" });
+          if (j.prior) so.priorAttempts.push(j.prior);
+        }
       }
+
+      perObligation.push({
+        name:       ob.theorem.name,
+        ...(ob.kind && ob.kind !== "theorem" ? { kind: ob.kind } : {}),
+        discharged,
+        attempts:   history.length,
+        finalTerm,
+        authorship,
+        history,
+        turns,
+      });
     }
-
-    perObligation.push({
-      name:       ob.theorem.name,
-      ...(ob.kind && ob.kind !== "theorem" ? { kind: ob.kind } : {}),
-      discharged,
-      attempts:   history.length,
-      finalTerm,
-      authorship,
-      history,
-    });
+  } finally {
+    await box?.close();
   }
 
   const summary = {
@@ -683,13 +1044,181 @@ export async function runLlmWorker(opts: RunWorkerOptions): Promise<WorkerResult
     pending:    perObligation.filter(o => !o.discharged).length,
     skipped:    skipped.length,
   };
+  const transcript: Transcript = {
+    version:        TRANSCRIPT_VERSION,
+    file:           opts.filename,
+    prover:         client?.modelId() ?? "none",
+    date:           startedAt,
+    maxAttempts,
+    ...(opts.turnTimeoutMs  ? { turnTimeoutMs:  opts.turnTimeoutMs }  : {}),
+    ...(opts.replyTimeoutMs ? { replyTimeoutMs: opts.replyTimeoutMs } : {}),
+    skipped,
+    obligations: perObligation.map(o => ({
+      name: o.name, kind: o.kind ?? "theorem", discharged: o.discharged, attempts: o.attempts,
+      ...(o.authorship ? { authorship: o.authorship } : {}),
+      turns: o.turns,
+    })),
+  };
   return {
     sourceAfter:   source,
     allDischarged: summary.pending === 0,
     perObligation,
     ...(skipped.length > 0 ? { skipped } : {}),
     summary,
+    transcript,
   };
+}
+
+// --- The transcript (B-187 L4) --------------------------------------------------
+//
+// What a run did, for a stakeholder and for a test: per obligation its name
+// and kind, and per attempt the request (the system prompt by its primer
+// section's name), the reply's code block, the kernel's answer verbatim and
+// the time each took; the authorship on acceptance; the prover (the model's
+// name, or `scripted:FILE`) and the date. `formatTranscript` renders it as
+// Markdown; the same record as JSON is its twin, which a test reads back
+// without parsing Markdown (`prove --transcript FILE.md` writes both).
+
+export const TRANSCRIPT_VERSION = "transcript/1";
+
+export interface Transcript {
+  version:         typeof TRANSCRIPT_VERSION;
+  file:            string;
+  /** The client's `modelId()`: the model's name, or `scripted:FILE`. */
+  prover:          string;
+  /** When the run started (ISO 8601). */
+  date:            string;
+  maxAttempts:     number;
+  turnTimeoutMs?:  number;
+  replyTimeoutMs?: number;
+  /** The obligations the proposer declined. */
+  skipped:         string[];
+  obligations: Array<{
+    name: string; kind: ObligationKind; discharged: boolean; attempts: number;
+    authorship?: Authorship;
+    turns: TurnRecord[];
+  }>;
+}
+
+/** A fence longer than any run of backticks in the text. */
+function fenceFor(text: string, info = ""): (body: string) => string {
+  const longest = Math.max(2, ...(text.match(/`+/g) ?? []).map(r => r.length));
+  const fence = "`".repeat(longest + 1);
+  return (body) => `${fence}${info}\n${body}\n${fence}`;
+}
+
+/** The transcript as Markdown. */
+export function formatTranscript(t: Transcript): string {
+  const out: string[] = [];
+  out.push(`# Transcript: \`prove ${t.file}\``, "");
+  out.push(`- **Prover:** \`${t.prover}\``);
+  out.push(`- **Date:** ${t.date}`);
+  out.push(`- **Attempt limit:** ${t.maxAttempts} per obligation`);
+  out.push(`- **Time box:** kernel ${t.turnTimeoutMs ? formatSeconds(t.turnTimeoutMs) : "none"} per turn, reply ${t.replyTimeoutMs ? formatSeconds(t.replyTimeoutMs) : "none"}`);
+  out.push(`- **Attempted:** ${t.obligations.length}; **discharged:** ${t.obligations.filter(o => o.discharged).length}`);
+  if (t.skipped.length > 0) {
+    out.push(`- **Skipped** (the proposer has no answer): ${t.skipped.map(n => `\`${n}\``).join(", ")}`);
+  }
+  for (const o of t.obligations) {
+    out.push("", `## \`${o.name}\` (${o.kind})`, "");
+    out.push(`**Result:** ${o.discharged ? "discharged" : "pending"} after ${o.attempts} attempt(s).`);
+    for (const turn of o.turns) {
+      out.push("", `### Attempt ${turn.attempt}`, "");
+      out.push(`**Request** (system prompt: ${turn.primer}):`, "");
+      out.push(fenceFor(turn.request, "text")(turn.request), "");
+      if (turn.reply === undefined) {
+        out.push(`**Reply** (${turn.replyMs} ms): none.`, "");
+      } else if (turn.candidate === undefined) {
+        out.push(`**Reply** (${turn.replyMs} ms), no code block:`, "");
+        out.push(fenceFor(turn.reply, "text")(turn.reply), "");
+      } else {
+        out.push(`**Reply** (${turn.replyMs} ms), its code block:`, "");
+        out.push(fenceFor(turn.candidate, "allegro")(turn.candidate), "");
+      }
+      out.push(`**Kernel**${turn.kernelMs !== undefined ? ` (${turn.kernelMs} ms)` : ""}:`, "");
+      out.push(fenceFor(turn.kernel, "text")(turn.kernel));
+    }
+    if (o.authorship) {
+      out.push("", "### Authorship", "");
+      out.push(fenceFor("", "json")(JSON.stringify(o.authorship, null, 2)));
+    }
+  }
+  return out.join("\n") + "\n";
+}
+
+/** The JSON twin's path beside a transcript: `FILE.md` becomes `FILE.json`. */
+export function transcriptJsonPath(file: string): string {
+  return file.replace(/\.md$/i, "") + ".json";
+}
+
+// --- The `prove` command's options (B-187 L4) ----------------------------------
+
+export interface ProveOptions {
+  maxAttempts:    number;
+  model?:         string;
+  outputPath?:    string;
+  asJson:         boolean;
+  proposalsPath?: string;
+  /** `--api-key KEY` (B-175 item 6); `ANTHROPIC_API_KEY` when absent. */
+  apiKey?:        string;
+  /** `--turn-timeout MS`, `DEFAULT_TURN_TIMEOUT_MS` by default; 0: no box. */
+  turnTimeoutMs:  number;
+  /** `--reply-timeout MS`, `DEFAULT_REPLY_TIMEOUT_MS` by default; 0: no box. */
+  replyTimeoutMs: number;
+  /** `--transcript FILE.md`: the transcript, and its JSON twin beside it. */
+  transcriptPath?: string;
+  /** `--proposer anthropic|claude-code` (ruled at L4's PR): the SDK client
+   *  (API billing; the default) or Claude Code's scripted mode (a
+   *  subscription). Absent: `anthropic`. `--proposals FILE` selects the
+   *  scripted proposer. */
+  proposer?:      ProposerName;
+}
+
+export type ProposerName = "anthropic" | "claude-code";
+
+/** Parse `prove`'s flags from the command line's arguments. Answers the
+ *  options, or the error to print. */
+export function parseProveArgs(argv: string[]): ProveOptions | { error: string } {
+  const value = (flag: string): string | undefined | null => {
+    const i = argv.indexOf(flag);
+    if (i < 0) return undefined;
+    const v = argv[i + 1];
+    return v === undefined || v.startsWith("--") ? null : v;
+  };
+  const opts: ProveOptions = {
+    maxAttempts: 5, asJson: argv.includes("--json"),
+    turnTimeoutMs: DEFAULT_TURN_TIMEOUT_MS, replyTimeoutMs: DEFAULT_REPLY_TIMEOUT_MS,
+  };
+  const proposer = value("--proposer");
+  if (proposer === null) return { error: "--proposer takes a value" };
+  if (proposer !== undefined) {
+    if (proposer !== "anthropic" && proposer !== "claude-code") {
+      return { error: `--proposer takes anthropic or claude-code, not ${proposer}` };
+    }
+    opts.proposer = proposer;
+  }
+  const strings: Array<[string, "model" | "outputPath" | "proposalsPath" | "apiKey" | "transcriptPath"]> = [
+    ["--model", "model"], ["--output", "outputPath"], ["--proposals", "proposalsPath"],
+    ["--api-key", "apiKey"], ["--transcript", "transcriptPath"],
+  ];
+  for (const [flag, key] of strings) {
+    const v = value(flag);
+    if (v === null) return { error: `${flag} takes a value` };
+    if (v !== undefined) opts[key] = v;
+  }
+  const max = value("--max-attempts");
+  if (max === null) return { error: "--max-attempts takes a value" };
+  if (max !== undefined) opts.maxAttempts = Number(max);
+  const millis: Array<[string, "turnTimeoutMs" | "replyTimeoutMs"]> = [
+    ["--turn-timeout", "turnTimeoutMs"], ["--reply-timeout", "replyTimeoutMs"],
+  ];
+  for (const [flag, key] of millis) {
+    const v = value(flag);
+    if (v === undefined) continue;
+    if (v === null || !/^\d+$/.test(v)) return { error: `${flag} takes milliseconds, a whole number (0: no time box)` };
+    opts[key] = Number(v);
+  }
+  return opts;
 }
 
 /** Load the participant-neutral primer from `docs/book/proving-in-allegro.md`
