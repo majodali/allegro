@@ -16,7 +16,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npx tsx scripts/analyze/lane-lint.ts --check
 chunks: [L1, L2, L3, L4, L5, L6, L7]
-reserves: [B-188, B-189]
+reserves: [B-188, B-189, B-195, B-196]
 boundary:
   - docs/plans/planning-loop.md
   - lib/planning.alg
@@ -41,7 +41,9 @@ boundary:
 > from the maintainer's direction of that day, on `origin/main` at
 > `a8e19c8`; active since the merge of PR #167 on 2026-11-07, with
 > every recommendation taken (§6). The status line and the header's
-> `status` say the same thing.
+> `status` say the same thing. The SY1 amendment (§2b; §5's rows S1 to
+> S5; §6's R11 to R18) is proposed, 2026-11-12, and is ratified at its
+> PR.
 >
 > **Reader**: the maintainer, who ruled on §6 at PR #167; the session that runs the
 > [stream](parallel-streams.md#def-stream). Assumed known: the planning
@@ -68,7 +70,10 @@ The stream delivers in that order: (1) the planning loop, fully chunked
 here; (2) the software system model and (3) a documentation or
 comprehension model, each staged in §5 with the ruling that admits it
 once (1) has run. Vision §4 directs "don't over-design ahead of
-evidence"; (1) is the evidence (2) and (3) wait for.
+evidence"; (1) is the evidence (2) and (3) wait for. (1) was delivered
+at PR #192; R7 admitted (2) on 2026-11-12, and the SY1 amendment (§2b,
+§5's rows S1 to S5, §6's R11 to R18) plans it, proposed until its PR is
+ratified.
 
 **The demo, as a stakeholder sees it.** An operations lead has a plan
 with a hole in it: an order is packed, and nothing in the plan gets it
@@ -100,6 +105,28 @@ thing that says yes.
   and its transcript captured.
 - The claims register of `docs/plans/release-track.md` re-graded only
   for what is delivered (R6).
+
+**Done-condition for (2)** (proposed at the SY1 amendment; ratified at
+its PR). All of these hold:
+
+- A runnable scene, `demos/rung4/02-system.alg` (R6 (a): the scenes for
+  (2) and (3) follow in rung 4), suite-pinned by its `// expect:` lines,
+  in which a plan and a system model are related by a declared mapping
+  and one finding names both: a cross-model obligation, answered by a
+  proposal and judged by the kernel. With a walkthrough
+  `demos/rung4/02-system.md` and its transcripts, the transcripts
+  reproduced by a test, as for (1).
+- An LLM-free path through the same loop on the scene: the obligations
+  listed by `allegro obligations`, rendered by `allegro propose`,
+  answered by a scripted proposer and verified by the kernel, without a
+  key and without the network.
+- The same loop with a language-model proposer, run once and its
+  transcript captured (the maintainer's run, as at L4).
+- The claims register of `docs/plans/release-track.md` re-graded only
+  for what is delivered. The one row that may move is D2 (the
+  assumption ledger)'s "cross-model ledger", and only if the scene's
+  ledger names the plan, the system model and the mapping. D7 (the
+  capstone) stays hypothesis.
 
 **The horizon: Allegro's own development.** Once (1) to (3) have run,
 the loop is meant to work on Allegro itself: its plan (the backlog's
@@ -212,13 +239,54 @@ before it.
   `catalog NAME:` block an obligation names. Ratified on the
   maintainer's review of PR #192, 2026-11-12.
 
+The terms below are SY1's, each proposed at the SY1 amendment and
+ratified at its PR. "Model" is used as the book pass's review of Part V
+defines it: a description of a system, written in a language made for
+its domain and precise enough to be checked
+(`docs/records/book-pass/dr5-part-5-vivace.md`, "Terms introduced").
+
+- <a id="def-artifact"></a>**Artifact**: a named thing that one part of
+  a software system hands to another, such as an order, an invoice or a
+  report. Inside one model an artifact is known by its name.
+- <a id="def-component"></a>**Component**: a named part of a software
+  system, described by the [artifacts](#def-artifact) it provides and
+  the artifacts it requires.
+- <a id="def-component-model"></a>**Component model**: a value listing
+  [components](#def-component) and the artifacts the system declares as
+  its outcomes, checked so that every required artifact has exactly one
+  provider.
+- <a id="def-entity"></a>**Entity**: a named record of data: its fields,
+  each with a type, and its key.
+- <a id="def-data-model"></a>**Data model**: a value listing
+  [entities](#def-entity), checked so that every key and every reference
+  names something the model holds.
+- <a id="def-mapping"></a>**Mapping** (declared mapping): a value that
+  relates two models, declared in the file, of one kind the library
+  defines, and checked by the kernel when it is built; the only way two
+  models relate, as the book pass ruled on 2026-11-12 ("Two models
+  relate only through a declared mapping",
+  `docs/plans/book-pass-inventory.md`, Part V, Models). SY1 uses two
+  kinds: an artifact typed by an entity, and a plan's outcome typed by an
+  artifact.
+- <a id="def-system-model"></a>**System model**: a
+  [component model](#def-component-model) and a
+  [data model](#def-data-model) of one software system, related by a
+  [mapping](#def-mapping).
+- <a id="def-cross-model-obligation"></a>**Cross-model obligation**: a
+  [plan obligation](#def-plan-obligation) of a mapping's reading of a
+  plan that the plan alone does not have: an artifact the mapping
+  assigns to the plan's outcomes that no completion from the plan's
+  catalog produces.
+
 **Reserved ids.** The header reserves B-188 (first out-of-scope finding
 of the planning-loop stream) and B-189 (second out-of-scope finding of
 the planning-loop stream). The plan's PR files both as placeholders in
 `docs/backlog.md`, so the header resolves under `npm run lint:streams`.
 B-187 (the planning loop, the next validating demo) is the stream's
 item. B-083 (the AI iteration loop) and B-082 stay open; this stream
-works their first slices.
+works their first slices. The SY1 amendment reserves B-195 (first
+out-of-scope finding of SY1) and B-196 (second out-of-scope finding of
+SY1), filed as placeholders in `docs/backlog.md` at its PR (R18).
 
 ## 2. The problem, measured
 
@@ -836,7 +904,43 @@ every chunk stops at its PR in any case. The stream adds four:
   scene shows; one that says more is a stop, whatever the chunk.
 - **Any file outside the boundary** (§4), and any edit to the
   software system model or the documentation model before R7 or R8
-  admits it.
+  admits it. R7 admitted the software system model on 2026-11-12; its
+  files are §4's SY1 list, in the header once the SY1 amendment is
+  ratified.
+
+**For row SY1** (proposed at the SY1 amendment). Checks 1 to 5 bind S1
+to S5, read this way:
+
+- Check 2: S1 to S3 add files only, so no existing output moves. S4
+  moves only the new ledger lines on files holding a mapping, each
+  listed in its PR, and what a ruling under R17 lists.
+- Check 3: SY1's libraries are outside the load corpus until lane P
+  adds them (2b.6). Until then each chunk reports its libraries' parse
+  counts (`ALLEGRO_PARSE_STATS=1`) in its PR, and the counts of
+  `lib/planning.alg` and `demos/rung3/02-solve.alg` do not move.
+
+Two checks are added:
+
+6. **No name collision.** A test asserts that SY1's libraries bind no
+   top-level name and no grammar rule name that `lib/units.alg`,
+   `lib/planning.alg` or `lib/planning_loop.alg` binds, except the ones
+   reused on purpose and listed in the test (2b.2).
+7. **The four strengths.** New findings, records and ledger lines say
+   decided, sampled, assumed or undecided (B-194 (one vocabulary of four
+   strengths in the planning loop)); "admitted" and "discharged" appear
+   in a new library only where it reads the loop's existing records.
+
+And four stops:
+
+- **A rename of an existing pinned output or ledger word** under B-194
+  before the maintainer has ruled on the list of the pins it moves.
+- **An edit to the planning chapter's decisions**
+  (`docs/book/vivace/planning-dsl.md` §1 to §8): the book pass holds
+  them (its review of Part V, 2026-11-12).
+- **A compilation unit that holds both a recursive binding and a caller
+  of `check_plan`** (2b.3; R16).
+- **A chunk that needs a second obligation kind** (2b.4), or a change in
+  `src/runtime.ts` or `src/evaluator.ts`.
 
 ## 4. File boundary
 
@@ -901,8 +1005,33 @@ stops:
   plan's.
 - `README.md` and `docs/messaging.md`: lane S. A rung 4 entry in either
   goes as a lane-S PR after L7, if R6 allows public copy at all.
-- Any library or document of the software system model or the
-  documentation model, until R7 or R8 admits it.
+- Any library or document of the documentation model, until R8 admits
+  it; and of the software system model, any file not on SY1's list
+  below.
+- For SY1: B-188's fix, B-189's and B-190's. They are in
+  `src/runtime.ts` and `src/evaluator.ts`, so each is a chunk of its own
+  plan or of B-180 (recursion handling under partial evaluation)'s, and
+  SY1's rows wait for none of them (R16).
+
+**SY1's files** (proposed at the SY1 amendment). The header's `boundary`
+gains them at ratification, with the names R11 rules:
+
+- `lib/components.alg` (S1) and `lib/data_model.alg` (S2), the two DSLs;
+  `lib/system.alg` (S2), the mapping between them;
+  `lib/system_planning.alg` (S3), the mapping between a plan and a system
+  model and the cross-model check (R13). Under R11 (a), the first three
+  are one `lib/system.alg`.
+- `tests/system-*.alg` (S1, S2) and `tests/planning-system-*.alg` (S3,
+  S4): new demo files only.
+- Already in the header and used by S4 and S5: `src/pcp.ts`,
+  `src/index.ts`, `src/test/pcp.ts`, `src/test/language.ts`, `pcp/**`,
+  `demos/rung4/**`, `docs/plans/release-track.md`,
+  `docs/book/platform/tooling.ir.md`, `docs/book/getting-started.md`.
+- `scripts/analyze/lanes.json`: only under R14 (b), in a lane-S PR
+  before S1.
+- No chapter under R15 (b). `docs/book/vivace/**` stays in the header
+  for (1)'s chapter; SY1 edits it only if R15 is taken as (a).
+- `lib/planning.alg` gains nothing (R10 (a)); `bench/**` stays lane P's.
 
 **Lanes sharing these files.** Lane D is internally serial. If the
 pilot-findings plan runs in lane D, it runs first and this stream
@@ -925,17 +1054,39 @@ Each chunk is one PR, human-gated.
 | L6 | B-187 | **Legibility, if the loop needs it.** The rest of B-081 (counterexample legibility) as its C2 row of `planning-pilot.md` holds it: the call-site origin (B-057 (call-site origin)) if the splice needs a source location, rendering the refused value if a proposer cannot converge from the text alone. Decided on L3's and L4's evidence; dropped if neither shows the need | as the chunk's PR states it; no output moves outside it |
 | L7 | B-187 | **The demo and packaging.** `demos/rung4/01-loop.alg` (suite-pinned), `01-loop.md` (obligations, propose, the scripted loop, the LLM loop), `README.md` saying what the rung does not yet show (one model; no composition); the transcripts reproduced by a test; the claims register re-graded (R6); the chapter's §2.8 and §9; getting-started's tour entry | the scene green in the suite; the register's changes listed against the scene's lines; no public claim beyond them |
 
-### Staged: the second and third models
+### SY1: the software system model (proposed at the SY1 amendment)
+
+R7 (a), taken 2026-11-12, admitted row SY1: components and data first,
+UI later, all from B-080 (the Vivace DSL roster); the composition point
+a plan's outcome typed by a system model's artifact, with a cross-model
+check whose findings are plan obligations; library-first. The rows below
+are the amendment's and are ratified at its PR. The header's `chunks`
+gains S1 to S5 then, not now: `npm run lint:streams` would accept them
+(it checks a chunk id's form only, `scripts/stream-plan.ts:120` to
+`:130`), but a row that is not ratified is not a chunk yet. Each row is
+one PR, human-gated, and each is evidence for one of the foundations the
+book pass ruled for Part V on 2026-11-12 (last column). The sequence is
+library-first: no surface form until a demo needs one.
+
+| Chunk | Backlog | Deliverable | Oracle | Evidence for |
+|---|---|---|---|---|
+| S1 | B-187 | **The component DSL, library-first.** `lib/components.alg` (R11): an `Artifact` record (its name; nothing about its data until S2), a `Component` record (its name, the artifacts it provides and requires), and a component model value holding the components and the artifacts the system declares as its outcomes; constructors and queries, as `lib/planning.alg`'s stage A1 had. Its checks, as finding records in the model's words: an artifact required and provided by no component, or by two; an artifact provided and neither required nor declared; a component that requires only what it provides itself. Wiring by artifact name inside the one model, as planning's convention 5 wires by type name. No surface form. Status words in the four strengths (R17). A demo `tests/system-components.alg` | the demo's pins (a model checked clean, each finding once); every existing output identical (check 2); check 6; the library's parse counts in the PR (2b.6) | "A model is a value": a component model built, inspected and checked by ordinary functions |
+| S2 | B-187 | **The data DSL, and the first declared mapping.** `lib/data_model.alg`: `Entity` (its name, fields and key), `Field` (its name, and a kernel type or a reference to an entity by name), a data model value, its checks (a key names a field; field names are distinct; a reference names an entity of the model). `lib/system.alg` (R11): the mapping kind "an artifact typed by an entity", declared as a record that holds both models and the two names, checked when it is built (the artifact is one the component model has; the entity is one the data model has), its findings naming both models; the system model as the two models and their mappings. Neither DSL's library uses the other. A demo `tests/system-data.alg` | the demo's pins (a mapping checked; each refusal in both models' words); check 2; check 6 for both libraries | "Two models relate only through a declared mapping", inside one system: the book pass's candidate "one model's values typed by another's" |
+| S3 | B-187 | **The composition with the planning model.** `lib/system_planning.alg` (R13): the mapping kind "a plan's outcome typed by a system artifact" (R12), declared as a record holding the open plan, the system model and the artifacts the plan is to deliver, checked when it is built (each artifact is one the system has); its reading, the plan with those artifacts among its declared outcomes as an open plan over the plan's own catalog (2b.4); the cross-model check: an artifact the mapping assigns that no completion produces is a [cross-model obligation](#def-cross-model-obligation), a plan obligation of the reading, so the plan kind serves it unchanged; an artifact the system declares that no mapping assigns is a finding in the mapping's words, not an obligation. Whether the identity also names the system is ruled at S3's PR. No recursive binding in the library (R16). A demo `tests/planning-system-obligations.alg` | `obligations --pending` lists the cross-model obligation with its hash, in text and JSON; `src/pcp.ts`, `src/index.ts` and `pcp/**` unchanged (2b.4's claim held); check 2 | "Two models relate only through a declared mapping" (the planning pair), and "Solving is proposing a value for an unknown, and the kernel checks it": the obligation is a claim waiting for a value. In part, "A transformation is a model": the mapping is a declared record, its reading one fixed library function |
+| S4 | B-187 | **The loop and the ledger over the composed model.** `prove --proposals` on S3's file, converging (a refused attempt, then an accepted one); `verify --transcript` carrying the author; the ledger across both models: a record of the mapping (decided when its check passes, or its finding) and of the system model, each rendered by its library, and the reading's "rests on" naming the mapping beside the plan's promises. `src/pcp.ts` collects records of more than the three planning types (2b.5); the shape (an optional verdict field beside `planLedger`, or the mapping's records in the plan ledger's form) is ruled at S4's PR. The rename of the loop's "admitted" and "discharged" if R17 is taken as (a), after the stop that lists its pins | the scripted loop pinned with a test client; `verify` and `inspect` on the new files gain only the lines S4's PR lists; every other output identical; no network | "Feasible is decided; best says how strongly it holds": the solved reading decided, the promises and the mapping each at their strength |
+| S5 | B-187 | **The scene and the record.** `demos/rung4/02-system.alg` (suite-pinned), `02-system.md` (obligations, propose, the scripted loop, the keyed run), its transcripts reproduced by a test, the rung's `README.md` saying what the scene does not show (UI; one mapping kind per pair of models); the keyed run, the maintainer's; the claims register re-graded only for what the scene shows; getting-started's tour entry; the chapter's status as R15 rules | the scene green in the suite; the register's change listed against the scene's lines; no public claim beyond them | "Two models relate only through a declared mapping", shown to a stakeholder: one finding names both models |
+
+### Staged: the third model
 
 Staged as `planning-pilot.md` staged two of its rows: its C2 row, the
 rest of B-081 (counterexample legibility), and its row D3 (branch-and-bound,
-a surface form for catalogs): not before a demo needs one, and not before (1) has run. Neither row is in the
+a surface form for catalogs): not before a demo needs one, and not before (1) has run. The row is not in the
 header's `chunks` until its ruling admits it; the stream's plan is
-amended at that PR.
+amended at that PR. Row SY1 was staged here until R7 admitted it; its
+rows are above.
 
 | Row | Outcome | Engine and library questions it opens | Admitted by |
 |---|---|---|---|
-| SY1 | **The software system model, composed with the planning model.** The second pilot of Vision §4, "a software system model (several interconnected DSLs)", in Shape 1: a system described in two or more small DSLs, checked, and composed with a plan so that one finding names both, and the loop of (1) answers the composed model's obligations | Which DSLs: the chapter's table names data, components and UI (`docs/book/vivace/planning-dsl.md` §1), and B-080 (the Vivace DSL roster) lists software-systems, data and UI modelling separately. A port's type is a `String` today (`Port`, `lib/planning.alg:46`), so a plan cannot name another model's type: cross-library types in a model's records. Two grammars active in one file, each `use`d (conflict detection at `use` time). One verdict and one ledger across two models (D2 (the assumption ledger)'s row "cross-model ledger", hypothesis). Whether a cross-model check lives in either library or in a third that imports both | R7, after L7 has merged: the DSL list and the first composition point, chosen on (1)'s evidence |
 | DC1 | **A documentation or comprehension model, composed with the two.** The third model, which makes the test multi-model in the maintainer's sense | What it is for, which is R8's question. Whatever it is, how its values are read from files (an effect; §1's horizon), and how it composes with the other two (a plan node that produces a chapter; a component a chapter documents) | R8, after SY1 has run |
 
 **The third model's raw material.** No record designs it. The nearest
@@ -955,7 +1106,10 @@ terms as ports.
 Each with its options, costs and a recommendation; "Taken:" is the
 maintainer's. Suggested order of taking: R5 and R10 first (they decide
 whether the chunks can land at all), then R1 with R9, R2, R3, R4, R6;
-R7 and R8 at their rows' time.
+R7 and R8 at their rows' time. For the SY1 amendment: first the tension
+§7's SY1 entry states (whether SY1 proceeds while the book pass holds
+the pilots); then R11, R12 and R13 (they decide S1's files); then R16,
+R14, R15, R17 and R18.
 
 - **R1** — **What a plan obligation is, and which the first demo
   takes.** Candidates: (i) a gap that completion from the plan's
@@ -1170,6 +1324,157 @@ R7 and R8 at their rows' time.
     delivered from what the loop adds. If the wording fix itself raises
     the counts, that one commit takes (b).
   - **Taken:** (a), at the merge of PR #167, 2026-11-07.
+
+The rulings below are the SY1 amendment's (2026-11-12), each awaiting
+the maintainer at its PR.
+
+- **R11** — **One library or one per DSL, and their names.**
+  - (a) One library, `lib/system.alg`: the component DSL, the data DSL
+    and the mapping between them. One `use` line. Nothing then separates
+    a mapping from a model's own code, which is what S2 is meant to
+    show, and the one library holds three meta-models' worth of names
+    in the scope 2b.2 found shared.
+  - (b) One library per DSL and one per mapping: `lib/components.alg`
+    and `lib/data_model.alg`, neither using the other; `lib/system.alg`,
+    using both, for the mapping between them (S2); and
+    `lib/system_planning.alg` for the planning pair (R13). Each library
+    is one meta-model or one mapping, as the book pass's foundations
+    separate them, and a file that needs one DSL loads only it. Costs:
+    four `use` lines in the scene, and four libraries for lane P's
+    corpus (2b.6).
+  - (c) One library per DSL, with the mapping inside
+    `lib/components.alg`, which then `use`s `lib/data_model.alg`. One
+    file fewer; the component DSL reads the data model's values, which
+    is the coupling by code that "Two models relate only through a
+    declared mapping" rules out.
+  - Under every option: names with underscores, since the `use`
+    scanner takes identifiers only (§7, L1's first default); every
+    grammar rule name prefixed (`cm_`, `dm_`, `sy_`, `sp_`) and no
+    top-level name a planning library binds (2b.2: `Port`, `Finding`,
+    `join`, `catalog` and the rest), checked by §3's check 6.
+  - **Recommended: (b).**
+  - **Taken:**
+- **R12** — **How a plan's port names another model's type.**
+  - (a) A type value in the port: `Port.type` holds the artifact's type.
+    Every rendering and the identity hash halt on it (2b.1), it changes
+    `lib/planning.alg`, which R10 keeps as rung 3 left it, and it puts
+    the system model's values inside the planning model's records: the
+    planning model reads another model's values, coupling by code.
+  - (b) A name resolved at check time: the port keeps its string, and a
+    check matches it against the system's artifact names. No new record;
+    but the relation is a coincidence of names that nothing declares,
+    and a renamed artifact quietly stops relating. This is the option
+    the book pass recorded as not chosen: "models coupled implicitly,
+    through shared names or code that reads both".
+  - (c) A declared mapping record: a value of the mapping's library that
+    pairs an open plan with the system artifacts its outcomes are to
+    be, built by a constructor that checks both ends, and read as an
+    open plan (2b.4). The port stays a name in the planning model; the
+    relation is one value, declared, inspectable and checked; the
+    identity hash covers it through the reading's surface. It is the
+    book pass's first candidate kind: one model's values typed by
+    another's.
+  - **Recommended: (c).** It is the only option that is a declared
+    mapping; (a) couples by code and (b) by shared names.
+  - **Taken:**
+- **R13** — **Where the cross-model check lives.**
+  - (a) A third library, `lib/system_planning.alg`, that `use`s
+    `planning_loop` and the system model's libraries. Neither model's
+    library knows the other; the mapping is the third library's value
+    and the check its function, as Part I's "A mapping between models
+    is itself a checked value" puts it. It holds no recursive binding
+    (2b.3: such a library loads).
+  - (b) In `lib/planning_loop.alg`. The loop's library then reads
+    system values, and the planning model depends on every model
+    composed with it.
+  - (c) In the system model's library. The system model then reads
+    plans, and its recursive walks would sit beside a caller of
+    `check_plan`, the unit B-188 stalls (2b.3, the first probe).
+  - **Recommended: (a).**
+  - **Taken:**
+- **R14** — **The lane, R5 (b) revisited.**
+  - (a) Lane D until DC1. Lane D's globs already hold every file of §4's
+    SY1 list (`lib/**`, `tests/**`, `src/*.ts`, `src/test/**`,
+    `pcp/**`, `demos/rung4/**`, `docs/book/**`), so no lane-S PR. Lane D
+    is serial, but its rule admits concurrent streams with disjoint
+    boundaries (ruled at the merge of PR #177): a stream fixing B-188,
+    B-189 or B-190 in `src/runtime.ts` and `src/evaluator.ts`, outside
+    this boundary, can run beside SY1.
+  - (b) A lane for the Vivace models now: a lane-S PR adding the lane's
+    row and globs (`lib/planning*.alg`, SY1's libraries,
+    `tests/planning-*.alg`, `tests/system-*.alg`, `demos/rung4/**`,
+    `docs/plans/planning-loop.md`); it overlaps lane D in `src/pcp.ts`,
+    `src/index.ts` and `src/test/**`, and lane C in `pcp/**`; S1 waits
+    for the PR. What it frees, lane D's band beside SY1, (a)'s rule
+    already frees for any disjoint boundary.
+  - **Recommended: (a)**, revisited at DC1, when a third model's
+    libraries join. S1 to S3 touch only new libraries and tests, so (b)
+    buys nothing yet.
+  - **Taken:**
+- **R15** — **The chapter.**
+  - (a) A new chapter now, `system-model.md` under
+    `docs/book/vivace/`. It
+    conflicts with lane R: the book pass holds the planning chapters,
+    is restructuring Part V (Models; Search and optimization; Analysing
+    models; then the worked languages), and owns
+    `docs/reading-order.json` and the anchors. A new chapter would
+    pre-empt the structure the maintainer ruled on 2026-11-12.
+  - (b) The design truth in this plan, §2b, §5's rows and §6's
+    rulings, and in the libraries' header comments, until the book
+    pass's phase 2 reaches Part V, as `planning-dsl.md` was the design
+    truth for rung 3 before the book took it in. S5 then edits nothing
+    under `docs/book/vivace/`, except a status line in
+    `planning-dsl.md` §9 if the maintainer asks for one.
+  - **Recommended: (b).**
+  - **Taken:**
+- **R16** — **B-188's order.**
+  - (a) A fix first, in the home B-188 names, B-180 (recursion handling
+    under partial evaluation), which has no plan: a plan and at least
+    one chunk in `src/runtime.ts` and `src/evaluator.ts` before S1.
+  - (b) The rule 2b.3 measured instead: no compilation unit holds both
+    a recursive binding and a caller of `check_plan`. The component and
+    data libraries may recurse over their own graphs, since they never
+    call `check_plan`; `lib/system_planning.alg` holds no recursive
+    binding (its check is a fold over the mapping's artifacts); no walk
+    hands a function to itself (B-189). §3's stop holds the rule.
+    Measured cost: none.
+  - **Recommended: (b).** B-188 and B-189 stay open with their owner,
+    and SY1 waits for neither.
+  - **Taken:**
+- **R17** — **B-194's wording in SY1.**
+  - (a) New wording in the four strengths from S1 (a model's check
+    decided, a promise assumed), and the loop's existing "admitted" and
+    "discharged" renamed at S4, which touches the ledger, after a stop
+    that lists the pins the rename moves: `demos/rung4/01-loop.alg:110`
+    ("rests on 1 admitted promise: sealed"); the ledger lines of `verify`
+    and `inspect` on the twelve files holding a plan value (§7, L5's
+    list: outputs, not pins); and the assertions of `src/test/pcp.ts`
+    on the ledger's words (26 lines carry them, by a text count). The
+    theorem verdict's "discharged" and the laws' "admitted" tier are
+    the prover protocol's and the units library's, not the loop's, and
+    stay for the book pass's phase 2.
+  - (b) New wording from S1, and the existing uses left to the book
+    pass's phase 2. The composed scene would then show "assumed" for the
+    mapping beside "admitted" for the plan's promises.
+  - (c) The loop's words in the new libraries too, until one rename.
+    Against B-194's instruction to write new wording in the four words.
+  - **Recommended: (a).** B-194 asks the stream to rename existing uses
+    when a chunk touches them, each discussed first; S4 touches them,
+    and (b) would put both vocabularies in one scene.
+  - **Taken:**
+- **R18** — **The reserves.**
+  - (a) Two new ids, B-195 and B-196, filed now as placeholders at L0,
+    "reserved by the planning-loop stream for SY1", as the plan's PR
+    filed B-188 and B-189; the header's `reserves` gains them now, so
+    `npm run lint:streams` resolves them. §2b holds two candidates: the
+    record fields not checked at construction (2b.1) and a rule replaced
+    silently across libraries (2b.2). Each is filed on the maintainer's
+    ruling, not by this amendment.
+  - (b) No reserves: a finding takes the next free id at its chunk. Two
+    streams can then mint one id, as lanes A and B did with
+    B-101 (predicate-carrier residue cleanup).
+  - **Recommended: (a).**
+  - **Taken:**
 
 ## 7. Record
 
@@ -2727,3 +3032,45 @@ R7 and R8 at their rows' time.
     halts the accepting turn, because the solved plan's obligation list
     is empty; the loop reports the file's own fault as the proposal's
     refusal (`refused (halt)`). Not filed unless the maintainer asks.
+- **2026-11-12 — SY1 planned.** The amendment, drafted on `origin/main`
+  at `1d63a6b` (the merge of PR #192); no code changed. It adds §2b (the
+  second model, measured), the done-condition for (2) and seven terms
+  in §1 (proposed), SY1's readings of the oracle and four stops in §3,
+  SY1's files in §4, rows S1 to S5 in §5 (SY1 moved out of the staged
+  table; DC1 stays), and rulings R11 to R18 in §6. The header gains
+  only the reserves B-195 and B-196, filed as placeholders; `chunks`
+  and `boundary` gain S1 to S5 and SY1's files at ratification.
+  - **The tension the maintainer settles first.** In the book pass's
+    review of Part V (`docs/records/book-pass/dr5-part-5-vivace.md`,
+    merged at PR #193 before PR #192), the maintainer said: "let's hold
+    off on pilots in general and the planning pilot in particular. We
+    need to clarify the foundational decisions first". R7 (a) was taken
+    the same day, on the review of PR #192, after that record merged.
+    Read one way, SY1 is a pilot and waits; read the other, R7 is the
+    later and narrower ruling and admits it. This amendment does not
+    choose. It drafts SY1 so that each row is evidence for one of the
+    foundations the review ruled (§5's last column), and asks which
+    reading holds before any other SY1 ruling.
+  - **The rulings it awaits**, each with its recommendation: R11 (one
+    library per DSL and one per mapping), R12 (a declared mapping record, not a type value or a
+    shared name), R13 (a third library for the cross-model check), R14
+    (lane D until DC1), R15 (no chapter until the book pass reaches Part
+    V), R16 (B-188 as a rule SY1 obeys), R17 (the four strengths from
+    S1, the rename at S4) and R18 (two reserves).
+  - **The probes, one line each** (§2b):
+    - A port names another model's type as a string that nothing
+      checks; a type value in `Port.type` wires by identity but halts
+      every rendering and the hash.
+    - A `component NAME:` form composes with `plan NAME:` in one file;
+      a later library silently replaces an earlier one's grammar rule or
+      top-level binding of the same name.
+    - B-188 stalls only a unit holding both a recursive binding and a
+      caller of `check_plan`; a recursive system library and a flat
+      third library both load. B-189 holds on nested components.
+    - A mapping read as an open plan gives a cross-model obligation that
+      `obligations`, `prove --proposals` and `verify` serve with no host
+      change.
+    - The ledger across the two models names the plan only, and a
+      mapped reading makes `entryAuthorsByValue`'s ambiguity routine.
+    - `lib/planning_loop.alg` never entered the load corpus; a new
+      library costs neither gate until lane P adds it.

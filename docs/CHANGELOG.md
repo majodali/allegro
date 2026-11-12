@@ -859,6 +859,28 @@ Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
 entries newest first, directly below this line.
 
+### 2026-11 — SY1 planned: the software system model (B-187, amendment)
+
+The maintainer took R7 (the software system model, the second pilot)
+as (a) on the review of PR #192: components and data first, the
+composition point a plan's outcome typed by a system model's artifact,
+library-first. The plan records that ruling and L7's asks (ask A8 of
+`docs/book/platform/tooling.ir.md` resolved; the term splice site
+ratified), measures the second model before designing it (§2b), and
+proposes rows S1 to S5 with rulings R11 to R18 (the reserves). The
+measurements: a port names another model's type only as an unchecked
+string; a second grammar-bearing library composes with planning in one
+file but shares its rule and top-level names silently;
+B-188 (a recursive binding or a library-named list stalls the
+precompile or the load) stalls only a unit holding both a recursive
+binding and a caller of `check_plan`; a declared mapping read as an
+open plan yields a cross-model obligation the existing loop serves
+with no host change; the ledger names the plan only; the loop's
+library never entered the load corpus. The amendment states, and
+leaves to the maintainer, the tension between R7 (a) and the book
+pass's hold on pilots. Reserves B-195 (first out-of-scope finding of
+SY1) and B-196 (second out-of-scope finding of SY1). No code changed.
+
 ### 2026-11 — Rung 4 scene 1: the planning loop demonstrated (B-187, chunk L7)
 
 B-187 (the planning loop, the next validating demo), chunk L7 of

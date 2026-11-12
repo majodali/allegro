@@ -1448,7 +1448,9 @@ table and the stream plans.
     `docs/plans/planning-loop.md`, draft 2026-11-06) stages the software
     system model composed with the planning model (row SY1) and a
     documentation model composed with both (row DC1), each admitted by a
-    ruling after the loop has run.
+    ruling after the loop has run. R7 admitted SY1 on 2026-11-12; its
+    amendment (rows S1 to S5) proposes the first declared mapping between
+    two models, a plan's outcome typed by a system model's artifact.
 - [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
   agent can't discharge; surfacing; time-boxing; shared artifact with
   B-081), as described in Vision §4 (one of the seven gaps)
@@ -3517,7 +3519,9 @@ table and the stream plans.
   AI iteration loop) and B-082 (model composition), which stay open.
   Reserves B-188 (a recursive binding or a library-named list stalls
   the precompile or the load) and B-189 (a self-applied function
-  exhausts the JS stack), filed at L5. Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06,
+  exhausts the JS stack), filed at L5, and, for SY1, B-195 (first
+  out-of-scope finding of SY1) and B-196 (second out-of-scope finding
+  of SY1), filed as placeholders at the amendment's PR. Stream plan: `docs/plans/planning-loop.md`, drafted 2026-11-06,
   ratified 2026-11-07 at PR #167; L1 (the obligation surface) merged
   at PR #177 with its four defaults ratified; L2 (the proposal
   protocol) merged at PR #182, where the maintainer ruled on 2026-11-10 that
@@ -3657,6 +3661,24 @@ table and the stream plans.
   **Pointer**: `docs/records/book-pass/dr5-part-5-vivace.md`, "Rulings
   taken"; `docs/plans/book-pass-inventory.md`, "Four strengths, one
   vocabulary"
+- [ ] **B-195** (first out-of-scope finding of SY1) · L0 · Placeholder,
+  reserved by the planning-loop stream for SY1
+  (`docs/plans/planning-loop.md`, the SY1 amendment, ruling
+  R18 (the reserves)). Filed 2026-11-12 so the plan's header resolves
+  under `npm run lint:streams`; a finding takes it on the maintainer's
+  ruling. Candidate in the plan's
+  §2b.1: a record's declared field types are not checked when it is
+  built (`Port(42, none)` is a `Port`).
+  **Pointer**: the plan's §2b and §6, R18
+- [ ] **B-196** (second out-of-scope finding of SY1) · L0 · Placeholder,
+  reserved by the planning-loop stream for SY1
+  (`docs/plans/planning-loop.md`, the SY1 amendment, ruling
+  R18 (the reserves)). Filed 2026-11-12 so the plan's header resolves
+  under `npm run lint:streams`; a finding takes it on the maintainer's
+  ruling. Candidate in the plan's
+  §2b.2: a later `use`d library's grammar rule silently replaces an
+  earlier library's rule of the same name.
+  **Pointer**: the plan's §2b and §6, R18
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations
