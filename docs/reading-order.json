@@ -77,7 +77,8 @@
         { "doc": "docs/records/concepts-analyses.md", "title": "Concept spine: the analysis record", "record": true },
         { "doc": "docs/records/book-pass/f1-readme.md", "title": "Book pass, chapter review F1: the root README", "record": true },
         { "doc": "docs/records/book-pass/p2-allegretto-metadata-and-capability.md", "title": "Book pass, chapter review P2: metadata and the capability to write it", "record": true },
-        { "doc": "docs/records/book-pass/dr1-part-1-the-bet.md", "title": "Book pass, decision review of Part I: the bet", "record": true }
+        { "doc": "docs/records/book-pass/dr1-part-1-the-bet.md", "title": "Book pass, decision review of Part I: the bet", "record": true },
+        { "doc": "docs/records/book-pass/dr2-part-2-the-kernel.md", "title": "Book pass, decision review of Part II: the kernel", "record": true }
       ]
     }
   ]

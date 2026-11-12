@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 256 decisions after DR1's rulings of 2026-11-11 (Part I: 23, with a thesis statement; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts: 231 decisions after DR2's rulings of 2026-11-11 (Part I: 23, with a thesis statement; Part II: 49; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -13,7 +13,7 @@ The order binds by dependency: every decision comes after the decisions it depen
 **Front matter**
 
 - **How this book is organized** (the preface, as merged). Holds the organization the book follows; it presents no decision.
-- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (Keep it simple); One operation: partial evaluation (Keep it simple); Correctness and safety are one kind of claim (Keep it simple); Claims are evaluated like everything else (Keep it simple); The kernel trusts only what it has evaluated (Keep it simple); One value universe (Values and their seven kinds); Metadata is a field on every value (Metadata and the capability to write it); Evaluation is total over unresolved information (Evaluation over unresolved information); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
+- **Ten choices that define Allegro** (the tour). Tells the ten significance-5 decisions as one story, each pointing forward to its chapter: Everything above the kernel is an extension, and there is one way to extend (Keep it simple); One operation: partial evaluation (Keep it simple); Correctness and safety are one kind of claim (Keep it simple); Claims are evaluated like everything else (Keep it simple); The kernel trusts only what it has evaluated (Keep it simple); One value universe (Values); Metadata is a field on every value (Metadata); Evaluation is total over unresolved information (Evaluation); Types are values that constrain values (Types as values); Refinement types (Refinement types). Draws on [README.md](../../README.md) what Allegro is, [vision.md](../book/vision.md) §1, §2.
 
 **Part I: The bet**
 
@@ -25,35 +25,24 @@ Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer ga
    - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
 Chapter 3 of the first proposal is dissolved: its decisions are folded into chapters 1 and 2 (DR1). The chapter numbers of Parts II to VI below are those of the first proposal and are renumbered when phase 1 ends.
 
-**Part II: Allegretto, the kernel**
+**Part II: The kernel**
 
-4. **Values and their seven kinds** (8 decisions). Everything is a value of one of seven fixed kinds, and the base offers a small set of primitives over them.
-   - Decisions: One value universe; Seven representation kinds; Kind is a host discriminant, not a type; Value as a contract, seven kind units and an assembly; Bits is the only scalar; Minimal base surface of about forty primitives; The discriminator rule for kind comparisons; Scalar encodings inside Bits.
-   - Draws on: [units.md](../book/units.md) §3, §3.2, [concepts.md](../book/concepts.md) T0 §1 to §3, §8, [allegretto/README.md](../book/allegretto/README.md) the minimal base, [allegretto/structures.md](../book/allegretto/structures.md) §11, Appendix B, Value, the kinds and the assembly (planned), [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 (the default arm), Futures and the base primitives (planned).
-5. **Expressions, functions and symbols** (8 decisions). Unevaluated applications are values forming a DAG; functions are data; symbols are identified by fully-qualified name.
-   - Decisions: Expressions are values, forming a DAG; Symbol identity is a fully-qualified name; Host functions as values with declared evaluation control; Expressions memoize per evaluation context; Positional parameters owned by membership; Functions are data: params plus body; Transient reference symbols resolved by base name; Symbols interned by FQN.
-   - Draws on: [concepts.md](../book/concepts.md) T0 §4 to §7, [allegretto/structures.md](../book/allegretto/structures.md) §5, Value, the kinds and the assembly (planned).
-6. **Structures** (8 decisions). The one composite kind, how its entries are laid out, how it is constructed, and why it is immutable.
-   - Decisions: One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; The composite is one sequence of optionally-keyed entries; Untyped structures allowed in Allegretto; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Empty array and empty record are not told apart at L0.
-   - Draws on: [concepts.md](../book/concepts.md) T0 §9, §12 to §14, [allegretto/structures.md](../book/allegretto/structures.md) §1, §2.
-7. **Metadata and the capability to write it** *(recommended pilot)* (13 decisions). Every value carries independent metadata fields, and only the holder of a field's writer may originate it.
-   - Decisions: Metadata channels are independent; Metadata is a field on every value; Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled; Fixed propagation vocabulary; Writes gated by a capability, reads free; Writers are closures: delegable, attenuable, unforgeable; No seal operation: constructor trust decomposes; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit; Symbols serialise by FQN; deserialisation never mints reachability; One-shot field registration with a pass epoch; Capability denial is an abort, not an error value.
-   - Draws on: [units.md](../book/units.md) §3.1, [concepts.md](../book/concepts.md) T2 §19, §19b, §21, [allegretto/structures.md](../book/allegretto/structures.md) §3, Appendix C, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §1 to §4, §6, §9.
-8. **How metadata propagates** (7 decisions). The fixed vocabulary by which fields travel through evaluation, errors as a viral field, the source field, and which layer registers what.
-   - Decisions: Primitives receive full values; How the base applies propagation; Errors as a viral metadata field; The source field: an expression as metadata; Each layer registers its own fields; Field versus channel, and channel registration; Subsumption of legacy primitives into channel operations.
-   - Draws on: [concepts.md](../book/concepts.md) T2 §20, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §5, §8.
-9. **Four planes** (5 decisions). Where each kind of information about a value lives, and the sanctioned interfaces that reach each plane.
-   - Decisions: Four planes and the placement rule; Plane interfaces are sanctioned and policed; Engine meta slots retired into registered members; The data plane has no accessor; Where the host plane is declared.
-   - Draws on: [architecture-vocabulary.md](../book/architecture-vocabulary.md) plane, [concepts.md](../book/concepts.md) T1 §11, §18, §22, [allegretto/structures.md](../book/allegretto/structures.md) Appendix A, [standard/type-system.md](../book/standard/type-system.md) §4.
-10. **Installing a layer into the base** (10 decisions). How a layer gives the base meaning through gated installs and hooks without the base importing it, and the crossings still open.
-   - Decisions: The layer installs; the base never imports; Installs are gated by the field's writer; One check hook per field, called with a free reader; Member dispatch and call-site unification through the dispatch hook; Carrying needs a handle; deciding needs a hook; Knowledge propagation inside the evaluator; Layers reach the base only through metadata and capability; Computed projections installed, not stored; Analysis results cross upward through a gated install; Shared TypeScript types as representation leakage.
-   - Draws on: [architecture-vocabulary.md](../book/architecture-vocabulary.md) plane interface, [concepts.md](../book/concepts.md) §23, §24, [allegretto/README.md](../book/allegretto/README.md) the install surface, [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) §7, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §7, §8.
-11. **Scopes** (4 decisions). The evaluation environment, kept outside the value universe and layered by parent chain, with its facts plane.
-   - Decisions: Scope is the evaluation environment, not data; Scope leaves the value universe; Scopes layer by parent chain; Facts plane immutable-layered and opaque to the base.
-   - Draws on: [concepts.md](../book/concepts.md) §15, [allegretto/structures.md](../book/allegretto/structures.md) §4, Scope (planned).
-12. **Evaluation over unresolved information** (11 decisions). Evaluation never stops on missing information: residuals, future cells, forward chaining, and the two partial-evaluation rules.
-   - Decisions: Evaluation is total over unresolved information; PE Rule 1: residualise, but unfold composed calls; PE Rule 2: speculate every branch, run no effect; Incompleteness lives in write-once future cells; Evaluation resumes on new information by forward chaining; Determinism and confluence of evaluation; Substitution of params into bodies; Tail calls by sentinel and loop; One residualising resolution semantics for scopes; Specified aborts; Evaluation depth bound.
-   - Draws on: [concepts.md](../book/concepts.md) §25 to §29, [allegretto/structures.md](../book/allegretto/structures.md) §10, [allegretto/evaluator.md](../book/allegretto/evaluator.md) §2 to §6, Futures and the base primitives (planned).
+As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
+
+3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
+   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it computes nothing on them; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
+4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
+   - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; Functions are data: params plus body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
+5. **Authority** (5 decisions). The right to do what not all code may do is an unforgeable value; capabilities are granted, bounded by claims and supplied per target.
+   - Decisions: Authority is an unforgeable value; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a capability that ships with the platform.
+6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
+   - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
+7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; A function may take an argument unevaluated; A call is evaluated by evaluating the function's body; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+8. **Extensions** (2 decisions). Functions and metadata fields, and the few pure primitives beneath them.
+   - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few.
+9. **Correctness** (5 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
+   - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; A failure a program can handle is supplied by an extension; Evaluation stops early for two reasons only.
 
 **Part III: Syntax and modules**
 
@@ -130,7 +119,7 @@ Chapter 3 of the first proposal is dissolved: its decisions are folded into chap
    - Decisions: Multi-phase build as successive partial evaluation; Code generation from the expression graph, JavaScript first; Laws licence rewrites; Self-hosting and a package ecosystem.
    - Draws on: [vision.md](../book/vision.md) §6, [platform/README.md](../book/platform/README.md) undelivered tracks.
 
-**The recommended pilot.** The plan names `metadata-and-capability.md` as the pilot. That chapter becomes chapter 7 of these contents, "Metadata and the capability to write it", with its propagation sections moving to chapter 8 and its install section to chapter 10. Chapter 7 is the recommended pilot. Of its thirteen decisions, eleven are settled and two partly built (the metadata slot as a mixin, and the fixed propagation vocabulary, whose `positional` rule has no path); none is open, so the review rules on presentation rather than on open design. It sits early, after only the thesis and three short kernel chapters, so the concepts it needs (value, kind, structure, immutability) come from chapters the pilot's author can point to without rewriting them. It holds both labels (foundational channels and origination; swappable registration and denial details), so the swappable and foundational marks get tested. Its present text is one chapter already organized by unit, which keeps the rewrite to one source file.
+**The recommended pilot.** The plan names `metadata-and-capability.md` as the pilot. That chapter becomes chapter 7 of these contents, "Metadata", with its propagation sections moving to chapter 8 and its install section to chapter 10. Chapter 7 is the recommended pilot. Of its thirteen decisions, eleven are settled and two partly built (the metadata slot as a mixin, and the fixed propagation vocabulary, whose `positional` rule has no path); none is open, so the review rules on presentation rather than on open design. It sits early, after only the thesis and three short kernel chapters, so the concepts it needs (value, kind, structure, immutability) come from chapters the pilot's author can point to without rewriting them. It holds both labels (foundational channels and origination; swappable registration and denial details), so the swappable and foundational marks get tested. Its present text is one chapter already organized by unit, which keeps the rewrite to one source file.
 
 ## Findings held for their decisions
 
@@ -138,19 +127,20 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 
 | Finding | Decision | Chapter | Source |
 |---|---|---|---|
-| A second viral field erases the first | Metadata channels are independent | Metadata and the capability to write it | the pilot's review, §7 item 1 |
-| `channel_register` accepts any rule string | Fixed propagation vocabulary | Metadata and the capability to write it | the pilot's review, §7 item 2 |
-| A user-registered viral field stops computation | How the base applies propagation | How metadata propagates | the pilot's review, §7 item 3 |
-| The ownership test never checks owners | Each layer registers its own fields | How metadata propagates | the pilot's review, §7 item 4 |
+| A second viral field erases the first | Metadata fields are independent | Metadata | the pilot's review, §7 item 1 |
+| `channel_register` accepts any rule string | A field's rule is a pure, bounded function | Metadata | the pilot's review, §7 item 2 |
+| A user-registered viral field stops computation | A field's rule is a pure, bounded function | Metadata | the pilot's review, §7 item 3 |
+| The ownership test never checks owners | An extension registers its own fields; the kernel has two | Metadata | the pilot's review, §7 item 4 |
 | Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; Exhaustiveness checking at info severity | Termination and completion | DR1, rulings of 2026-11-11 |
-| `print` is a base primitive | Minimal base surface of about forty primitives; Environment capabilities outside the base, effect-labelled | Values and their seven kinds; Hosts | DR1, rulings of 2026-11-11 |
+| `print` is a base primitive | The kernel's primitives are pure and few; Environment capabilities outside the base, effect-labelled | Values; Hosts | DR1, rulings of 2026-11-11 |
 | Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | One evalSource pipeline for programs and libraries | Modules, the use header and one pipeline | DR1, rulings of 2026-11-11 |
-| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; Errors as a viral metadata field | Hosts; How metadata propagates | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; A failure a program can handle is supplied by an extension | Hosts; Metadata | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
-| Installed hooks are opaque to partial evaluation | The layer installs; the base never imports | Installing a layer into the base | DR1, rulings of 2026-11-11 |
+| Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Extensions | DR1, rulings of 2026-11-11 |
+| Housekeeping removed as decisions in DR2, still owed as work: prefixed engine slots, legacy primitives, the host plane's declaration, shared host types that let the kernel see an extension's representation, kind comparisons outside their units | Each decision lives in one replaceable unit of code; An extension is made of functions and metadata fields | Keep it simple; the extension interface | DR2, rulings of 2026-11-11 |
 | The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
 | Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
 | Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; The verdict as accumulated metadata | Proofs as values; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
@@ -165,14 +155,14 @@ The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book
 The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pass.md](book-pass.md) §6, "Rulings taken 2026-11-05", as the record:
 
 - **The contents have the right shape.** They are working placeholders. The tour becomes a significant conceptual journey: it lays out the shape of Allegro (a minimal kernel, extension, the type philosophy, maximal domains, and Allegro in use: execution, tooling, pipelines), with reasoning that establishes the kernel's requirements and features, prefiguring the later chapters. It will likely conclude with the ten choices listed above, or very similar ones. "The bet" is a placeholder too, and incomplete; more detail comes in later discussion.
-- **The pilot** is "Metadata and the capability to write it".
+- **The pilot** is "Metadata".
 - **The chapters leaving the book** leave as proposed. Units and layers are discussed early as architectural principles, in appendices, not chapters.
 - **Every decision is worked through in order.** Any decision may change, be removed, or gain new neighbours, and the resulting code and test changes are made. The process is strictly monotonic: once a decision is approved and its code changes made, every decision up to it, and the code stemming from them, is final and correct. A point of non-monotonicity is a process failure: the pass goes back, reorders or revises, and repeats until the list is fully ordered and monotonic.
 - **Two types of decision.** Each decision is about language capability or about implementation. No capability decision may depend on an implementation decision. The three cycles the merge broke looked like decisions whose type was unclear. Capability decisions that necessarily depend on each other are stated as one decision.
 - **Order of definition carries no meaning.** A new decision, below in "Why a new language". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
 - **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
 
-Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "Incompleteness lives in write-once future cells". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
+Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "A missing value is a cell that is filled once". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
 
 ## The author's motivations, for the tour
 
@@ -211,19 +201,19 @@ They came together over years of exploration into most of what Allegro is today.
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Who can see a member (Private members). |
 | [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Vivace: models as the program (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
-| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Installing a layer into the base (plane interface). |
+| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
 | [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules, the use header and one pipeline (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
-| [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values and their seven kinds (§3, §3.2); Metadata and the capability to write it (§3.1). |
+| [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values (§3, §3.2); Metadata (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
-| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values and their seven kinds (T0 §1 to §3, §8); Expressions, functions and symbols (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata and the capability to write it (T2 §19, §19b, §21); How metadata propagates (T2 §20); Four planes (T1 §11, §18, §22); Installing a layer into the base (§23, §24); Scopes (§15); Evaluation over unresolved information (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
-| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values and their seven kinds (the minimal base); Installing a layer into the base (the install surface). |
-| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values and their seven kinds (§11, Appendix B); Expressions, functions and symbols (§5); Structures (§1, §2); Metadata and the capability to write it (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation over unresolved information (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
-| Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values and their seven kinds; Expressions, functions and symbols. |
-| [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata and the capability to write it (§1 to §4, §6, §9); How metadata propagates (§5, §8); Installing a layer into the base (§7). |
+| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Four planes (T1 §11, §18, §22); Extensions (§23, §24); Scopes (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
+| [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values (the minimal base); Extensions (the install surface). |
+| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Structures (§1, §2); Metadata (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
+| Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values; Programs as values. |
+| [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata (§1 to §4, §6, §9); Metadata (§5, §8); Extensions (§7). |
 | Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
-| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values and their seven kinds (§2 (the default arm)); Installing a layer into the base (§7, §8); Evaluation over unresolved information (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
-| Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values and their seven kinds; Evaluation over unresolved information; Hosts: the terminal and the browser. |
+| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
+| Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; Hosts: the terminal and the browser. |
 | [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Grammars as values (the boundary). |
 | [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Grammars as values (§1 to §5, §7, §8); Extending the grammar (§6); The surface language (§5 (layout)). |
 | [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Grammars as values (§1, §2); Extending the grammar (§4); Modules, the use header and one pipeline (§4 (activation)); The surface language (§3). |
@@ -295,10 +285,10 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vision.md §1, §5; docs/book/concepts.md R1, R9; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Programmable language platform: minimal core, extensions are the language". "Allegretto" is the platform with no extension loaded; "Allegro Standard" is a named configuration; `--base` and the `typed` flag are not concepts of the language. One interface is about the interface, not the implementation language; with host code excluded from extensions (next decision but two), the two coincide. "Self-hosting and a package ecosystem" is re-read against this in its part.
 - Held finding (2026-11-11, DR1): the standard language's type system is host code holding writers, a trusted base larger than the kernel (`createTypeSystem`, `src/types-std.ts:4894`). Held on the decisions of Part IV that it realises.
-- Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "The layer installs; the base never imports" and its neighbours.
+- Held finding (2026-11-11, DR1): the install operations (merge, check, dispatch, projection, analysis) are host functions; Allegro has only `channel_register` (`src/capability.ts:96`–`144`). Held on "An extension is made of functions and metadata fields" and its neighbours.
 - Held finding (2026-11-11, DR1): the `typed` flag of `evalSource` changes literal typing, wraps every primitive and turns on precompile; no extension can ask for these (`src/runtime.ts:150`–`160`, `1167`–`1174`). Held on "One evalSource pipeline for programs and libraries" and "Precompile before the evaluation loop".
 - Held finding (2026-11-11, DR1): the base grammar and tree builder lower annotations and contracts to the standard language's primitives by name (`src/grammar2/base-grammar.ts:748`–`755`, `src/grammar2/tree-builder.ts:1384`–`1396`). Held on the surface-language and proofs decisions.
-- Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "Minimal base surface of about forty primitives".
+- Held finding (2026-11-11, DR1): 54 primitives of the standard language are in the kernel's one table (`src/runtime.ts:156`–`160`). Held on "The kernel's primitives are pure and few".
 - Held finding (2026-11-11, DR1): the platform with no extension loaded cannot load one: `use` is a parse error under `--base` (`src/index.ts:115`–`119`, `252`–`253`). Held on the CLI's decisions.
 - Chapter: Why a new language
 
@@ -425,7 +415,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: fixed compile-time and run-time phases built into the language (what the code does today, adopted for want of an alternative; rejected, R38 (the purpose of the decision review) of book-pass.md); `print` and other effects as base primitives (rejected: every primitive is pure)
 - Sources: the maintainer's rulings of 2026-11-11 (R38 and R39 (partial evaluation is primary) of book-pass.md; ../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/concepts.md §25 to §29; docs/book/platform/host.ir.md (environment capabilities)
 - Notes: new, by ruling. A phase's diagnostics (refutations, verdicts, warnings) are its result, metadata rendered by the tool that ran the phase, and are never program output; program output is an effect through a capability, so the two are different streams even where a console shows both. "Capability" is kept for this sense; how it relates to the capability to write a metadata field is explored in Part II. Absorbs "Multi-phase build as successive partial evaluation" and "Project severity configuration" as its realisations; both to be re-read in their parts.
-- Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "Minimal base surface of about forty primitives" and "Environment capabilities outside the base, effect-labelled".
+- Held finding (2026-11-11, DR1): `print` is a base primitive and performs output in any evaluation (`docs/book/units.md` row 15 lists it in `base-primitives`). Held on "The kernel's primitives are pure and few" and "Environment capabilities outside the base, effect-labelled".
 - Held finding (2026-11-11, DR1): the precompile and compile-time phases are hard-coded in the pipeline. Held on "Multi-phase build as successive partial evaluation" and "Precompile before the evaluation loop".
 - Chapter: Keep it simple
 
@@ -478,7 +468,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### The kernel trusts only what it has evaluated
-- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, the return of a capability, a statement a program asks it to accept: each is reported as assumed, and everything that rests on it says so.
+- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, or a statement a program asks it to accept, is reported as assumed, and everything that rests on it says so. A claim decided with the help of a capability is decided, and names the capability.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: technical
@@ -491,6 +481,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT" and merges "SMT as a selective fallback", which is no longer a decision.
 - Chapter: Keep it simple
 
+- Notes (amended 2026-11-11, DR2, with the maintainer's approval): the return of a capability is not a claim, so it is not "assumed"; a claim decided by calling a capability is decided and names it.
 #### Anyone may propose, and the record shows who
 - Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
 - Status: partly built; ruled 2026-11-11 (DR1)
@@ -594,7 +585,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): 2 forbidden imports, 5 mixed files and 456 kind comparisons outside their units (`npm run lint:units`). Held here; the evaluator's imports of the standard language's units are also the extension decision's findings.
 - Chapter: Keep it simple
 
-### Values and their seven kinds
+### Values
 
 #### One value universe
 - Decides: everything the evaluator can meet is a value; there are no statements, declarations or types that are not values.
@@ -609,10 +600,10 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md R8, T0 §1; docs/book/units.md §4.1 row 1
 - Book home (fragments' proposal): concepts.md Part 0 (R8) and T0 §1 / kinds chapter (planned II.3)
 - Notes: Told in the tour.
-- Chapter: Values and their seven kinds
+- Chapter: Values
 
 #### Seven representation kinds
-- Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure.
+- Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure. A kind says how a value is represented; types come from extensions, so a structure in the kernel carries no type.
 - Status: settled
 - Type: capability — concepts.md files it as a specification choice, visible to the layers above
 - Rationale kind: technical
@@ -624,220 +615,25 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-1, T0 §2; docs/decisions.md D1, D46, D51
 - Book home (fragments' proposal): concepts.md Part 0 (SC-1) / kinds chapter (planned II.3)
 - Notes: Significance calibrated from 5.
-- Chapter: Values and their seven kinds
+- Notes (2026-11-11, DR2): ruled; each kind passes the kernel's criterion. Absorbs "Kind is a host discriminant, not a type". Carried forward to the open privacy question: a symbol is identified by name, and a name can be guessed.
+- Chapter: Values
 
-#### Kind is a host discriminant, not a type
-- Decides: `v.kind` is an interpreter tag invisible at the language level, separate from types; the definitional ladder runs representations → values → types → kinds, and the language taxonomy is data versus computation forms.
-- Status: settled
-- Type: capability — it decides what the language does not expose
-- Rationale kind: technical
-- Depends on: Seven representation kinds
-- Significance: 4 — keeps the type system an extension
-- Label: foundational — Allegro Standard's type system as an extension rests on it
-- Units: kinds, value
-- Options recorded: kind as a type (rejected: the type system would be fixed at seven)
-- Sources: docs/decisions.md D46; docs/book/concepts.md T0 §2; docs/book/allegretto/structures.md §2 (D46 block)
-- Book home (fragments' proposal): kinds chapter (planned II.3)
-- Chapter: Values and their seven kinds
-
-#### Value as a contract, seven kind units and an assembly
-- Decides: `Value` is an open registry contract naming no kind; each kind registers itself by declaration merging with its tag, interface, factories, guard and ops; one assembly closes the set per build, holds the ops table and the walkers, and is the fork point.
-- Status: partly built
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Seven representation kinds; Each decision lives in one replaceable unit of code
-- Significance: 4 — makes each kind replaceable and dependencies on a kind visible
-- Label: foundational — every guard import and walker depends on the split
-- Units: value, bits, symbol, param, primitive-function, expression, composed-function, structure, kinds
-- Options recorded: an open extension point for kinds (rejected: R9 and R14 are the language's extension points); container kinds generic over the value type with the union tied in the assembly (rejected: guards would live in the assembly and hide the edge)
-- Sources: docs/decisions.md D51; docs/book/units.md §3
-- Book home (fragments' proposal): kinds chapter (planned II.3) / units.md §3
-- Notes: specified and probed on TypeScript 7.0.2; the move rides the first chunk that edits the `Value` union. Today all of it is in `src/types.ts`.
-- Chapter: Values and their seven kinds
-
-#### Bits is the only scalar
-- Decides: Allegretto has one uninterpreted scalar, a bit vector of known length, and `Int`, `Float`, `String` and `Bool` are Bits with a type attached at L2.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Seven representation kinds; Everything above the kernel is an extension, and there is one way to extend
-- Significance: 4 — puts numeric and textual semantics in extensions
-- Label: foundational — core types and typed literals build on it
-- Units: bits
-- Options recorded: a fixed set of primitive scalars (violates R6); tagged scalars (the tag is a degenerate type channel)
-- Sources: docs/book/concepts.md SC-2, T0 §3; docs/decisions.md D9 (no references inside Bits)
-- Book home (fragments' proposal): concepts.md Part 0 (SC-2) / kinds chapter (planned)
-- Notes: revisit trigger recorded: a numeric or textual operation that cannot be expressed at L2 without the base knowing its semantics.
-- Chapter: Values and their seven kinds
-
-#### Minimal base surface of about forty primitives
-- Decides: Allegretto's irreducible base is about forty primitives in five groups (Bits, Expression, Structure, channels, Scope) plus core control (`eval_if`, `seq`, `id`); types, proofs, effects, contracts, totality, pattern matching, grammar tooling and IO are not base.
-- Status: partly built
-- Type: capability
-- Rationale kind: technical
-- Depends on: The kernel contains only what no extension could supply; Everything above the kernel is an extension, and there is one way to extend
-- Significance: 4 — the layering proof
-- Label: foundational — every primitive's layer placement follows
-- Units: base-primitives
-- Options recorded: the per-primitive audit (keep, refactor, subsume, extension, env, delete); `eval_when` as base control versus a pattern-matching library is marked a judgment call
-- Sources: docs/decisions.md D27, D28; docs/book/allegretto/structures.md §11, Appendix B; docs/plans/archive/structured-values-unification.md B8
-- Book home (fragments' proposal): allegretto base-primitives chapter (planned, II.5)
-- Notes: physical relocation out of `src/primitives.ts` rides M2/M3. units.md row 15 lists `eval_when`, `print` and `make_error` as base-primitives, while Appendix B marks `eval_when` EXTENSION and `print` ENV: the sources disagree on placement.
-- Chapter: Values and their seven kinds
-
-#### The discriminator rule for kind comparisons
-- Decides: a guard imports its kind instead of comparing tags, a walker uses the assembly's traversal protocol, and only the evaluator switches on kind for behaviour, naming only the participating kinds with an inert default arm.
-- Status: partly built
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Value as a contract, seven kind units and an assembly
-- Significance: 3 — makes a fork's new kind inert until its author says otherwise
-- Label: swappable — a rule over the kinds unit
-- Units: kinds, evaluator
-- Options recorded: every kind has an arm (the compiler's default check, replaced); a failing default arm (RR5 option b, rejected)
-- Sources: docs/book/units.md §3.2; docs/plans/pe-rules.md §6 RR5; docs/decisions.md D51
-- Book home (fragments' proposal): kinds chapter (planned II.3) / allegretto/evaluator.md §2
-- Notes: the evaluator's default arm landed at B-172 C5 (`src/evaluator.ts:546`); `allegretto/evaluator.md` §2 still says the switch names all seven kinds with no default arm, which the IR (claims C173 to C177) corrects. Ten walker switches remain; the traversal protocol is owed. The `units` report skips the evaluator in its count.
-- Chapter: Values and their seven kinds
-
-#### Scalar encodings inside Bits
-- Decides: an integer is 64-bit, a float is IEEE-754 packed into the same 64 bits, and a string is UTF-8 bytes.
-- Status: settled
-- Type: capability — the number semantics a program sees
-- Rationale kind: technical
-- Depends on: Bits is the only scalar
-- Significance: 1 — local encoding
-- Label: swappable — behind the `bits` unit's factories
-- Units: bits
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md T0 §3; docs/book/units.md §4.1 row 2; src/types.ts:276-484 (makeInt, makeFloat, stringToBits)
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: the sources record no rationale for these encodings.
-- Chapter: Values and their seven kinds
-
-### Expressions, functions and symbols
-
-#### Expressions are values, forming a DAG
-- Decides: an unevaluated application (a function value plus arguments) is an ordinary value, so a partially evaluated program is also a value, and expressions form a shared DAG rather than a tree.
-- Status: settled
-- Type: capability — a partially evaluated program is a value a user can hold
-- Rationale kind: technical
-- Depends on: One value universe; One operation: partial evaluation
-- Significance: 4 — residuals flow through the same machinery as results
-- Label: foundational — residuals, source metadata and PE rules rest on it
-- Units: expression
-- Options recorded: a separate IR for unevaluated code (rejected: violates R8, and residuals could not share machinery)
-- Sources: docs/book/concepts.md SC-3, T0 §6
-- Book home (fragments' proposal): concepts.md Part 0 (SC-3) / kinds chapter (planned)
-- Notes: Significance calibrated from 5.
-- Chapter: Expressions, functions and symbols
-
-#### Symbol identity is a fully-qualified name
-- Decides: a registered symbol's identity is its defining scope's FQN plus base name (default FQN is the module path), the base name is only a projection for printing, serialisation and loose matching, and an ambiguous base name requires explicit qualification or is an error.
-- Status: settled
+#### The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart and does nothing else with them. What the bits mean, and every operation on them, comes from extensions and from capabilities.
+- Status: partly built (arithmetic and the scalar encodings are kernel primitives today); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
 - Depends on: Seven representation kinds
-- Significance: 4 — conformance becomes an identity question
-- Label: foundational — member conformance, export partition and visibility rest on it
-- Units: symbol
-- Options recorded: name-string comparison (rejected; D44 removed exactly that false-positive class); opaque gensym identity (loses the readable projection)
-- Sources: docs/book/concepts.md SC-4, T0 §4; docs/decisions.md D20, D29, C5.2-R4, C5.2-R5; docs/book/allegretto/structures.md §5
-- Book home (fragments' proposal): symbols chapter (proposed, within the kinds chapter)
-- Notes: the qualification syntax `x[ns.name]` is deferred (C5.2-R4); ambiguity is a detected error.
-- Chapter: Expressions, functions and symbols
-
-#### Host functions as values with declared evaluation control
-- Decides: a primitive function is host-implemented and carries declarations the evaluator acts on (`lazy`: do not evaluate my arguments; `effects`: labels I produce; `sourceAware`: attach each argument's originating expression), so primitives never reach into the evaluator.
-- Status: settled
-- Type: capability — evaluation control and effect labels are semantics a program observes
-- Rationale kind: technical
-- Depends on: Seven representation kinds
-- Significance: 3 — keeps the propagation table authoritative
-- Label: swappable — the declaration set can grow behind the unit
-- Units: primitive-function
-- Options recorded: lazy registration as a way to see ASTs (replaced by `sourceAware`); lazy registration to dodge argument stripping (deleted with D3)
-- Sources: docs/book/concepts.md T0 §8; docs/decisions.md D3, D47; docs/book/allegretto/structures.md §3.1 "What migrates"; docs/plans/structures-implementation.md §6 item 2
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: two proof primitives stay lazy for a different reason: as non-value interpreters a residual or error proposition must become a failed proof, and lazy registration is the only way to opt out of the Rule 1 residual guard (structures.md §3.1).
-- Chapter: Expressions, functions and symbols
-
-#### Expressions memoize per evaluation context
-- Decides: an Expression carries a memo table keyed by evaluation context, and a clone shares it.
-- Status: settled
-- Type: implementation — concepts.md files it as an implementation choice
-- Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG
-- Significance: 2 — PE cost
-- Label: swappable — invisible above the expression unit
-- Units: expression
-- Options recorded: no memo, re-evaluate per reference (exponential under PE)
-- Sources: docs/book/concepts.md IC-6, T0 §6; docs/plans/metadata-on-values.md §3.3 (the clone shares the memo)
-- Book home (fragments' proposal): kinds chapter (planned)
-- Chapter: Expressions, functions and symbols
-
-#### Positional parameters owned by membership
-- Decides: a Param is a positional placeholder, and a function owns a Param by its membership in the function's parameter list rather than through a back-pointer's identity.
-- Status: settled
-- Type: capability — parameters are positional for every program, and ownership decides what substitution replaces
-- Rationale kind: technical
-- Depends on: Seven representation kinds
-- Significance: 2 — makes substitution positional and clone-safe
-- Label: swappable — behind the `param` unit
-- Units: param
-- Options recorded: named parameters (would need a name environment for substitution); ownership by back-pointer identity (dissolved 2026-08)
-- Sources: docs/book/concepts.md SC-1 row 1, T0 §5; docs/plans/metadata-on-values.md §3.3; docs/book/units.md §4.1 row 4 (M7)
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: concepts.md T0 §5 still describes a back-reference `owner` as the mechanism; metadata-on-values §3.3 says substitution asks `ownsParam` and nothing reads the back-pointer's identity. `ParamValue.predicates` is a reserved field with no reader (B-107).
-- Chapter: Expressions, functions and symbols
-
-#### Functions are data: params plus body
-- Decides: a composed function is a list of declared Params and a body value, so building, inspecting and specialising functions needs no reflection API, and every clone goes through shared helpers that preserve its properties.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG; Positional parameters owned by membership
-- Significance: 4 — specialising a function is substituting into a value
-- Label: foundational — precompile, unfolding and analyser properties rest on it
-- Units: composed-function
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md T0 §7; docs/book/units.md §4.1 row 7; docs/book/process.md §6 (not read; cited by CLAUDE.md)
-- Book home (fragments' proposal): kinds chapter (planned)
-- Notes: analysis properties (`partial`, `inferredEffects`, …) ride as JS expandos listed in `PRESERVED_FN_META_KEYS`, invisible in the interface; the host-plane declaration entry owns that.
-- Chapter: Expressions, functions and symbols
-
-#### Transient reference symbols resolved by base name
-- Decides: the parser mints a transient Symbol per identifier occurrence, with no identity beyond it, resolved by base name against the enclosing scope, so resolution is not folded into parsing; scope binding keys may stay strings.
-- Status: settled
-- Type: implementation — how the parser hands names to resolution; the scoping is unchanged
-- Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name
-- Significance: 2 — local to symbol resolution
-- Label: swappable — resolution policy inside the symbol and scope units
-- Units: symbol, scope
-- Options recorded: the parser decides what an identifier refers to (rejected)
-- Sources: docs/book/concepts.md T0 §4; docs/decisions.md D14, D29
-- Book home (fragments' proposal): symbols chapter (proposed)
-- Chapter: Expressions, functions and symbols
-
-#### Symbols interned by FQN
-- Decides: the same FQN is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
-- Status: settled
-- Type: implementation — concepts.md files it as an implementation choice; it realises symbol identity by name
-- Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name
-- Significance: 2 — hot-path comparison cost
-- Label: swappable — invisible above the symbol unit
-- Units: symbol
-- Options recorded: compare FQN strings at each site; for metadata on a Symbol, error versus warn (warn ruled, removable later)
-- Sources: docs/book/concepts.md IC-4; docs/plans/metadata-on-values.md §6 ruling 2
-- Book home (fragments' proposal): symbols chapter (proposed)
-- Chapter: Expressions, functions and symbols
-
-### Structures
+- Significance: 4 — the smallest kernel that still holds data
+- Label: foundational — every scalar type and every numeric operation is built above it
+- Options recorded: machine arithmetic and comparison as kernel primitives (the review session's first draft; rejected by the maintainer: specific scalar representations and operations could, and some should, belong in extensions, and some operations will always be defined there); an integer, a float and a text encoding fixed in the kernel (what the code does today)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Bits is the only scalar" and "Scalar encodings inside Bits". The 64-bit width, the IEEE float and the UTF-8 text encoding become choices of the standard language and of the arithmetic capability.
+- Held finding (2026-11-11, DR2): arithmetic, comparison and the scalar encodings are base primitives (`src/primitives.ts`).
+- Chapter: Values
 
 #### One composite kind: Structure
-- Decides: MultiValue and Context are condensed into one composite kind, Structure, the only kind with internal parts, used for records, arrays, types, proofs and module objects.
+- Decides: the kernel has one composite kind, Structure, the only kind with internal parts, used for records, arrays, types, proofs and module objects.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -849,7 +645,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-5, T0 §9; docs/decisions.md D1, D19, D48 ("SC-5 upheld"); docs/book/allegretto/structures.md §1
 - Book home (fragments' proposal): allegretto/structures.md
 - Notes: Significance calibrated from 5.
-- Chapter: Structures
+- Chapter: Values
 
 #### Structures immutable by default; derive, never mutate
 - Decides: data structures are born immutable with deep immutability, a value is written in place only while provably unshared during construction, an unresolved future cell counts as immutable, and transient-to-immutable finalisation waits for the mutability track.
@@ -864,14 +660,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/decisions.md D22, D13; docs/book/concepts.md IC-3a; docs/book/allegretto/structures.md §2 "Immutability", "There is no immutable bit"; docs/plans/metadata-on-values.md §3.4
 - Book home (fragments' proposal): allegretto/structures.md
 - Notes: the in-place rule is stated, not enforced (B-143). The cross-module form, the owner-module invariant of B-158 (a library's values are immutable after load), belongs to the modules fragment. D22's own text still names the bit.
-- Chapter: Structures
+- Chapter: Values
 
 #### Arrays are structures with unkeyed entries
-- Decides: an array is a Structure whose entries all carry a null key, with no separate vector kind and no references inside Bits.
+- Decides: an array is a Structure whose entries all carry a null key, with no separate vector kind and no references inside Bits. Nothing in the kernel tells an empty array from an empty record; that is a type's question.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: One composite kind: Structure; Bits is the only scalar
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it computes nothing on them
 - Significance: 2 — local to the structure unit
 - Label: swappable — collection types choose representations above
 - Units: structure
@@ -879,7 +675,37 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/decisions.md D9, D18, D48(a); docs/book/concepts.md §16, §17; docs/book/allegretto/structures.md §2
 - Book home (fragments' proposal): allegretto/structures.md
 - Notes: the collection half of D9 (encapsulated `Array[T]`, `Map`, `Set`) is open under B-041 and belongs to the L2 fragment.
-- Chapter: Structures
+- Chapter: Values
+
+#### Symbol identity is a fully-qualified name
+- Decides: a registered symbol's identity is its defining scope's FQN plus base name (default FQN is the module path), the base name is only a projection for printing, serialisation and loose matching, and an ambiguous base name requires explicit qualification or is an error.
+- Status: settled
+- Type: capability
+- Rationale kind: technical
+- Depends on: Seven representation kinds
+- Significance: 4 — conformance becomes an identity question
+- Label: foundational — member conformance, export partition and visibility rest on it
+- Units: symbol
+- Options recorded: name-string comparison (rejected; D44 removed exactly that false-positive class); opaque gensym identity (loses the readable projection)
+- Sources: docs/book/concepts.md SC-4, T0 §4; docs/decisions.md D20, D29, C5.2-R4, C5.2-R5; docs/book/allegretto/structures.md §5
+- Book home (fragments' proposal): symbols chapter (proposed, within the kinds chapter)
+- Notes: the qualification syntax `x[ns.name]` is deferred (C5.2-R4); ambiguity is a detected error.
+- Chapter: Values
+
+#### Value as a contract, seven kind units and an assembly
+- Decides: `Value` is an open registry contract naming no kind; each kind registers itself by declaration merging with its tag, interface, factories, guard and ops; one assembly closes the set per build, holds the ops table and the walkers, and is the fork point.
+- Status: partly built
+- Type: implementation
+- Rationale kind: technical
+- Depends on: Seven representation kinds; Each decision lives in one replaceable unit of code
+- Significance: 4 — makes each kind replaceable and dependencies on a kind visible
+- Label: foundational — every guard import and walker depends on the split
+- Units: value, bits, symbol, param, primitive-function, expression, composed-function, structure, kinds
+- Options recorded: an open extension point for kinds (rejected: R9 and R14 are the language's extension points); container kinds generic over the value type with the union tied in the assembly (rejected: guards would live in the assembly and hide the edge)
+- Sources: docs/decisions.md D51; docs/book/units.md §3
+- Book home (fragments' proposal): kinds chapter (planned II.3) / units.md §3
+- Notes: specified and probed on TypeScript 7.0.2; the move rides the first chunk that edits the `Value` union. Today all of it is in `src/types.ts`.
+- Chapter: Values
 
 #### The composite is one sequence of optionally-keyed entries
 - Decides: a Structure stores an ordered sequence of optionally-keyed entries, with the by-name map a derived view and a lazy index built on first lookup past eight entries, whatever the structure's role.
@@ -894,22 +720,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md IC-2, §12, §16, §17; docs/decisions.md D48(a), D48(d); docs/records/concepts-analyses.md §5.2 (not read)
 - Book home (fragments' proposal): allegretto/structures.md
 - Notes: concepts.md §13 still describes bindings as a stored map and a list maintained at each write site; since B-120 E3 `entries` is the store and `bindings` the derived view (`src/structure.ts:107-157`). The header comment of `src/structure.ts` (lines 17 and 31) still names `dense`. Role tag `isScope` is the last role field.
-- Chapter: Structures
-
-#### Untyped structures allowed in Allegretto
-- Decides: Allegretto structures may be untyped, duck-typed over defined slot keys, and strict typing of every structure is a guarantee of Allegro Standard.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; One composite kind: Structure
-- Significance: 2 — states what the base promises about structure typing
-- Label: swappable — Standard's guarantee sits above
-- Units: structure
-- Options recorded: none recorded
-- Sources: docs/decisions.md D5; docs/plans/archive/structured-values-unification.md decision table (sole definition site)
-- Book home (fragments' proposal): allegretto/structures.md
-- Notes: decisions.md says D5 has no design-doc restatement yet.
-- Chapter: Structures
+- Chapter: Values
 
 #### Construction only through factories, one host class
 - Decides: every Structure is an instance of one host class with one declared hidden class, constructed only through the factory functions, so a stray object literal fails the boundary invariant.
@@ -923,7 +734,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: per-shape object literals (replaced; measured slower)
 - Sources: docs/book/allegretto/structures.md §2 (C4.1 status); docs/book/concepts.md T0 §9
 - Book home (fragments' proposal): allegretto/structures.md
-- Chapter: Structures
+- Chapter: Values
 
 #### Binding state belongs to the binding, not the value
 - Decides: export-ness, cell origin, completion state and pending dependencies are attributes of a binding in its scope, so copying a value never copies them.
@@ -937,25 +748,168 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: export-ness on the value plane (the `exported` field, deleted at V-R4); state encoded in synthetic binding names (`__future_N`, to be replaced, B-104(b))
 - Sources: docs/book/concepts.md T1 §14; docs/decisions.md V-R4
 - Book home (fragments' proposal): allegretto/structures.md or scope chapter (planned)
-- Chapter: Structures
+- Chapter: Values
 
-#### Empty array and empty record are not told apart at L0
-- Decides: whether a structure's entries are wholly unkeyed is a private derived cache, and nothing at L0 distinguishes an empty array from an empty record, because that is the type's question.
+#### Symbols interned by FQN
+- Decides: the same FQN is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
 - Status: settled
-- Type: capability — it decides what L0 can tell apart
+- Type: implementation — concepts.md files it as an implementation choice; it realises symbol identity by name
 - Rationale kind: technical
-- Depends on: Arrays are structures with unkeyed entries
-- Significance: 1 — local host bit
-- Label: swappable — inside the structure unit
-- Units: structure
-- Options recorded: a stored `positional` host bit (demoted at B-133)
-- Sources: docs/book/concepts.md §16; docs/plans/entry-sequence-composite.md §5.5 (not read)
-- Book home (fragments' proposal): allegretto/structures.md
-- Chapter: Structures
+- Depends on: Symbol identity is a fully-qualified name
+- Significance: 2 — hot-path comparison cost
+- Label: swappable — invisible above the symbol unit
+- Units: symbol
+- Options recorded: compare FQN strings at each site; for metadata on a Symbol, error versus warn (warn ruled, removable later)
+- Sources: docs/book/concepts.md IC-4; docs/plans/metadata-on-values.md §6 ruling 2
+- Book home (fragments' proposal): symbols chapter (proposed)
+- Chapter: Values
 
-### Metadata and the capability to write it
+### Programs as values
 
-#### Metadata channels are independent
+#### Expressions are values, forming a DAG
+- Decides: an unevaluated application (a function value plus arguments) is an ordinary value, so a partially evaluated program is also a value, and expressions form a shared DAG rather than a tree.
+- Status: settled
+- Type: capability — a partially evaluated program is a value a user can hold
+- Rationale kind: technical
+- Depends on: One value universe; One operation: partial evaluation
+- Significance: 4 — residuals flow through the same machinery as results
+- Label: foundational — residuals, source metadata and PE rules rest on it
+- Units: expression
+- Options recorded: a separate IR for unevaluated code (rejected: violates R8, and residuals could not share machinery)
+- Sources: docs/book/concepts.md SC-3, T0 §6
+- Book home (fragments' proposal): concepts.md Part 0 (SC-3) / kinds chapter (planned)
+- Notes: Significance calibrated from 5.
+- Chapter: Programs as values
+
+#### Positional parameters owned by membership
+- Decides: a Param is a positional placeholder, and a function owns a Param by its membership in the function's parameter list rather than through a back-pointer's identity.
+- Status: settled
+- Type: capability — parameters are positional for every program, and ownership decides what substitution replaces
+- Rationale kind: technical
+- Depends on: Seven representation kinds
+- Significance: 2 — makes substitution positional and clone-safe
+- Label: swappable — behind the `param` unit
+- Units: param
+- Options recorded: named parameters (would need a name environment for substitution); ownership by back-pointer identity (dissolved 2026-08)
+- Sources: docs/book/concepts.md SC-1 row 1, T0 §5; docs/plans/metadata-on-values.md §3.3; docs/book/units.md §4.1 row 4 (M7)
+- Book home (fragments' proposal): kinds chapter (planned)
+- Notes: concepts.md T0 §5 still describes a back-reference `owner` as the mechanism; metadata-on-values §3.3 says substitution asks `ownsParam` and nothing reads the back-pointer's identity. `ParamValue.predicates` is a reserved field with no reader (B-107).
+- Chapter: Programs as values
+
+#### Functions are data: params plus body
+- Decides: a composed function is a list of declared Params and a body value, so building, inspecting and specialising functions needs no reflection API, and every clone goes through shared helpers that preserve its properties.
+- Status: settled
+- Type: capability
+- Rationale kind: technical
+- Depends on: Expressions are values, forming a DAG; Positional parameters owned by membership
+- Significance: 4 — specialising a function is substituting into a value
+- Label: foundational — precompile, unfolding and analyser properties rest on it
+- Units: composed-function
+- Options recorded: none recorded
+- Sources: docs/book/concepts.md T0 §7; docs/book/units.md §4.1 row 7; docs/book/process.md §6 (not read; cited by CLAUDE.md)
+- Book home (fragments' proposal): kinds chapter (planned)
+- Notes: analysis properties (`partial`, `inferredEffects`, …) ride as JS expandos listed in `PRESERVED_FN_META_KEYS`, invisible in the interface; the host-plane declaration entry owns that.
+- Chapter: Programs as values
+
+#### Expressions memoize per evaluation context
+- Decides: an Expression carries a memo table keyed by evaluation context, and a clone shares it.
+- Status: settled
+- Type: implementation — concepts.md files it as an implementation choice
+- Rationale kind: technical
+- Depends on: Expressions are values, forming a DAG
+- Significance: 2 — PE cost
+- Label: swappable — invisible above the expression unit
+- Units: expression
+- Options recorded: no memo, re-evaluate per reference (exponential under PE)
+- Sources: docs/book/concepts.md IC-6, T0 §6; docs/plans/metadata-on-values.md §3.3 (the clone shares the memo)
+- Book home (fragments' proposal): kinds chapter (planned)
+- Chapter: Programs as values
+
+#### Transient reference symbols resolved by base name
+- Decides: the parser mints a transient Symbol per identifier occurrence, with no identity beyond it, resolved by base name against the enclosing scope, so resolution is not folded into parsing; scope binding keys may stay strings.
+- Status: settled
+- Type: implementation — how the parser hands names to resolution; the scoping is unchanged
+- Rationale kind: technical
+- Depends on: Symbol identity is a fully-qualified name
+- Significance: 2 — local to symbol resolution
+- Label: swappable — resolution policy inside the symbol and scope units
+- Units: symbol, scope
+- Options recorded: the parser decides what an identifier refers to (rejected)
+- Sources: docs/book/concepts.md T0 §4; docs/decisions.md D14, D29
+- Book home (fragments' proposal): symbols chapter (proposed)
+- Chapter: Programs as values
+
+### Authority
+
+#### Authority is an unforgeable value
+- Decides: the right to do something that not all code may do is a function value that cannot be forged or guessed: writing a metadata field, reading a private member, performing an effect. Any code that holds the value can use it, pass it on, or wrap it in a narrower one. Nothing is granted by name, or by the identity of whoever asks.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Host code reaches a program only as a capability
+- Significance: 5 — one idea for field writers, supplied capabilities and private access
+- Label: foundational — proofs, effects, privacy and every field's writer rest on it
+- Options recorded: authority by name or by the identity of the requester (rejected); three separate mechanisms for field writers, effects and member privacy (what the inventory listed)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Metadata origination is capability-controlled"; "An extension registers its own fields; the kernel has two", "Authority is an unforgeable value" and, in Part IV, "Evidence is possession" are re-read as its instances. Open under it: privacy by possession of an unforgeable key, the working answer, analysed with "Who can see a member"; its first test is reflection, since every extension can read a value's source expression: what does an expression show of a key to code that does not hold it?
+- Notes (2026-11-11, DR2, leftovers): absorbs "Writers are closures: delegable, attenuable, unforgeable". "Symbols serialise by FQN; deserialisation never mints reachability" moves to the privacy decision of Part IV ("Who can see a member"), as the pilot's review ruled: a symbol's wire form is its fully-qualified name, and reading one back never gives access to anything not exported.
+- Chapter: Authority
+
+#### A capability is granted, never acquired
+- Decides: host code enters only through the configuration of a phase. An extension receives a capability only when the code using that extension passes it one. An extension cannot bring host code of its own, and cannot obtain a capability it was not handed.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Authority is an unforgeable value; Host code reaches a program only as a capability
+- Significance: 4 — no third-party extension installs anything transitively
+- Label: foundational — the trust placed in every extension rests on it
+- Options recorded: capabilities available to any code by name (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the first of the maintainer's two questions on making capability extensions trustworthy.
+- Chapter: Authority
+
+#### What code may do is bounded by the capabilities it is given, and that bound is a claim
+- Decides: a program, a function or an extension can state which capabilities it uses. The kernel decides that claim like any other.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is granted, never acquired; Claims are evaluated like everything else
+- Significance: 4 — what an extension is allowed to do is checked, not trusted
+- Label: foundational — the effects decisions of Part IV are to be read as its instances
+- Options recorded: effect labels as a separate system (to be re-read in Part IV: an effect label is the name of a capability that code can reach)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling.
+- Chapter: Authority
+
+#### A capability is supplied per target
+- Decides: for each kind of phase, whoever supplies a capability gives either an implementation to run or code to emit. Exporting a program is a phase in which capabilities are emitted, not performed. The kernel's own primitives are translated in the same way.
+- Status: open; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is granted, never acquired; Phases are configuration
+- Significance: 4 — how a program that uses capabilities becomes native code
+- Label: foundational — every back end rests on it
+- Options recorded: capabilities that exist only in the interpreter (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the second of the maintainer's two questions. To be placed with Part VI when that part is reviewed.
+- Chapter: Authority
+
+#### Machine arithmetic is a capability that ships with the platform
+- Decides: arithmetic and comparison on machine integers and floating-point numbers are a pure capability that ships with the platform and is supplied in every standard configuration, build phases included, so known values still fold. A claim decided with its help names it.
+- Status: open (to prove); ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Significance: 4 — shrinks the kernel to what no capability could supply
+- Label: swappable — another arithmetic can be supplied in its place
+- Options recorded: machine arithmetic in the kernel (rejected, see the bits decision)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
+- Chapter: Authority
+
+### Metadata
+
+#### Metadata fields are independent
 - Decides: each piece of named information about a value is handled by its own declaration, independently of every other, and no operation may disturb a field it does not know about.
 - Status: settled
 - Type: capability
@@ -969,14 +923,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): concepts.md Part 0 (R3) / allegretto/metadata-and-capability.md §1
 - Notes: Significance calibrated from 5.
 - Held finding (2026-11-10, from the pilot's review, ../records/book-pass/p2-allegretto-metadata-and-capability.md §7 item 1): a second viral field erases the first: `viralOnto` returns at the first viral field it finds (`src/metadata.ts:331`–`347`), so `t + e` loses `e`'s `error` field. Fixed when the pass takes this decision in order.
-- Chapter: Metadata and the capability to write it
+- Chapter: Metadata
 
 #### Metadata is a field on every value
 - Decides: every representation kind carries an optional `meta` map, so a typed `42` is a Bits with a `type` field, and attaching metadata yields a new value of the same kind.
 - Status: settled
-- Type: capability — metadata rides each occurrence of a value, which a program observes; concepts.md files the representation as implementation and its R3 entry (Metadata channels are independent) calls placement a specification choice
+- Type: capability — metadata rides each occurrence of a value, which a program observes; concepts.md files the representation as implementation and its R3 entry (Metadata fields are independent) calls placement a specification choice
 - Rationale kind: technical
-- Depends on: Metadata channels are independent; Seven representation kinds
+- Depends on: Metadata fields are independent; Seven representation kinds
 - Significance: 5 — every residual carries propagated fields this way
 - Label: foundational — every metadata read and write and PE Rule 1's residual rest on it
 - Units: metadata
@@ -984,95 +938,67 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md IC-3, §10, §11; docs/decisions.md D10, D15, D17, D46, D48(b); docs/plans/metadata-on-values.md §1, §3; docs/plans/archive/structured-values-unification.md D46
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §2
 - Notes: D10, D15 and D17 are still marked "accepted (executed)" in decisions.md although D48(b) retired the carrier they describe; decisions.md records no supersession for them. Told in the tour.
-- Chapter: Metadata and the capability to write it
+- Chapter: Metadata
 
-#### Metadata fields registered with declared propagation rules
-- Decides: extensions register their own metadata fields, each with a declared propagation rule, rather than the base fixing a set of annotation channels.
-- Status: settled
+#### An extension registers its own fields; the kernel has two
+- Decides: a metadata field is registered by the extension whose concept it holds, with the rule for how it travels. Only a field's owner can write it; any code can read it. A field has one owner: a second registration is a conflict. The kernel registers only two: the outcome of a claim, and a value's origin.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata channels are independent
-- Significance: 4 — the extension mechanism for value information
-- Label: foundational — every channel registers this way
-- Units: metadata, capability
-- Options recorded: a fixed set of annotation channels (implied alternative); `__*` meta-bindings (replaced)
-- Sources: docs/decisions.md D2; docs/book/allegretto/structures.md §3; docs/book/allegretto/metadata-and-capability.md §3
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §3
-- Chapter: Metadata and the capability to write it
+- Depends on: Metadata fields are independent
+- Significance: 4 — the kernel names no extension's concept
+- Label: foundational — every field rests on it
+- Options recorded: a fixed set of fields in the kernel (rejected); one registration for a group of fields, a channel (dropped with the term)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Metadata fields registered with declared propagation rules" and "Each layer registers its own fields"; the open "Field versus channel, and channel registration" is removed, and "channel" is no longer a term: a field is a field.
+- Held finding (2026-11-10, from the pilot's review §7 item 4): the ownership test names an owner file per field but only checks that each field is registered (`src/boundary-tests.ts:924`–`936`).
+- Held finding (2026-11-11, DR2): the kernel registers `error`, `knowledge`, `warnings` and `exported` (`src/capability.ts:181`–`195`); the registration primitive is named `channel_register`.
+- Notes (2026-11-11, DR2, leftovers): absorbs "Writes gated by a capability, reads free" and "One-shot field registration with a pass epoch".
+- Held finding (2026-11-11, DR2): a second registration with the same rule in the same evaluation pass returns the held writer, a workaround for re-evaluation in the REPL.
+- Chapter: Metadata
 
-#### Metadata origination is capability-controlled
-- Decides: a field carrying authority must be unforgeable by code without its writer; authority is a capability held, not a name.
-- Status: settled
+#### A field's rule is a pure, bounded function
+- Decides: a rule computes a field's value on a result from the field's values on the function applied and on its arguments. It sees nothing else, performs no effect, and always finishes. For now a rule may not recurse, which the kernel can check by itself.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata channels are independent
-- Significance: 4 — metadata that anyone can write cannot be evidence
-- Label: foundational — proofs, provenance and gated installs rest on it
-- Units: capability
-- Options recorded: trust carried by naming a channel (rejected: externalised registration would be a counterfeit vector)
-- Sources: docs/book/concepts.md R12; docs/book/allegretto/metadata-and-capability.md §1, §6
-- Book home (fragments' proposal): concepts.md Part 0 (R12)
-- Notes: Significance calibrated from 5.
-- Chapter: Metadata and the capability to write it
+- Depends on: An extension registers its own fields; the kernel has two; Authority is an unforgeable value
+- Significance: 4 — the one place kernel evaluation runs an extension's code
+- Label: foundational — every field registration rests on it
+- Options recorded: a fixed vocabulary of five rules with owner-installed semantics (what the code does today; it becomes a library of common rules); general callbacks that take part in the evaluator's own work, with state or events (rejected: "a vampire is at the door asking to come in")
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Fixed propagation vocabulary". Purity follows from evaluating a rule with no capability supplied, and the kernel refuses a rule that holds one. The no-recursion form is relaxed only when a real rule needs more, with evidence.
+- Held finding (2026-11-10, from the pilot's review §7 item 2): `channel_register` accepts any rule string; `channel_register("xq", "nonsense")` returns a writer and the field then behaves as `drop` (`src/capability.ts:56`).
+- Notes (2026-11-11, DR2, leftovers): supersedes "How the base applies propagation".
+- Held finding (2026-11-10, from the pilot's review §7 item 1): a second viral field erases the first: `viralOnto` returns at the first viral field it finds (`src/metadata.ts:331`–`347`).
+- Chapter: Metadata
 
-#### Fixed propagation vocabulary
-- Decides: a field's rule is one of `viral`, `union`, `computed`, `positional`, `drop`, applied by the base without knowing the field's meaning, with the semantics a rule needs (a merge for `union`) installed by the field's owner.
-- Status: partly built
+#### Every value keeps its origin
+- Decides: the result of evaluating an expression carries that expression as metadata, and no later evaluation discards it. Each residual keeps a reference to the expression immediately before it, so every step of evaluation can be traced back to what was first written or constructed. What is known about an expression is found by evaluating it: each part of the result carries the fields derived so far, and its own origin.
+- Status: partly built (to verify); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata fields registered with declared propagation rules; Metadata origination is capability-controlled
-- Significance: 4 — makes integrity enforceable over inspectable rules
-- Label: foundational — every field registration and the integrity check use it
-- Units: metadata
-- Options recorded: arbitrary propagation closures per field (rejected: a closure is not inspectable, so a fabricating rule on an integrity field could not be refused); extend the vocabulary rather than open it
-- Sources: docs/book/concepts.md SC-7; docs/decisions.md D2; docs/book/allegretto/metadata-and-capability.md §5; docs/records/concepts-analyses.md §4.2 (not read)
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §5
-- Notes: `positional` is vocabulary without a path; removing it is an open maintainer decision. The `union` rule and the `effects` path are not one mechanism (B-146).
-- Held finding (2026-11-10, from the pilot's review §7 item 2): `channel_register` accepts any rule string; `channel_register("xq", "nonsense")` returns a writer and the field then behaves as `drop` (`src/capability.ts:56`). Fixed when the pass takes this decision in order.
-- Chapter: Metadata and the capability to write it
+- Depends on: Expressions are values, forming a DAG; An extension registers its own fields; the kernel has two
+- Significance: 4 — analyses, diagnostics and proof translation read it
+- Label: foundational — every analysis of a program and every report about one rest on it
+- Options recorded: attaching the expression on demand, at calls of functions that ask for it, and reading it under an `observe` effect (what the code does today; rejected: attach always and let partial evaluation drop what nothing reads)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "The source field: an expression as metadata". Only the kernel writes the record. Assumptions to verify, in the maintainer's words "all assumption": that keeping the origin is cheap apart from memory, that partial evaluation eliminates an origin nothing reads, and that every evaluation step preserves the link. The raw form will not be friendly to use; there is scope for a utility extension for querying and analysing origins.
+- Held finding (2026-11-11, DR2): the `source` field is attached on demand and read under `observe` (`src/capability.ts:181`).
+- Chapter: Metadata
 
-#### Writes gated by a capability, reads free
-- Decides: originating a field value requires its writer, propagation is evaluator-performed and authority-free, reads are free, and integrity fields may register only non-fabricating rules.
-- Status: settled
+#### Trust in a value needs no seal
+- Decides: a value built by trusted code is trusted for three reasons already in the kernel: only the owner can write the field that marks it, values never change, and the field's rule cannot invent the mark on a new value. No separate sealing operation exists.
+- Status: settled; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Metadata origination is capability-controlled; Fixed propagation vocabulary
-- Significance: 4 — the read/write asymmetry introspection and PCP need
-- Label: foundational — every writer and forgery scenario D rest on it
-- Units: capability, metadata
-- Options recorded: read-gated fields (left to policy; `readVisibility` recorded)
-- Sources: docs/decisions.md D23; docs/book/allegretto/structures.md §3; docs/book/allegretto/metadata-and-capability.md §6, Appendix C scenarios C, D
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §6
-- Notes: `readVisibility` is recorded and enforced nowhere; whether a field may restrict reads is owned by no item (an open sub-decision). V-R7 settles the parallel question for reflection.
-- Chapter: Metadata and the capability to write it
-
-#### Writers are closures: delegable, attenuable, unforgeable
-- Decides: the capability is a PrimitiveFunction closure returned by registration; delegation is passing it, attenuation is wrapping it in a re-checking closure, and writers are non-serialisable, print redacted and identity-equal only.
-- Status: settled
-- Type: capability — delegation and attenuation are what a writer's holder can do
-- Rationale kind: technical
-- Depends on: Writes gated by a capability, reads free; Host functions as values with declared evaluation control
-- Significance: 4 — authority as a value, trackable in the PE dataflow
-- Label: foundational — every gated install checks writer identity
-- Units: capability, primitive-function
-- Options recorded: scope-ambient authority (rejected; recoverable as a usage pattern, while ambient-to-token would be a breaking change); a separate `channel_write` primitive (rejected: the writer is the operation)
-- Sources: docs/decisions.md D24; docs/plans/archive/structured-values-unification.md D24; docs/book/allegretto/metadata-and-capability.md §6
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §6
-- Chapter: Metadata and the capability to write it
-
-#### No seal operation: constructor trust decomposes
-- Decides: there is no seal primitive or per-value brand bit; trust in a constructed value decomposes into write authority over its integrity field, data immutability and a non-fabricating propagation rule, and it is global and structural.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Structures immutable by default; derive, never mutate; Writes gated by a capability, reads free
-- Significance: 4 — the integrity model proofs depend on
-- Label: foundational — proof unforgeability and the forgery battery rest on it
-- Units: capability
-- Options recorded: a `seal` op (D13, superseded because it was only ever conceptual); a provenance tag per value (rejected)
-- Sources: docs/decisions.md D13, D21; docs/book/allegretto/structures.md §3 "Integrity model", Appendix C; docs/book/allegretto/metadata-and-capability.md §6
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md
-- Chapter: Metadata and the capability to write it
+- Depends on: Structures immutable by default; derive, never mutate; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function
+- Significance: 3 — unforgeable proofs without a new mechanism
+- Label: foundational — proof unforgeability rests on it
+- Options recorded: a kernel operation that seals or brands a value (rejected)
+- Sources: docs/decisions.md D21; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "No seal operation: constructor trust decomposes".
+- Chapter: Metadata
 
 #### Metadata supplied at construction, one attachment operation
 - Decides: factories take an optional metadata argument so a value never exists without what it must carry, `withMeta` is the one attachment operation, and `carryMeta` moves metadata onto a derived value.
@@ -1087,7 +1013,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md IC-3a; docs/decisions.md D48(c); docs/plans/metadata-on-values.md §3.2
 - Book home (fragments' proposal): allegretto/metadata-and-capability.md §2
 - Notes: decisions.md D48(c) still says the four operations "get four names"; metadata-on-values §3.2 records the correction to one.
-- Chapter: Metadata and the capability to write it
+- Chapter: Metadata
 
 #### Metadata slot mixed in from the metadata unit
 - Decides: the `meta` slot is not part of the `Value` contract; the `metadata` unit adds it by augmenting the base interface and stamps it in place while the value is unshared, so no kind unit reads it.
@@ -1102,436 +1028,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/decisions.md D51; docs/book/units.md §3.1
 - Book home (fragments' proposal): units.md §3.1 or kinds chapter (planned)
 - Notes: today `MetadataBearing` and `withMeta` are still in `src/types.ts`. The order is enforced by the analyser, not the compiler, because augmentation is program-global.
-- Chapter: Metadata and the capability to write it
+- Chapter: Metadata
 
-#### Symbols serialise by FQN; deserialisation never mints reachability
-- Decides: a symbol's wire form is its FQN, registration and exporting are separate maps, and deserialisation answers only from the exported registry, so a private or unknown FQN resolves to nothing.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name; Writers are closures: delegable, attenuable, unforgeable
-- Significance: 3 — cross-process trust bottoms out in re-verification
-- Label: swappable — the wire format is local to the symbol unit
-- Units: symbol
-- Options recorded: none recorded
-- Sources: docs/decisions.md D42 (wire rule); docs/book/allegretto/structures.md §5 (C5.1 status), Appendix C scenario E
-- Book home (fragments' proposal): symbols chapter (proposed)
-- Chapter: Metadata and the capability to write it
-
-#### One-shot field registration with a pass epoch
-- Decides: the first registrant of a field receives its writer and no one else can obtain it, except that Allegro re-registration with the same rule in the same evaluation pass returns the held writer; kernel registrations never re-issue.
-- Status: settled
-- Type: capability — it decides who can obtain a writer
-- Rationale kind: technical
-- Depends on: Writers are closures: delegable, attenuable, unforgeable
-- Significance: 2 — makes R12 hold without a list of important fields
-- Label: swappable — inside the capability unit
-- Units: capability
-- Options recorded: none recorded
-- Sources: docs/book/allegretto/metadata-and-capability.md §3
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §3
-- Chapter: Metadata and the capability to write it
-
-#### Capability denial is an abort, not an error value
-- Decides: refusing a write, an install or a fabricating rule aborts evaluation instead of returning an error value, because an error value would be forgeable.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Writes gated by a capability, reads free
-- Significance: 2 — local to the capability unit
-- Label: swappable — the refusal mechanism
-- Units: capability
-- Options recorded: denial as an error value (rejected)
-- Sources: docs/book/concepts.md SC-8 class C; docs/book/allegretto/metadata-and-capability.md §6
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §6
-- Chapter: Metadata and the capability to write it
-
-### How metadata propagates
-
-#### Primitives receive full values
-- Decides: eager primitives receive their arguments with metadata intact, `lazy` is evaluation control only, and the propagation table alone governs metadata.
-- Status: settled
-- Type: implementation — a rule for host primitive code, realising that channels are independent
-- Rationale kind: technical
-- Depends on: Host functions as values with declared evaluation control; Fixed propagation vocabulary
-- Significance: 4 — removes the lazy/eager stripping asymmetry
-- Label: foundational — every primitive implementation relies on it
-- Units: evaluator, base-primitives
-- Options recorded: strip arguments to their data for eager primitives (the prior `primaryOf` asymmetry, replaced); a `channelAware` registration mode (deleted at C4.3c, now everyone's default)
-- Sources: docs/decisions.md D3, D28; docs/book/allegretto/structures.md §2 (C4.3c status); docs/book/concepts.md T0 §11; docs/plans/structures-implementation.md §6 rulings R4
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md (propagation) or evaluator.md §3
-- Chapter: How metadata propagates
-
-#### How the base applies propagation
-- Decides: on a residual the first viral field found on the callee or an argument is carried (first occurrence wins); on re-evaluation the outer value's fields are laid under the inner value's, merged where the rule is `union` and inner-wins otherwise; `drop` needs no code.
-- Status: partly built
-- Type: capability — which field value survives a residual is observable
-- Rationale kind: technical
-- Depends on: Fixed propagation vocabulary
-- Significance: 3 — the generic half of propagation
-- Label: swappable — inside the metadata unit
-- Units: metadata, evaluator
-- Options recorded: inner-shadows-outer for every field, including `effects` (legacy, replaced at C4.3a for union fields)
-- Sources: docs/book/allegretto/metadata-and-capability.md §5; docs/decisions.md C4.3-R3; docs/plans/structures-implementation.md §6 (C4.3 rulings R3)
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §5
-- Notes: `viralOnto` also carries that candidate's `type` by name (B-145). units.md row 10 names `viralScan` and `mergeOverMeta` as still in `evaluator.ts`; metadata-and-capability.md §5 and §9 place both in `src/metadata.ts`.
-- Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation: `print(t + 1)` prints nothing when `t` carries one (`src/evaluator.ts:745`–`746`). Fixed when the pass takes this decision in order.
-- Chapter: How metadata propagates
-
-#### Errors as a viral metadata field
-- Decides: an error is a `viral` field with a public writer (`make_error`), so it rides every derived result through residual chains, user functions and an `if` condition, reproducing automatic error propagation without a special form.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: How the base applies propagation; Writes gated by a capability, reads free
-- Significance: 3 — the base's error model
-- Label: swappable — a field registration in the capability unit
-- Units: capability
-- Options recorded: error lost after the first residual hop (legacy, ruled a bug); an error-carrying `if` condition taking the else branch (legacy, ruled away)
-- Sources: docs/decisions.md D28(b), C4.3-R1, C4.3-R2; docs/book/allegretto/metadata-and-capability.md §8; docs/plans/structures-implementation.md §6 (C4.3 rulings R1, R2)
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8
-- Chapter: How metadata propagates
-
-#### The source field: an expression as metadata
-- Decides: a value can carry the Expression it evaluated from (plus span) as a `drop` field with a kernel-private writer, attached on demand at calls of source-aware functions and on resolved top-level bindings, read through `source of x` under the `observe` effect.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Fixed propagation vocabulary; Writes gated by a capability, reads free; Expressions are values, forming a DAG
-- Significance: 3 — gives meta-functions AST access without grammar productions
-- Label: swappable — one field registration and an evaluator attachment point
-- Units: metadata, capability, evaluator
-- Options recorded: universal attachment (rejected: cost on every hot path); a public writer (superseded: a doctored source could make a verdict display a different proposition); source text as a second payload (rejected); a first-class inert AST value (needs a quote carrier, deferred); lazy attachment at statement level (rejected tentatively); binding-level attachment on Structures (deferred to an identity audit)
-- Sources: docs/decisions.md D47, B-094-1/2/3; docs/book/allegretto/structures.md §3.1; docs/book/allegretto/metadata-and-capability.md §8
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8 (design in structures.md §3.1)
-- Notes: the effect label `observe` belongs to the effects fragment.
-- Chapter: How metadata propagates
-
-#### Each layer registers its own fields
-- Decides: a field is registered where its concept lives; the base registers only `error` and `source`, the fields whose concepts survive under `--base`, and a battery pins the ownership table.
-- Status: partly built
-- Type: capability — it decides which fields the base language has
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Metadata fields registered with declared propagation rules
-- Significance: 3 — R6 for fields
-- Label: swappable — registrations move between units
-- Units: capability, metadata
-- Options recorded: the base registering every field at module init (prior state, moved at B-109)
-- Sources: docs/book/allegretto/metadata-and-capability.md §3, §8; docs/book/concepts.md R6 delta
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §8
-- Notes: `knowledge`, `warnings` and `exported` are still registered by the base with no owner (B-111).
-- Held finding (2026-11-10, from the pilot's review §7 item 4): the ownership test names an owner file per field but only checks that each field is registered, never which file registered it (`src/boundary-tests.ts:924`–`936`). The fix is a test change in `src/boundary-tests.ts`; ruled case by case under R32 (M3 reconciled with the monotonic pass) if an implementation stream then holds the file.
-- Chapter: How metadata propagates
-
-#### Field versus channel, and channel registration
-- Decides: open — a metadata field is storage and a channel is the capability built on one or more fields, their rules, writer and interpreting code; whether one channel-level registration ("these fields, these rules, this semantics, this owner") replaces field-by-field registration, and what the three ownerless fields are.
-- Status: open
-- Type: capability — the registration surface an extension author uses
-- Rationale kind: technical
-- Depends on: Each layer registers its own fields
-- Significance: 3 — closes the fourth owed plane interface
-- Label: swappable — a registration surface in the capability unit
-- Units: capability, metadata
-- Options recorded: none recorded beyond the hook (d) sketch; hook (e), the facts merge, is proposed to be (d)'s registration read by a second consumer
-- Sources: docs/book/allegretto/metadata-and-capability.md §4; docs/plans/metadata-on-values.md §6 ruling 1 (vocabulary); docs/plans/plane-interfaces.md §6 hook (d), (e); docs/book/concepts.md §24 item 4; B-111
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §4
-- Chapter: How metadata propagates
-
-#### Subsumption of legacy primitives into channel operations
-- Decides: `mv_*` and `component_get` become channel reads and writers, `make_error` becomes the public writer of the viral `error` field, and the `*_attach` family collapses into writer invocations or function properties.
-- Status: partly built
-- Type: capability — it changes the base's primitive surface
-- Rationale kind: technical
-- Depends on: Minimal base surface of about forty primitives; Metadata fields registered with declared propagation rules
-- Significance: 2 — local cleanups that follow from channels
-- Label: swappable — each subsumption is local
-- Units: base-primitives, capability
-- Options recorded: none recorded
-- Sources: docs/decisions.md D28; docs/plans/structures-implementation.md §6 item 3; docs/book/allegretto/structures.md Appendix B
-- Book home (fragments' proposal): allegretto base-primitives chapter (planned)
-- Notes: `mv_set` was deleted at B-125 (metadata-and-capability.md §6, scenario G).
-- Chapter: How metadata propagates
-
-### Four planes
-
-#### Four planes and the placement rule
-- Decides: a value's information lives on one of four planes, data (the value itself), binding (named parts), metadata (registered fields) and host (interpreter bookkeeping invisible to Allegro), and new information is placed by asking those questions in that order.
-- Status: settled
-- Type: capability — it decides where a value's information is visible; the host plane's invisibility is a guarantee
-- Rationale kind: technical
-- Depends on: Metadata is a field on every value; One composite kind: Structure
-- Significance: 4 — answers "where does this go?" for every new thing
-- Label: foundational — the plane lint and every plane interface rest on it
-- Units: structure, metadata
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md T2 §18
-- Book home (fragments' proposal): concepts.md T2 §18 (or a planes chapter)
-- Chapter: Four planes
-
-#### Plane interfaces are sanctioned and policed
-- Decides: each plane is reached only through its sanctioned interface (accessors for engine slots, `metaReadRaw` and the propagation table for metadata, install for layer meaning), and reaching it any other way is a violation, enforced by `lint:planes` on the storage plane.
-- Status: partly built
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Four planes and the placement rule
-- Significance: 4 — the planes become a discipline instead of a taxonomy
-- Label: foundational — B-128's lints and the install hooks enforce it
-- Units: structure, metadata, capability
-- Options recorded: lint before interface (rejected by P5: the interface lands first)
-- Sources: docs/book/concepts.md T2 §24; docs/plans/plane-interfaces.md §5.5 (P5); B-128
-- Book home (fragments' proposal): concepts.md T2 §24
-- Chapter: Four planes
-
-#### Engine meta slots retired into registered members
-- Decides: no new `__*` slot is ever introduced; every engine-owned binding gets a declared home (a member, a metadata field, a base concept or the host side), the partition between engine slots and user fields is the registered set, not the prefix, and the remaining prefixed names are renamed.
-- Status: partly built
-- Type: implementation — it renames engine slots; no program's meaning changes
-- Rationale kind: technical
-- Depends on: Four planes and the placement rule; Symbol identity is a fully-qualified name
-- Significance: 3 — removes a duck-typing hazard and a privileged binding interface
-- Label: swappable — slot by slot
-- Units: structure; type-core, structure
-- Options recorded: the `__` prefix as the partition (deleted as predicate at B-120 E5); slot keys partitioned by key sort (D14, mechanism of the original design); a dedicated `meta` plane for type slots (withdrawn on measurement); the `__` prefix (retired as artifact)
-- Sources: docs/decisions.md D6, D14, D39; docs/book/concepts.md T2 §22, §24 disposition note; docs/book/allegretto/structures.md Appendix A; docs/book/standard/type-system.md §4; D6, D39 (docs/decisions.md); B-104, B-120 E5
-- Book home (fragments' proposal): allegretto/structures.md / standard/type-system
-- Notes: Merged from fragment A ("Engine meta slots retired into declared members"), fragment B ("Type metadata in registered slots, not a prefix convention"). A: decisions.md D6 names the registry `src/slots.ts`; the file is now `src/slot-accessors.ts` (units.json). 14 slots remain to become members (B-104); the boundary-lint ratchet tracks dunder literals. B: type-system.md §4 says both "retirement is not yet implemented — shipping code still uses `__*` throughout" and that host-plane names were renamed in 2026-08; the section is internally out of date. Significance calibrated from 3/2.
-- Chapter: Four planes
-
-#### The data plane has no accessor
-- Decides: a value is its data, so there is no data-plane accessor; data access is well defined because above L0 values are created or modified only through defined Allegretto functions.
-- Status: settled
-- Type: implementation — a statement about the accessor layer
-- Rationale kind: technical
-- Depends on: Metadata is a field on every value
-- Significance: 2 — closes a question the carrier left
-- Label: swappable — a policy statement
-- Units: none
-- Options recorded: `dataOf`/`primaryOf` peel (deleted with 849 call sites, forbidden by lint)
-- Sources: docs/book/concepts.md T0 §11 (maintainer ruling, 2026-08)
-- Book home (fragments' proposal): concepts.md T0 §11
-- Chapter: Four planes
-
-#### Where the host plane is declared
-- Decides: open — whether interpreter-only properties are declared on the value interfaces or on a separate host-plane interface reachable only through generated accessors, whether the unregistered properties are registered first, and what happens to the two registered as destined for the metadata plane.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Four planes and the placement rule
-- Significance: 2 — removes the `as any` casts that hide host access from the lints
-- Label: swappable — per-unit declarations
-- Units: structure, expression, composed-function, scope
-- Options recorded: A declare on the value interfaces; B a separate host-plane interface behind generated accessors (recommended)
-- Sources: docs/plans/host-plane-declaration.md §3, §5, §6; docs/book/units.md §4.1 "Not a unit: the host plane"; B-135, B-137
-- Book home (fragments' proposal): allegretto/structures.md or kinds chapter (planned)
-- Notes: units.md §4.1 says that under the unit DAG "the first reading is the natural one" (declare per unit), which leans toward option A against the plan's recommendation of B. `predicateSet` and `effectSet` are host properties with a metadata-field disposition (B-118).
-- Chapter: Four planes
-
-### Installing a layer into the base
-
-#### The layer installs; the base never imports
-- Decides: a layer gives the base meaning by installing an implementation under a slot keyed by field name (merge, check, dispatch, projection, facts merge), the base calls it with opaque values and never imports the layer, and the base stores symbols without interpreting them.
-- Status: partly built
-- Type: implementation — installs are host-level: no Allegro program installs into the base
-- Rationale kind: technical
-- Depends on: Everything above the kernel is an extension, and there is one way to extend; Plane interfaces are sanctioned and policed
-- Significance: 4 — how Allegro Standard attaches to Allegretto
-- Label: foundational — every L2-to-L0 crossing uses it
-- Units: capability, evaluator, scope
-- Options recorded: the evaluator importing L2 symbols (the prior state; 131 imports measured); deleting the type dispatch altogether (rejected: dispatch is needed during evaluation because discharge is evaluation)
-- Sources: docs/plans/plane-interfaces.md §5.1 (P1), §5.2 (P2), §6, §9; docs/book/concepts.md §23, §24; docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: §5's principles were "accepted as provisional" with a survey trigger (§5.7), re-run at the plan's exit (§11). Significance calibrated from 5.
-- Chapter: Installing a layer into the base
-
-#### Installs are gated by the field's writer
-- Decides: installing into any hook requires holding the writer of the corresponding field, checked by identity against the registry, and a foreign install is refused with an error.
-- Status: settled
-- Type: implementation — a gate on host-level installs
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Writers are closures: delegable, attenuable, unforgeable
-- Significance: 3 — otherwise any module could decide what type checking means
-- Label: swappable — the gate inside the capability unit
-- Units: capability
-- Options recorded: ungated installs by field name (the prior `installFieldMerge`)
-- Sources: docs/plans/plane-interfaces.md §5.4 (P4); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### One check hook per field, called with a free reader
-- Decides: argument checking at a typed call site runs every installed field check, each receiving the expected constraint, the argument, a reader over all fields and the site, with no ordering between checks; a declared parameter type with no installed check aborts.
-- Status: settled
-- Type: implementation — the check wiring inside the evaluator; installs are host-level
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 3 — removes type checking from the evaluator
-- Label: swappable — the hook signature
-- Units: evaluator, capability
-- Options recorded: three hooks for the three jobs of `checkArgType` (rejected); ordering checks by field dependency (rejected: it would encode which field derives from which)
-- Sources: docs/plans/plane-interfaces.md §6.1, §8.1 (ruling 1); docs/book/allegretto/metadata-and-capability.md §7; docs/book/allegretto/evaluator.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### Member dispatch and call-site unification through the dispatch hook
-- Decides: type-directed dispatch at primitive applications and composed calls, including member dispatch and call-site unification, is an installed dispatcher that may answer or decline with null, in which case the base proceeds as Allegretto.
-- Status: settled
-- Type: implementation — the dispatch wiring inside the evaluator; installs are host-level
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 3 — the evaluator decides nothing about types
-- Label: swappable — the hook's two entry points
-- Units: evaluator, capability
-- Options recorded: member dispatch as a separate population (rejected, ruling 3); descriptor predicates folded in (they stay: P6)
-- Sources: docs/plans/plane-interfaces.md §8.3 (ruling 3), §9 C3 row (call-site unification, maintainer ruling 2026-10-22); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-#### Carrying needs a handle; deciding needs a hook
-- Decides: open in its remainder — where the base only passes a layer's value through, it should hold an opaque handle given at registration rather than an installed implementation; the type-vocabulary population (base primitives naming types they build) is to be solved this way.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports
-- Significance: 3 — touches every primitive that builds a typed result
-- Label: swappable — a registration surface
-- Units: base-primitives, evaluator
-- Options recorded: extend the hook mechanism to carrying (rejected by P3)
-- Sources: docs/plans/plane-interfaces.md §5.3 (P3), §7; B-145; docs/book/allegretto/evaluator.md §8
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7 or evaluator.md §8
-- Chapter: Installing a layer into the base
-
-#### Knowledge propagation inside the evaluator
-- Decides: open — how the evaluator's remaining effect and knowledge inference (predicate sets at primitive application, a Param's effect bound, the precompile stash) leaves L0, given that the generic `union` rule cannot encode an effect set.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Fixed propagation vocabulary
-- Significance: 3 — the last two forbidden edges of the evaluator
-- Label: swappable — behind the evaluator's install surface
-- Units: evaluator
-- Options recorded: an installed interpreter, larger than a hook (named); whether the facts merge and the `predicates` value-merge become one (B-146)
-- Sources: docs/plans/plane-interfaces.md §7; docs/book/allegretto/evaluator.md §8; docs/book/allegretto/metadata-and-capability.md §5, §7; B-146
-- Book home (fragments' proposal): allegretto/evaluator.md §8
-- Chapter: Installing a layer into the base
-
-#### Layers reach the base only through metadata and capability
-- Decides: every L2 unit reaches L0 through the `metadata` and `capability` units, never through a kind's representation, so `refinements` and `effects` sit below `type-core` and the grammar engine depends on nothing of Allegretto.
-- Status: partly built
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Each decision lives in one replaceable unit of code; The layer installs; the base never imports
-- Significance: 3 — P2 as a graph property
-- Label: foundational — the L2 unit order rests on it
-- Units: metadata, capability, refinements?, effects?
-- Options recorded: none recorded
-- Sources: docs/book/units.md §5; docs/plans/plane-interfaces.md §5.2
-- Book home (fragments' proposal): units.md §5
-- Chapter: Installing a layer into the base
-
-#### Computed projections installed, not stored
-- Decides: a field computed on read, such as `shape` over `type`, is an installed projection served by name from `metaReadRaw`, whose read path names no field.
-- Status: settled
-- Type: implementation — how `shape` is served
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer
-- Significance: 2 — local to metadata reads
-- Label: swappable — one hook
-- Units: metadata, capability
-- Options recorded: the refinement-chain walk in L0's accessor layer (the prior `typeShape` in `slots.ts`, moved to `refinements`)
-- Sources: docs/plans/plane-interfaces.md §6 hook (c), §9 C4; docs/book/allegretto/metadata-and-capability.md §2, §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: `discharged` is still read from a binding-plane slot by registration `bindingKey`, a name-specific read (B-104).
-- Chapter: Installing a layer into the base
-
-#### Analysis results cross upward through a gated install
-- Decides: when a lower unit needs an analysis only a higher unit computes (effects inferred, may diverge), the producer installs the answer under a question about a field and the consumer reads it by name, erroring if it is missing once a compilation has begun.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Installs are gated by the field's writer; Each decision lives in one replaceable unit of code
-- Significance: 2 — closes the reverse crossing
-- Label: swappable — one hook
-- Units: capability
-- Options recorded: (a) gated install (taken); (b) leave the `set*` probes and file an item; (c) ordinary imports (impossible: inverts the unit order)
-- Sources: docs/plans/plane-interfaces.md §8.2 (ruling 2), §9 C5, §11; docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): allegretto/metadata-and-capability.md §7
-- Notes: the ruling table of plane-interfaces.md §8 still lists ruling 2 as "Open"; §11 records it taken as option (a) on 2026-10-21. The inline cutoff (`setInlineCutoff`) is an ungated injection of the same shape, recorded as owed (evaluator.md §7).
-- Chapter: Installing a layer into the base
-
-#### Shared TypeScript types as representation leakage
-- Decides: open — L2 representation types crossing into L0 erase at runtime but let the base destructure the layer's representation; the tension is accepted for now, with the `value` contract's own types as the sanctioned shared types, and its resolution deferred to a self-hosted semantic hierarchy.
-- Status: open
-- Type: implementation
-- Rationale kind: technical
-- Depends on: The layer installs; the base never imports; Value as a contract, seven kind units and an assembly
-- Significance: 2 — porous interfaces, bounded
-- Label: foundational — the fix is bootstrapping-era work across layers
-- Units: all L0 units
-- Options recorded: none achievable with TypeScript alone
-- Sources: docs/plans/plane-interfaces.md §5.6 (P6), §8.3
-- Book home (fragments' proposal): units.md or allegretto/metadata-and-capability.md §7
-- Chapter: Installing a layer into the base
-
-### Scopes
-
-#### Scope is the evaluation environment, not data
-- Decides: the evaluation environment has its own protocol (parent-chain resolution, forward chaining, a facts plane), is barred from type dispatch and typing, and is mutable evaluator state where data is not.
-- Status: settled
-- Type: capability — it decides how a name resolves and that the environment is not user data
-- Rationale kind: technical
-- Depends on: One composite kind: Structure
-- Significance: 4 — separates the environment from user data
-- Label: foundational — the evaluator and every lookup thread a scope
-- Units: scope
-- Options recorded: Context with both roles (the original); Scope as a role of Structure on a shared substrate (D25's clause, superseded by D49)
-- Sources: docs/decisions.md D1, D25; docs/book/concepts.md T1 §15; docs/book/allegretto/structures.md §4
-- Book home (fragments' proposal): scope chapter (planned II.5)
-- Chapter: Scopes
-
-#### Scope leaves the value universe
-- Decides: the evaluation environment becomes a non-value host construct with its own representation, so plane-violation checks become unrepresentable; custom scope kinds stay closed.
-- Status: settled
-- Type: implementation — no scope reaches user code as a value (its own options), so leaving `Value` changes the representation only
-- Rationale kind: technical
-- Depends on: Scope is the evaluation environment, not data; One value universe
-- Significance: 3 — removes five sites that exist only to undo the sharing
-- Label: foundational — primitive and evaluator signatures type their context on it
-- Units: scope
-- Options recorded: scopes as first-class values introspectable like any other (SC-6, superseded: no scope ever reaches user code as a value, a scope has no position for metadata, and it is mutable); custom scope kinds (rejected: no use case, forgery-prone)
-- Sources: docs/decisions.md D49, D1 (superseded clause), D25 (superseded clause); docs/book/concepts.md SC-6, candidate R19; docs/plans/entry-sequence-composite.md §5.6 (not read); B-136
-- Book home (fragments' proposal): scope chapter (planned II.5)
-- Notes: ruled, not executed; the code still implements the superseded SC-6 (a `StructureValue` with `isScope`, `src/scope.ts:36`). Status "settled" here means ruled; nothing is built.
-- Chapter: Scopes
-
-#### Scopes layer by parent chain
-- Decides: extending a scope is O(1) and does not copy; lookup walks the parent chain.
-- Status: settled
-- Type: implementation — concepts.md files it as an implementation choice
-- Rationale kind: technical
-- Depends on: Scope is the evaluation environment, not data
-- Significance: 2 — cost of the operation PE performs most
-- Label: swappable — inside the scope unit
-- Units: scope
-- Options recorded: flatten-copy on extend (the prior implementation)
-- Sources: docs/book/concepts.md IC-5; docs/decisions.md D26; docs/plans/archive/structured-values-unification.md B5
-- Book home (fragments' proposal): scope chapter (planned)
-- Chapter: Scopes
-
-#### Facts plane immutable-layered and opaque to the base
-- Decides: a fact about a name is layered onto a child scope that branches, asserts and `requires` push and discard, the base stores fact payloads as opaque values, and layers are combined only through an installed, writer-gated facts merge.
-- Status: settled
-- Type: implementation — how the evaluator stores knowledge; branch-local knowledge is decided in the contracts chapter
-- Rationale kind: technical
-- Depends on: Scopes layer by parent chain; Installs are gated by the field's writer
-- Significance: 3 — occurrence knowledge without in-place mutation
-- Label: swappable — inside the scope unit
-- Units: scope
-- Options recorded: mutate-and-pop `scopePredicates` (the prior implementation); the scope importing the predicate-set merge (M12, closed at B-112 C1)
-- Sources: docs/decisions.md D26; docs/book/allegretto/structures.md §4; docs/book/allegretto/README.md invariants; docs/plans/plane-interfaces.md §6 hook (e); docs/book/allegretto/metadata-and-capability.md §7
-- Book home (fragments' proposal): scope chapter (planned)
-- Notes: the evaluator still casts the fact to `PredicateSet` when it attaches it (`src/evaluator.ts:526`), part of B-146.
-- Chapter: Scopes
-
-### Evaluation over unresolved information
+### Evaluation
 
 #### Evaluation is total over unresolved information
 - Decides: the evaluator has a rule for every value it can meet, and an unresolved input produces a residual, never a failure to proceed; no operation errors on an incomplete value.
@@ -1546,81 +1045,128 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md R4, §26; docs/decisions.md D11; docs/book/allegretto/README.md invariants
 - Book home (fragments' proposal): concepts.md Part 0 (R4)
 - Notes: concepts.md §26 says `isResolved` is "walked structurally" and that an unresolved value "transitively contains" a symbol or pending cell; `src/types.ts:455-470` answers true for any Structure whatever its slots hold, as evaluator.md §3 says. §26 is wrong about the code. Told in the tour.
-- Chapter: Evaluation over unresolved information
+- Chapter: Evaluation
 
-#### PE Rule 1: residualise, but unfold composed calls
-- Decides: an application with an unresolved argument residualises with fields propagated, unless it applies a composed function, which is unfolded into its substituted body, except a call into a recursion cycle during a typed compilation and a call inside a speculated `when` arm, which residualise carrying the callee's effects.
-- Status: settled
-- Type: capability — it decides what a residual is, which every check reads
-- Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; How the base applies propagation
-- Significance: 4 — unfolding is what lets discharge see inside a call
-- Label: foundational — refinement checks, effect inference and theorem discharge rely on unfolding
-- Units: evaluator
-- Options recorded: (a) restate the rule with unfolding as policy (taken); (b) residualise every composed call with an unresolved argument plus a separate inlining stage (rejected: loses discharge inside calls)
-- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6 RR1, RR9; docs/book/allegretto/evaluator.ir.md C201 to C205
-- Book home (fragments' proposal): concepts.md T3 §25 / allegretto/evaluator.md §3
-- Notes: Significance calibrated from 5.
-- Chapter: Evaluation over unresolved information
-
-#### PE Rule 2: speculate every branch, run no effect
-- Decides: a lazy primitive with an unresolved control input evaluates every branch speculatively (`eval_if` both branches, `eval_when` every arm's guard and body with pattern names as fresh Params, the right operand of `&&` and `||`) in a fresh child scope marked as compile mode, so an effect reached there becomes a residual carrying its effects.
-- Status: settled
-- Type: capability — it decides what a residual is, which every check reads
-- Rationale kind: technical
-- Depends on: PE Rule 1: residualise, but unfold composed calls; Host functions as values with declared evaluation control
-- Significance: 4 — an unknown condition no longer hides everything behind it
-- Label: foundational — effect inference through branches rests on it
-- Units: evaluator, base-primitives
-- Options recorded: RR2 (b) type patterns bind typed placeholders (deferred, needs the type side); RR2 (c) exempt binding primitives; RR3 (b) speculate only in precompile; RR3 (c) exempt short-circuit operators; RR7 (b) always residualise a branch tail call; RR9 options A, B, B2 for nested speculation cost (C taken)
-- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6 RR2, RR3, RR7, RR9; docs/book/allegretto/evaluator.ir.md C178 to C200
-- Book home (fragments' proposal): concepts.md T3 §25 / allegretto/evaluator.md §3
-- Notes: `allegretto/evaluator.md` §3 prose still says `eval_when`, `&&` and `||` do not meet Rule 2 and that `eval_when` evaluates no branch; the IR (C179, C189 to C196) and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. The residual `eval_when` holds arms as written, not evaluated (C196). Rule 2 is left to each lazy primitive's implementation (C50). RR9's narrowing is to be revisited "when we want to push PE for more optimizations".
-- Chapter: Evaluation over unresolved information
-
-#### Incompleteness lives in write-once future cells
-- Decides: structures are always structurally complete; incompleteness is an unresolved future occupying a slot, never a structure state, and the future is its sole external locus: a write-once monotonic cell filled once, with `Future[Future[T]]` flattening and equality on an unresolved future residualising, write-once enforced at the phase interface; one representation serves REPL declarations, forward chaining and async futures.
-- Status: settled
+#### The environment is not a value
+- Decides: names are resolved in an environment that the evaluator keeps and no program can hold, inspect or pass on. A program reaches only what it can name.
+- Status: partly built (the code still represents a scope as a structure); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information
-- Significance: 3 — one representation for every kind of pending; monotonicity keeps forward chaining sound
-- Label: foundational — completion, forward chaining and async rest on it
-- Units: scope, futures
-- Options recorded: `ctx_use` and `Binding.isUse` as a separate declared-without-value state (retired); none recorded beyond the Oz/IVar precedent
-- Sources: docs/decisions.md D12, D26, D33, CE-R5, CE-R6; docs/book/allegretto/structures.md §4, §10; docs/book/concepts.md §28
-- Book home (fragments' proposal): futures chapter (planned)
-- Notes: Merged in chunk P1b from "Incompleteness is a value in a slot" and "Future cells: write-once, monotonic, flattening": the first states incompleteness as a future, the second states the future as the locus of incompleteness, so neither holds without the other (see "The type check, 2026-11-05"). From the second: incompleteness detection as an effect and `Future[T]` as a type belong to the L2 fragment; CE-R6 (no future manager in base mode is a configuration error, not incompleteness) is L0.
-- Chapter: Evaluation over unresolved information
+- Depends on: Authority is an unforgeable value; One value universe
+- Significance: 4 — an environment holds every capability and key bound in it
+- Label: foundational — the evaluator and every lookup rest on it
+- Options recorded: the environment as a first-class value a program can hold (rejected for now: it would let a program enumerate and hand on by name everything bound in it)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
+- Notes: replaces "Scope is the evaluation environment, not data" and "Scope leaves the value universe". Tabled by the maintainer, with no solid use case yet and an unknown effect on unforgeability: introspection of an environment, and a tool that translates one environment into another, without adding or forging capabilities, for a program that requires a specific one.
+- Held finding (2026-11-11, DR2): a scope is a `StructureValue` with `isScope` (`src/scope.ts:36`), with five sites that exist to undo its valuehood.
+- Chapter: Evaluation
 
-#### Evaluation resumes on new information by forward chaining
-- Decides: when a cell is filled, everything that residualised on it re-evaluates, and this completion cascade is base evaluator machinery, not a primitive.
+#### A function may take an argument unevaluated
+- Decides: a parameter can be declared to receive its argument as written: the expression itself, with nothing evaluated, together with the context it was written in, which the function cannot inspect. The function may read the expression, and may hand it back to the kernel to be evaluated in that context, whole, in part or transformed, with names rebound or capabilities withheld as it chooses. There is one unevaluated form; everything else about the argument is found by evaluating it.
+- Status: open (use cases to work through); ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
+- Significance: 4 — what lets control forms be built by extensions
+- Label: foundational — `if` with branch knowledge, pattern matching and every analysis of an expression rest on it
+- Options recorded: laziness as a privilege of kernel primitives (what the code does today); passing a partly evaluated form (not needed: the function asks the kernel to evaluate what it wants evaluated)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; it replaces the `lazy` and `sourceAware` declarations of primitives. The declaration is a property of the parameter, since the kernel has no syntax. The maintainer: the function cannot know which other extensions are loaded, so that information is carried in the expression; here each part of an expression holds the function it applies, and the context stays with the expression. Use cases to work through: `if` with branch knowledge (first), pattern matching, `&&` and `||`, reading a function's body for termination, diagnostics that show an expression, rewriting by laws.
+- Chapter: Evaluation
+
+#### A call is evaluated by evaluating the function's body
+- Decides: applying a function to arguments means evaluating its body with whatever is known about those arguments. The call survives into the residual only where the body cannot be reduced further. This holds across every boundary: a program's own functions, an extension's, another extension's.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; No interface limits optimization
+- Significance: 5 — what lets a check, a proof or an optimization see inside a call
+- Label: foundational — every claim decided inside a call rests on it
+- Options recorded: leaving a call as a residual behind its signature (rejected: it hides everything inside the callee); the two exceptions of the former rule, a recursion cycle during a typed compilation and a call inside a speculated `when` arm (replaced by the next decision and by sharing)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "PE Rule 1: residualise, but unfold composed calls", without its exceptions.
+- Chapter: Evaluation
+
+#### A recursive call is evaluated once for each state of knowledge
+- Decides: while evaluating a function's body, the evaluator may meet a call to the same function with the same information known about its arguments. It does not open that call again. The call stays in the residual, as a call to the function being evaluated. Claims stated about the function's result are assumed at that inner call and decided on the body.
+- Status: open (a design to prove on real cases); ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A call is evaluated by evaluating the function's body; Claims are evaluated like everything else
+- Significance: 5 — where much of Allegro's potential is delivered
+- Label: foundational — checking, proof and optimization of every recursive function rest on it
+- Options recorded: residualising every call into a recursion cycle during a typed compilation (what the code does today); unfolding to a depth limit
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling; the principled replacement for both exceptions of the former rule. A state of knowledge at a call is everything the evaluator knows about its arguments, their values and their metadata. A recursive function needs a stated claim, or nothing is known at the inner call. Where the states of knowledge never repeat, evaluation reaches a resource limit and the outcome is undecided. The maintainer: recursion "will be where we deliver a lot of Allegro's potential"; it will likely need a whole section. Read with B-180 (recursion handling under partial evaluation).
+- Held finding (2026-11-11, DR2): the recursion cutoff residualises by rule of thumb and names typed compilation (`src/evaluator.ts`, the inline cutoff; docs/book/concepts.md §25).
+- Chapter: Evaluation
+
+#### A branch that may not be taken is evaluated without capabilities
+- Decides: when a condition cannot be decided, both branches are still evaluated, so that what is true on either path is still discovered. Neither branch is given any capability, so any effect it reaches stays in the residual. The kernel has one conditional; every other branching form is built on it by an extension.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A call is evaluated by evaluating the function's body; Phases are configuration; Authority is an unforgeable value
+- Significance: 4 — an unknown condition hides nothing behind it
+- Label: foundational — effect inference and every check through a branch rest on it
+- Options recorded: a scope marked as compile mode (what the code does today); several lazy primitives in the kernel, `eval_when`, `&&` and `||` among them (rejected: one conditional, the rest by extension)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "PE Rule 2: speculate every branch, run no effect". Growth under nested conditions is bounded by sharing equal sub-evaluations, since expressions form a shared graph, and by resource limits, not by an exception.
+- Held finding (2026-11-11, DR2): `eval_when`, `&&` and `||` are kernel primitives with their own speculation (`src/evaluator.ts`, `src/primitives.ts`), and speculation runs in a scope flagged `compileMode`. Held here and on the pattern-matching decisions of Part IV.
+- Chapter: Evaluation
+
+#### A missing value is a cell that is filled once
+- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, and an input not yet supplied, are cells too.
+- Status: settled; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Evaluation is total over unresolved information; Phases are configuration
+- Significance: 4 — one representation for everything not yet known
+- Label: foundational — completion, later phases and asynchronous results rest on it
+- Options recorded: incompleteness as a state of a structure (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
+- Notes: replaces "Incompleteness lives in write-once future cells" and absorbs "One residualising resolution semantics for scopes": a declared name with no value yet is such a cell, and a name nothing declares is a refutation. The maintainer doubted that a name without a value arises apart from these cases; it does not, so it is not a decision of its own.
+- Chapter: Evaluation
+
+#### When information arrives, what waited on it is evaluated again
+- Decides: everything left in the residual because of a missing value is evaluated again when the value arrives, within a phase or in a later one. The step from one phase to the next is the same event.
+- Status: settled; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A missing value is a cell that is filled once
+- Significance: 4 — how later information re-enters an evaluation
+- Label: foundational — module loading, asynchronous results and phases rest on it
+- Options recorded: a single pass, leaving anything unknown permanently residual (rejected)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
+- Notes: replaces "Evaluation resumes on new information by forward chaining".
+- Chapter: Evaluation
+
+#### The same program and the same information give the same result
+- Decides: neither the order in which information arrives nor the order in which independent parts are evaluated can change the outcome of an evaluation.
+- Status: to prove; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: When information arrives, what waited on it is evaluated again; Order of definition carries no meaning
+- Significance: 5 — order-free definitions and replayable evaluation both need it
+- Label: foundational — translation of proofs and every re-check rest on it
+- Options recorded: leaving it open (rejected: determinism is built in)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
+- Notes: replaces "Determinism and confluence of evaluation", which was open. It holds only if every cell is filled exactly once.
+- Chapter: Evaluation
+
+#### Scopes layer by parent chain
+- Decides: extending a scope is O(1) and does not copy; lookup walks the parent chain.
 - Status: settled
-- Type: capability
+- Type: implementation — concepts.md files it as an implementation choice
 - Rationale kind: technical
-- Depends on: Incompleteness lives in write-once future cells
-- Significance: 4 — loading and async re-enter an evaluation that already ran
-- Label: foundational — module loading and async results depend on it
-- Units: futures
-- Options recorded: single-pass PE (rejected: anything unknown at that instant stays residual)
-- Sources: docs/book/concepts.md R10, §28; docs/decisions.md D27, D33; docs/book/allegretto/structures.md §10 (B-028 status)
-- Book home (fragments' proposal): futures chapter (planned)
-- Notes: slot substitution is per binding and shallow; a pending slot in a structure never registered as a dependent stays symbolic until read (structures.md §10 residue).
-- Chapter: Evaluation over unresolved information
-
-#### Determinism and confluence of evaluation
-- Decides: open — whether the same source and inputs must give the same residual, and whether arrival order of completions provably cannot matter.
-- Status: open
-- Type: capability
-- Rationale kind: technical
-- Depends on: Evaluation resumes on new information by forward chaining
-- Significance: 3 — reproducible builds and re-checkable proofs need it
-- Label: foundational — proof re-checking would rest on it
-- Units: futures
-- Options recorded: none recorded; an arrival-order bug was fixed by completion replacement, not by construction
-- Sources: docs/book/concepts.md candidate R16, §28 delta; B-114; docs/book/allegretto/structures.md §6 "Confluence invariant"
-- Book home (fragments' proposal): futures chapter (planned)
-- Chapter: Evaluation over unresolved information
+- Depends on: The environment is not a value
+- Significance: 2 — cost of the operation PE performs most
+- Label: swappable — inside the scope unit
+- Units: scope
+- Options recorded: flatten-copy on extend (the prior implementation)
+- Sources: docs/book/concepts.md IC-5; docs/decisions.md D26; docs/plans/archive/structured-values-unification.md B5
+- Book home (fragments' proposal): scope chapter (planned)
+- Chapter: Evaluation
 
 #### Substitution of params into bodies
 - Decides: applying a composed function substitutes each owned Param by position, leaves Symbols to resolve by name through the scope, shares unchanged subtrees, and copies an inner function whose body changed with fresh Params and its metadata carried.
@@ -1634,7 +1180,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: none recorded
 - Sources: docs/book/allegretto/evaluator.md §4
 - Book home (fragments' proposal): allegretto/evaluator.md §4
-- Chapter: Evaluation over unresolved information
+- Chapter: Evaluation
 
 #### Tail calls by sentinel and loop
 - Decides: a call in tail position of a function body, marked before precompile, returns a host sentinel that the enclosing application loops on at the first round's depth, so recursion depth is not bounded by the host stack; body wrappers forward the sentinel.
@@ -1649,51 +1195,108 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/allegretto/evaluator.md §5; docs/book/concepts.md §27; docs/plans/pe-rules.md §6 RR7
 - Book home (fragments' proposal): allegretto/evaluator.md §5
 - Notes: nothing checks that a wrapper forwards the sentinel (B-113).
-- Chapter: Evaluation over unresolved information
+- Chapter: Evaluation
 
-#### One residualising resolution semantics for scopes
-- Decides: resolving a name is one path: bound gives the value with merged facts, unresolved gives a residual and never a throw; a genuinely absent source-level name is a compile-time error, and the reflective lookup returns an error value.
-- Status: partly built
+### Extensions
+
+#### An extension is made of functions and metadata fields
+- Decides: the kernel gives an extension two things to build with: ordinary functions, and metadata fields, each with a rule the extension supplies for how the field travels through evaluation. Every feature above the kernel is built from these: a typed call, an operator on typed values, a check on a member.
+- Status: open (the code installs host functions at fixed points of the evaluator); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Scope is the evaluation environment, not data; Evaluation is total over unresolved information
-- Significance: 2 — unifies two divergent paths
-- Label: swappable — inside the scope unit
-- Units: scope
-- Options recorded: the evaluator residualising while `ctx_resolve` throws (the prior split)
-- Sources: docs/decisions.md D26, D11; docs/book/allegretto/structures.md §4
-- Book home (fragments' proposal): scope chapter (planned)
-- Notes: structures.md §4 marks the Allegro-surface `scope_*` primitives as still pending.
-- Chapter: Evaluation over unresolved information
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; No interface limits optimization; A field's rule is a pure, bounded function
+- Significance: 5 — the whole of the extension interface
+- Label: foundational — every extension, the standard language included, is built on it
+- Options recorded: a kernel with a purpose-built extension point for each feature, checks, dispatch, projections and analyses installed at fixed points of the evaluator (what the code does today; rejected: the maintainer always had concerns about how such points would be handled by partial evaluation)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "The layer installs; the base never imports" and dissolves the entries on gated installs, the check hook, the dispatch hook, handles, knowledge propagation inside the evaluator, installed projections, analysis results crossing upward, and the facts plane. How today's uses fare: a typed literal is a value the extension's syntax maps to; an operator is the extension's own function; a check at a call is a claim at the top of the function's body; a computed field is an ordinary function; knowledge inside a branch is the extension's own `if` evaluating each branch with names rebound to values carrying the extra fact, using the kernel's ordinary operation of evaluating an expression with names rebound. Branch knowledge is the case to prove first.
+- Held finding (2026-11-11, DR2): the evaluator calls installed host functions for merge, check, dispatch, projection, analysis and facts merge (`src/capability.ts:96`–`144`), and imports the standard language's units (`src/evaluator.ts:9`–`10`). Held here; the largest change Part II names.
+- Chapter: Extensions
 
-#### Specified aborts
-- Decides: open — the base aborts in exactly five distinguishable classes (host-invariant assertion, plane violation, capability denial, resource guard, ill-formed application), and type errors thrown by the base are rework, not specification.
-- Status: open
+#### The kernel's primitives are pure and few
+- Decides: the kernel's primitives cover six things: telling bits apart; building and reading structures and expressions; one conditional; evaluating an expression with names rebound; registering a metadata field; evaluating a claim. None performs an effect. An effect is always a capability.
+- Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information; Capability denial is an abort, not an error value
-- Significance: 2 — lets tools tell an interpreter bug from a user error
-- Label: swappable — an error taxonomy
-- Units: evaluator, capability, base-primitives
-- Options recorded: none recorded
-- Sources: docs/book/concepts.md SC-8, candidates R18, R19, R20; docs/plans/pe-rules.md §6 RR5 (a kernel fault as a plain Error)
-- Book home (fragments' proposal): concepts.md Part 0 (SC-8)
-- Notes: not ratified. Today one class `AllegroError` carries no discriminator (B-110(d)).
-- Chapter: Evaluation over unresolved information
+- Depends on: The kernel contains only what no extension could supply; Seven representation kinds
+- Significance: 4 — the whole of what the kernel computes
+- Label: foundational — every extension is built from these
+- Options recorded: a target of about forty primitives (dropped: the criterion decides the count); primitives that declare the effects they produce (rejected: every primitive is pure)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Minimal base surface of about forty primitives" and "Host functions as values with declared evaluation control"; "Primitives receive full values" is a rule of the kernel's own code under it.
+- Held finding (2026-11-11, DR1 and DR2): 178 primitives in one table, 54 of them the standard language's, `print` and other effects among them (`src/primitives.ts:4509` onward).
+- Notes (2026-11-11, DR2, leftovers): "Primitives receive full values" is a rule of the kernel's own code: a primitive receives its arguments with their metadata intact.
+- Chapter: Extensions
 
-#### Evaluation depth bound
-- Decides: evaluation aborts past a depth of 10,000, as a resource guard distinguishable from unresolved information.
-- Status: partly built
-- Type: implementation — a resource limit of this interpreter, inside the classes "Specified aborts" names
+### Correctness
+
+#### Only the kernel records the outcome of a claim
+- Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Evaluation is total over unresolved information
-- Significance: 1 — a host guard
-- Label: swappable — a constant in the evaluator
-- Units: evaluator
-- Options recorded: none recorded; candidate R18 asks for a requirement above it; D35's resource budgets as catchable capabilities are the deferred general form
-- Sources: docs/book/allegretto/evaluator.md §2; docs/book/concepts.md SC-8 class D, candidate R18; src/evaluator.ts:15
-- Book home (fragments' proposal): allegretto/evaluator.md §2
-- Chapter: Evaluation over unresolved information
+- Depends on: Claims are evaluated like everything else; The kernel trusts only what it has evaluated; Authority is an unforgeable value
+- Significance: 5 — the anchor of the trusted base
+- Label: foundational — every result's strength rests on it
+- Options recorded: a claim as an ordinary function of some extension, writing the outcome into its own field (rejected: it does not remove the trusted operation, it moves it into that extension)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. The kernel's contents are then values, pure primitives, the evaluator, metadata with its fields and rules, authority, and this operation.
+- Chapter: Correctness
+
+#### A refutation marks everything computed from it
+- Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, a name that nothing declares, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Only the kernel records the outcome of a claim; A field's rule is a pure, bounded function; An effect consumes only values whose claims are decided
+- Significance: 5 — the one mechanism behind halting, effect gating and reporting every failure
+- Label: foundational — every phase's result and every effect rest on it
+- Options recorded: an abort at the first failure (rejected: a phase reports every refutation); a program-visible error value for a program's own mistakes (rejected: it could be forged, tested and laundered)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling. With it an effect never consumes a refuted value, and a phase goes on evaluating what does not depend on one, then ends refuted. A test for the mark is itself computed from the refuted value, so it is refuted too.
+- Held finding (2026-11-11, DR2): the kernel throws on an ill-formed application and on some type errors instead of recording a refutation (the five abort classes of the former "Specified aborts").
+- Chapter: Correctness
+
+#### A refutation on a path that may be taken refutes the program
+- Decides: if a claim is refuted in a branch whose condition cannot be decided, the program is wrong, unless what is known already rules that branch out. A program that means to handle the bad case uses a handled failure.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A branch that may not be taken is evaluated without capabilities; A refutation marks everything computed from it
+- Significance: 4 — a provably failing path is a mistake, however rarely taken
+- Label: foundational — every check of a function with a branch rests on it
+- Options recorded: leaving the refutation conditional until the condition is known (rejected: a function with a failing path would pass until run on the bad input)
+- Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: new, by ruling.
+- Chapter: Correctness
+
+#### A failure a program can handle is supplied by an extension
+- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: An extension is made of functions and metadata fields; A refutation marks everything computed from it
+- Significance: 3 — keeps recoverable failure out of the kernel
+- Label: swappable — one extension's field and functions
+- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Errors as a viral metadata field". The maintainer: "exception" probably fits better than "error", and the choice is left to each extension. To be placed with the standard language in Part IV when that part is reviewed.
+- Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
+- Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
+- Chapter: Correctness
+
+#### Evaluation stops early for two reasons only
+- Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
+- Status: partly built; ruled 2026-11-11 (DR2)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A refutation marks everything computed from it; Evaluation is total over unresolved information
+- Significance: 3 — separates the kernel's own faults and limits from a program's mistakes
+- Label: swappable — the limits and how they are reported
+- Options recorded: five classes of abort, capability denial and ill-formed application among them (what the inventory listed; three of the five are refutations or cannot arise)
+- Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
+- Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
+- Chapter: Correctness
 
 ### Grammars as values
 
@@ -1909,7 +1512,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: The kernel holds no language; Scope is the evaluation environment, not data
+- Depends on: The kernel holds no language; The environment is not a value
 - Significance: 4 — the standard library, grammars and the type system all arrive as extensions
 - Label: foundational — loading, typed module objects and grammar harvesting
 - Units: module-loading
@@ -1998,7 +1601,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — the search order, cycle detection and load-once are what a program sees; threading the future manager is the realising part
 - Rationale kind: technical
-- Depends on: Extensions are the module substrate; Incompleteness lives in write-once future cells
+- Depends on: Extensions are the module substrate; A missing value is a cell that is filled once
 - Significance: 2 — load cost and module identity
 - Label: swappable — module-loading internals
 - Units: module-loading
@@ -2171,7 +1774,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Every Standard value has a type, with no implicit fallback; Bits is the only scalar
+- Depends on: Every Standard value has a type, with no implicit fallback; The kernel's plain data is a sequence of bits, and it computes nothing on them
 - Significance: 3 — the types every program uses
 - Label: swappable — each type behind its member set
 - Units: core-types, type-primitives
@@ -2364,7 +1967,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Mediated member access; Writes gated by a capability, reads free
+- Depends on: Mediated member access; An extension registers its own fields; the kernel has two
 - Significance: 3 — the ocap basis of privacy and the forgery-E guarantee
 - Label: foundational — private members, export filtering and the wire rule
 - Units: type-core, typed-modules
@@ -2466,7 +2069,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Host functions as values with declared evaluation control
+- Depends on: A function may take an argument unevaluated
 - Significance: 2 — local to the conditional, but its thunking interacts with tail calls
 - Label: swappable — the spelling is base-grammar; the thunking rides the lazy-primitive mechanism
 - Units: base-grammar, tree-builder, base-primitives
@@ -2481,7 +2084,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Metadata is a field on every value; Errors as a viral metadata field
+- Depends on: Metadata is a field on every value; A failure a program can handle is supplied by an extension
 - Significance: 2 — the reader's view of the metadata plane at the surface
 - Label: swappable — a surface over channel reads
 - Units: base-grammar, metadata
@@ -2587,7 +2190,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: One operation: partial evaluation; Writes gated by a capability, reads free; Kinds are types, and Type is its own type
+- Depends on: One operation: partial evaluation; An extension registers its own fields; the kernel has two; Kinds are types, and Type is its own type
 - Significance: 4 — the provability thesis in the language
 - Label: foundational — laws, PCP, `proven`, verdict
 - Units: proofs; proofs, evaluator
@@ -2810,7 +2413,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Effects are values in one lattice; Incompleteness lives in write-once future cells
+- Depends on: Effects are values in one lattice; A missing value is a cell that is filled once
 - Significance: 2 — quarantines nondeterminism and knowledge-dependence from pure code
 - Label: swappable — label roster
 - Units: effects
@@ -2897,7 +2500,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability — the two carriers decide where knowledge holds; the list form is a realising detail
 - Rationale kind: technical
-- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; Scope is the evaluation environment, not data
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; The environment is not a value
 - Significance: 3 — how facts reach a check
 - Label: swappable — carrier representation
 - Units: refinements, contracts
@@ -3015,7 +2618,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Divergence is a computed effect; Incompleteness lives in write-once future cells
+- Depends on: Divergence is a computed effect; A missing value is a cell that is filled once
 - Significance: 3 — frames what "the program completes" means
 - Label: foundational — liveness ledger and `sched`
 - Units: totality, futures
@@ -3116,7 +2719,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Errors as a viral metadata field; Strict at the contract, informational for undeclared code
+- Depends on: A failure a program can handle is supplied by an extension; Strict at the contract, informational for undeclared code
 - Significance: 3 — failure semantics of all contract forms
 - Label: foundational — the halt invariant cited across the project
 - Units: contracts
@@ -3144,7 +2747,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Invariants are refinements; Errors as a viral metadata field; Mechanical purity gates
+- Depends on: Invariants are refinements; A failure a program can handle is supplied by an extension; Mechanical purity gates
 - Significance: 3 — an instance never exists tagged valid before its invariant holds
 - Label: swappable — the mint's guard
 - Units: refinements, type-core
@@ -3188,7 +2791,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: implementation — how the verdict is computed; what it reports is "Every result says how strongly it holds"
 - Rationale kind: technical
-- Depends on: Four-tier discharge spectrum; Metadata fields registered with declared propagation rules
+- Depends on: Four-tier discharge spectrum; An extension registers its own fields; the kernel has two
 - Significance: 2 — how obligations reach the verdict
 - Label: swappable — verdict assembly
 - Units: pcp
@@ -3665,7 +3268,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: implementation — where the post-passes are registered in the code
 - Rationale kind: technical
-- Depends on: The evalSource stage order; Plane interfaces are sanctioned and policed
+- Depends on: The evalSource stage order; Each decision lives in one replaceable unit of code
 - Significance: 3 — would make the pipeline layer-neutral
 - Label: foundational — moving the passes changes what L0 knows of L2
 - Units: pipeline
@@ -3693,7 +3296,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: implementation — a cutoff for a precompile performance pathology
 - Rationale kind: technical
-- Depends on: PE Rule 1: residualise, but unfold composed calls; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
+- Depends on: A call is evaluated by evaluating the function's body; Definition and memo entries in the precompile context; Divergence is a computed effect; Mutual recursion requires every edge to decrease
 - Significance: 3 — without it precompile unfolds recursion until the stack overflows
 - Label: swappable — one injected predicate
 - Units: evaluator, pipeline; pipeline, evaluator; totality, pipeline
@@ -3800,7 +3403,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability — what running a file guarantees: futures drained, an error as exit code 1
 - Rationale kind: technical
-- Depends on: `use` header for language extension, `import` for module values; Incompleteness lives in write-once future cells
+- Depends on: `use` header for language extension, `import` for module values; A missing value is a cell that is filled once
 - Significance: 2 — the reference way a program runs
 - Label: swappable — `runFile` in the `cli` unit
 - Units: cli, module-loading
@@ -3815,7 +3418,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability — the REPL's behaviour for its user
 - Rationale kind: technical
-- Depends on: Scope is the evaluation environment, not data
+- Depends on: The environment is not a value
 - Significance: 2 — interactive use
 - Label: swappable — `repl` in the `cli` unit
 - Units: cli
@@ -3862,7 +3465,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
-- Depends on: Minimal base surface of about forty primitives; Effect inference is driven by partial evaluation, and a declaration is a contract
+- Depends on: The kernel's primitives are pure and few; Effect inference is driven by partial evaluation, and a declaration is a contract
 - Significance: 3 — makes I/O visible to the effect system
 - Label: swappable — the host can offer a different set
 - Units: not yet a unit (T-host track); base-primitives, futures (today; a `host` unit is proposed)
@@ -3892,7 +3495,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Incompleteness lives in write-once future cells; Errors as a viral metadata field
+- Depends on: A missing value is a cell that is filled once; A failure a program can handle is supplied by an extension
 - Significance: 3 — the I/O edge of the futures model
 - Label: swappable — the capability implementations
 - Units: futures, base-primitives
@@ -3997,7 +3600,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open
 - Type: capability
 - Rationale kind: vision
-- Depends on: One operation: partial evaluation; Incompleteness lives in write-once future cells
+- Depends on: One operation: partial evaluation; A missing value is a cell that is filled once
 - Significance: 3 — the T-build milestone M6 and the "config is a compile-time theorem" claim
 - Label: foundational — would define how every later binding stage is reached
 - Units: not yet a unit (only `applyPhase` exists, driven by futures alone)
@@ -4059,40 +3662,40 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | # | Entry | Depended on | Resolution | Why |
 |---|---|---|---|---|
 | 1 | Arrays are structures with unkeyed entries | The composite is one sequence of optionally-keyed entries | (a) Now depends on "One composite kind: Structure". The composite's representation now depends on this entry and follows it. | An array is a structure with unkeyed entries however the entries are stored; concepts.md files the sequence and its index as an implementation choice. |
-| 2 | Symbols serialise by FQN; deserialisation never mints reachability | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | The wire form is the name, interned or not; interning realises identity by name. |
-| 3 | One residualising resolution semantics for scopes | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Resolution rests on the parent-chain protocol that entry states; the constant-time chain is how it is built. |
+| 2 | Authority is an unforgeable value | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | The wire form is the name, interned or not; interning realises identity by name. |
+| 3 | A missing value is a cell that is filled once | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Resolution rests on the parent-chain protocol that entry states; the constant-time chain is how it is built. |
 | 4 | Offside rule through stateful indent terminals | Memoized recursive-descent engine with seed-growing left recursion | (a) Removed. The engine now depends on this entry and follows it. | Grammar authors name the indent terminals; the engine implements them, so the edge pointed the wrong way. |
 | 5 | Parse failure reporting and recovery | Memoized recursive-descent engine with seed-growing left recursion | (a) Now depends on "Grammars are Allegro values". The engine now depends on this entry and follows it. | Error productions and sync points are features of a grammar; the engine's farthest-advance report realises them. |
-| 6 | Extensions are the module substrate | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Extensions layer by the scope's protocol, not by its cost. |
+| 6 | Extensions are the module substrate | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Extensions layer by the scope's protocol, not by its cost. |
 | 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
 | 8 | Export marks the binding, and a module with no exports is open | Module loading and typed module objects are separate layers | (a) Now depends on "Extensions are the module substrate". | Export rests on modules existing; which unit loads them is a cut in the code. |
-| 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "Scope is the evaluation environment, not data". | Occurrence facts live in the scope's facts plane, which that entry states. |
+| 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Occurrence facts live in the scope's facts plane, which that entry states. |
 | 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every result says how strongly it holds". | Contracts must reach the verdict and the ledger however the verdict is computed. |
 | 11 | Planning surface conventions | Library before surface | (a) Now depends on "A plan is an outcome graph with derived wiring". | The conventions spell the model; the order in which the library and the grammar were built changes no spelling. |
 | 12 | Post-passes registered by layers | The evalSource stage order | (b) Retyped implementation. | It decides where the code registers its post-passes; no program's meaning changes. |
-| 13 | Post-passes registered by layers | Plane interfaces are sanctioned and policed | (b) The same retyping. | As above. |
+| 13 | Post-passes registered by layers | Each decision lives in one replaceable unit of code | (b) The same retyping. | As above. |
 | 14 | Inspect reports only what the pipeline computed | The evalSource stage order | (a) Removed; "Types are values that constrain values" remains. | Inspect promises to add no analysis of its own; which stage computes each fact is the pipeline's arrangement. |
 | 15 | One command-line entry with subcommands | One evalSource pipeline for programs and libraries | (a) Removed; the entry now depends on nothing. | The command-line surface holds whatever runs behind it; what every run checks is "Claims are evaluated like everything else". |
 | 16 | File runner as one evaluation with futures drained | Callers pre-scan and strip the `use` header | (a) Now depends on "`use` header for language extension, `import` for module values". | The runner honours the header; the pre-scan is how a caller does it. |
-| 17 | REPL as successive evaluations over a persistent scope | One evalSource pipeline for programs and libraries | (a) Now depends on "Scope is the evaluation environment, not data". | An entry sees the earlier entries by scope layering; the shared pipeline is how it runs. |
+| 17 | REPL as successive evaluations over a persistent scope | One evalSource pipeline for programs and libraries | (a) Now depends on "The environment is not a value". | An entry sees the earlier entries by scope layering; the shared pipeline is how it runs. |
 | 18 | Execution tracing and step-through debugging | The evalSource stage order | (a) Now depends on "Expressions are values, forming a DAG". | Tracing and graph inspection show evaluation and the expression graph, not the stage list. |
-| 19 | A stated host boundary in a host unit | Scope leaves the value universe | (a) Removed. | The edge recorded where the future manager is planted, on the scope's host plane, which is an implementation detail; the boundary rests on the environment capabilities. |
+| 19 | A stated host boundary in a host unit | The environment is not a value | (a) Removed. | The edge recorded where the future manager is planted, on the scope's host plane, which is an implementation detail; the boundary rests on the environment capabilities. |
 | 20 | Browser sandbox as an IIFE bundle with a library registry | A browser-compatible core | (a) Removed. The core rule now depends on the sandbox and follows it. | The rule exists to keep the sandbox possible (its own significance line), so it realises the sandbox. |
 | 21 | Browser runtime packaging | A browser-compatible core | (a) Now depends on "Browser sandbox as an IIFE bundle with a library registry". | Packaging extends the sandbox's one bundle; the API rule is its implementation. |
 
 Three typings go against a source or need the maintainer's eye:
 
-- "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata channels are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata channels are independent" instead.
-- "Scope leaves the value universe" is typed implementation, although it supersedes a specification choice. Its own options line says no scope reaches user code as a value, so leaving `Value` changes the representation only.
+- "Metadata is a field on every value" is typed capability. concepts.md files it as an implementation choice that realises "Metadata fields are independent", while that requirement's own text calls where channels are stored a specification choice. The sources conflict. Typed capability because metadata rides each occurrence of a value, not each datum, and a program observes that. It is a tour decision; if the maintainer rules it implementation, its seven capability dependents rest on "Metadata fields are independent" instead.
+- "The environment is not a value" is typed implementation, although it supersedes a specification choice. Its own options line says no scope reaches user code as a value, so leaving `Value` changes the representation only.
 - "One operation: partial evaluation" is typed capability. The language exposes it: residuals are values, and every check is an evaluation a user can read.
 
 **Mutual capability dependencies.** One pair was merged:
 
 | Merged entry | From | Why |
 |---|---|---|
-| Incompleteness lives in write-once future cells | "Incompleteness is a value in a slot"; "Future cells: write-once, monotonic, flattening" | The first states incompleteness as an unresolved future; the second states the future as the sole locus of incompleteness. Each is stated in the other's terms, so neither holds alone. Sources, options and notes are the union. |
+| A missing value is a cell that is filled once | "Incompleteness is a value in a slot"; "Future cells: write-once, monotonic, flattening" | The first states incompleteness as an unresolved future; the second states the future as the sole locus of incompleteness. Each is stated in the other's terms, so neither holds alone. Sources, options and notes are the union. |
 
-Not merged, because they relate without needing each other: "Mediated member access" and the access tiers and evidence it stages; "`use` header for language extension, `import` for module values" and "Activation by a `use` header, per file and not transitive"; "Metadata channels are independent" and "Metadata is a field on every value".
+Not merged, because they relate without needing each other: "Mediated member access" and the access tiers and evidence it stages; "`use` header for language extension, `import` for module values" and "Activation by a `use` header, per file and not transitive"; "Metadata fields are independent" and "Metadata is a field on every value".
 
 **The three cycles the merge broke, re-examined.**
 
@@ -4106,13 +3709,13 @@ Not merged, because they relate without needing each other: "Mediated member acc
 - "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies" move after "Parse failure reporting and recovery" (Grammars as values).
 - "A browser-compatible core" moves after "Browser sandbox as an IIFE bundle with a library registry" (Hosts: the terminal and the browser).
 
-**Contents changed.** "Why a new language" lists "Order of definition carries no meaning", which the rulings added but the list missed (9 decisions). "Evaluation over unresolved information" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
+**Contents changed.** "Why a new language" lists "Order of definition carries no meaning", which the rulings added but the list missed (9 decisions). "Evaluation" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
 
 ### The maintainer's rulings on the type check, 2026-11-06 (PR #164)
 
 The ten hard calls stand, except three put to review; the merge of the incompleteness and future-cell decisions stands. The review session's findings on the three, for the pass to settle when it reaches their chapters:
 
-1. **"Scope leaves the value universe".** The maintainer's test: capability if read-site forgery requires it, else reversed. Finding: forgery does not require it. The protection against read-site forgery is a separate decision already in this inventory, "Evidence is possession": a mediator receives an opaque, kernel-minted evidence capsule that answers only whether a name is held, never the raw scope (decisions.md V-R2 (the mediation context is an opaque evidence capsule), executed). It ships today with scope still a value. The argument behind D49 (scope leaves `Value`) in `docs/plans/entry-sequence-composite.md` §5.6 is representational: five code sites that exist to undo scope's valuehood, metadata meaningless on a value with no position, the one mutable value, scope-only state on every structure, and code generation; it rests on the fact that no scope ever reaches user code as a value. Forgery appears only in closing custom scope kinds. D49 is ruled but not executed (`src/scope.ts:36` still implements scope as a structure). So by the maintainer's test the decision is an implementation decision, and the open question is whether to keep it (its five costs) or reverse it (nothing to undo, since it is unbuilt). Recommendation for the Scopes chapter: keep it as implementation, ruled on its costs, with "Evidence is possession" as the capability it serves.
+1. **"The environment is not a value".** The maintainer's test: capability if read-site forgery requires it, else reversed. Finding: forgery does not require it. The protection against read-site forgery is a separate decision already in this inventory, "Evidence is possession": a mediator receives an opaque, kernel-minted evidence capsule that answers only whether a name is held, never the raw scope (decisions.md V-R2 (the mediation context is an opaque evidence capsule), executed). It ships today with scope still a value. The argument behind D49 (scope leaves `Value`) in `docs/plans/entry-sequence-composite.md` §5.6 is representational: five code sites that exist to undo scope's valuehood, metadata meaningless on a value with no position, the one mutable value, scope-only state on every structure, and code generation; it rests on the fact that no scope ever reaches user code as a value. Forgery appears only in closing custom scope kinds. D49 is ruled but not executed (`src/scope.ts:36` still implements scope as a structure). So by the maintainer's test the decision is an implementation decision, and the open question is whether to keep it (its five costs) or reverse it (nothing to undo, since it is unbuilt). Recommendation for the Scopes chapter: keep it as implementation, ruled on its costs, with "Evidence is possession" as the capability it serves.
 2. **"Effects describe computations, refinements describe data".** Finding: the entry joins a decision and a storage note. The decision: effect constraints and refinement predicates are separate kinds of claim in separate lattices, an effect bound on a parameter is not a refinement of the parameter's value. It has an alternative (one lattice of facts, effects as predicates over computations), so it is a decision, not an observation, and it is capability. The storage note (effects in their own metadata field; parameter bounds in `Param.effectBound`, moved out of `Param.predicates`) is implementation and belongs under the effects field's own entry. Recommendation for the Effects chapter: restate as the capability "Effects and refinements are separate lattices", and fold the storage into the implementation entry.
 3. **"One primer for human and machine provers".** The primer is `docs/book/proving-in-allegro.md`, the proving guide: the language model worker of the prove loop reads that file and sends it to the model as its instructions (`pcp/llm-worker.ts:394`–`403`). The decision is that a human prover and a machine prover are given the same document, which makes the protocol's neutrality literal. Note for R25 (chapters leaving the book): the guide moves to an appendix, but the worker reads it by path, so its path stays or the worker's path changes with it (stop condition 4 of the plan).
 
@@ -4142,12 +3745,12 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 1. **GLL or ordered choice.** `docs/book/grammar-formalism.md` §1 says GLL is chosen and §5.1 speaks of GLL memoization; `docs/book/extension/grammar.md` §1 and §4 describe a memoized parser with PEG-committed ordered choice. The shipped base grammar relies on alternative order, and ambiguity detection is opt-in for that reason. Entries: "Memoized recursive-descent engine with seed-growing left recursion", "Ambiguity is banned and detected, not resolved by alternative order", "Rules for user-written EBNF". The grammars chapter cannot be written until one source is ruled stale.
 2. **Whether `when` arms narrow knowledge.** `docs/book/standard/pattern-matching.md` §3 says they do not; `docs/book/standard/contracts.md` §4 says the arms lift the matched pattern tagged `match-case`, and §9 says that shipped. A spot check finds the `match-case` provenance tag declared in `src/refinements.ts:457` and no other occurrence of the string in `src/` (a text search, not a binder-aware survey), which suggests the tag has no producer and pattern-matching.md is the current one. Entries: "Unification and branch refinement in patterns", "Branch refinement narrows knowledge per region".
 3. **Effects as values or a set of strings.** `docs/book/standard/effects.md` says an effect is a value of kind `Effect` composed by conjunction, with no separate effect-set type; the code holds an effect set as `Set<string>` merged by union (`src/effects.ts:41`), and non-trivial unions coerce to `opaque`. Entry: "Effects are values in one lattice" (status partly built).
-4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "PE Rule 2: speculate every branch, run no effect", "The discriminator rule for kind comparisons".
+4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "A branch that may not be taken is evaluated without capabilities", "Each decision lives in one replaceable unit of code".
 5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every result says how strongly it holds". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
 6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every result says how strongly it holds".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".
 8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Claims are evaluated like everything else".
-9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "Minimal base surface of about forty primitives".
+9. **Where `print` and `eval_when` live.** `docs/book/units.md` row 15 lists `print` and `eval_when` in `base-primitives`; `docs/book/allegretto/structures.md` Appendix B and the environment-capability decision place `print` outside the base, and whether `eval_when` is base or a pattern-matching library is recorded only as a judgment call. Entries: "Environment capabilities outside the base, effect-labelled", "The kernel's primitives are pure and few".
 10. **Stale statements inside one chapter.** `docs/book/standard/type-system.md` §3 still lists `extends` after inheritance was dissolved, and §4 calls the retirement of prefixed slots unimplemented while recording completed chunks; `docs/book/standard/core-types.md` says ten core types and lists eleven; `docs/book/implementation-map.md` puts `src/introspect.ts` in L2 while `scripts/analyze/units.json` puts it on the track layer; `docs/book/concepts.md` R6's delta (27 imports) disagrees with its §23 (7 imports); several register entries name retired files or the retired carrier (detail in the Notes of the entries concerned).
 
 ### Placement questions this proposal raises
@@ -4348,7 +3951,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | P7 | chunk or principle P7 of the plan or chapter cited beside it (for example a chunk of B-157 or of this book pass) |
 | R1 | concepts.md: Allegretto is the simplest base that can carry Allegro (where a Sources line names a plan, the plan's ruling of that number) |
 | R2 | concepts.md: Partial evaluation is the mechanism by which layers are added (where a Sources line names a plan, the plan's ruling of that number) |
-| R3 | concepts.md: Metadata channels are independent (where a Sources line names a plan, the plan's ruling of that number) |
+| R3 | concepts.md: Metadata fields are independent (where a Sources line names a plan, the plan's ruling of that number) |
 | R4 | concepts.md: Evaluation is total over unresolved information (where a Sources line names a plan, the plan's ruling of that number) |
 | R5 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
 | R6 | concepts.md: Everything above the kernel is an extension, and there is one way to extend (where a Sources line names a plan, the plan's ruling of that number) |
@@ -4357,7 +3960,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | R9 | concepts.md: The language surface is extensible (where a Sources line names a plan, the plan's ruling of that number) |
 | R10 | concepts.md: Evaluation is resumable on new information (where a Sources line names a plan, the plan's ruling of that number) |
 | R11 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
-| R12 | concepts.md: Metadata origination is capability-controlled (where a Sources line names a plan, the plan's ruling of that number) |
+| R12 | concepts.md: Authority is an unforgeable value (where a Sources line names a plan, the plan's ruling of that number) |
 | R14 | concepts.md: Code is organised into separately-loadable units (where a Sources line names a plan, the plan's ruling of that number) |
 | R15 | ruling of that number in the document cited beside it (chunk rulings of decisions.md, a plan's §6, or a chapter IR) |
 | R16 | concepts.md: Same source and same inputs give the same residual (where a Sources line names a plan, the plan's ruling of that number) |
@@ -4371,13 +3974,13 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | S2d | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | S4b | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | SC-1 | concepts.md: Seven representation kinds |
-| SC-2 | concepts.md: Bits is the only scalar |
+| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it computes nothing on them |
 | SC-3 | concepts.md: Expressions are values |
 | SC-4 | concepts.md: Symbol identity is fully-qualified, not spelling |
 | SC-5 | concepts.md: One composite kind rather than two |
 | SC-6 | concepts.md: Scopes are values |
 | SC-7 | concepts.md: Propagation is drawn from a fixed, inspectable vocabulary |
-| SC-8 | concepts.md: Specified aborts |
+| SC-8 | concepts.md: Evaluation stops early for two reasons only |
 | T-R1 | register: Severity reconciliation: D34's strict-by-default binds at discharge ACCOUNTING (always … |
 | T-R2 | register: The flip is PER-PROJECT CONFIG, deferred: total-by-default, per-kind severity promotion, … |
 | T-R3 | register: Exhaustiveness stays info until T-R2 lands; promoting non-exhaustive-over-finite-type (or … |
