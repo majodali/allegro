@@ -1090,6 +1090,19 @@ they halt, the verdict's `auto-PE` in place of a proposer. The
 scenarios are the acceptance statement for milestones 5, 6 and 7 of
 the rebuild. No code changed.
 
+### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
+
+B-196 (the rebuild's acceptance side). `next/models/specs/planning.md`
+states the planning model and the loop over it against the ruled
+decisions of the inventory's Part V: its values, its claims and their
+strengths, an open plan as a model with an unknown, search as feasible
+and best, the notation, failure, mappings and the result a tool reads.
+It recommends on each of the 15 held planning decisions and puts 13
+questions to the maintainer. The pilot as built is its evidence of use:
+three of the pilot's mechanisms (a splice into source text, a hash over
+rendered text, records of dead ends read by host code) are set out as
+workarounds of the present implementation. No code changed.
+
 ### 2026-11 — The new tree's gate takes the kernel stream's files (B-196)
 
 B-196 (the rebuild's acceptance side). Three changes the kernel

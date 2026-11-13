@@ -391,6 +391,30 @@ policy is the gate ruled there.
   check accepts a case that cites a former title and counts it in its
   summary; `next/tools/corpus.ts --follow-renames` then moves the
   cases, in this stream's next chunk.
+- **2026-11-13 — Q4, part 1 drafted: the planning model specified.**
+  `next/models/specs/planning.md`, for the maintainer's ruling: five
+  use cases; the model's values, each marked as taken from the pilot,
+  changed by a named ruled decision, or open; its claims with who
+  makes each and its strength; an open plan as a model with an
+  unknown, the catalog remainder; search under "Feasible is decided;
+  best says how strongly it holds", with the two designs for the bound
+  set side by side; the notation, each form with the expression it
+  stands for; every failure the pilot reports and what the ruled
+  decisions make it; the mappings; what a phase's result must hold;
+  a recommendation on each of the 15 held planning decisions; and 13
+  questions, each with options and a recommendation. Its last section
+  states the six issues of the review session's adversarial review of
+  phase 1 (PR #199) that the specification rests on. One term is new,
+  the catalog remainder. The software system model's specification is
+  the chunk's second part.
+  - **Ruled 2026-11-13.** The maintainer took the recommended option
+    of each of the 13 questions and ratified the term, in a comment on
+    PR #202: "All defaults accepted, "catalog remainder" ratified." A
+    port's type is a type value. An open plan's unknown is the catalog
+    remainder, and declaring the plan claims a feasible completion.
+    The search's bound comes from the residual of the plan with its
+    choices unknown. A model value's names live in a field of the
+    value. The 15 held planning decisions stay the review session's.
 - **2026-11-13 — Q3 drafted: the scenarios.** Eleven files under
   `next/corpus/scenarios/` and an index, for the maintainer's ruling:
   one [scenario](#def-scenario) per scene, each with who acts and why,
