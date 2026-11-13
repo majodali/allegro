@@ -1077,6 +1077,19 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The acceptance corpus inventoried (B-196, chunk Q2 (the corpus inventoried and classed), part 1)
+
+B-196 (the rebuild's acceptance side), chunk Q2 (the corpus inventoried and classed), part 1.
+`next/corpus/cases.json` holds 1,992 cases, one per line: 613 pins,
+one per `// expect:` line of the 71 programs the suite runs against
+their pins, and 1,379 tests, one per registration of the suite, every
+class null. `next/corpus/registered-tests.json` lists the
+registrations, taken from the suite by a dry listing that runs no test
+body. `next/tools/corpus.ts` generates both, syncs them while keeping
+the hand-edited fields, and checks them; its tests probe the check
+against known-bad inventories. `npm run lint:corpus` runs the check in
+the new tree's CI step.
+
 ### 2026-11 — The decision map (B-196, the stream's first chunk)
 
 B-196 (the rebuild's acceptance side), chunk Q1 (the decision map). `next/decisions.json`
