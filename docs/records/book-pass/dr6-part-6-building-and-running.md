@@ -108,3 +108,79 @@ the first recommendations:
 - Every decision needs example use cases, "which I suppose is true
   for every decision in the book, but is especially true for here
   where the rubber hits the road".
+
+**A brainstorm on the kernel, the launcher, capabilities and
+configuration, 2026-11-12 and 2026-11-13.** The maintainer laid out a
+model of how they work and asked for critique, with neither side
+committing until the conclusions were vetted. The conclusions, agreed
+2026-11-13 ("I agree with all these conclusions, recommendations and
+terms"; "My only requirement is we have a foundation we can build
+on"):
+
+- **The kernel is passive.** It acts only on calls of its interface
+  and knows nothing of configuration or phases. Its interface lets a
+  caller construct values, bind symbols in a scope, create scopes,
+  including ones that are not children of the root, and evaluate
+  expressions. The review added: filling a cell, reading a result and
+  its metadata, obtaining the residual, setting limits, receiving
+  faults, and a statement of what the interface never exposes.
+- **Configuration** is all the information that determines how an
+  execution is performed, read from sources with a priority. The
+  maintainer blurred on purpose the line between what the launcher
+  manages and what Allegro code manages: a launcher may be minimal,
+  and the more is handed to Allegro, the more partial evaluation and
+  claims can work on. The review's first split is withdrawn.
+- **The launcher does only what cannot be done in Allegro.** Anything
+  more it does is an earlier phase, run ahead of time and saved. Only
+  the launcher can set the ceiling.
+- **An execution's grant is a ceiling.** Code inside still has to be
+  handed a capability, by value or by being evaluated in a scope that
+  holds it. A module is a function of the capabilities it declares.
+- **Four kinds of function.** A primitive function has a body of host
+  code; a composed function is written in Allegro. Either is effectful
+  or pure. A primitive's purity is declared and assumed; a composed
+  function's is decided from what it holds. A kernel primitive is one
+  of the six the kernel ships. A capability is a named set of
+  effectful primitives, and is what gets granted.
+- **Loading host code may be a capability**, controlled by the
+  ceiling, by granting it only to trusted code, and by narrowing it to
+  an allow list pinned by content hash. A configuration can claim that
+  no host code is loaded after bootstrap.
+- **Saved programs come in two forms**: data, a recorded sequence of
+  interface calls, and host code, which can also contain primitive
+  functions. A data-form program names the primitives it needs by
+  content hash. The maintainer: this "is inviting dependency hell, but
+  every modular programming platform that's successful goes to
+  dependency hell as punishment. I think hash checks will work for
+  now." Saving is export to a target whose model is the kernel's
+  interface.
+- **An exported program usually needs no kernel.** It needs one when
+  it handles expressions at run time; then it carries a kernel, loads
+  one as a library, or, once the platform hosts itself, carries a
+  kernel specialised to it.
+- **Trust.** The maintainer: "A big part of the issue is a user (or
+  organization) determining what level of trust they need, and where
+  Allegro reliably improves on what they would otherwise do."
+  Recommendations accepted as a foundation to build on:
+  - No interface call writes a bare claim outcome. Restore stamps an
+    outcome with its builder's identity; the kernel computes the
+    claim's key itself. Restore is allowed inside the kernel as a
+    capability narrowed per builder, and that is configurable. The
+    maintainer: the launcher being safer than Allegro code "means
+    mostly we need to always analyze for vulnerabilities".
+  - A builder is identified in stages: content hashes, a manifest, a
+    signature. Determinism lets anyone rebuild and compare.
+  - A primitive's purity: assumed and named by default; sampled;
+    enforced where a target can run code with no access to the
+    outside; and a reference definition as a composed function, which
+    the maintainer holds a worthwhile goal.
+  - A policy is a claim over what a result rests on, stated on a
+    phase, on a capability or as a profile adopted whole. Policies
+    only add requirements and combine by conjunction.
+  - Limits are step budgets, which are deterministic; a wall-clock
+    limit belongs to the launcher. One reference kernel is the root of
+    trust; a variant is trusted as far as it agrees with it.
+- The review suggested that checked mappings between versions of a
+  model might one day replace version numbers as compatibility
+  claims. The maintainer remains "skeptical on combinatorial
+  complexity grounds".
