@@ -21,7 +21,8 @@
 > a proposal fills with one entry and a new remainder (§4, question 2).
 >
 > **Rulings needed** are numbered in §11. Where a section depends on
-> one, it says so and continues under the recommended option.
+> one, it says so and continues under the recommended option. §13
+> lists the open issues of the ruled decisions that it rests on.
 
 ## 1. What the model is for
 
@@ -51,12 +52,12 @@ question of §11).
 
 | Value | What it holds | Constructs it | Mark |
 |---|---|---|---|
-| Plan | A name, declared inputs and outcomes (ports), nodes, an optional budget, handlers | `plan NAME:`; `plan(name, inputs, outcomes, nodes)` | *pilot* for its fields. The name comes from the binding's origin under "Every value keeps its origin"; the pilot stores it as a string |
+| Plan | A name, declared inputs and outcomes (ports), nodes, an optional budget, handlers | `plan NAME:`; `plan(name, inputs, outcomes, nodes)` | *pilot* for its fields, the name among them (question 13) |
 | Node: leaf | A name, ports, an estimate, instructions, an optional retry, declared failures | a node block with no nested node; `leaf` | *pilot* |
 | Node: composite | As a leaf, plus inner nodes, handlers and an optional budget; its declared outcomes are what its inner graph produces | a node block holding node blocks; `composite` | *pilot* |
 | Node: borrowed plan | A name and a plan value whose ports become the node's | `Name: uses Target`; `uses` | *pilot*. Across files the target is an imported binding, under "Imported modules are typed objects whose type encapsulates" |
 | Port (input or outcome) | A type, and optionally a fixture | the entries of `inputs:` and `outcomes:`; `port`, `port_where` | *open*, question 1. The pilot holds the type as a `String`; a type value is recommended under "Types are values that constrain values" |
-| Fixture | A predicate over the port's value. On an outcome it is a promise; on an input, a requirement | `[ name ]` after a port; `fixture(name, holds)` | *changed*. The pilot stores the name beside the predicate; the predicate value suffices, its name read from its origin under "Every value keeps its origin" |
+| Fixture | A predicate over the port's value. On an outcome it is a promise; on an input, a requirement | `[ name ]` after a port; `fixture(name, holds)` | *open*, question 13. The pilot stores a name beside the predicate; whether the name is a field of the model or read from the predicate's origin is asked there |
 | Estimate | Up to three measures: duration, effort, money; each may be absent | `estimate:`; `est(d, e, m)` | *changed* by "Constructing a refined value claims its predicate": each field is typed, and a wrong measure is a refutation. The pilot types the fields `Any` and guards them with error values |
 | Budget | The same three measures, each an optional limit | `budget:`; `budget(d, e, m)` | *changed*, as the estimate |
 | Measures | A duration is the units language's `Duration`; effort (person-hours) and money (an amount and a currency) are the planning model's own records with their own arithmetic | quantity literals (§6); `person_hours(n)`, `money(n, currency)` | *pilot* for effort and money (question 12). Duration *changed*: it crosses a mapping, §8, question 10 |
@@ -152,7 +153,10 @@ value", a proposal is one catalog entry and nothing else: a leaf, a
 composite, a choice or a borrowed plan, as §2.9 of the chapter allows.
 A proposal written as text is read by the planning notation's node
 form (§6). A text the form cannot read is a parse failure of the
-proposal, refuted before any claim is evaluated.
+proposal, refuted before any claim is evaluated. An entry is data, but
+it can hold functions: a fixture is a predicate. A proposed entry holds
+no capability, and its predicates are evaluated with none; §13 says
+which open issue this rests on.
 
 **A refusal.** The tool evaluates the open plan's claim with the
 candidate in the remainder and keeps the candidate only if the claim
@@ -181,7 +185,7 @@ limits of the present implementation.
 |---|---|---|
 | Dead-end records built for the protocol (`Completion`, `Gap`, `PlanObligation` with ten string fields), computed when the open plan is built | The error value's payload is text, and host code reads the obligation by type name from the file's scope (`src/pcp.ts`, the lookups of `"OpenPlan"`) | The obligation is a claim in the phase's result, with the explanation its predicate answered, under "A predicate can explain its refusal" and "A tool reads a phase's result and adds no analysis of its own" |
 | A hash over rendered text (`plan_surface`: the name, declared inputs, outcomes and budget, then the gap) to refuse a proposal that edits the plan | A proposal arrives as text spliced into the source, so the protocol must detect an edit after the fact. The hash leaves the nodes out: a probe with the open plan's one node changed gives the same surface and the same hash | A proposal fills a cell and can change nothing else. Identity, where a record needs one, is the content hash of the value |
-| A splice into source text: the reply's lines appended under `catalog NAME:` by `splicePlanProposal`, the file re-read, the catalog's binding name recovered by the protocol because a grammar label hands a form the value or the matched text, never both | The kernel has no interface by which a value reaches a waiting cell | The proposal is supplied to the cell, and what waited on it is evaluated again, under "When information arrives, what waited on it is evaluated again". The catalog's name is in its expression's origin, under "Every value keeps its origin" |
+| A splice into source text: the reply's lines appended under `catalog NAME:` by `splicePlanProposal`, the file re-read, the catalog's binding name recovered by the protocol because a grammar label hands a form the value or the matched text, never both | The kernel has no interface by which a value reaches a waiting cell | The proposal is supplied to the cell, and what waited on it is evaluated again, under "When information arrives, what waited on it is evaluated again". The catalog is the value the open plan holds, so no name has to be recovered |
 
 The stored state and answer strings, and authorship kept in a
 transcript outside the result, are the same kind of workaround; §9
@@ -204,6 +208,14 @@ and designs neither.
   cell inside a list value whose shape is otherwise complete; that
   decision says a structure is always complete in shape and a value in
   one of its places may be missing, so the need is within it.
+
+A third need has no decision that owns it yet. Judging a candidate
+means evaluating a claim that may come out refuted, and reading that
+outcome as data: the refusal's explanation goes back to the proposer,
+and the search moves to the next candidate. "A refutation marks
+everything computed from it" says a refutation cannot be tested for.
+The loop and the search both need a trial evaluation whose outcome,
+a refutation included, is a value to the code that asked for it (§13).
 
 ## 5. Search
 
@@ -422,9 +434,8 @@ finding's message, the obligation, the surface and so its hash, and
 the ledger's lines. So the model must expose:
 
 - ports typed by type values, compared by identity (question 1);
-- nodes, failures and fixtures as values with origins, so that a
-  mapping refers to them and a rendering reads their names from the
-  origin;
+- nodes, failures and fixtures as values a mapping can refer to, each
+  with the name its renderings show (question 13);
 - findings and explanations that refer to these values, rendered by the
   library that owns each value;
 - the plan value itself as what a mapping relates, with no rendered
@@ -467,8 +478,8 @@ answer are strings computed when it is built. The record's strengths
 use "discharged" and "admitted". The walk over a plan's ports is a
 fold over 32 levels because three plainer forms did not load. Under
 the ruled decisions each of these is the result's content, written by
-evaluation: no tool looks a model up by name, the proposer is in the
-filled cell's origin, and the strength words are the four.
+evaluation: no tool looks a model up by name, who filled a cell is
+recorded with the filling, and the strength words are the four.
 
 ## 10. The fifteen held decisions
 
@@ -501,8 +512,8 @@ Ordered so that a question comes after the ones it depends on.
 
 1. **What a port's type is.** (a) A type value, compared by identity,
    possibly another model's. (b) A name, with a declared mapping from
-   names to types. (a) costs a rendering path that reads a value's name
-   from its origin, and findings that hold values (§8). (b) keeps names
+   names to types. (a) costs a rendering path that shows a type value by
+   its name, and findings that hold values (§8). (b) keeps names
    in the model and puts every relation to a type in a mapping that
    must itself be checked against the names; a typo checks clean until
    the mapping is. **Recommended: (a).** Questions 2, 10 and §8 depend
@@ -581,6 +592,19 @@ Ordered so that a question comes after the ones it depends on.
     the seven of SI. (b) is a units design question and changes a ruled
     worked language. **Recommended: (a)**, with a mapping to a
     generalised units model left open.
+13. **Where a model value's names live.** A plan, a node, a failure, a
+    fixture and a catalog each have a name that findings and
+    explanations use. (a) The name is a field of the value, as the
+    pilot has it. (b) The name is read from the value's origin, under
+    "Every value keeps its origin", and the field goes. (b) removes a
+    duplicated string and lets a notation name things implicitly. It
+    costs the model its independence from how a value was written: a
+    plan built by a program that read a file (use case 5) has no
+    binding to take a name from, and the adversarial review asks who
+    may read an origin and when a phase may erase one (§13).
+    **Recommended: (a)**: a name that a finding must show is data of
+    the model; an origin locates the text and is not relied on for
+    meaning.
 
 ## 12. Evidence and limits
 
@@ -622,3 +646,27 @@ built. The claims' strengths, the unknown and the obligation, the
 refusal under step budgets, the "Under the ruled decisions" column,
 the result of §9 and the recommendations rest on the ruled decisions
 alone.
+
+## 13. Open issues of the ruled decisions this specification rests on
+
+The review session ran an adversarial review of phase 1's decisions on
+2026-11-13 (its PR #199, unmerged at this writing): 31 issues, none
+ruled. This specification was drafted without it and checked against
+it afterwards. Six issues bear on it. Each is the kernel's or the
+inventory's to settle; the specification states what it needs and
+changes when the issue is ruled.
+
+| Issue of the review | Where this specification meets it | What the model needs |
+|---|---|---|
+| A refutation cannot be tested for, yet search, proposal loops and budgeted evaluation must | §4, the refusal; §5, a solver that rebinds a candidate and evaluates again | A trial evaluation whose outcome is data to the caller, a refutation included. Without it neither the loop nor design B of §5 can be written as an ordinary function |
+| An undeclared name is a refutation, and an unknown is an unbound symbol | §4 and §5: the unknowns here are declared, a cell for the catalog remainder and a stated set of options for a choice | Nothing new: no unknown of the planning model is an undeclared name. The specification does not depend on how the issue is ruled |
+| A proposal that is accepted runs later with the capabilities of the place it filled | §4, a proposal: a catalog entry can hold predicates | A value that fills an unknown holds no capability unless a claim says otherwise, which is the review's own candidate ruling |
+| Origins disclose data, cost memory, and a phase may need to erase them | §2, §8 and question 13: names and renderings | Names that findings show are fields of the model (question 13 (a)); an origin is used to locate text only |
+| A circular definition is decided; ordinary recursion never repeats a state | §3, the walks' termination; §7, the last row | The walks over a plan are ordinary recursion over a finite tree. The model needs that recursion decided by a decrease on a child list, and until then the termination claim stays assumed and named |
+| An effect waits for undecided claims that a run can never decide | §3, promises; question 9 | A promise is a claim about the value a step produces, never about the plan value. Printing or saving a checked plan consumes the plan, so an undecided promise does not hold it back. A phase that runs a plan would meet the issue in full, which is one reason question 8 leaves running out |
+
+Two more issues touch the result of §9 without changing it: the meaning
+of the strength words where a capability helped decide a claim, and
+identity across evaluations for the content hash of §4. Both are stated
+there in the ruled vocabulary and follow whatever the rulings make of
+it.
