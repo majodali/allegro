@@ -235,6 +235,19 @@ test("a retitled decision is followed in the decisions lists and the rulings, on
   assert.deepEqual(renameDecision(c, "No such title", "Beta").changed, []);
 });
 
+test("a case on a decision's former title passes and is counted; a title that is neither fails", () => {
+  const c = good();
+  Object.assign(c.cases[0], { class: "survives", decisions: ["Old alpha"], milestone: 3 });
+  Object.assign(c.cases[1], { class: "changes", ruling: "Old alpha", becomes: "x", decisions: ["Beta"], milestone: 3 });
+  const former = new Map([["Old alpha", "Alpha"]]);
+  const r = checkCorpus(source(), c, TITLES, former);
+  assert.deepEqual(r.findings, []);
+  assert.match(r.summary, / · 2 on a decision's former title \(--follow-renames\) — consistent$/);
+  assert.equal(check(c).findings.length, 2);
+  const followed = renameDecision(c, "Old alpha", "Alpha").corpus;
+  assert.doesNotMatch(checkCorpus(source(), followed, TITLES, former).summary, /former/);
+});
+
 test("the committed inventory is consistent with the present tree, by a fresh dry listing", () => {
   const r = checkRepository(ROOT);
   assert.deepEqual(r.findings, []);

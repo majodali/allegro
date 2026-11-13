@@ -385,6 +385,9 @@ policy is the gate ruled there.
   `next/<dir>/tsconfig.json` (`next/tools/typecheck.ts`), so
   `next/kernel/` is checked when it lands. The decision map's test no
   longer pins 231 rows: the counts follow the inventory, which may
-  gain a decision. `next/tools/corpus.ts --rename-decision` moves
-  every case from a retitled decision to its new title, so a retitle
-  is two commands: the map's `--sync --rename`, then this.
+  gain a decision. A retitle now passes the gate without either
+  stream editing the other's file: the map's `--sync --rename` records
+  the former title on the moved row, in a field `was`; the corpus
+  check accepts a case that cites a former title and counts it in its
+  summary; `next/tools/corpus.ts --follow-renames` then moves the
+  cases, in this stream's next chunk.

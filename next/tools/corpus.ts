@@ -32,6 +32,10 @@
 //                                           after decision-map.ts --sync
 //                                           --rename; it refuses a new title
 //                                           the map does not hold
+//   npx tsx next/tools/corpus.ts --follow-renames
+//                                           the same for every former title
+//                                           the map records (a row's `was`)
+//                                           that a case still cites
 //   npx tsx next/tools/corpus.ts --by-decision
 //                                           one line per decision of the map,
 //                                           in its order: its owner and the
@@ -72,7 +76,10 @@
 // check until --sync; the cases are in the stable order; class, ruling,
 // becomes, decisions and milestone obey the rules of docs/plans/
 // rebuild-acceptance.md §1 and §5 row Q2, against the titles of
-// next/decisions.json.
+// next/decisions.json. A case that cites a title the map records as a
+// decision's former one passes, and the summary counts it, so the kernel
+// stream can retitle a decision without editing the corpus; --follow-renames
+// then moves the cases.
 //
 // What it cannot catch. Whether a test body really tests what its name
 // says, or a `file:` or grammar2 test really compares the pins (the runner
@@ -369,7 +376,9 @@ export function initialCorpus(src: Source): Corpus {
 export interface CheckResult { findings: string[]; summary: string }
 
 /** Check the cases (parsed JSON, any shape) against the present tree's pins and tests and the decision titles. */
-export function checkCorpus(src: Source, corpus: unknown, decisionTitles: Set<string>): CheckResult {
+export function checkCorpus(src: Source, corpus: unknown, decisionTitles: Set<string>, former: Map<string, string> = new Map()): CheckResult {
+  const known = (t: string): boolean => decisionTitles.has(t) || former.has(t);
+  let onFormer = 0;
   const findings: string[] = [];
   const listed = corpus !== null && typeof corpus === "object" && Array.isArray((corpus as { cases?: unknown }).cases);
   const cases: unknown[] = listed ? (corpus as { cases: unknown[] }).cases : [];
@@ -416,11 +425,13 @@ export function checkCorpus(src: Source, corpus: unknown, decisionTitles: Set<st
     else findings.push(`${label}: class ${JSON.stringify(cls)} is not null, survives, changes or detail`);
     if (cls === "changes") {
       if (typeof r.ruling !== "string") findings.push(`${label}: class changes with no ruling`);
-      else if (!decisionTitles.has(r.ruling)) findings.push(`${label}: ruling "${r.ruling}" is no decision of ${DECISIONS_PATH}`);
+      else if (!known(r.ruling)) findings.push(`${label}: ruling "${r.ruling}" is no decision of ${DECISIONS_PATH}`);
       if (typeof r.becomes !== "string") findings.push(`${label}: class changes with no becomes (the new result, a string)`);
     }
     if (!Array.isArray(r.decisions) || r.decisions.some((d) => typeof d !== "string")) findings.push(`${label}: decisions is not a list of strings`);
-    else for (const d of r.decisions as string[]) if (!decisionTitles.has(d)) findings.push(`${label}: decision "${d}" is no decision of ${DECISIONS_PATH}`);
+    else for (const d of r.decisions as string[]) if (!known(d)) findings.push(`${label}: decision "${d}" is no decision of ${DECISIONS_PATH}`);
+    const cited = [...(Array.isArray(r.decisions) ? (r.decisions as unknown[]) : []), r.ruling];
+    if (cited.some((t) => typeof t === "string" && !decisionTitles.has(t) && former.has(t))) onFormer++;
     const ms = r.milestone;
     if (ms !== null && !(typeof ms === "number" && Number.isInteger(ms) && ms >= 1 && ms <= 9)) findings.push(`${label}: milestone ${JSON.stringify(ms)} is neither null nor 1 to 9`);
     if ((cls === "survives" || cls === "changes") && ms === null) findings.push(`${label}: class ${cls} with no milestone`);
@@ -436,7 +447,8 @@ export function checkCorpus(src: Source, corpus: unknown, decisionTitles: Set<st
   const verdict = findings.length === 0 ? "consistent" : `${findings.length} finding(s)`;
   const summary =
     `corpus: ${cases.length} cases · pins ${counts.pin} · tests ${counts.test} · classed ${classed} ` +
-    `(survives ${counts.survives}, changes ${counts.changes}, detail ${counts.detail}) · unclassed ${counts.unclassed} — ${verdict}`;
+    `(survives ${counts.survives}, changes ${counts.changes}, detail ${counts.detail}) · unclassed ${counts.unclassed}` +
+    `${onFormer > 0 ? ` · ${onFormer} on a decision's former title (--follow-renames)` : ""} — ${verdict}`;
   return { findings, summary };
 }
 
@@ -563,6 +575,14 @@ export function casesByDecision(decisions: { title: string; owner: string }[], c
   return [...rows.values()];
 }
 
+/** The former titles the decision map records (each row's `was`), each with the decision's title now. */
+export function formerTitles(root: string): Map<string, string> {
+  const map = JSON.parse(fs.readFileSync(path.join(root, DECISIONS_PATH), "utf-8")) as { rows: { title: string; was?: string[] }[] };
+  const out = new Map<string, string>();
+  for (const r of map.rows) for (const t of r.was ?? []) out.set(t, r.title);
+  return out;
+}
+
 function readJson(root: string, rel: string): { value: unknown; error: string | null } {
   const file = path.join(root, rel);
   if (!fs.existsSync(file)) return { value: null, error: `${rel} does not exist (generate it with --init)` };
@@ -597,7 +617,7 @@ export function checkRepository(root: string, listed: RegisteredTest[] | null | 
     const r = checkCorpus(src, { cases: [] }, new Set());
     return { findings: [...findings, cases.error, ...r.findings], summary: r.summary.replace(/— .*$/, `— ${findings.length + 1 + r.findings.length} finding(s)`) };
   }
-  const r = checkCorpus(src, cases.value, decisionTitles(root));
+  const r = checkCorpus(src, cases.value, decisionTitles(root), formerTitles(root));
   const all = [...findings, ...r.findings];
   return { findings: all, summary: r.summary.replace(/— (consistent|\d+ finding\(s\))$/, `— ${all.length === 0 ? "consistent" : `${all.length} finding(s)`}`) };
 }
@@ -628,6 +648,20 @@ function main(): void {
     if (r.changed.length === 0) { console.error(`no case lists or cites "${from}"`); process.exit(1); }
     fs.writeFileSync(casesFile, serializeCorpus(r.corpus));
     console.log(`${CASES_PATH}: ${r.changed.length} case(s) moved from "${from}" to "${to}"`);
+    return;
+  }
+
+  if (argv[0] === "--follow-renames") {
+    let corpus = JSON.parse(fs.readFileSync(casesFile, "utf-8")) as Corpus;
+    let moved = 0;
+    for (const [from, to] of formerTitles(root)) {
+      const r = renameDecision(corpus, from, to);
+      if (r.changed.length === 0) continue;
+      corpus = r.corpus; moved += r.changed.length;
+      console.log(`${r.changed.length} case(s) moved from "${from}" to "${to}"`);
+    }
+    if (moved > 0) fs.writeFileSync(casesFile, serializeCorpus(corpus));
+    console.log(`${CASES_PATH}: ${moved} case(s) moved`);
     return;
   }
 

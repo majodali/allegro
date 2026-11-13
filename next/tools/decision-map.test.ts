@@ -228,6 +228,10 @@ test("sync never guesses a rename: an orphan is kept and reported until --rename
   assert.deepEqual(moved.errors, []);
   assert.deepEqual(check(moved.map).findings, []);
   assert.deepEqual(moved.map.rows[1].cases, ["c2"]);
+  // The moved row records its former title, and keeps it through a later sync.
+  assert.deepEqual(moved.map.rows[1].was, [m.rows[1].title]);
+  assert.deepEqual(syncMap(derived, moved.map).map.rows[1].was, [m.rows[1].title]);
+  assert.match(serializeMap(moved.map), /"was":\[/);
   assert.match(syncMap(derived, m, [["No such row", "Beta"]]).errors[0], /0 rows titled/);
 });
 
