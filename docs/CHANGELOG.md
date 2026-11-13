@@ -1088,9 +1088,10 @@ not compared. It reports the cases due and passing per milestone. Its
 tests in `next/corpus/harness.test.ts` probe the comparison with stub
 runners that are wrong in known ways. `npm run harness:present` runs
 the present tree on its own pins: 586 of 589 surviving pins pass and
-no printed line differs; the 3 others belong to
+no printed line differs. The 3 others belong to
 `tests/proofs-proven-demo.alg`, which the file runner cannot parse
-without the extension the suite passes it.
+without the extension the suite passes it; the command names the
+program and counts its pins as not run.
 
 ### 2026-11 — The corpus's tests classed (B-196, chunk Q2 (the corpus inventoried and classed), part 3)
 

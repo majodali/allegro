@@ -18,6 +18,12 @@
 // milestone, then a summary line. It exits 1 on a failing survives pin or
 // a finding on a program.
 //
+// One program the calibration does not run. The suite runs
+// tests/proofs-proven-demo.alg with an extension the test passes; the file
+// runner has no flag for one. PRESENT_RUN_DIFFERS names the program and the
+// reason; the command prints it and counts its pins as not run. `--file`
+// with that program runs it all the same and shows the stop.
+//
 // A runner is the one thing the harness asks of an implementation: a
 // function from a program (its path relative to the repository root and
 // its text) to the lines it printed, in order, and how the run ended. The
@@ -307,6 +313,18 @@ export function presentTreeRunner(root: string, options: { timeoutMs?: number } 
   });
 }
 
+/**
+ * Programs the suite runs in a way the file runner cannot reproduce, each
+ * with the reason. The calibration does not run them: it names each and
+ * counts its pins as not run. The harness's tests hold that every program
+ * named here does stop under the present-tree runner, so an entry cannot
+ * outlive its reason.
+ */
+export const PRESENT_RUN_DIFFERS: Record<string, string> = {
+  "tests/proofs-proven-demo.alg":
+    "the suite passes it lib/proven.alg as an extension (src/test/proofs.ts); the program has no `use proven` and the file runner has no flag for an extension, so its run stops on a parse error",
+};
+
 // ── main ──────────────────────────────────────────────────────────────
 
 function usage(msg: string): never {
@@ -337,12 +355,15 @@ async function main(): Promise<void> {
     files = [only];
   }
   if (msArg !== undefined) files = files.filter((f) => byProgram.get(f)!.some((c) => c.milestone !== null && c.milestone <= upTo));
+  const skipped = only !== undefined ? [] : files.filter((f) => f in PRESENT_RUN_DIFFERS);
+  files = files.filter((f) => !skipped.includes(f));
 
   const bound = Math.max(1, Math.min(8, os.availableParallelism()));
   const started = Date.now();
   const compared = await comparePrograms(root, corpus, presentTreeRunner(root), files, bound);
   const report = buildReport(corpus, compared, upTo);
   for (const f of report.findings) console.log(f);
+  for (const f of skipped) console.log(`not run: ${f}: ${PRESENT_RUN_DIFFERS[f]}`);
   for (const r of formatRows(report)) console.log(r);
   console.log(`${formatSummary(report, "present tree")} · ${((Date.now() - started) / 1000).toFixed(1)} s, ${bound} at a time`);
   if (failed(report)) process.exit(1);

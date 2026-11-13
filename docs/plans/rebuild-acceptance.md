@@ -356,17 +356,20 @@ policy is the gate ruled there.
   due, the pins passing, failing and to review, the tests not yet
   realised, and the running total. The present tree's runner runs
   `src/index.ts` in a child process and imports nothing from `src/`.
-  `npm run harness:present` runs the 71 pinned programs, four at a
-  time, in about 25 seconds, and prints:
-  `harness: present tree · programs 71 run, 1 stopped · pins 613 (passing 586, failing 3 of which 3 with no line, to review 22 of which 22 unchanged, not compared 2, not run 0) · tests 1379 (due 1236, not yet realised 1236; detail 143) — 3 failing pin(s), 0 program finding(s)`.
-  No printed line differs from its pin. The command exits 1 on the 3.
+  `npm run harness:present` runs 70 of the 71 pinned programs, four at
+  a time, in about 25 seconds, and prints:
+  `harness: present tree · programs 70 run, 0 stopped · pins 613 (passing 586, failing 0 of which 0 with no line, to review 22 of which 22 unchanged, not compared 2, not run 3) · tests 1379 (due 1236, not yet realised 1236; detail 143) — no failing pin`.
+  No printed line differs from its pin.
   - **One program's command-line run differs from the suite's.**
     `tests/proofs-proven-demo.alg` declares `proven` clauses without
     `use proven`. The suite passes it `lib/proven.alg` as an
     extension; the file runner has no flag for that, so the run stops
     on a parse error and prints none of its 3 lines. With `use proven`
     added to a copy, the copy prints all 3. The program is the present
-    tree's, so the difference stays reported.
+    tree's and is not changed. The harness names it with the reason in
+    `PRESENT_RUN_DIFFERS`; the command prints that line and counts the
+    3 pins as not run. A test holds that every program named there does
+    stop under the present tree's runner.
   - **What part 2 needs.** The kernel's runner behind the same type,
     which needs the interface file, the saved-program data form, and
     a way for a pinned program in the surface notation to reach the
@@ -374,6 +377,4 @@ policy is the gate ruled there.
     tree names the case it realises, so the harness can count tests.
     A rule for a program that a ruling stops part-way or whose detail
     pins no longer print: the comparison by ordinal then reads every
-    later line against the wrong pin. A decision on the 3 pins above,
-    since the oracle's `npm run harness:present` stays red while they
-    fail.
+    later line against the wrong pin.

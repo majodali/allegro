@@ -12,7 +12,7 @@ import * as assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  compareProgram, buildReport, formatRows, formatSummary, failed, runAll, comparePrograms, presentTreeRunner, pinsByProgram,
+  compareProgram, buildReport, formatRows, formatSummary, failed, runAll, comparePrograms, presentTreeRunner, pinsByProgram, PRESENT_RUN_DIFFERS,
   type Runner, type RunResult, type Program,
 } from "./harness.js";
 import { CASES_PATH, type Corpus, type PinCase, type TestCase } from "../tools/corpus.js";
@@ -154,6 +154,8 @@ test("the present-tree runner runs programs as a user would; one that the suite 
   assert.equal(proven.end.kind, "stopped");
   assert.match((proven.end as { reason: string }).reason, /^Error in tests\/proofs-proven-demo\.alg: Parse error .*\(exit 1\)$/);
   assert.deepEqual(proven.verdicts.map((v) => v.outcome), ["fails", "fails", "fails"]);
+  // The calibration leaves out exactly the programs shown here to stop.
+  assert.deepEqual(Object.keys(PRESENT_RUN_DIFFERS), ["tests/proofs-proven-demo.alg"]);
 });
 
 test("the present-tree runner refuses a text that differs from the file on disk, and a path that is no file", async () => {
