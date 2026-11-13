@@ -1,8 +1,11 @@
 # The planning model and the loop over it — a model specification
 
-> **Status: draft**, written 2026-11-13 for the maintainer's ruling and
-> for the review session, which rules the 15 held planning decisions of
-> `docs/plans/book-pass-inventory.md` from it.
+> **Status: ruled 2026-11-13.** The maintainer took the recommended
+> option of each of the thirteen questions of §11 and ratified the term
+> catalog remainder, in a comment on PR #202: "All defaults accepted,
+> "catalog remainder" ratified." The 15 held planning decisions of
+> `docs/plans/book-pass-inventory.md` are the review session's to rule;
+> §10 is this specification's recommendation on each.
 >
 > **Reader.** The maintainer and the review session. The reader knows the
 > ruled decisions of the inventory, Parts I to VI; the program plan
@@ -20,9 +23,10 @@
 > remainder** is the cell at the end of an open plan's catalog, which
 > a proposal fills with one entry and a new remainder (§4, question 2).
 >
-> **Rulings needed** are numbered in §11. Where a section depends on
-> one, it says so and continues under the recommended option. §13
-> lists the open issues of the ruled decisions that it rests on.
+> **Rulings** are numbered in §11. Where a section depends on one, it
+> says so and continues under the recommended option, which is now the
+> ruling. §13 lists the open issues of the ruled decisions that it
+> rests on.
 
 ## 1. What the model is for
 
@@ -507,6 +511,10 @@ plan's choice or a workaround.
 | "Search beyond enumeration" | Whether to add branch and bound | *Fold* into "Feasible is decided; best says how strongly it holds" | A strategy is a library's choice; what it may claim is the ruled decision's |
 
 ## 11. Questions for the maintainer
+
+**Ruled 2026-11-13: the recommended option of every question below is
+taken.** The options and their costs stay as the record of what was
+weighed.
 
 Ordered so that a question comes after the ones it depends on.
 

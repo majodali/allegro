@@ -357,3 +357,11 @@ policy is the gate ruled there.
   phase 1 (PR #199) that the specification rests on. One term is new,
   the catalog remainder. The software system model's specification is
   the chunk's second part.
+  - **Ruled 2026-11-13.** The maintainer took the recommended option
+    of each of the 13 questions and ratified the term, in a comment on
+    PR #202: "All defaults accepted, "catalog remainder" ratified." A
+    port's type is a type value. An open plan's unknown is the catalog
+    remainder, and declaring the plan claims a feasible completion.
+    The search's bound comes from the residual of the plan with its
+    choices unknown. A model value's names live in a field of the
+    value. The 15 held planning decisions stay the review session's.
