@@ -1091,6 +1091,17 @@ chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
 
+### 2026-11 — The new tree's gate takes the kernel stream's files (B-196)
+
+B-196 (the rebuild's acceptance side). Three changes the kernel
+stream's first chunk asked of lane Q. `npm run typecheck:next` checks
+every `next/<dir>/tsconfig.json`, not `next/tools` alone. The decision
+map's test follows the inventory's count of decisions, so the
+inventory can gain one. A decision can be retitled without editing
+the corpus: the map's `--sync --rename` records the former title on
+the row, the corpus check accepts a case that still cites it, and
+`next/tools/corpus.ts --follow-renames` moves the cases afterwards.
+
 ### 2026-11 — The comparison harness on a stub kernel (B-196, chunk Q6 (the comparison harness), part 1)
 
 B-196 (the rebuild's acceptance side). `next/corpus/harness.ts` runs
