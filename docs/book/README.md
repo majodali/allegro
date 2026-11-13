@@ -118,4 +118,6 @@ Part V, Vivace) ·
 `../records/book-pass/dr6-part-6-building-and-running.md` (record: the
 decision review of Part VI, building and running programs) ·
 `../records/book-pass/phase-1-close.md` (record: what phase 1 of the book pass
-leaves).
+leaves) ·
+`../records/book-pass/adversarial-review.md` (record: an adversarial review of
+phase 1's decisions).

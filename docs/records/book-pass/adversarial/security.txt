@@ -1,0 +1,207 @@
+# Security review of the trust model, as designed
+
+Source read: `decisions-extract.md` only (216 decisions). Nothing else in the repository was read.
+Scope: attacks the design as stated permits, or gaps between two decisions. Trusted host code, the kernel, and "open" status are not reported as findings.
+
+Counts: 7 break a stated guarantee, 5 weaken one, 3 are hardening. Strongest first.
+
+---
+
+### S1. A notation's author decides what the victim's text means: it can erase claims and capture every authority the text names
+- Attacker and what they hold: the author of a library that offers notation (a units DSL, a query syntax). The victim's file asks for that notation with a grammar-changing form. The attacker is handed no capability.
+- Decisions involved: D88 (A text can change the grammar it is read in), D89 (Every production can be extended), D78 (Every notation stands for an expression), D90 (Grammars combine without regard to order), D150 (A body clause is a notation), D128 (Type annotations on parameters and returns), D133 (Nothing is a claim until someone makes it), D1 (Trust comes from the kernel, not the author), D5 (Meaning comes before notation).
+- Steps:
+  1. The library's grammar value, besides adding its literals, applies "replace" or "wrap" (D89: "Every production is open to them; none must be marked extensible") to the productions for `requires`, `ensures`, the `effects` clause, `: Type` annotations, `private(...)` or `export`.
+  2. The wrapped form maps what it matched to an expression of the attacker's choosing (D78: a form "maps what it matched to an expression"). Variant A: it yields the body with the clause dropped. Variant B: it yields `attacker.tap(<matched part>)`, where `attacker.tap` is a free name that "means what it meant where the form was defined".
+  3. The victim's text after the grammar change is read in the new grammar. The victim wrote `requires x > 0` and `effects pure`; the expression that results holds no such claim. Under D133 no claim was made, so nothing is refuted and nothing is listed as undecided.
+  4. In variant B the matched parts are the victim's own subexpressions. They are evaluated in the victim's scope and their values (capabilities, private keys, data) are passed to `attacker.tap` as ordinary arguments.
+- Result: the attacker removes the victim's claims without any refutation, and receives capabilities it was never handed. The reviewer of D1 "reads what was claimed and what was decided, not every line", and the claims the author typed are absent from that record.
+- The defence the design would cite, and whether it holds: D90, "Replacing or removing another grammar's form is explicit and names what it replaces". It does not hold. The explicitness is on the attacker's side; the victim consented only to "use this notation". "Wrap" is a separate operation in D89 and D90 does not mention it. D86 (ambiguity is a refutation) stops a silently added competing alternative, not a replace or wrap. D91 limits the reach to the block or text, which is exactly the victim's file. Nothing gives a grammar change a bound, such as "may only add productions" or "may not touch claim-bearing forms".
+- Severity: breaks a stated guarantee (D1, D43)
+- Confidence: high
+
+### S2. A function that takes an argument unevaluated can run any expression in its caller's context
+- Attacker and what they hold: a dependency written in Allegro, called by the victim with one argument. The victim's scope holds capabilities (D181, D185: held "by being evaluated in a scope that holds it") and private keys bound to names.
+- Decisions involved: D57 (A function may take an argument unevaluated), D56 (The environment is not a value), D40 (Transient reference symbols resolved by base name), D43 (A capability is granted, never acquired), D181 (Only the launcher sets the ceiling), D119 (A private member is one whose key not all code holds), D36 (Expressions are values, forming a DAG).
+- Steps:
+  1. The dependency exports `log(msg)` and declares `msg` as received unevaluated. Nothing at the call site shows this.
+  2. The victim calls `log("started")`. The callee receives the expression and "the context it was written in".
+  3. D57 lets the callee "hand it back to the kernel to be evaluated in that context, whole, in part or transformed". The callee builds a different expression, `http.post(u, files.read(p))` or just the symbol `account_key`, from transient symbols (D40: resolved "by base name against the enclosing scope"), and asks the kernel to evaluate it in the caller's context.
+  4. The kernel resolves those names in the caller's scope and returns the value, or performs the effect.
+- Result: the callee uses, and can extract as values, every capability and key the caller can name. It was handed none of them.
+- The defence the design would cite, and whether it holds: D57, the context is one "which the function cannot inspect", and D56, "A program reaches only what it can name". Neither holds. Evaluating a chosen symbol in the context is inspection one name at a time, and the callee may build any name. "Transformed" has no limit: the design lets the callee withhold capabilities from the argument, and gives the caller no way to withhold its scope from the callee. A fix needs either transformation limited to the names the original expression already uses, or the unevaluated parameter made visible and consented to at the call site.
+- Severity: breaks a stated guarantee (D43, D56, D119)
+- Confidence: high
+
+### S3. A module is evaluated once but is supplied its capabilities by "whoever loads it": the first loader decides for everyone
+- Attacker and what they hold: a dependency module B, handed no capability, in the same configuration as victim module A, which holds `files`. Both import a shared module M that declares it needs `files`.
+- Decisions involved: D69 (What the kernel requires of an extension), D185 (A module is a function of the capabilities it declares), D94 (A module is an extension that arrives as a file), D7 (Order of definition carries no meaning), D43 (A capability is granted, never acquired).
+- Steps, variant 1 (acquire): A imports M and supplies its `files`. D69: "An extension is evaluated once in a configuration, and everything that names it gets the same values." B names M and receives M's functions, which are closed over A's `files`. B calls `M.readAll(path)`.
+- Steps, variant 2 (intercept): B is evaluated first. It imports M and supplies, as `files`, a composed function it wrote that records its arguments and then fails or forwards. M is evaluated once, with B's fake. A later imports M and gets "the same values". A's data flows through B's function.
+- Result: variant 1 gives B the use of a capability nobody handed it. Variant 2 gives B a man-in-the-middle on A's use of M. Which one occurs depends on load order, which D7 says carries no meaning.
+- The defence the design would cite, and whether it holds: D185, the module's scope holds only the capabilities "supplied by whoever loads it". That is the cause, not a defence: D185 makes a module a function of its capabilities (one instance per supply), D69 makes it a singleton (one instance per configuration). The two cannot both hold once two importers supply different values. The design must choose: instantiate per supplied capability set, or let only the configuration supply a module's capabilities.
+- Severity: breaks a stated guarantee (D43)
+- Confidence: high for the contradiction; medium for which variant an implementation would expose
+
+### S4. A non-terminating function gets any claim about its result recorded as decided, by the kernel itself
+- Attacker and what they hold: the author of a dependency whose module summary the consumer reads, or the author of any lemma in scope of an obligation. No capability is needed.
+- Decisions involved: D59 (A recursive call is evaluated once for each state of knowledge), D133 (Nothing is a claim until someone makes it), D153 (Termination is a claim), D147 (A contract is a predicate that becomes knowledge, discharged by PE), D135 (A proof term is a proposal), D21 (Every result says how strongly it holds), D100 (Kinds are types, and Type is its own type).
+- Steps:
+  1. The attacker writes `lemma(x): Int & _ > 100 => lemma(x)`, or the same with return type `Proof` of any proposition P. It marks the function `partial`, or says nothing, so no termination claim is made (D153: "`partial` makes no claim").
+  2. The kernel evaluates the body. It meets a call to the same function with the same knowledge. D59: the call "stays in the residual" and "claims stated about the function's result are assumed at that inner call and decided on the body".
+  3. The body is that inner call, whose result is assumed to satisfy the claim. The return claim evaluates to true. The kernel records it as decided.
+  4. By D147 the decided `ensures` becomes knowledge on every `lemma(e)`. A later claim `lemma(e) > 100`, or `by lemma(e)` for a theorem stating P, is decided from that knowledge or from the declared result type.
+- Result: a false claim carries the strength "decided", written by an honest kernel. The module summary (D207) says "decided". A proposer who can reach such a function in scope (D208 lists "what is in scope") can discharge obligations with it.
+- The defence the design would cite, and whether it holds: D153, termination is a claim, and D21, a result resting on an assumed result is itself assumed. D153 does not hold as a defence, because under D133 the termination claim is optional and D59 does not require it. D21 would hold only if the inner "assumed" tainted the outcome, but then no recursive function's contract could ever be decided, which D59 plainly intends ("decided on the body"). The design needs one of: the outcome of a claim discharged through D59 rests on the function's termination claim and takes its strength, or it is reported as assumed when no termination claim is decided.
+- Severity: breaks a stated guarantee (D16, D21, D70 in effect)
+- Confidence: medium-high (D59 is marked "a design to prove"; as written it permits this)
+
+### S5. D42 protects the unforgeable value at the leaf, not the subexpression that applies it: narrowed capabilities and origin-based access rules are both bypassed
+- Attacker and what they hold: a module handed a narrowed capability (a function `readCfg(p)` whose body guards `p` and then applies `files.read`), or handed any exported function of a type's module that contains a member access.
+- Decisions involved: D42 (Reading an expression never yields authority), D36 (Expressions are values, forming a DAG), D38 (Functions are data: params plus body), D68 (The kernel's primitives are pure and few), D145 (A capability has named parts and narrowed forms), D120 (Who may use a member is a claim about where the access was written), D51 (Every value keeps its origin).
+- Steps:
+  1. The attacker reads the function's body (D38: "building, inspecting and specialising functions needs no reflection API"; D42: "any code can read an expression's structure").
+  2. It does not try to obtain the capability. It takes the application node `files.read(p)` as a whole. That node is an ordinary Expression value (D36).
+  3. It hands the node to the kernel primitive "evaluating an expression with names rebound" (D68), with `p` rebound to a path of its choice. Alternatively it builds a new function from the same params and the inner node only, dropping the guard (D38 specialisation).
+  4. For D120: the node `obj.secret` taken from the trusted module's accessor is evaluated with `obj` rebound to a victim object. The access's origin says it was written in the trusted module, so the origin claim holds.
+  5. If the function body is somehow hidden, D51 supplies the same node: every result of calling the narrowed capability carries its origin expression, and "reading a field is free to any code" (D127).
+- Result: the holder of a narrowed form exercises the wide capability, contradicting D145 ("holding a part or a narrowed form gives nothing wider"). Origin-based privacy is satisfied by replaying a privileged access on a different object.
+- The defence the design would cite, and whether it holds: D42, the reader "sees which one it is and cannot obtain it", so "a function that wraps a capability in a narrower one does not give the wider one away". It holds only against extracting the leaf as a first-class value. It does not address re-evaluating, re-binding or re-wrapping a subexpression that contains the leaf. To hold, the design must say that an expression containing an unforgeable value which the reader does not hold cannot be evaluated or rebuilt by that reader except as part of the whole function it came from.
+- Severity: breaks a stated guarantee (D145, D42's stated consequence, D120)
+- Confidence: medium-high (D42 is open; the gap is in its wording)
+
+### S6. Origins disclose private data: every value keeps the expression it came from and any code may read it
+- Attacker and what they hold: any code that receives a public result computed from a private member or a secret. For example a `Bool` from `account.canWithdraw(n)`, a digest, a count.
+- Decisions involved: D51 (Every value keeps its origin), D49 (An extension registers its own fields; the kernel has two), D127 (The `Y of x` component-access form), D119 (A private member is one whose key not all code holds), D42 (Reading an expression never yields authority), D159 (Every failure carries a legible counterexample), D134 (a refuted claim carries its counterexample).
+- Steps:
+  1. The type's module reads its private member with its key and returns `balance >= n`.
+  2. The result carries the origin: the expression, and through "each residual keeps a reference to the expression immediately before it" the whole chain back to "what was first written or constructed". The operands, including the private member's value, are plain data in that chain.
+  3. The recipient evaluates `origin of r` (D49: "any code can read it"; D127: "Reading a field is free to any code") and walks to the operand.
+- Result: the recipient reads the private member's value without the key. More generally no value can be declassified: a hash carries its preimage, a sanitised string carries the raw one.
+- The defence the design would cite, and whether it holds: D119, "no other code can [reach the member], by any name", and "printing a value omits what the printer cannot reach". Both are about reaching the member through the value. D42 hides unforgeable values inside expressions, not data. Origin is a kernel field with unrestricted read, and D51 says "no later evaluation discards it". The same leak reaches people through D159 and D134: a refutation "renders the violated constraint and the actual Int value", so a claim placed over a value derived from a secret prints the secret into a check report.
+- Severity: breaks a stated guarantee (confidentiality in D119)
+- Confidence: high
+
+### S7. A restored outcome is reported as "decided" although this kernel never evaluated it, and its justification (determinism) is false for outcomes that rested on a capability or on configuration
+- Attacker and what they hold: the author of a saved program, distributed as a dependency (D198). The consumer's configuration grants restore for that builder, which the wording suggests is the default ("a configuration may withhold it").
+- Decisions involved: D193 (A stored outcome is restored with its builder's name), D16 (The kernel trusts only what it has evaluated), D21 (Every result says how strongly it holds), D207 (A module's summary is the weakest strength among its claims), D175 (No interface call writes a bare claim outcome), D63 (The same program and the same information give the same result), D199 (Three things are trusted), D200 (A result names everything it rests on), D202 (A builder is identified by hash, then manifest, then signature).
+- Steps:
+  1. The builder produces a saved program in which claim C (false, or never evaluated) is recorded as decided. The key is "computed by the kernel from the claim and what it rests on", but what C rests on is itself recorded by the builder; the loading kernel cannot know it without deciding C again.
+  2. The consumer loads it. The outcome is restored and stamped with the builder's name.
+  3. The vocabulary has four strengths (D21, D138). A restored outcome is none of "sampled", "assumed" or "undecided", so it is "decided" with a name beside it. D207 shows one word for the module: "decided".
+  4. Second route, no dishonesty needed: at build time C was "decided with the help of a capability" (D16), for example a request or a file read, or it used configuration information (D177). D193 argues "because evaluation is deterministic, a stored outcome is what the loading kernel would compute". That is untrue for these outcomes; the loading kernel may have no such capability, or one that answers differently.
+- Result: a claim outcome forged by the builder, or stale, is laundered into the top strength. Everything computed from it inherits "decided". D16 says "a result the kernel did not evaluate itself is never reported as decided".
+- The defence the design would cite, and whether it holds: the stamp ("nothing removes the stamp"), D200 (results name builders), and policies (D201). They hold only for a consumer who writes a policy over builders and reads past the summary word. They do not repair the contradiction between D193 and D16. The restore grant is also "narrowed to one builder" and not to what that builder may attest: a builder accepted for its own library can stamp outcomes on any claim its saved program can construct, including claims about values of other extensions it names by hash. A fifth strength word ("restored"), or mapping restored to "assumed", plus refusing restore for outcomes that name a capability, would close it.
+- Severity: breaks a stated guarantee (D16)
+- Confidence: high for the D16/D193 conflict; medium for the default grant
+
+### S8. Wrapping an oracle in a capability turns "assumed" into "decided"
+- Attacker and what they hold: a program or library author who holds one ordinary capability, such as the HTTP capability the shipped launchers supply (D213).
+- Decisions involved: D16 (The kernel trusts only what it has evaluated), D19 (Host code reaches a program only as primitive functions), D21 (Every result says how strongly it holds), D157 (Equality, coercion and invariant predicates hold no capability and terminate), D136 (Discharge mechanisms without search), D213 (The terminal and the browser ship output, timers and HTTP).
+- Steps:
+  1. D16 gives two rules: "an answer from an outside solver … is reported as assumed", and "a claim decided with the help of a capability is decided, and names the capability".
+  2. The attacker defines a refinement `Safe = Blob & (http.get(oracle_url, _) == "ok")`, or an `ensures`, `requires` or `verify` with the same shape. The oracle is a server the attacker controls, or any outside solver.
+  3. The kernel evaluates the claim in full. The capability returns data, the comparison is true. The outcome is "decided", naming `http`.
+- Result: a statement whose truth depends on an untrusted outside answer carries the strongest strength. The two rules of D16 describe the same mechanism and give different strengths. The outcome is also not reproducible, which feeds S7.
+- The defence the design would cite, and whether it holds: the result "names the capability", so a policy (D201) can reject results that rest on `http`. D19 adds that "a claim about what a primitive returns is either checked when the data arrives or reported as assumed". The naming is real but the word is still "decided", against D21's "no keyword, grade or report uses a stronger word than the result earned". D157 shows the authors saw the problem and closed it for three predicate kinds only (equality, coercion, invariant). Contracts, theorems and non-invariant refinement predicates are open.
+- Severity: weakens a stated guarantee (D21)
+- Confidence: medium-high
+
+### S9. A low-priority configuration source selects the parser, the loader, the kernel and the accepted keys; the design records this and does not prevent it
+- Attacker and what they hold: someone who controls one configuration source: a project file in a repository the victim checks, or an environment variable on a build machine.
+- Decisions involved: D177 (Configuration is all the information that determines an execution), D178 (Configuration sources have a priority, and a result says which supplied each value), D179 (A full configuration is a model, evaluated in a first phase), D181 (Only the launcher sets the ceiling), D186 (Loading is three capabilities of rising strength), D201 (A policy is a claim over what a result rests on), D202 (A builder is identified by hash, then manifest, then signature), D76 (No parser is privileged), D199 (Three things are trusted), D203 (One reference kernel is the root of trust).
+- Steps:
+  1. D177 puts in configuration: "which kernel to use", "which implementation each capability maps to", "the parser engine and the module loader". D202 puts the accepted signing keys there. D186's pinned hash list for host code is configuration too.
+  2. D178: sources are read in order and "a value missing from one source is taken from the next". The attacker's source supplies any value the others leave unset: a parser engine written in Allegro, a loader, an added accepted key, a capability-to-implementation mapping, the hash list.
+  3. The victim runs `allegro check` on the project.
+- Result, by value supplied: a parser engine decides what expression every text denotes (same power as S1, for every file). A loader decides which file a module name denotes. An accepted key makes the attacker a builder whose restored outcomes are honoured (S7). A capability mapping or hash list is host code. The claim "no host code is loaded after startup" (D186) still passes for the first three, because parser and loader are Allegro code.
+- The defence the design would cite, and whether it holds: D178 ("the result records which source supplied each value"), D201 ("a policy can only add requirements … never looser") and D181. Recording is after the fact; the check has already run. D201's conjunction covers policy claims, not the non-policy values above, and the policy profile in force is itself a configuration value. D181 says only the launcher sets the ceiling, but the launcher computes the ceiling from these sources. D199 lists three trusted things; parser engine, module loader and export mapping (D194, D203: a derived kernel "is trusted as an export mapping is") are trusted in practice and are selectable by configuration. The design needs a rule for which sources may set which keys, stated as strongly as D201 is for policies.
+- Severity: weakens a stated guarantee (D199, D181)
+- Confidence: medium (D177 leaves the split "open on purpose"; the priority direction in D178 is not stated)
+
+### S10. A proposer's accepted value becomes code in the obligation's scope and runs later with that scope's capabilities
+- Attacker and what they hold: a proposer (a person, an agent or a tool) answering an obligation whose missing value is a function or a structure holding one: a catalog entry, a plan step, a strategy in a model (D165).
+- Decisions involved: D210 (A proposer answers with only the missing value), D165 (Solving is proposing a value for an unknown, and the kernel checks it), D208 (Open obligations are listed for any proposer), D146 (A bound on capabilities is written in an `effects` clause or a type slot), D133 (Nothing is a claim until someone makes it), D181 (Only the launcher sets the ceiling), D188 (The platform ships three phases), D199 (Three things are trusted).
+- Steps:
+  1. The obligation waits for a value of type `Function[Order, Price]`. The model states claims about the price. It states no bound on capabilities; D146: "a function-typed parameter with no bound makes no claim".
+  2. The proposer answers `o => (http.post(u, o); honestPrice(o))`, using names the obligation listing told it are in scope.
+  3. The tool places it and has the claims evaluated in the check phase. Check has "no capability to act" (D188), so the `http.post` call stays residual (D214: "it does not fail"). The stated claims are decided. The proposal is kept.
+  4. The run phase supplies capabilities. The placed text sits in a scope that holds `http` (D181: handed "by being evaluated in a scope that holds it"). The effect fires.
+- Result: a party the design says "is never trusted" (D199) has its code run with the authority of the place where the gap was. The claim record shows every stated claim decided.
+- The defence the design would cite, and whether it holds: D165, "none needs to be trusted, because the candidate is evaluated", and D44, the bound on capabilities is a claim. Evaluation checks only the claims someone made (D133). The design has no default that a proposed value holds no capability, the way D157 imposes one on invariant predicates. Such a default for proposals, or for every value that fills an unknown, would close it.
+- Severity: weakens a stated guarantee (D199, D43)
+- Confidence: medium-high
+
+### S11. The data form of a saved program is "confined to the kernel's interface", and that interface is the launcher's
+- Attacker and what they hold: the author of a saved program in data form, loaded through the middle loading capability, which the design treats as safer than host code.
+- Decisions involved: D191 (A saved program is a recorded sequence of interface calls), D174 (What the kernel's interface offers), D186 (Loading is three capabilities of rising strength), D61 (A missing value is a cell that is filled once), D176 (Limits are step budgets), D175 (No interface call writes a bare claim outcome), D182 (Startup, step by step).
+- Steps:
+  1. D191: the data form "is a record of calls on the kernel's interface, and can do nothing else". D174 lists the calls: construct values, including primitive and composed functions; "bind a symbol to a value in a scope"; create a scope; evaluate; "fill a cell when a value arrives"; "set limits".
+  2. The saved program includes a fill-cell call on a cell that stands for a capability or an input (D61: "a capability a phase is not given, and an input not yet supplied, are cells too"), filling it with a composed function or datum of its own. Cells are "filled exactly once and never changed", so the launcher's later, real delivery loses.
+  3. Or it includes a set-limits call with a small budget, so later claims hit the limit and are "left undecided, not refuted" (D74).
+  4. Or it binds a name in a scope it can address, ahead of the program that will resolve that name by base name.
+- Result: a party given only "load data" pre-empts the launcher on capabilities and inputs, or weakens the checking of code evaluated after it. A fake standing in a capability's cell also makes later outcomes read "decided with the help of capability K".
+- The defence the design would cite, and whether it holds: D175 blocks bare outcome writes and extension-field writes. D192 names primitives by hash. D7 makes a conflicting binding an error. These cover three of the calls. Nothing says which interface calls a replayed record may contain, which scopes and cells it may address, or that cell filling and limit setting are reserved to the launcher. The record needs its own, smaller interface: construct and bind inside a fresh scope sharing nothing, and nothing else.
+- Severity: weakens a stated guarantee (D186's ordering of the three loaders)
+- Confidence: medium
+
+### S12. Module names are an ambient namespace, and a module with no export list hands out its keys and its grants
+- Attacker and what they hold: a dependency handed no capability, in a configuration that also holds an "open" module (no `export`), or a capability's definition module.
+- Decisions involved: D121 (Export marks the binding, and a module with no exports is open), D94 (A module is an extension that arrives as a file), D69 (What the kernel requires of an extension), D119 (A private member is one whose key not all code holds), D184 (A capability is a named set of effectful primitives), D186 (Loading is three capabilities of rising strength), D43 (A capability is granted, never acquired), D22 (From experiment to proof without rewriting).
+- Steps:
+  1. A victim module defines a type with a private member. Its key is "made where the type is defined" (D119), so it is a binding of that module. The module also binds `read = files.read` for convenience. It has no `export` line, as D22 encourages for early code.
+  2. D121: "A module that declares no exports hands out everything."
+  3. The attacker module names the victim module. D94: "the values are handed to it". By whom is not said; importing is by name and needs no capability, although D186 calls loading a module from text a capability.
+  4. The attacker reads the key binding and the `read` binding off the module object.
+  5. Variant: D184 says a capability "is defined once, in Allegro, by its name and its parts, so that a bound on capabilities can name it". If naming that definition yields the value the launcher filled in (D61, D69 "everything that names it gets the same values"), any module acquires the capability by importing its definition.
+- Result: private keys and capabilities are acquired by naming a module. D41 says "nothing is granted by name".
+- The defence the design would cite, and whether it holds: D121, "what it does not hand out cannot be reached", and D185, a module's scope holds only its declared capabilities. D121 fails open: the safe behaviour needs an action the author has not yet taken. D185 limits what a module starts with, not what it can import. The design needs fail-closed handling for bindings that hold unforgeable values (never exported implicitly), and a statement of who authorises an import.
+- Severity: weakens a stated guarantee (D41, D119)
+- Confidence: medium (the variant is low: the relation between a capability's definition and its granted value is not stated)
+
+### S13. Limits and refutations give untrusted code control over what gets decided and which effects happen
+- Attacker and what they hold: a dependency, a proposer, or a party that supplies run-time data. No capability.
+- Decisions involved: D74 (Evaluation stops early for two reasons only), D176 (Limits are step budgets), D13 (Claims are evaluated like everything else), D14 (An effect consumes only values whose claims are decided), D50 (A field's rule is a pure, bounded function), D71 (A refutation marks everything computed from it), D183 (One kernel serves many invocations), D39 (Expressions memoize per evaluation context), D35 (Symbols interned by FQN).
+- Steps:
+  1. Refutation avoided: the budget is deterministic (D176), so the attacker pads a false claim until it costs one step more than the budget. D74: it is "left undecided, not refuted". A phase that states nothing it "must leave decided" proceeds.
+  2. Budget theft: an extension registers a field whose rule is non-recursive but large (D50 bounds termination, not cost). The rule runs on every application in the consumer's program. If rule steps count against the caller's budget, the consumer's own claims run out and become undecided; if they do not count, the rule is an unmetered sink.
+  3. Effect truncation: D14 says "after a phase has refuted a claim, it performs no further effect". A dependency called between a debit and a credit, or before an audit write, makes a residual claim fail on chosen run-time data (`Positive(n - k)`). The earlier effects have happened; the later ones never do.
+  4. Shared kernel: D183 runs many invocations in one kernel. Interned symbols (D35) and memo tables shared by clones (D39) persist across them, so one invocation can exhaust memory for the others; D176 budgets steps only.
+- Result: a false claim that is never refuted, a consumer whose claims silently become undecided, an effect sequence cut at a point the attacker picks, and cross-invocation exhaustion.
+- The defence the design would cite, and whether it holds: undecided is visible (D207 shows it) and a phase or policy can require decided (D189, D201). That holds for step 1 when such a requirement is stated. D14 does not say what happens when an undecided claim meets an effect and its evaluation hits the limit again. Steps 2 to 4 have no stated defence: no decision attributes budget to the code that spends it, bounds memory, or relates effect order to refutation.
+- Severity: hardening
+- Confidence: medium
+
+### S14. Parsing evaluates, and the loader reads files chosen by the text: "check" is not inert
+- Attacker and what they hold: the author of a text that the victim only checks or opens: a pull request checked in CI, a file opened in a tool. The check phase grants "no capability to act".
+- Decisions involved: D88 (A text can change the grammar it is read in), D94 (A module is an extension that arrives as a file), D95 (The loader reaches files through a capability), D87 (Parse failure reporting and recovery), D185 (A module is a function of the capabilities it declares), D188 (The platform ships three phases), D7 (Order of definition carries no meaning), D205 (A tool reads a phase's result).
+- Steps:
+  1. The text's first form is a grammar change. D88: "the parser evaluates it at once". Its expression names a module, so the loader loads and evaluates that module, in the middle of the parse.
+  2. This evaluation happens before the rest of the text exists as an expression. The module's own capability declaration (D185), its `effects` bounds and any project-wide claim over it are not yet known. D7's "a conflict is reported before either is used" cannot be met either.
+  3. The loader holds file reading (D95) and uses it on names the text chose. D95 states a search order (project library directory, then the platform's) and no confinement of the name.
+  4. The text imports a path that is not Allegro. D87: the failed parse reports "the farthest point reached, with what was expected and what was found". The report goes to the check output.
+- Result: a party whose text is only checked causes file reads of its choosing and gets fragments of those files into a report it can read (CI logs of a contributed change). Every tool that parses must evaluate, so a tool that "adds no analysis of its own" (D205) still runs untrusted code under whatever budget it set.
+- The defence the design would cite, and whether it holds: D188, check has no capability to act, and D95, the loader "acquires nothing". The loader is the deputy: it holds a real capability in every phase and spends it on the text's request. The defence would hold with two additions that are not stated: a module name can never denote a file outside the two library roots, and a parse failure in a file the requesting text could not read does not quote that file.
+- Severity: hardening
+- Confidence: medium-low (path confinement is likely intended; it is not stated)
+
+### S15. "No operation may disturb a field it does not know about" against "a rule cannot invent the mark on a new value"
+- Attacker and what they hold: a dependency handed a value that carries an owner-written mark: a refined record type (`Account & balance >= 0`), accumulated knowledge, or a third-party extension's "validated" field.
+- Decisions involved: D47 (Metadata fields are independent), D52 (Trust in a value needs no seal), D50 (A field's rule is a pure, bounded function), D53 (Metadata supplied at construction, one attachment operation), D68 (The kernel's primitives are pure and few), D116 (Invariants are refinements), D148 (What is known about a value travels with the value).
+- Steps:
+  1. The attacker applies a kernel structure primitive (D68: "building and reading structures") or its own function to the marked value, producing a structure with one entry changed.
+  2. The mark on the result is whatever the field's rule computes from "the field's values on the function applied and on its arguments" (D50). The rule "sees nothing else": it cannot look at the new data, so it cannot re-check the predicate.
+  3. If the rule or the primitive preserves the field, as D47 demands of an operation that does not know it, and as `carryMeta` does (D53: "moves metadata onto a derived value"), the new data carries the old type, invariant and knowledge.
+- Result: a value that claims an invariant its data does not satisfy, with no failed claim on the record. Later claims of the same property are "decided by what is known" (D147).
+- The defence the design would cite, and whether it holds: D52, "the field's rule cannot invent the mark on a new value". The rule here invents nothing; it carries. D52's three reasons cover fresh values, not derived ones. Rules are supplied by extensions, so each extension must get this right for every kernel primitive, and D47 pushes in the unsafe direction. The safe reading (a kernel primitive that builds a new datum drops every field whose rule does not explicitly keep it) contradicts D47's wording and should be stated.
+- Severity: hardening
+- Confidence: low-medium (it depends on which of D47 and D52 wins for derived values)
+
+---
+
+## Considered and not reported
+
+- The exception field with "a writer anyone may use" (D73, D105): I found no way to turn the open writer into authority or a forged outcome. One open question remains: D14 does not say whether a value carrying an unhandled exception may reach an effect.
+- Field-name squatting (D49, "a second registration is a conflict"): gives denial of service at most, if field identity is by fully-qualified name (D30). The design does not say which identity a field has.
+- Metadata on an interned symbol "warns rather than errors" (D35): a possible cross-invocation channel under D183. Too dependent on implementation to state as a design attack.
+- Knowledge losing the strength of the claim that produced it (D147, D148, D50): plausibly covered if the kernel's outcome field propagates the weakest strength to everything computed from a value. The design does not state that rule for strengths as it does for refutations (D71).
