@@ -236,3 +236,19 @@ policy is the gate ruled there.
   what its name says, a test registered only inside another test's
   body, a pin compared by some runner other than the two it knows by
   their tests' names, or whether a class or a ruling is right.
+- **2026-11-13 — Q4, part 1 drafted: the planning model specified.**
+  `next/models/specs/planning.md`, for the maintainer's ruling: five
+  use cases; the model's values, each marked as taken from the pilot,
+  changed by a named ruled decision, or open; its claims with who
+  makes each and its strength; an open plan as a model with an
+  unknown, the catalog remainder; search under "Feasible is decided;
+  best says how strongly it holds", with the two designs for the bound
+  set side by side; the notation, each form with the expression it
+  stands for; every failure the pilot reports and what the ruled
+  decisions make it; the mappings; what a phase's result must hold;
+  a recommendation on each of the 15 held planning decisions; and 13
+  questions, each with options and a recommendation. Its last section
+  states the six issues of the review session's adversarial review of
+  phase 1 (PR #199) that the specification rests on. One term is new,
+  the catalog remainder. The software system model's specification is
+  the chunk's second part.
