@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   pinsOf, pinnedPrograms, deriveSource, initialCorpus, checkCorpus, compareRegistered, syncCorpus,
-  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository, applyOverlay, casesByDecision,
+  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository, applyOverlay, casesByDecision, renameDecision,
   type Corpus, type RegisteredTest, type RegisteredList, type Case,
 } from "./corpus.js";
 
@@ -218,6 +218,34 @@ test("the cases by decision: every listing counted once under its class, in the 
     { title: "Beta", owner: "Q", survives: [a.id], changes: [], detail: [] },
     { title: "Delta", owner: "none", survives: [], changes: [], detail: [] },
   ]);
+});
+
+test("a retitled decision is followed in the decisions lists and the rulings, once per case, and nowhere else", () => {
+  const c = good();
+  const [a, b, d] = [c.cases[0], c.cases[1], c.cases[2]];
+  Object.assign(a, { class: "survives", decisions: ["Alpha", "Beta"], milestone: 3 });
+  Object.assign(b, { class: "changes", ruling: "Alpha", becomes: "x", decisions: ["Beta"], milestone: 3 });
+  Object.assign(d, { class: "survives", decisions: ["Beta"], milestone: 3 });
+  const r = renameDecision(c, "Alpha", "Beta");
+  assert.deepEqual(r.changed, [a.id, b.id]);
+  assert.deepEqual(r.corpus.cases[0].decisions, ["Beta"]);
+  assert.equal(r.corpus.cases[1].ruling, "Beta");
+  assert.deepEqual(r.corpus.cases[2], d);
+  assert.deepEqual(check(r.corpus).findings, []);
+  assert.deepEqual(renameDecision(c, "No such title", "Beta").changed, []);
+});
+
+test("a case on a decision's former title passes and is counted; a title that is neither fails", () => {
+  const c = good();
+  Object.assign(c.cases[0], { class: "survives", decisions: ["Old alpha"], milestone: 3 });
+  Object.assign(c.cases[1], { class: "changes", ruling: "Old alpha", becomes: "x", decisions: ["Beta"], milestone: 3 });
+  const former = new Map([["Old alpha", "Alpha"]]);
+  const r = checkCorpus(source(), c, TITLES, former);
+  assert.deepEqual(r.findings, []);
+  assert.match(r.summary, / · 2 on a decision's former title \(--follow-renames\) — consistent$/);
+  assert.equal(check(c).findings.length, 2);
+  const followed = renameDecision(c, "Old alpha", "Alpha").corpus;
+  assert.doesNotMatch(checkCorpus(source(), followed, TITLES, former).summary, /former/);
 });
 
 test("the committed inventory is consistent with the present tree, by a fresh dry listing", () => {
