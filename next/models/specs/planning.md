@@ -650,8 +650,8 @@ alone.
 ## 13. Open issues of the ruled decisions this specification rests on
 
 The review session ran an adversarial review of phase 1's decisions on
-2026-11-13 (its PR #199, unmerged at this writing): 31 issues, none
-ruled. This specification was drafted without it and checked against
+2026-11-13 (`docs/records/book-pass/adversarial-review.md`): 31
+issues, none ruled. This specification was drafted without it and checked against
 it afterwards. Six issues bear on it. Each is the kernel's or the
 inventory's to settle; the specification states what it needs and
 changes when the issue is ruled.
