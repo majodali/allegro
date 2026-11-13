@@ -78,7 +78,8 @@ undecided claims, the five Quantity laws, and prints quantities. If the
 rule holds an effect back for a claim that a run can never decide, the
 scenes of rungs 2, 3 and 4 print nothing. If it covers only the claims
 a concrete value decides, they print as they do today. The review
-session's adversarial review of phase 1 raises the same point (its PR
-#199, unmerged at this writing). Each scenario's steps say "the run
+session's adversarial review of phase 1 raises the same point
+(`docs/records/book-pass/adversarial-review.md`, its issue on effects
+that wait for undecided claims). Each scenario's steps say "the run
 prints" on the second reading; a ruling for the first changes every
 such step.
