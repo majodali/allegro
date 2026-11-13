@@ -1026,6 +1026,26 @@ re-proposes C111 as C171 and C172 (ask A3).
 Work outside any stream: per-chunk gated lanes and one-off chunks.
 Entries newest first, directly below this line.
 
+### 2026-11 — Allow rules for the sessions' routine tool calls
+
+`.claude/settings.json` is new: a `permissions.allow` list read by
+every Claude Code session on this repository, so that a session no
+longer stops for the maintainer's approval on its routine calls. The
+list was built from a count of the calls in 71 session transcripts. It
+holds the GitHub pull request calls (read, list, create, update,
+comment, merge, job logs), the PR subscription and check-in calls, the
+board's publish, the gate's commands in their exact forms (`npm test`,
+`npm run test:shards`, the lints, `bash scripts/typecheck.sh`, the
+`npx tsx scripts/…` checks, `npx tsx src/index.ts`), and the git
+commands a chunk needs (fetch, add, commit, push of a new branch,
+merge, checkout, worktree). Left out on purpose, so each still asks:
+interpreters run on inline code (`python3 -`, `node -e`), `git reset`,
+`git stash`, `git rebase`, `git filter-branch`, `rm`, `cp`, and the
+calls that change or delete a scheduled task, since those reach every
+scheduled task on the account. Merging by an agent stays governed by
+D-2 (merge-on-green streams) of `docs/classification.md`; the rule
+only removes the prompt.
+
 ### 2026-11 — Rung 3 on the site; the web bundle loads in a browser and the registry is in the gate (B-151 E2, B-093 slice 2, B-176 items 1 and 2)
 
 B-176 (the host chapter's findings), items 1 and 2: line 23 of
