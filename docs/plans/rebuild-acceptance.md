@@ -236,6 +236,43 @@ policy is the gate ruled there.
   what its name says, a test registered only inside another test's
   body, a pin compared by some runner other than the two it knows by
   their tests' names, or whether a class or a ruling is right.
+- **2026-11-13 — Q2, part 2 landed: the pins classed.** Every pin
+  [case](#def-case) has its [class](#def-class), the decisions it
+  tests and its milestone. The check prints:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 613 (survives 589, changes 22, detail 2) · unclassed 1379 — consistent`.
+  By milestone: 31 at milestone 3, 170 at 4, 133 at 5, 82 at 6, 195 at
+  7, none at 8. `next/tools/corpus.ts` gains `--apply`, which classes
+  cases from an overlay file and refuses an id that is no case.
+  - **The 22 that change, by ruling.** Nine by "Constructing a refined
+    value claims its predicate": a failed construction read as an
+    error value becomes a refutation. Six by "The standard language's
+    handled failure is an exception": the printed form of an error
+    value. Five by "Four strengths, one vocabulary". One each by "Every
+    value keeps its origin" and "An extension registers its own fields;
+    the kernel has two".
+  - **The 2 that are detail** print through `observe`, which phase 1
+    removed.
+  - **151 surviving pins carry a note**, since the default class is
+    survives where no ruling settles a line. The largest groups: 25
+    pins print a plain value in a program that a ruling refutes
+    elsewhere; 25 read a library's error value whose replacement the
+    scenarios leave open; 13 read the message of a program's own error
+    value, where the line stays and the program's source changes; 16
+    turn on whether `use` stays one form for bindings and notation.
+  - **277 pins rest on one open question**: all of milestones 6 and 7
+    print values in programs that hold undecided claims. They are
+    classed on the reading that such a run prints (the scenarios' shared
+    question).
+  - **The planning pins cite held decisions**, 195 of them. A held
+    title that the review session restates is moved by the decision
+    map's `--sync --rename`, and the corpus check then names every case
+    to follow.
+  - **What the 1,379 tests need that the pins did not**: rules for tool
+    output and for pinned halt messages, a rule for a test of a held
+    finding, a wide detail rule for host internals and lints, and
+    milestones 1 and 2. The line between milestones 3 and 4 was drawn
+    at "the untyped part"; every test program is in the surface
+    notation, so the line is by content, not by notation.
 - **2026-11-13 — Q3 drafted: the scenarios.** Eleven files under
   `next/corpus/scenarios/` and an index, for the maintainer's ruling:
   one [scenario](#def-scenario) per scene, each with who acts and why,
