@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-13 — An adversarial review of phase 1's decisions.** Four
+  independent reviewers attacked the 216 ruled decisions of
+  `docs/plans/book-pass-inventory.md` for consistency, feasibility and
+  security, and one read them as a newcomer. The review session
+  checked each finding: 31 issues, none ruled, in
+  `docs/records/book-pass/adversarial-review.md`, with the reviewers'
+  reports beside it. The decisions are unchanged.
 - **2026-11-13 — Phase 1 of the book pass closed.** The decision
   review has ruled every part of `docs/plans/book-pass-inventory.md`:
   231 decisions in 38 chapters, with the planning pilot's 15 entries
