@@ -24,6 +24,14 @@
 //                                           from case id to class, ruling,
 //                                           becomes, decisions, milestone and
 //                                           an optional note; run the check after
+//   npx tsx next/tools/corpus.ts --rename-decision "<old>" "<new>"
+//                                           follow a decision the inventory
+//                                           retitled: every case that lists
+//                                           the old title, or cites it as its
+//                                           ruling, takes the new one. Run it
+//                                           after decision-map.ts --sync
+//                                           --rename; it refuses a new title
+//                                           the map does not hold
 //   npx tsx next/tools/corpus.ts --by-decision
 //                                           one line per decision of the map,
 //                                           in its order: its owner and the
@@ -518,6 +526,26 @@ export function decisionTitles(root: string): Set<string> {
   return new Set(map.rows.map((r) => r.title));
 }
 
+/**
+ * Follow a retitled decision: every case that lists `from` among its
+ * decisions, or cites it as its ruling, takes `to`. Returns the ids of the
+ * cases changed. A case that already lists `to` beside `from` keeps one.
+ */
+export function renameDecision(corpus: Corpus, from: string, to: string): { corpus: Corpus; changed: string[] } {
+  const changed: string[] = [];
+  const cases = corpus.cases.map((c) => {
+    const lists = c.decisions.includes(from);
+    const cites = c.ruling === from;
+    if (!lists && !cites) return c;
+    changed.push(c.id);
+    const out = { ...c } as Case;
+    if (lists) out.decisions = [...new Set(c.decisions.map((t) => (t === from ? to : t)))];
+    if (cites) out.ruling = to;
+    return out;
+  });
+  return { corpus: { ...corpus, cases }, changed };
+}
+
 export interface DecisionCases { title: string; owner: string; survives: string[]; changes: string[]; detail: string[] }
 
 /**
@@ -591,6 +619,17 @@ function main(): void {
   }
 
   if (argv[0] === "--dry-list") { void dryListChild(root, argv[1]); return; }
+
+  if (argv[0] === "--rename-decision") {
+    const [from, to] = [argv[1], argv[2]];
+    if (!from || !to) { console.error('--rename-decision takes two titles: "<old>" "<new>"'); process.exit(1); }
+    if (!decisionTitles(root).has(to)) { console.error(`"${to}" is no decision of ${DECISIONS_PATH}; run decision-map.ts --sync --rename first`); process.exit(1); }
+    const r = renameDecision(JSON.parse(fs.readFileSync(casesFile, "utf-8")) as Corpus, from, to);
+    if (r.changed.length === 0) { console.error(`no case lists or cites "${from}"`); process.exit(1); }
+    fs.writeFileSync(casesFile, serializeCorpus(r.corpus));
+    console.log(`${CASES_PATH}: ${r.changed.length} case(s) moved from "${from}" to "${to}"`);
+    return;
+  }
 
   if (argv[0] === "--by-decision") {
     const map = JSON.parse(fs.readFileSync(path.join(root, DECISIONS_PATH), "utf-8")) as { rows: { title: string; owner: string }[] };

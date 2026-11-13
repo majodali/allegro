@@ -378,3 +378,13 @@ policy is the gate ruled there.
     A rule for a program that a ruling stops part-way or whose detail
     pins no longer print: the comparison by ordinal then reads every
     later line against the wrong pin.
+- **2026-11-13 — The new tree's gate takes the kernel stream's files.**
+  Three things the kernel stream's first chunk (PR #207, the kernel's
+  interface and the saved-program data form) asked of this lane.
+  `npm run typecheck:next` now runs the gate's compiler over every
+  `next/<dir>/tsconfig.json` (`next/tools/typecheck.ts`), so
+  `next/kernel/` is checked when it lands. The decision map's test no
+  longer pins 231 rows: the counts follow the inventory, which may
+  gain a decision. `next/tools/corpus.ts --rename-decision` moves
+  every case from a retitled decision to its new title, so a retitle
+  is two commands: the map's `--sync --rename`, then this.

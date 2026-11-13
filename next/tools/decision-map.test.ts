@@ -236,7 +236,15 @@ test("sync never guesses a rename: an orphan is kept and reported until --rename
 test("the committed map is consistent with the committed inventory", () => {
   const r = checkRepository(ROOT);
   assert.deepEqual(r.findings, []);
-  assert.match(r.summary, /^decision-map: 231 rows · R 141 · Q 67 · none 23 · /);
+  // The counts follow the inventory: the kernel stream adds and retitles
+  // decisions there, and the check above already holds the map to it row
+  // for row. What is held here is the summary's form and that the owners'
+  // counts add up to the rows.
+  const m = r.summary.match(/^decision-map: (\d+) rows · R (\d+) · Q (\d+) · none (\d+) · .* — consistent$/);
+  assert.ok(m, r.summary);
+  const [rows, kernel, acceptance, none] = m.slice(1).map(Number);
+  assert.equal(kernel + acceptance + none, rows);
+  assert.ok(rows >= 231, `the inventory closed phase 1 with 231 decisions; the map has ${rows}`);
 });
 
 test("the committed map is in the serialiser's form, one row per line", () => {
