@@ -1070,7 +1070,7 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
-### 2026-11 — The decision map (B-196, chunk Q1)
+### 2026-11 — The decision map (B-196, the stream's first chunk)
 
 B-196 (the rebuild's acceptance side), chunk Q1. `next/decisions.json`
 holds one row per decision of `docs/plans/book-pass-inventory.md`, 231
