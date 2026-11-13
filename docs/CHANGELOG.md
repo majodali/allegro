@@ -1090,6 +1090,18 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+
+### 2026-11 — The corpus's pins classed (B-196, chunk Q2 (the corpus inventoried and classed), part 2)
+
+B-196 (the rebuild's acceptance side). Each of the 613 pinned lines of
+the acceptance corpus has its class, the decisions it tests and the
+milestone at which the rebuilt implementation must pass it: 589
+survive, 22 change by a named ruled decision, 2 are implementation
+detail. A line is classed as changing only where a ruled decision
+changes it; 151 surviving pins carry a note naming what is unsettled.
+`next/tools/corpus.ts --apply` classes cases from an overlay file. The
+1,379 test cases are the next part.
+
 ### 2026-11 — The acceptance corpus inventoried (B-196, chunk Q2 (the corpus inventoried and classed), part 1)
 
 B-196 (the rebuild's acceptance side), chunk Q2 (the corpus inventoried and classed), part 1.
