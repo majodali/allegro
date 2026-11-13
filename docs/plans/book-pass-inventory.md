@@ -3087,6 +3087,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: an application embeds a kernel, binds its own data as values, evaluates a rule and reads back the result and what it rests on.
 - Notes: new, by ruling. The maintainer listed constructing, binding, evaluating and creating scopes; the review added cells, results, residuals, limits and faults. A scope that shares nothing with any other is what lets specific code be given specific capabilities. Inside Allegro the environment is still not a value: a scope is a handle of the interface.
 - Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
+- Notes (2026-11-13, with the first version of the interface): filling a cell records the value and evaluates nothing. A kernel-wide call evaluates again everything that waited on cells filled since, under a step budget: the kernel tracks what waits on what, and the host says when the work happens. Ruled against the host asking for each result it kept (it cannot know every waiter) and against evaluation inside the fill (no budget, and effects in arrival order).
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome

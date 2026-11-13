@@ -137,9 +137,14 @@ export interface Limits {
  */
 export type Outcome = "decided" | "refuted" | "undecided";
 
-/** What one call of `evaluate` returns. */
+/** What one call of `evaluate` returns: how things stood when it returned. */
 export interface Result {
-  /** The value, or the residual where information was missing. A residual is a value of kind "expression". */
+  /**
+   * The value, or the residual where information was missing. A residual
+   * is a value of kind "expression". After cells are filled and the
+   * kernel has advanced, `Kernel.current` gives the value as it now
+   * stands.
+   */
   readonly value: Value;
   /**
    * "complete": evaluation went as far as the information allows.
@@ -150,6 +155,19 @@ export interface Result {
   readonly steps: number;
   /** True when a refutation is recorded on `value`: the program is wrong. */
   readonly refuted: boolean;
+}
+
+/** What one call of `advance` returns. */
+export interface Advance {
+  /**
+   * "complete": everything that was ready has been evaluated again.
+   * "limit": the budget ran out first; call `advance` again to go on.
+   */
+  readonly ended: "complete" | "limit";
+  /** The number of steps spent. */
+  readonly steps: number;
+  /** The values on which a refutation was recorded during this call. */
+  readonly refuted: readonly Value[];
 }
 
 /**
@@ -211,24 +229,42 @@ export interface Kernel {
   cell(): Cell;
   /**
    * Fills a cell with plain data: bits, symbols and structures of them,
-   * carrying no metadata. Once only. What waited on the cell is
-   * evaluated again by the next `evaluate` or `settle`.
+   * carrying no metadata. Once only. Filling records the value and
+   * evaluates nothing: what waited on the cell is evaluated again by the
+   * next `advance`.
    */
   fill(cell: Cell, value: Value): void;
   /** True when the cell has been filled. */
   filled(cell: Cell): boolean;
+  /**
+   * The unfilled cells that something in this kernel still waits on.
+   * Empty when nothing is outstanding. The kernel knows every waiter,
+   * whoever built it; the host need not.
+   */
+  waiting(): readonly Cell[];
 
   // ---- Evaluating -----------------------------------------------------
 
   /** Evaluates an expression in a scope, as far as the information allows and within the limits. */
   evaluate(expression: Value, scope: Scope, limits?: Limits): Result;
   /**
-   * Evaluates again what waited on cells filled since, for a result
-   * returned earlier. Returns the new result.
+   * Evaluates again everything in this kernel that waited on a cell
+   * filled since the last call, and whatever waited on that in turn,
+   * within the limits. The kernel tracks what waits on what; the host
+   * says when the work happens and how much of it. Several cells may be
+   * filled before one call: each waiter is then evaluated once, after
+   * all it depends on. With nothing ready it does nothing.
+   *
+   * The order in which effects that became ready are performed is not
+   * stated in this version; it waits on a ruling (issue 17 of
+   * docs/records/book-pass/adversarial-review.md).
    */
-  settle(result: Result, limits?: Limits): Result;
-  /** The cells an unfinished result still waits on. Empty when nothing is outstanding. */
-  waitingOn(result: Result): readonly Cell[];
+  advance(limits?: Limits): Advance;
+  /**
+   * The value as it now stands: where a residual has since been
+   * evaluated further, the result of that; otherwise the value itself.
+   */
+  current(value: Value): Value;
 
   // ---- Reading --------------------------------------------------------
 

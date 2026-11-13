@@ -322,6 +322,24 @@ first version of the data form leaves out claim outcomes, keys and
 origins, defines the data form only, and is written as JSON. The
 calls of the first version of the interface.
 
+**How the kernel evaluates again when a cell is filled, ruled
+2026-11-13.** The first draft of the interface had the host ask for
+each result it kept. The maintainer asked whether the host
+necessarily knows every expression that waits, and had assumed the
+update would be built into the cell: a `set` that triggers
+re-evaluation up the expression DAG, a read-only `filled` flag, and a
+list of unbound cells on a result. Three approaches were compared:
+the host pulls for each result (the host must know every root, and
+each pass walks the whole residual); the cell pushes at once
+(complete, but the work runs inside the fill with no budget, effects
+fire in arrival order, and a waiter on two cells is evaluated twice);
+the kernel tracks what waits on what and the host says when. Ruled:
+the third. Filling a cell records the value and evaluates nothing; a
+kernel-wide call, `advance`, evaluates again everything that became
+ready, under a step budget, each waiter once after all it depends on.
+Cells stay opaque handles and all logic is in the kernel's calls. The
+order of effects that become ready together waits on issue 17.
+
 ## Terms introduced
 
 - **Instantiate**: to call a module's function with its capabilities
