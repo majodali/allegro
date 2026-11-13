@@ -3782,6 +3782,10 @@ The ten hard calls stand, except three put to review; the merge of the incomplet
 
 ## Open questions
 
+### The adversarial review, 2026-11-13
+
+After phase 1 closed, four independent reviewers attacked the ruled decisions for consistency, feasibility and security, and one read them as a newcomer. Their findings reduce to 31 issues, none ruled yet: an expression that can be read and evaluated again against authority held in it; recursion; what a notation may do to a text; the meaning of the strength words; identity across evaluations and saved programs; and others. They are in [adversarial-review.md](../records/book-pass/adversarial-review.md), with what each ruling must choose. The decisions above are unchanged by them.
+
 ### Proposals deferred by DR1 to their parts
 
 - **Taken in DR3 (2026-11-12)**, as the last clause of "Every program is evaluated the same way, however it arrives"; first deferred to DR2, with the expressions chapter: "A program built by a program is checked like any other" (reflection checked end to end; the review's R-DR1-32). `expr_eval` calls the evaluator directly (`src/primitives.ts:405`–`409`); whether a constructed program skips checks was not confirmed either way by one probe.
