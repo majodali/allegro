@@ -1091,6 +1091,23 @@ chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
 
+### 2026-11 — The corpus's tests classed (B-196, chunk Q2 (the corpus inventoried and classed), part 3)
+
+B-196 (the rebuild's acceptance side). Each of the 1,379 tests of the
+acceptance corpus has its class, the decisions it tests and its
+milestone: 1,029 survive, 207 change by a named ruled decision, 143
+assert how the present tree is built. With the pins, all 1,992 cases
+are classed: 1,618 survive, 229 change, 145 are detail. Six readers
+classed one group of modules each from one brief, and the results were
+reconciled before they were applied. The largest changes are the
+strength words (68 tests) and effects as capability use (61). A test
+that asserts a halt survives, restated as the refutation of the named
+claim. `next/tools/corpus.ts` gains `--by-decision`, the cases that
+list each decision: 56 of the 231 decisions are listed by no case, so
+their cases are written new. The decision map's stored case lists are
+not filled; the plan's §7 says why. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The corpus's pins classed (B-196, chunk Q2 (the corpus inventoried and classed), part 2)
 
 B-196 (the rebuild's acceptance side). Each of the 613 pinned lines of

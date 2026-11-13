@@ -273,3 +273,71 @@ policy is the gate ruled there.
     milestones 1 and 2. The line between milestones 3 and 4 was drawn
     at "the untyped part"; every test program is in the surface
     notation, so the line is by content, not by notation.
+- **2026-11-13 — Q2, part 3 landed: the tests classed.** Every
+  [case](#def-case) of the corpus now has its [class](#def-class).
+  The check prints:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1618, changes 229, detail 145) · unclassed 0 — consistent`.
+  Of the 1,379 tests, 1,029 survive, 207 change and 143 are detail.
+  All cases by milestone: 27 at milestone 1, 11 at 2, 216 at 3, 564 at
+  4, 542 at 5, 147 at 6, 244 at 7, 94 at 8, 2 at 9. Six readers classed
+  one group of modules each from one brief, read-only; the six results
+  were reconciled before they were applied.
+  - **The 207 that change, by ruling.** 68 by "Four strengths, one
+    vocabulary": a replaced strength word asserted in output, in a
+    message or in a command's data. 61 by "An effect is the use of a
+    capability": effect labels as values, effect variables, `opaque`,
+    the lattice. 15 by "Constructing a refined value claims its
+    predicate". 13 by "The standard language's handled failure is an
+    exception". 9 by "Termination is a claim". 6 by "A match where no
+    arm matches is a refutation". 5 by "A module's summary is the
+    weakest strength among its claims". The other 30 cite 21 more
+    rulings, three cases or fewer each.
+  - **The 143 that are detail** assert how the present tree is built:
+    host layout and host helpers, lints and ratchets over the present
+    source, the fixed pipeline's stages and counts, install operations,
+    wire schemas of the present tools. 22 of them test the
+    repository's own process tools.
+  - **639 surviving tests carry a note.** 78 are file tests, whose
+    pinned lines are separate cases. Most of the rest are asserted
+    through a host interface and restate the behaviour a user
+    observes.
+  - **Rules the reconciliation fixed.** A test that asserts a halt
+    survives: the halt is restated as the refutation of the named
+    claim, and the message's words are the present tree's. All six
+    readers reached this alone. A strength read through a host
+    predicate survives where the ruled strength is decided; the word
+    asserted in output or data changes. A failed parse read as an
+    error value changes by "Parsing is evaluation", whose entry says a
+    text that does not parse is a refutation; two readers had cited
+    different rulings for it. A test that asserts what a pin asserts
+    takes the pin's class; one case moved by this rule. A file test
+    survives at the highest milestone of its pins, also where a pin
+    changes. Effect labels as values of the language change; host
+    helpers over label sets are detail. Milestones go by content: a
+    test of the kernel's behaviour is at milestone 1 though a parsed
+    program drives it; a grammar extended through a `grammar { … }`
+    block is at 6, and a parser called on a grammar value is at 8.
+  - **Left unsure, for the milestones' review.** Whether `decreases`
+    offers a measure or makes a claim (6 cases); hints and strategy
+    records a tool computes itself, against "A tool reads a phase's
+    result and adds no analysis of its own" (9); clock time boxes
+    against "Limits are step budgets" (4); recursion through
+    higher-order calls, which "Termination by bounded decrease" does
+    not name (4); the form of a failure no ruling settles, such as
+    division by zero (3); whether a type remains for an unfilled cell
+    (2). Each is classed survives with a note saying what is unsure.
+  - **The cases by decision.** `next/tools/corpus.ts --by-decision`
+    prints, for each decision of the map, the number of cases that
+    list it, and with a title the cases themselves. 175 of the 231
+    decisions are listed by a case. 56 are listed by none: 32 of the
+    acceptance stream's, 12 of the kernel stream's and 12 that no
+    stream owns. The present tree has no test for those, so their
+    cases are written new.
+  - **Not done in this part: the map's stored lists.** The Q2 row
+    says the decision map's rows gain the cases. The stored `cases`
+    lists stay empty. Filling them would copy about 4,700 ids into
+    `next/decisions.json`, about 3,800 of them onto rows the kernel
+    stream edits, and each later change of a class would touch those rows.
+    The view above answers the same question from the corpus alone.
+    Whether the stored lists are filled or the field goes is put to
+    the maintainer with the next gated chunk.
