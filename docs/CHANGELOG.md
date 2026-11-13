@@ -1089,6 +1089,45 @@ chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
 
+### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
+
+B-196 (the rebuild's acceptance side). `next/models/specs/planning.md`
+states the planning model and the loop over it against the ruled
+decisions of the inventory's Part V: its values, its claims and their
+strengths, an open plan as a model with an unknown, search as feasible
+and best, the notation, failure, mappings and the result a tool reads.
+It recommends on each of the 15 held planning decisions and puts 13
+questions to the maintainer. The pilot as built is its evidence of use:
+three of the pilot's mechanisms (a splice into source text, a hash over
+rendered text, records of dead ends read by host code) are set out as
+workarounds of the present implementation. No code changed.
+
+### 2026-11 — The new tree's gate takes the kernel stream's files (B-196)
+
+B-196 (the rebuild's acceptance side). Three changes the kernel
+stream's first chunk asked of lane Q. `npm run typecheck:next` checks
+every `next/<dir>/tsconfig.json`, not `next/tools` alone. The decision
+map's test follows the inventory's count of decisions, so the
+inventory can gain one. A decision can be retitled without editing
+the corpus: the map's `--sync --rename` records the former title on
+the row, the corpus check accepts a case that still cites it, and
+`next/tools/corpus.ts --follow-renames` moves the cases afterwards.
+
+### 2026-11 — The comparison harness on a stub kernel (B-196, chunk Q6 (the comparison harness), part 1)
+
+B-196 (the rebuild's acceptance side). `next/corpus/harness.ts` runs
+the pinned programs of the acceptance corpus through a runner and
+compares each printed line with its pin by class: a survives pin
+passes on the exact text, a changes pin is to review, a detail pin is
+not compared. It reports the cases due and passing per milestone. Its
+tests in `next/corpus/harness.test.ts` probe the comparison with stub
+runners that are wrong in known ways. `npm run harness:present` runs
+the present tree on its own pins: 586 of 589 surviving pins pass and
+no printed line differs. The 3 others belong to
+`tests/proofs-proven-demo.alg`, which the file runner cannot parse
+without the extension the suite passes it; the command names the
+program and counts its pins as not run.
+
 ### 2026-11 — The corpus's tests classed (B-196, chunk Q2 (the corpus inventoried and classed), part 3)
 
 B-196 (the rebuild's acceptance side). Each of the 1,379 tests of the

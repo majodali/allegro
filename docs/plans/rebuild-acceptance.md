@@ -14,6 +14,7 @@ oracle:
   - npm run test:next
   - npm run typecheck:next
   - npm run lint:corpus
+  - npm run harness:present
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
@@ -341,3 +342,76 @@ policy is the gate ruled there.
     The view above answers the same question from the corpus alone.
     Whether the stored lists are filled or the field goes is put to
     the maintainer with the next gated chunk.
+- **2026-11-13 — Q6, part 1 landed: the comparison harness on a stub kernel.**
+  `next/corpus/harness.ts` takes a runner: a function from a program,
+  its path and its text, to the lines it printed and how its run ended,
+  completed or stopped with a reason. It compares the i-th pin of a
+  program with the i-th printed line, as the suite's `runAlgFile` does.
+  A survives pin passes on the exact text. A changes pin is to review,
+  with its ruling, its new result and the line produced; a produced
+  line equal to the present pin is reported as a change that did not
+  happen. A detail pin is not compared. A program that prints more
+  lines than it has pins, or stops after a line for every pin, is a
+  finding on the program. The report gives, per milestone, the cases
+  due, the pins passing, failing and to review, the tests not yet
+  realised, and the running total. The present tree's runner runs
+  `src/index.ts` in a child process and imports nothing from `src/`.
+  `npm run harness:present` runs 70 of the 71 pinned programs, four at
+  a time, in about 25 seconds, and prints:
+  `harness: present tree · programs 70 run, 0 stopped · pins 613 (passing 586, failing 0 of which 0 with no line, to review 22 of which 22 unchanged, not compared 2, not run 3) · tests 1379 (due 1236, not yet realised 1236; detail 143) — no failing pin`.
+  No printed line differs from its pin.
+  - **One program's command-line run differs from the suite's.**
+    `tests/proofs-proven-demo.alg` declares `proven` clauses without
+    `use proven`. The suite passes it `lib/proven.alg` as an
+    extension; the file runner has no flag for that, so the run stops
+    on a parse error and prints none of its 3 lines. With `use proven`
+    added to a copy, the copy prints all 3. The program is the present
+    tree's and is not changed. The harness names it with the reason in
+    `PRESENT_RUN_DIFFERS`; the command prints that line and counts the
+    3 pins as not run. A test holds that every program named there does
+    stop under the present tree's runner.
+  - **What part 2 needs.** The kernel's runner behind the same type,
+    which needs the interface file, the saved-program data form, and
+    a way for a pinned program in the surface notation to reach the
+    kernel (the bootstrap of Q5). A rule by which a test of the new
+    tree names the case it realises, so the harness can count tests.
+    A rule for a program that a ruling stops part-way or whose detail
+    pins no longer print: the comparison by ordinal then reads every
+    later line against the wrong pin.
+- **2026-11-13 — The new tree's gate takes the kernel stream's files.**
+  Three things the kernel stream's first chunk (PR #207, the kernel's
+  interface and the saved-program data form) asked of this lane.
+  `npm run typecheck:next` now runs the gate's compiler over every
+  `next/<dir>/tsconfig.json` (`next/tools/typecheck.ts`), so
+  `next/kernel/` is checked when it lands. The decision map's test no
+  longer pins 231 rows: the counts follow the inventory, which may
+  gain a decision. A retitle now passes the gate without either
+  stream editing the other's file: the map's `--sync --rename` records
+  the former title on the moved row, in a field `was`; the corpus
+  check accepts a case that cites a former title and counts it in its
+  summary; `next/tools/corpus.ts --follow-renames` then moves the
+  cases, in this stream's next chunk.
+- **2026-11-13 — Q4, part 1 drafted: the planning model specified.**
+  `next/models/specs/planning.md`, for the maintainer's ruling: five
+  use cases; the model's values, each marked as taken from the pilot,
+  changed by a named ruled decision, or open; its claims with who
+  makes each and its strength; an open plan as a model with an
+  unknown, the catalog remainder; search under "Feasible is decided;
+  best says how strongly it holds", with the two designs for the bound
+  set side by side; the notation, each form with the expression it
+  stands for; every failure the pilot reports and what the ruled
+  decisions make it; the mappings; what a phase's result must hold;
+  a recommendation on each of the 15 held planning decisions; and 13
+  questions, each with options and a recommendation. Its last section
+  states the six issues of the review session's adversarial review of
+  phase 1 (PR #199) that the specification rests on. One term is new,
+  the catalog remainder. The software system model's specification is
+  the chunk's second part.
+  - **Ruled 2026-11-13.** The maintainer took the recommended option
+    of each of the 13 questions and ratified the term, in a comment on
+    PR #202: "All defaults accepted, "catalog remainder" ratified." A
+    port's type is a type value. An open plan's unknown is the catalog
+    remainder, and declaring the plan claims a feasible completion.
+    The search's bound comes from the residual of the plan with its
+    choices unknown. A model value's names live in a field of the
+    value. The 15 held planning decisions stay the review session's.
