@@ -74,12 +74,23 @@ recorded on Part VI's entries.
 
 ## What changed
 
-Nothing yet. Part VI of `docs/plans/book-pass-inventory.md` is
-rewritten as the asks are ruled, and "Rulings taken" records each.
+Part VI of `docs/plans/book-pass-inventory.md`, from 31 decisions in
+four chapters to 44 in nine, after an introduction on roles and
+usage: The kernel's interface; Configuration; Launching; Capabilities
+and primitive functions; Phases; Saved programs and export; Trust;
+Tools; The launchers we ship. Every Part VI entry carries a "Use
+case" line. Fifteen entries stop being decisions, each named in the
+notes of the entry that replaces it. Six earlier decisions are
+amended, as "Rulings taken" lists. The inventory holds 231 decisions,
+15 of them held.
 
 ## Terms introduced
 
-No terms introduced.
+Agreed in the brainstorm and defined in Part VI's introduction or its
+entries: launcher; ceiling; primitive function; kernel primitive;
+effectful and pure, of a function; saved program; restore; manifest;
+trust profile; reference kernel; reference definition; target
+platform; pipeline, of phases.
 
 ## Rulings taken
 
@@ -184,3 +195,37 @@ on"):
   model might one day replace version numbers as compatibility
   claims. The maintainer remains "skeptical on combinatorial
   complexity grounds".
+
+**The list of Part VI's decisions, agreed 2026-11-13.** The review
+drafted the full list, with six changes to earlier parts and one
+example for each chapter. The maintainer: "List, early changes and
+examples all look good." Written into the inventory as drafted, with
+three differences the review made while writing, for the maintainer
+to confirm on the PR:
+
+- The draft counted 38 decisions; the list as written holds 44. The
+  count in the draft was wrong; the list is the one shown.
+- "Host code reaches a program only as a capability" was to move to
+  Part VI. It stays in Part I, reworded as "Host code reaches a
+  program only as primitive functions", because decisions of Parts III
+  and IV depend on it and a dependency must name an earlier decision.
+- "Saving is export to a target whose model is the kernel's
+  interface" is typed an implementation decision.
+
+The changes to earlier parts: the Part I decision above; Part II's
+"Machine arithmetic is a set of pure primitives that ships with the
+platform" (was "a capability"); notes on "The kernel's primitives are
+pure and few" (the term kernel primitive; evaluation with the complete
+set of names), on "What the kernel requires of an extension" (the
+kernel is passive), on "The platform's parser engine ships already
+built" (as a saved program) and on "An effect is the use of a
+capability" (the four kinds of function).
+
+Entries that stop being decisions: the eight of the build pipeline;
+the file runner; the prompt entry; a stated host boundary; liveness
+per source; the loader's file reader; further asynchronous
+capabilities (absorbed); browser packaging and self-hosting (absorbed
+into "How extensions are distributed").
+
+Every ask is ruled. Phase 1 has reviewed every part; the planning
+pilot's 15 entries remain held.

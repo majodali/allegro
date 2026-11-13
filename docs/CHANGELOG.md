@@ -574,6 +574,21 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-13 — Part VI's decisions ruled; every part reviewed.**
+  Building and running programs, in
+  `docs/plans/book-pass-inventory.md`: 44 decisions in nine chapters,
+  each with a use case. The kernel is passive and has a stated
+  interface; a launcher does only what cannot be done in Allegro and
+  sets the ceiling of capabilities; host code enters only as primitive
+  functions, effectful or pure; the platform ships three phases,
+  check, run and export; a saved program is a record of interface
+  calls, and a stored outcome is restored stamped with its builder's
+  name; a target platform is a model and export a transformation into
+  it; three things are trusted, the kernel, the launcher and primitive
+  functions, and a policy is a claim over what a result rests on. The
+  decision review has now covered all six parts; the planning pilot's
+  entries are held. No code changed. Record:
+  `docs/records/book-pass/dr6-part-6-building-and-running.md`.
 - **2026-11-12 — Part V's foundations ruled.** Vivace's part of
   `docs/plans/book-pass-inventory.md` now opens with an introduction
   (what a model and a meta-model are; Vivace's purpose) and eight
