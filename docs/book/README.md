@@ -116,4 +116,6 @@ review of Part IV, the standard language) ·
 `../records/book-pass/dr5-part-5-vivace.md` (record: the decision review of
 Part V, Vivace) ·
 `../records/book-pass/dr6-part-6-building-and-running.md` (record: the
-decision review of Part VI, building and running programs).
+decision review of Part VI, building and running programs) ·
+`../records/book-pass/phase-1-close.md` (record: what phase 1 of the book pass
+leaves).

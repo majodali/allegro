@@ -229,3 +229,11 @@ into "How extensions are distributed").
 
 Every ask is ruled. Phase 1 has reviewed every part; the planning
 pilot's 15 entries remain held.
+
+**On PR #195, 2026-11-13.** The maintainer reviewed and approved
+Part VI, and confirmed every ask: the count of 44, the Part I decision
+kept in Part I, the type of "Saving is export to a target whose model
+is the kernel's interface", the use-case rule for phase 2, and the
+terms, which are ratified. The maintainer asked for phase 1 to be
+closed out and tidied; the plan will change after the pilot stream's
+review. The close is recorded in `phase-1-close.md` beside this file.

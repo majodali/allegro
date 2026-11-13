@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 231 decisions after DR6's rulings of 2026-11-13, which close phase 1 (Part VI: 44; Part I: 23, with a thesis statement; Part II: 51; Part III: 23; Part IV: 63; Part V: 27, of which 15 are held; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 231 decisions in 6 parts and 38 chapters after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -22,8 +22,8 @@ Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer ga
 1. **Why a new language** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
    - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
 2. **Keep it simple** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
-   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
-Chapter 3 of the first proposal is dissolved: its decisions are folded into chapters 1 and 2 (DR1). The chapter numbers of Parts II to VI below are those of the first proposal and are renumbered when phase 1 ends.
+   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as primitive functions; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
+Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded into chapters 1 and 2. Chapters are numbered as phase 1 left them, 2026-11-13.
 
 **Part II: The kernel**
 
@@ -34,7 +34,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; Functions are data: params plus body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
 5. **Authority** (6 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
-   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a capability that ships with the platform.
+   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
@@ -86,40 +86,40 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 As ruled in DR5 (2026-11-12), with the chapter titles the maintainer confirmed on PR #193. The part opens with the introduction "What Vivace is for", which is not a list of decisions. The worked languages are evidence; planning's entries are held, not ruled.
 
-25. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
+24. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
    - Decisions: A model is a value; A transformation is a model; Two models relate only through a declared mapping; A change to a model is a mapping from the old one.
-26. **Search and optimization** (3 decisions). Solving as proposing, a solver that sees its problem unevaluated, and the difference between feasible and best.
+25. **Search and optimization** (3 decisions). Solving as proposing, a solver that sees its problem unevaluated, and the difference between feasible and best.
    - Decisions: Solving is proposing a value for an unknown, and the kernel checks it; A solver sees its problem unevaluated; Feasible is decided; best says how strongly it holds.
-27. **Analysing models** (1 decision). Meta-modelling as analysis with tools, and the questions left open.
+26. **Analysing models** (1 decision). Meta-modelling as analysis with tools, and the questions left open.
    - Decisions: A model's quality is a question for analysis.
-28. **Units of measure** (4 decisions; a worked language, reworded in DR4).
+27. **Units of measure** (4 decisions; a worked language, reworded in DR4).
    - Decisions: Dimensions as data, named dimensions as refinements over one Quantity; Quantity laws at honest tiers; Number-anchored quantity literals; Conversion sugar with `in`.
-29. **Plans as outcome graphs** (11 decisions; held, not ruled).
+28. **Plans as outcome graphs** (11 decisions; held, not ruled).
    - Decisions: A plan is an outcome graph with derived wiring; Leaf and composite nodes, with `uses` to borrow a plan; Failure handlers over outcomes; Two enforcement shapes for a well-formed plan; Planning surface conventions; Bracket constraints as refinements, named as predicate fixtures; Planning-local effort and money, durations from the units DSL; Estimates roll up, budgets are proved; Scheduling, resources, performers and latitude; Fan-in through an explicit aggregator node; Explicit `raise` and failure context in handlers.
-30. **Finding solutions to a plan** (4 decisions; held, not ruled).
+29. **Finding solutions to a plan** (4 decisions; held, not ruled).
    - Decisions: Choices, templates and solution finding by enumeration; Completion from a catalog; Library search over kernel residuals; Search beyond enumeration.
 
 **Part VI: Building and running programs**
 
 As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and the ways the platform is used, which is not a list of decisions.
 
-31. **The kernel's interface** (4 decisions). A passive kernel, what its interface offers and never exposes, and limits.
+30. **The kernel's interface** (4 decisions). A passive kernel, what its interface offers and never exposes, and limits.
    - Decisions: The kernel is passive; What the kernel's interface offers; No interface call writes a bare claim outcome; Limits are step budgets.
-32. **Configuration** (3 decisions). What configuration is, where it is read from, and configuration as a model.
+31. **Configuration** (3 decisions). What configuration is, where it is read from, and configuration as a model.
    - Decisions: Configuration is all the information that determines an execution; Configuration sources have a priority, and a result says which supplied each value; A full configuration is a model, evaluated in a first phase.
-33. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
+32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
    - Decisions: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; Startup, step by step; One kernel serves many invocations.
-34. **Capabilities and primitive functions** (4 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
+33. **Capabilities and primitive functions** (4 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
    - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
-35. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
+34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
    - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
-36. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
+35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
    - Decisions: A saved program is a recorded sequence of interface calls; A saved program names what it needs by content hash; A stored outcome is restored with its builder's name; A target platform is a model, and export is a transformation into it; Saving is export to a target whose model is the kernel's interface; An exported program needs a kernel only if it handles expressions at run time; A law licenses a rewrite, and the rewritten program carries the law's strength; How extensions are distributed.
-37. **Trust** (6 decisions). What is trusted, what a result names, policies, builders, the reference kernel, purity.
+36. **Trust** (6 decisions). What is trusted, what a result names, policies, builders, the reference kernel, purity.
    - Decisions: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on; A policy is a claim over what a result rests on; A builder is identified by hash, then manifest, then signature; One reference kernel is the root of trust; A primitive's purity is assumed and named unless something stronger is shown.
-38. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
+37. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
    - Decisions: A tool reads a phase's result and adds no analysis of its own; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
-39. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
+38. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
    - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell, and a failure fills it with an exception; The browser launcher is one bundle; The core runs in a browser.
 
 ## Findings held for their decisions
@@ -213,6 +213,8 @@ They came together over years of exploration into most of what Allegro is today.
 
 ## Today's chapters, mapped
 
+**Note, 2026-11-13.** The "Goes to" lists name the chapters as phase 1 left them. The sentence before each list is the first proposal's and may name a chapter since dissolved; the table is redone when the chapters are written.
+
 | Present chapter | Destination in the proposed contents |
 |---|---|
 | [preface.md](../book/preface.md) (How this book is organized) | Stays the preface, unchanged. Goes to: the preface. |
@@ -221,17 +223,17 @@ They came together over years of exploration into most of what Allegro is today.
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Reaching a member (Private members). |
 | [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Models (§4); Tools (§3, §6); Saved programs and export (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
-| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
+| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Metadata (plane); Extensions (plane interface). |
 | [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules and programs (§2 (build pipeline as a track)); Phases (§2 (precompile)). |
 | [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values (§3, §3.2); Metadata (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
-| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Four planes (T1 §11, §18, §22); Extensions (§23, §24); Scopes (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
+| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Values (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Metadata (T1 §11, §18, §22); Extensions (§23, §24); Evaluation (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
 | [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values (the minimal base); Extensions (the install surface). |
-| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Structures (§1, §2); Metadata (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
+| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Values (§1, §2); Metadata (§3, Appendix C); Metadata (Appendix A); Evaluation (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
 | Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values; Programs as values. |
 | [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata (§1 to §4, §6, §9); Metadata (§5, §8); Extensions (§7). |
-| Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
+| Scope (planned) | Becomes the scopes chapter. Goes to: Evaluation. |
 | [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); Phases (§3 (effects deferred, the cutoff)). |
 | Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; The launchers we ship. |
 | [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Parsing (the boundary). |
@@ -239,7 +241,7 @@ They came together over years of exploration into most of what Allegro is today.
 | [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Parsing (§1, §2); Changing the grammar (§4); Modules and programs (§4 (activation)); The surface language (§3). |
 | [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules and programs (Loading, Loaded once per process); Reaching a member (module objects). |
 | [standard/README.md](../book/standard/README.md) (L2 Allegro Standard: boundary contract) | Dissolves into Part IV's opening. Goes to: Types as values (the boundary). |
-| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
+| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Metadata (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
 | [standard/core-types.md](../book/standard/core-types.md) (Core types) | Joins the types chapter. Goes to: Types as values. |
 | [standard/effects.md](../book/standard/effects.md) (Effects) | Becomes the effects chapter; environment capabilities go to the host chapter. Goes to: Effects; The launchers we ship (environment capabilities). |
 | [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts (§3). |

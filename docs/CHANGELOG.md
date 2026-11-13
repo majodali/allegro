@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-13 — Phase 1 of the book pass closed.** The decision
+  review has ruled every part of `docs/plans/book-pass-inventory.md`:
+  231 decisions in 38 chapters, with the planning pilot's 15 entries
+  held. The contents are renumbered and the counts recounted. What the
+  phase leaves (designs to prove, held findings, what is owed) is in
+  `docs/records/book-pass/phase-1-close.md`. Phase 2 is not started;
+  the plan is to be revised first.
 - **2026-11-13 — Part VI's decisions ruled; every part reviewed.**
   Building and running programs, in
   `docs/plans/book-pass-inventory.md`: 44 decisions in nine chapters,

@@ -1382,6 +1382,15 @@ its approval.
   Part VI of the inventory: 31 decisions in four chapters became 44 in
   nine; six earlier decisions amended; 231 decisions in all, 15 held.
   Lints: `lint:docs:check` anchors 0 · order 0 · ids 783.
+- **2026-11-13 — phase 1 closed** (the review session). The
+  maintainer approved Part VI on PR #195 and asked for phase 1 to be
+  closed out. The inventory's contents are renumbered and its counts
+  recounted: 231 decisions in 38 chapters, 15 held. What phase 1
+  leaves is recorded in `docs/records/book-pass/phase-1-close.md`.
+  Phase 2 is not started. The maintainer: the plan will change after
+  the pilot stream's review of where it stands and of this stream's
+  findings; §2.7, §2.8 and §5 describe phase 2 as planned before that
+  review and are to be revised with it.
 
 ## 8. Sessions
 
