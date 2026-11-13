@@ -1160,6 +1160,29 @@ its approval.
   ruled, an exception to R37 (two phases), which has phase 1 rule
   every decision. They are ruled when the pilot is taken up.
 
+- **R46 — DR6 ruled; every part reviewed.** Part VI was ruled in the
+  review session on 2026-11-12 and 2026-11-13. The rulings are in
+  `docs/records/book-pass/dr6-part-6-building-and-running.md`. After
+  eleven conflicts were brought, the maintainer asked for an
+  introduction on roles and usage, the launcher and startup in
+  detail, and a chapter on trust; a brainstorm on the kernel, the
+  launcher, capabilities and configuration followed, with no
+  commitment until its conclusions were vetted. Part VI as ruled: a
+  passive kernel with a stated interface; configuration as all the
+  information that determines an execution; a launcher that does only
+  what cannot be done in Allegro and sets the ceiling; primitive and
+  composed functions, effectful or pure; three phases shipped; saved
+  programs, restored outcomes stamped with their builder, and export
+  to target platforms as models; what is trusted, and policies as
+  claims over what a result rests on. Every Part VI entry carries a
+  use case. The maintainer: example use cases are needed for every
+  decision in the book, so each decision section written in phase 2
+  carries at least one. With DR6 every part has been reviewed; the
+  planning pilot's entries stay held under R45 (DR5 ruled, with the
+  pilots held). Renumbering the chapters and recounting the
+  inventory's breakdowns, owed when phase 1 ends, is the next chunk
+  of work before the tour.
+
 ## 7. Record
 
 - **2026-11-03 — plan drafted** by the orchestrating session, for the
@@ -1355,6 +1378,19 @@ its approval.
   chapters, and the worked languages, of which planning's 15 entries
   are held; 218 decisions in all. Lints: `lint:docs:check` anchors 0 ·
   order 0 · ids 783.
+- **2026-11-13 — DR6 ruled** (the review session). R46 recorded in §6.
+  Part VI of the inventory: 31 decisions in four chapters became 44 in
+  nine; six earlier decisions amended; 231 decisions in all, 15 held.
+  Lints: `lint:docs:check` anchors 0 · order 0 · ids 783.
+- **2026-11-13 — phase 1 closed** (the review session). The
+  maintainer approved Part VI on PR #195 and asked for phase 1 to be
+  closed out. The inventory's contents are renumbered and its counts
+  recounted: 231 decisions in 38 chapters, 15 held. What phase 1
+  leaves is recorded in `docs/records/book-pass/phase-1-close.md`.
+  Phase 2 is not started. The maintainer: the plan will change after
+  the pilot stream's review of where it stands and of this stream's
+  findings; §2.7, §2.8 and §5 describe phase 2 as planned before that
+  review and are to be revised with it.
 
 ## 8. Sessions
 

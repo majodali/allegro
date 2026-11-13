@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts: 218 decisions after DR5's rulings of 2026-11-12 (Part I: 23, with a thesis statement; Part II: 51; Part III: 23; Part IV: 63; Part V: 27, of which 15 are held; the breakdowns below are those of the merge and are recounted when phase 1 ends). Counts at the merge: 256 decisions; 257 after the maintainer's rulings of 2026-11-05 added one (see "Rulings on the inventory"); 256 after chunk P1b (the decision types) merged two into one (see "The type check, 2026-11-05"). By type: capability 202, implementation 54. By significance: 5: 10, 4: 52, 3: 99, 2: 83, 1: 12. By label: foundational 100, swappable 156. By status: settled 176, partly built 42, open 37, and one settled in principle and partly built ("Order of definition carries no meaning"). Proposed contents: 6 parts, 33 chapters after the preface and the tour. Date: 2026-11-03; types added 2026-11-05.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 231 decisions in 6 parts and 38 chapters after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -22,8 +22,8 @@ Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer ga
 1. **Why a new language** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
    - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
 2. **Keep it simple** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
-   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as a capability; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
-Chapter 3 of the first proposal is dissolved: its decisions are folded into chapters 1 and 2 (DR1). The chapter numbers of Parts II to VI below are those of the first proposal and are renumbered when phase 1 ends.
+   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as primitive functions; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
+Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded into chapters 1 and 2. Chapters are numbered as phase 1 left them, 2026-11-13.
 
 **Part II: The kernel**
 
@@ -34,7 +34,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; Functions are data: params plus body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
 5. **Authority** (6 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
-   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a capability that ships with the platform.
+   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
@@ -86,35 +86,41 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 As ruled in DR5 (2026-11-12), with the chapter titles the maintainer confirmed on PR #193. The part opens with the introduction "What Vivace is for", which is not a list of decisions. The worked languages are evidence; planning's entries are held, not ruled.
 
-25. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
+24. **Models** (4 decisions). A model is a value; transformations are models; models relate only through declared mappings.
    - Decisions: A model is a value; A transformation is a model; Two models relate only through a declared mapping; A change to a model is a mapping from the old one.
-26. **Search and optimization** (3 decisions). Solving as proposing, a solver that sees its problem unevaluated, and the difference between feasible and best.
+25. **Search and optimization** (3 decisions). Solving as proposing, a solver that sees its problem unevaluated, and the difference between feasible and best.
    - Decisions: Solving is proposing a value for an unknown, and the kernel checks it; A solver sees its problem unevaluated; Feasible is decided; best says how strongly it holds.
-27. **Analysing models** (1 decision). Meta-modelling as analysis with tools, and the questions left open.
+26. **Analysing models** (1 decision). Meta-modelling as analysis with tools, and the questions left open.
    - Decisions: A model's quality is a question for analysis.
-28. **Units of measure** (4 decisions; a worked language, reworded in DR4).
+27. **Units of measure** (4 decisions; a worked language, reworded in DR4).
    - Decisions: Dimensions as data, named dimensions as refinements over one Quantity; Quantity laws at honest tiers; Number-anchored quantity literals; Conversion sugar with `in`.
-29. **Plans as outcome graphs** (11 decisions; held, not ruled).
+28. **Plans as outcome graphs** (11 decisions; held, not ruled).
    - Decisions: A plan is an outcome graph with derived wiring; Leaf and composite nodes, with `uses` to borrow a plan; Failure handlers over outcomes; Two enforcement shapes for a well-formed plan; Planning surface conventions; Bracket constraints as refinements, named as predicate fixtures; Planning-local effort and money, durations from the units DSL; Estimates roll up, budgets are proved; Scheduling, resources, performers and latitude; Fan-in through an explicit aggregator node; Explicit `raise` and failure context in handlers.
-30. **Finding solutions to a plan** (4 decisions; held, not ruled).
+29. **Finding solutions to a plan** (4 decisions; held, not ruled).
    - Decisions: Choices, templates and solution finding by enumeration; Completion from a catalog; Library search over kernel residuals; Search beyond enumeration.
 
 **Part VI: Building and running programs**
 
-30. **The build pipeline** (8 decisions). Precompile, the inline cutoff, the stage order of evalSource, registered post-passes and soft failure for verdict tools.
-   - Decisions: Precompile before the evaluation loop; The evalSource stage order; Post-passes registered by layers; Definition and memo entries in the precompile context; Inline cutoff for recursive bindings; Effects deferred during precompile; Soft-fail evaluation for verdict tools; Evaluation and parse statistics as diagnostics.
-   - Draws on: [layers.md](../book/layers.md) §2 (precompile), [allegretto/evaluator.md](../book/allegretto/evaluator.md) §3 (effects deferred, the cutoff), [standard/totality.md](../book/standard/totality.md) §7, §8 (the cutoff), [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) precompile onward.
-31. **Tools over the pipeline** (7 decisions). The command line, file runner, REPL, inspect, the safety grade, obligations and proposals, and debugging.
-   - Decisions: Inspect reports only what the pipeline computed; Safety grade as the default verification surface; One command-line entry with subcommands; File runner as one evaluation with futures drained; REPL as successive evaluations over a persistent scope; Obligations and proposals as machine and human views; Execution tracing and step-through debugging.
-   - Draws on: [getting-started.md](../book/getting-started.md) subcommands, [vision.md](../book/vision.md) §3, §6, [platform/tooling.ir.md](../book/platform/tooling.ir.md).
-32. **Hosts: the terminal and the browser** (9 decisions). Environment capabilities, the host boundary, asynchronous host results, the browser-compatible core and the sandbox.
-   - Decisions: Environment capabilities outside the base, effect-labelled; A stated host boundary in a host unit; Asynchronous host results arrive as future cells; Browser sandbox as an IIFE bundle with a library registry; A browser-compatible core; Liveness of host sources declared per source; Module loader takes its file reader from the host; Asynchronous I/O capabilities beyond timers and HTTP GET; Browser runtime packaging.
-   - Draws on: Futures and the base primitives (planned), [standard/effects.md](../book/standard/effects.md) environment capabilities, [platform/host.ir.md](../book/platform/host.ir.md).
-33. **Compiling beyond the interpreter** (4 decisions). Multi-phase builds, code generation from the expression graph, rewrites licensed by laws, and self-hosting.
-   - Decisions: Multi-phase build as successive partial evaluation; Code generation from the expression graph, JavaScript first; Laws licence rewrites; Self-hosting and a package ecosystem.
-   - Draws on: [vision.md](../book/vision.md) §6, [platform/README.md](../book/platform/README.md) undelivered tracks.
+As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and the ways the platform is used, which is not a list of decisions.
 
-**The recommended pilot.** The plan names `metadata-and-capability.md` as the pilot. That chapter becomes chapter 7 of these contents, "Metadata", with its propagation sections moving to chapter 8 and its install section to chapter 10. Chapter 7 is the recommended pilot. Of its thirteen decisions, eleven are settled and two partly built (the metadata slot as a mixin, and the fixed propagation vocabulary, whose `positional` rule has no path); none is open, so the review rules on presentation rather than on open design. It sits early, after only the thesis and three short kernel chapters, so the concepts it needs (value, kind, structure, immutability) come from chapters the pilot's author can point to without rewriting them. It holds both labels (foundational channels and origination; swappable registration and denial details), so the swappable and foundational marks get tested. Its present text is one chapter already organized by unit, which keeps the rewrite to one source file.
+30. **The kernel's interface** (4 decisions). A passive kernel, what its interface offers and never exposes, and limits.
+   - Decisions: The kernel is passive; What the kernel's interface offers; No interface call writes a bare claim outcome; Limits are step budgets.
+31. **Configuration** (3 decisions). What configuration is, where it is read from, and configuration as a model.
+   - Decisions: Configuration is all the information that determines an execution; Configuration sources have a priority, and a result says which supplied each value; A full configuration is a model, evaluated in a first phase.
+32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
+   - Decisions: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; Startup, step by step; One kernel serves many invocations.
+33. **Capabilities and primitive functions** (4 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
+   - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
+34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
+   - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
+35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
+   - Decisions: A saved program is a recorded sequence of interface calls; A saved program names what it needs by content hash; A stored outcome is restored with its builder's name; A target platform is a model, and export is a transformation into it; Saving is export to a target whose model is the kernel's interface; An exported program needs a kernel only if it handles expressions at run time; A law licenses a rewrite, and the rewritten program carries the law's strength; How extensions are distributed.
+36. **Trust** (6 decisions). What is trusted, what a result names, policies, builders, the reference kernel, purity.
+   - Decisions: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on; A policy is a claim over what a result rests on; A builder is identified by hash, then manifest, then signature; One reference kernel is the root of trust; A primitive's purity is assumed and named unless something stronger is shown.
+37. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
+   - Decisions: A tool reads a phase's result and adds no analysis of its own; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
+38. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
+   - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell, and a failure fills it with an exception; The browser launcher is one bundle; The core runs in a browser.
 
 ## Findings held for their decisions
 
@@ -127,18 +133,18 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | A user-registered viral field stops computation | A field's rule is a pure, bounded function | Metadata | the pilot's review, §7 item 3 |
 | The ownership test never checks owners | An extension registers its own fields; the kernel has two | Metadata | the pilot's review, §7 item 4 |
 | Termination and exhaustiveness are privileged host passes | Termination by bounded decrease; A match where no arm matches is a refutation | Termination and completion | DR1, rulings of 2026-11-11 |
-| `print` is a base primitive | The kernel's primitives are pure and few; Environment capabilities outside the base, effect-labelled | Values; Hosts | DR1, rulings of 2026-11-11 |
-| Phases are hard-coded in the pipeline | Multi-phase build as successive partial evaluation; Precompile before the evaluation loop | The build pipeline; Compiling beyond the interpreter | DR1, rulings of 2026-11-11 |
+| `print` is a base primitive | The kernel's primitives are pure and few; The terminal and the browser ship output, timers and HTTP | Extensions; The launchers we ship | DR1, rulings of 2026-11-11 |
+| Phases are hard-coded in the pipeline | The platform ships three phases: check, run and export | Phases | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | Every program is evaluated the same way, however it arrives | Modules and programs | DR1, rulings of 2026-11-11 |
-| Effects are not gated on decided claims | Environment capabilities outside the base, effect-labelled; A failure a program can handle is supplied by an extension | Hosts; Metadata | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | The terminal and the browser ship output, timers and HTTP; A failure a program can handle is supplied by an extension | The launchers we ship; Correctness | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
-| The platform with no extension loaded cannot load one | the CLI's decisions | Tools over the pipeline | DR1, rulings of 2026-11-11 |
+| The platform with no extension loaded cannot load one | Startup, step by step | Tools | DR1, rulings of 2026-11-11 |
 | Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Extensions | DR1, rulings of 2026-11-11 |
 | Housekeeping removed as decisions in DR2, still owed as work: prefixed engine slots, legacy primitives, the host plane's declaration, shared host types that let the kernel see an extension's representation, kind comparisons outside their units | Each decision lives in one replaceable unit of code; An extension is made of functions and metadata fields | Keep it simple; the extension interface | DR2, rulings of 2026-11-11 |
 | The separate effects checker | the effects decisions | Effects | DR1, rulings of 2026-11-11 |
-| Authorship is not kept in the verdict | Obligations and proposals as machine and human views | Tools over the pipeline | DR1, rulings of 2026-11-11 |
-| Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; Safety grade as the default verification surface; Every result says how strongly it holds | Claims and proofs; Tools over the pipeline; When a check fails | DR1, rulings of 2026-11-11 |
+| Authorship is not kept in the verdict | Open obligations are listed for any proposer | Tools | DR1, rulings of 2026-11-11 |
+| Three strength vocabularies; `proven` names a sampled check and is absent from the verdict; `proven-safe` and "Verdict (verified)" overstate | Bounded sampling for universal claims; A module's summary is the weakest strength among its claims; Every result says how strongly it holds | Claims and proofs; Tools; When a check fails | DR1, rulings of 2026-11-11 |
 | The return check reports a conforming refined return as a mismatch | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A name bound twice wins silently; implicit production replacement; ordered choice | the grammar, module and binding decisions | Parts III and IV | DR1, rulings of 2026-11-11 |
 | Forbidden imports, mixed files and kind comparisons outside their units | Each decision lives in one replaceable unit of code | Keep it simple | DR1, rulings of 2026-11-11 |
@@ -157,6 +163,10 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Effects are label strings checked separately; `is_resolved` is a primitive | An effect is the use of a capability | Effects | DR4, rulings of 2026-11-12 |
 | Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts | DR4, rulings of 2026-11-12 |
 | The verdict is assembled outside evaluation; undecided contracts do not reach it | Every result says how strongly it holds | Keep it simple | DR4, rulings of 2026-11-12 |
+| There is no stated kernel interface; each host calls the evaluator's internals | What the kernel's interface offers | The kernel's interface | DR6, rulings of 2026-11-13 |
+| Hosts are swapped by capturing output and substituting extensions; a failed request fills a cell with an error value; a missing runtime throws | The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell, and a failure fills it with an exception | The launchers we ship | DR6, rulings of 2026-11-13 |
+| The module summary has a vocabulary of its own | A module's summary is the weakest strength among its claims | Tools | DR6, rulings of 2026-11-13 |
+| The browser bundle holds no module loader and fails on an unguarded Node global | The browser launcher is one bundle; The core runs in a browser | The launchers we ship | DR6, rulings of 2026-11-13 |
 
 The pilot's review is [p2-allegretto-metadata-and-capability.md](../records/book-pass/p2-allegretto-metadata-and-capability.md).
 
@@ -203,44 +213,46 @@ They came together over years of exploration into most of what Allegro is today.
 
 ## Today's chapters, mapped
 
+**Note, 2026-11-13.** The "Goes to" lists name the chapters as phase 1 left them. The sentence before each list is the first proposal's and may name a chapter since dissolved; the table is redone when the chapters are written.
+
 | Present chapter | Destination in the proposed contents |
 |---|---|
 | [preface.md](../book/preface.md) (How this book is organized) | Stays the preface, unchanged. Goes to: the preface. |
 | [README.md](../../README.md) (Introduction) | Leaves the book's order: it stays the repository's front page; its account of what Allegro is feeds the tour. Goes to: the tour (what Allegro is). |
-| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Claims and proofs (The prover loop); Tools over the pipeline (subcommands). |
+| [getting-started.md](../book/getting-started.md) (Getting started) | Leaves the narrative as a guide (appendix); its prover loop and compiler views feed three chapters. Goes to: Keep it simple (See what the compiler knows); Claims and proofs (The prover loop); Tools (subcommands). |
 | [language-reference.md](../book/language-reference.md) (Language reference, by example) | Leaves the narrative as a lookup aid (appendix); its spellings are the decisions of the surface-language chapter. Goes to: The surface language; Reaching a member (Private members). |
-| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Models (§4); Tools over the pipeline (§3, §6); Compiling beyond the interpreter (§6). |
+| [vision.md](../book/vision.md) (Vision and principles) | Redistributed: its bets become the tour and Part I's decisions. Tier 0: moving its text needs the maintainer's sign-off (Open questions). Goes to: the tour (§1, §2); Keep it simple (§1, §1a, §2, §5); Why a new language (§1 Substrate and surfaces, §1a, §5); Keep it simple (§1a move 2, §3, §5 principles 6 to 13); Models (§4); Tools (§3, §6); Saved programs and export (§6). |
 | [process.md](../book/process.md) (Process and engineering guide) | Leaves the book: process detail (an appendix outside the order). |
-| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Four planes (plane); Extensions (plane interface). |
-| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules and programs (§2 (build pipeline as a track)); The build pipeline (§2 (precompile)). |
+| [architecture-vocabulary.md](../book/architecture-vocabulary.md) (Architecture vocabulary) | Dissolves: each term moves to the chapter that first uses it (layer and track in Part I, plane and plane interface in Part II); actor leaves with the actors study. Goes to: Why a new language (layer, track, unit); Metadata (plane); Extensions (plane interface). |
+| [layers.md](../book/layers.md) (Layers, tracks and milestones) | Split: the layer spine and tracks enter Part I and the pipeline chapters; milestones and the backlog's use of them leave the book (status). Goes to: Why a new language (§1); Modules and programs (§2 (build pipeline as a track)); Phases (§2 (precompile)). |
 | [units.md](../book/units.md) (Units: the implementation as a narrow DAG) | Split: what a unit is and the DAG enter Part I and the kinds chapter; actors, moves and measurement leave the book (process). Goes to: Why a new language (§1, §2, §4, §5); Values (§3, §3.2); Metadata (§3.1). |
 | [implementation-map.md](../book/implementation-map.md) (Implementation map) | Leaves the book: a file map (appendix); each chapter's as-implemented block points to its unit instead. |
 | [actors-and-activities.md](../book/actors-and-activities.md) (Actors and activities (study)) | Leaves the book: a study (records). |
-| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Structures (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Four planes (T1 §11, §18, §22); Extensions (§23, §24); Scopes (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
+| [concepts.md](../book/concepts.md) (Concepts: requirements, specification and implementation choices, and the definitional spine) | Dissolves: Part 0's requirements and choices become decisions in Parts I and II; the spine's entries become concept definitions at their first use. Goes to: Keep it simple (Part 0 R1, R2); Why a new language (Part 0 R6, §23); Values (T0 §1 to §3, §8); Programs as values (T0 §4 to §7); Values (T0 §9, §12 to §14); Metadata (T2 §19, §19b, §21); Metadata (T2 §20); Metadata (T1 §11, §18, §22); Extensions (§23, §24); Evaluation (§15); Evaluation (§25 to §29); Types as values (T3); Refinement types (T4); Effects (T5); Termination and completion (T5). |
 | [allegretto/README.md](../book/allegretto/README.md) (L0 Allegretto: boundary contract) | Dissolves into Part II: the boundary's invariants become the base's decisions. Goes to: Why a new language (the boundary); Values (the minimal base); Extensions (the install surface). |
-| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Structures (§1, §2); Metadata (§3, Appendix C); Four planes (Appendix A); Scopes (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
+| [allegretto/structures.md](../book/allegretto/structures.md) (Structures, scopes and channels) | Split across Parts II and IV: structure, channels, scope and symbols in Part II; shape and knowledge, equality, conformance and kinds-as-types in Part IV. Goes to: Values (§11, Appendix B); Programs as values (§5); Values (§1, §2); Metadata (§3, Appendix C); Metadata (Appendix A); Evaluation (§4); Evaluation (§10); Types as values (§9); Refinement types (§6); Equality and laws (§7, §8); Termination and completion (§10). |
 | Value, the kinds and the assembly (planned) | Becomes the first two kernel chapters. Goes to: Values; Programs as values. |
 | [allegretto/metadata-and-capability.md](../book/allegretto/metadata-and-capability.md) (Metadata and capability) | Split: §1 to §4 and §6 become the pilot chapter; §5 and §8 the propagation chapter; §7 the install chapter. Goes to: Metadata (§1 to §4, §6, §9); Metadata (§5, §8); Extensions (§7). |
-| Scope (planned) | Becomes the scopes chapter. Goes to: Scopes. |
-| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); The build pipeline (§3 (effects deferred, the cutoff)). |
-| Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; Hosts: the terminal and the browser. |
+| Scope (planned) | Becomes the scopes chapter. Goes to: Evaluation. |
+| [allegretto/evaluator.md](../book/allegretto/evaluator.md) (The evaluator) | Split: evaluation, the PE rules, substitution and tail calls stay together; the install surface goes to Part II's install chapter; precompile behaviour to the pipeline chapter. Its IR (`evaluator.ir.md`) travels with it. Goes to: Values (§2 (the default arm)); Extensions (§7, §8); Evaluation (§2 to §6); Phases (§3 (effects deferred, the cutoff)). |
+| Futures and the base primitives (planned) | Split: futures into the evaluation chapter, the primitives into the kinds chapter, environment capabilities into the host chapter. Goes to: Values; Evaluation; The launchers we ship. |
 | [extension/README.md](../book/extension/README.md) (L1 extension substrate: boundary contract) | Dissolves into Part III's opening. Goes to: Why a new language (the L1 boundary); Parsing (the boundary). |
 | [grammar-formalism.md](../book/grammar-formalism.md) (The grammar formalism) | Becomes the grammars chapter, its extension sections the next one; worked examples move to an appendix. Goes to: Parsing (§1 to §5, §7, §8); Changing the grammar (§6); The surface language (§5 (layout)). |
 | [extension/grammar.md](../book/extension/grammar.md) (Grammar and parser) | Split across Part III and the surface chapter. Goes to: Parsing (§1, §2); Changing the grammar (§4); Modules and programs (§4 (activation)); The surface language (§3). |
 | [extension/modules.md](../book/extension/modules.md) (Module loading and module objects) | Split: loading into the modules chapter, typed module objects into the visibility chapter. Goes to: Modules and programs (Loading, Loaded once per process); Reaching a member (module objects). |
 | [standard/README.md](../book/standard/README.md) (L2 Allegro Standard: boundary contract) | Dissolves into Part IV's opening. Goes to: Types as values (the boundary). |
-| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Four planes (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
+| [standard/type-system.md](../book/standard/type-system.md) (The type system) | Split across the types, refinement, visibility and surface chapters. Goes to: Metadata (§4); Types as values (§1, §2, §5, §6); Refinement types (§3 (refines)); Reaching a member (§3, §7); The surface language (§3 (combinators)). |
 | [standard/core-types.md](../book/standard/core-types.md) (Core types) | Joins the types chapter. Goes to: Types as values. |
-| [standard/effects.md](../book/standard/effects.md) (Effects) | Becomes the effects chapter; environment capabilities go to the host chapter. Goes to: Effects; Hosts: the terminal and the browser (environment capabilities). |
+| [standard/effects.md](../book/standard/effects.md) (Effects) | Becomes the effects chapter; environment capabilities go to the host chapter. Goes to: Effects; The launchers we ship (environment capabilities). |
 | [standard/pattern-matching.md](../book/standard/pattern-matching.md) (Pattern matching) | Split: the spelling into the surface chapter, branch refinement into the contracts chapter. Goes to: The surface language (§1, §2); Contracts (§3). |
-| [standard/totality.md](../book/standard/totality.md) (Totality and termination) | Becomes the termination chapter; the cutoff goes to the pipeline chapter. Goes to: Termination and completion (§1 to §5); When a check fails (§5 (severity)); The build pipeline (§7, §8 (the cutoff)). |
+| [standard/totality.md](../book/standard/totality.md) (Totality and termination) | Becomes the termination chapter; the cutoff goes to the pipeline chapter. Goes to: Termination and completion (§1 to §5); When a check fails (§5 (severity)); Phases (§7, §8 (the cutoff)). |
 | [standard/contracts.md](../book/standard/contracts.md) (Contracts and invariants) | Split: the predicate model and body forms into the contracts chapter, invariants into the refinement chapter, failure semantics into the failures chapter. Goes to: Refinement types (§5); Contracts (§1 to §4, §6, §8); When a check fails (§7, §10). |
 | [vivace/README.md](../book/vivace/README.md) (L3 Vivace: boundary contract) | Becomes the Vivace chapter. Goes to: Models. |
 | [vivace/planning-dsl.md](../book/vivace/planning-dsl.md) (The planning DSL: the first Vivace pilot) | Split: the model into the plans chapter, solution finding into the next. Goes to: Plans as outcome graphs (the model, conventions, enforcement); Finding solutions to a plan (choices, catalogs, search). |
-| [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Compiling beyond the interpreter (undelivered tracks). |
-| [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules and programs (one pipeline, the `use` pre-scan); The build pipeline (precompile onward). |
-| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Claims and proofs (C130); Tools over the pipeline. |
-| [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: Hosts: the terminal and the browser. |
+| [platform/README.md](../book/platform/README.md) (Capability tracks) | Dissolves into Part VI's opening and Part I's tracks. Goes to: Modules and programs (the build track); Saved programs and export (undelivered tracks). |
+| [platform/build-pipeline.ir.md](../book/platform/build-pipeline.ir.md) (The evaluation pipeline) | Split: one pipeline and the `use` pre-scan into the modules chapter, the rest into the pipeline chapter. Goes to: Modules and programs (one pipeline, the `use` pre-scan); Phases (precompile onward). |
+| [platform/tooling.ir.md](../book/platform/tooling.ir.md) (Tooling) | Becomes the tools chapter; verification claims go to Part I. Goes to: Keep it simple (C102 to C110); Claims and proofs (C130); Tools. |
+| [platform/host.ir.md](../book/platform/host.ir.md) (Host environments) | Becomes the host chapter. Goes to: The launchers we ship. |
 | [proving-in-allegro.md](../book/proving-in-allegro.md) (Proving in Allegro) | Its decisions enter the proofs and laws chapters; the primer itself stays a guide (appendix) for provers. Goes to: Keep it simple (When PE-as-discharge isn't enough); Claims and proofs (the proof model, strategies, output contract); Equality and laws (Laws, discharge tiers). |
 | [demo-ladder.ir.md](../book/demo-ladder.ir.md) (The demo ladder and the rung-3 pilot) | Split: the ladder as the thesis test into Part I, the rungs into Part V. Goes to: Why a new language (the ladder); Units of measure (rung 2); Finding solutions to a plan (rung 3, the capstone). |
 | Appendices (registers and records) | Stay appendices, outside the order. |
@@ -527,8 +539,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Proofs exportable to external checkers". The constraint that remains on representation is light: the kernel's rules must be stated, and an evaluation replayable step by step. Assumed and sampled results translate as assumptions.
 - Chapter: Keep it simple
 
-#### Host code reaches a program only as a capability
-- Decides: code in the host's language cannot be checked by the kernel, so it enters in one place: as a capability that the environment supplies to a phase. An extension may declare a capability; a configuration supplies it. A capability takes data and returns data. It cannot write metadata, so it cannot forge a type, a proof or the result of any analysis. A claim about what a capability returns is either checked when the data arrives or reported as assumed.
+#### Host code reaches a program only as primitive functions
+- Decides: code in the host's language cannot be checked by the kernel, so it enters in one form: as a primitive function, a function whose body is host code. A primitive function is effectful or pure. A capability is a named set of effectful ones: an extension may declare it, and a configuration supplies it. A primitive function takes data and returns data. It cannot write metadata, so it cannot forge a type, a proof or the result of any analysis. Its purity is declared and assumed, where a composed function's is decided from what it holds. A claim about what a primitive returns is either checked when the data arrives or reported as assumed.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: technical
@@ -539,6 +551,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a foreign-function interface inside extensions (rejected with the admitted-tier option above); the maintainer's note: this is a second mechanism beside extensions, with a cleaner distinction than before, and no alternative is seen
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/platform/host.ir.md (environment capabilities)
 - Notes: new, by ruling. A database driver, a file system and a fast numeric routine are one construct; the last is a capability with no effect. Data from outside arrives with no claims and earns them by being checked.
+- Notes (2026-11-13, DR6): was "Host code reaches a program only as a capability"; reworded for the four kinds of function the Part VI review settled: a primitive function or a composed function, each effectful or pure. Kept in Part I, where the decisions that depend on it need it.
 - Chapter: Keep it simple
 
 #### No interface limits optimization
@@ -546,7 +559,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
-- Depends on: One operation: partial evaluation; Everything above the kernel is an extension, and there is one way to extend; Host code reaches a program only as a capability
+- Depends on: One operation: partial evaluation; Everything above the kernel is an extension, and there is one way to extend; Host code reaches a program only as primitive functions
 - Significance: 5 — performance is how the partial-evaluation approach is demonstrated
 - Label: foundational — the form of every install, hook and module boundary rests on it
 - Units: evaluator, modules (to be checked in their parts)
@@ -561,7 +574,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
-- Depends on: The kernel trusts only what it has evaluated; Host code reaches a program only as a capability
+- Depends on: The kernel trusts only what it has evaluated; Host code reaches a program only as primitive functions
 - Significance: 5 — no bare checkmark: every result carries its strength and what it rests on
 - Label: foundational — the verdict, the ledger, every grade and every keyword naming a check rest on it
 - Units: none of its own
@@ -863,7 +876,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Host code reaches a program only as a capability
+- Depends on: Host code reaches a program only as primitive functions
 - Significance: 5 — one idea for field writers, supplied capabilities and private access
 - Label: foundational — proofs, effects, privacy and every field's writer rest on it
 - Options recorded: authority by name or by the identity of the requester (rejected); three separate mechanisms for field writers, effects and member privacy (what the inventory listed)
@@ -890,7 +903,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Authority is an unforgeable value; Host code reaches a program only as a capability
+- Depends on: Authority is an unforgeable value; Host code reaches a program only as primitive functions
 - Significance: 4 — no third-party extension installs anything transitively
 - Label: foundational — the trust placed in every extension rests on it
 - Options recorded: capabilities available to any code by name (rejected)
@@ -924,8 +937,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling; the second of the maintainer's two questions. To be placed with Part VI when that part is reviewed.
 - Chapter: Authority
 
-#### Machine arithmetic is a capability that ships with the platform
-- Decides: arithmetic and comparison on machine integers and floating-point numbers are a pure capability that ships with the platform and is supplied in every standard configuration, build phases included, so known values still fold. A claim decided with its help names it.
+#### Machine arithmetic is a set of pure primitives that ships with the platform
+- Decides: arithmetic and comparison on machine integers and floating-point numbers are pure primitive functions that ship with the platform and are supplied in every standard configuration, build phases included, so known values still fold. Being pure, they need no grant. A claim decided with their help names them.
 - Status: open (to prove); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -935,6 +948,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: machine arithmetic in the kernel (rejected, see the bits decision)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
+- Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
 - Chapter: Authority
 
 ### Metadata
@@ -1257,6 +1271,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1 and DR2): 178 primitives in one table, 54 of them the standard language's, `print` and other effects among them (`src/primitives.ts:4509` onward).
 - Notes (2026-11-11, DR2, leftovers): "Primitives receive full values" is a rule of the kernel's own code: a primitive receives its arguments with their metadata intact.
 - Notes (2026-11-12, DR4): truth. The kernel recognises two bit values as true and false; a conditional or a claim on anything else is a refutation. The standard language's Bool is those two values with a type, so the kernel's notion of true depends on no extension.
+- Notes (2026-11-13, DR6): terms. A kernel primitive is one of these; a primitive function is any function whose body is host code. The primitive for evaluating an expression with names rebound can supply the complete set of names, so that Allegro code, the module loader first, can evaluate a module in a scope that holds only what it is given.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1271,6 +1286,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken); docs/book/extension/modules.md "Loading (L1)", "Loaded once per process"
 - Notes: new, by ruling; placed in Part II with the maintainer's approval. These are requirements; the maintainer expects more detail on configuration and the startup process to be needed. Absorbs the load-once clause of "Module resolution, caching and the session's runtime" and the kernel's half of "A module is an extension that arrives as a file" (named values a configuration hands to an evaluation).
 - Held finding (2026-11-12, DR3): the load-once cache is keyed by resolved path and content for one process (`src/modules.ts`), a cache where the decision needs an identity for one configuration.
+- Notes (2026-11-13, DR6): the kernel is passive (Part VI): the launcher, or Allegro code it starts, orders and evaluates the configuration's extensions through the kernel's interface; the kernel itself knows nothing of configuration. "Once in a configuration" reads as once in a kernel.
 - Chapter: Extensions
 
 ### Correctness
@@ -1618,6 +1634,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: extensions delivered as built expressions should be allowed, to make bootstrapping efficient.
 - Held finding (2026-11-12, DR3): the engine, the base grammar and the tree builder are TypeScript (`src/grammar2/`).
+- Notes (2026-11-13, DR6): it ships as a saved program (Part VI).
 - Chapter: The parser engine
 
 ### Modules and programs
@@ -1642,7 +1659,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (the loader takes its file reader as an option; the browser has its own loading code); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired; A capability is supplied per target; Host code reaches a program only as a capability
+- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired; A capability is supplied per target; Host code reaches a program only as primitive functions
 - Significance: 3 — what a module can cause to be read
 - Label: swappable — the search order; the capability itself is fixed by Part II
 - Units: module-loading
@@ -1805,7 +1822,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a capability that ships with the platform; The standard language's handled failure is an exception
+- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
 - Significance: 3 — what every program starts with
 - Label: swappable — the roster
 - Units: core-types, type-primitives
@@ -2376,7 +2393,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (the code infers sets of effect labels and checks them in a pass of its own); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Reading an expression never yields authority; Host code reaches a program only as a capability
+- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Reading an expression never yields authority; Host code reaches a program only as primitive functions
 - Significance: 4 — what a piece of code can touch is visible in what it holds
 - Label: foundational — safety claims about any program
 - Units: effects
@@ -2385,6 +2402,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Effects are values in one lattice", "Effect inference is driven by partial evaluation, and a declaration is a contract", "Effects describe computations, refinements describe data", "Labels for observing knowledge and scheduling", "The `unsafe` hierarchy and safe wrappers", "Open effect surfaces" and the effect variables of "Parameter effect bounds and explicit effect variables". A new capability is declared by an extension (Part I). "Redefining primitives and core types is banned" dissolves into Part I's rule that replacing is explicit.
 - Held finding (2026-11-12, DR4): effects are sets of label strings merged by union (`src/effects.ts:41`) and checked by a separate checker (carried over from the Part I review).
 - Held finding (2026-11-12, DR4): `is_resolved` is a primitive (`src/primitives.ts:4676`).
+- Notes (2026-11-13, DR6): the four kinds of function: a primitive function or a composed function, each effectful or pure. A capability is a named set of effectful primitives. A primitive's purity is declared; a composed function's is decided from what it holds.
 - Chapter: Effects
 
 #### A capability has named parts and narrowed forms
@@ -3034,475 +3052,667 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): The planning DSL
 - Chapter: Finding solutions to a plan
 
-### The build pipeline
+### The kernel's interface
 
-#### Precompile before the evaluation loop
-- Decides: under Allegro Standard only, precompile partially evaluates each function definition's body over typed placeholders before the evaluation loop, inferring return types and effects, skipping library-owned functions and recording mismatches as notifications.
-- Status: settled
-- Type: implementation — the mechanism by which a function's body is checked before it runs
+**The introduction to Part VI, ruled 2026-11-13 (DR6).** Not a list of decisions: the roles and the ways the platform is used, as the maintainer asked.
+
+> **Who does what.** The kernel evaluates, and records the outcome of claims. A launcher is host code that creates a kernel, gives it its first extensions and capabilities, and starts an evaluation. A primitive function is a function whose body is host code; it is effectful or pure, and a capability is a named set of effectful ones. An extension is Allegro code: the parser engine, the module loader, the standard language, a domain language. A saved program rebuilds a program in a kernel without parsing. A configuration is all the information that determines an execution.
+>
+> **How the platform is used.** Running a script. Checking a project. A session at a prompt. Building in one place and running in another. Exporting to a target platform. Embedding a kernel in an application. A page in a browser. A tool reading a phase's result. A person or an agent answering obligations.
+
+#### The kernel is passive
+- Decides: the kernel acts only on calls of its interface. It starts nothing, reads nothing and knows nothing of configuration or phases.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
 - Rationale kind: technical
-- Depends on: One operation: partial evaluation; Types are values that constrain values
-- Significance: 4 — where type and effect inference happen
-- Label: foundational — the divergence stamp, the effects declaration check and the inferred list depend on its output
+- Depends on: What the kernel requires of an extension; The kernel's primitives are pure and few
+- Significance: 4 — everything outside the kernel is someone else's decision
+- Label: foundational — the launcher, configuration and phases
+- Options recorded: a kernel that reads its configuration and loads its extensions itself
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a test harness creates a kernel, makes three calls and discards it; nothing else has happened.
+- Notes: new, by ruling.
+- Chapter: The kernel's interface
+
+#### What the kernel's interface offers
+- Decides: a caller can construct values (bits, symbols, structures, expressions, primitive functions, composed functions); bind a symbol to a value in a scope; create a scope, as a child of another or sharing nothing with any other; evaluate an expression in a scope; fill a cell when a value arrives; read a result with its metadata; obtain a residual; set limits; and receive kernel faults.
+- Status: open (the host calls the evaluator's functions directly); ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The kernel is passive; One value universe; The environment is not a value; A missing value is a cell that is filled once; Evaluation stops early for two reasons only
+- Significance: 4 — the one door between host code and the kernel
+- Label: foundational — launchers, saved programs and embedding
+- Options recorded: no stated interface, each host reaching into the evaluator (what the code does)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: an application embeds a kernel, binds its own data as values, evaluates a rule and reads back the result and what it rests on.
+- Notes: new, by ruling. The maintainer listed constructing, binding, evaluating and creating scopes; the review added cells, results, residuals, limits and faults. A scope that shares nothing with any other is what lets specific code be given specific capabilities. Inside Allegro the environment is still not a value: a scope is a handle of the interface.
+- Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
+- Chapter: The kernel's interface
+
+#### No interface call writes a bare claim outcome
+- Decides: the outcome of a claim enters a kernel in two ways only: the kernel decides it, or it is restored with its builder's name. A field an extension owns is never written through the interface; the extension's constructors are replayed.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel's interface offers; Only the kernel records the outcome of a claim; An extension registers its own fields; the kernel has two
+- Significance: 5 — host code cannot forge a result
+- Label: foundational — trust in every result
+- Options recorded: an interface call that sets any field of any value
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a host-code extension tries to hand the kernel a value marked as proven; no call exists that would do it.
+- Notes: new, by ruling.
+- Chapter: The kernel's interface
+
+#### Limits are step budgets
+- Decides: a caller limits an evaluation by a budget of steps, which is deterministic. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided.
+- Status: open (a depth bound exists); ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel's interface offers; Evaluation stops early for two reasons only; The same program and the same information give the same result
+- Significance: 3 — a runaway evaluation ends the same way every time
+- Label: swappable — the unit of the budget
+- Options recorded: limits by the clock inside the kernel (rejected: the same program would give different results)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a solver gives each candidate ten thousand steps; a candidate that runs out is undecided, and is so on every machine.
+- Notes: new, by ruling.
+- Chapter: The kernel's interface
+
+### Configuration
+
+#### Configuration is all the information that determines an execution
+- Decides: it includes which kernel to use; the definitions of capabilities, phases and pipelines; which implementation each capability maps to; the parser engine and the module loader; information about the environment; and the parameters of the invocation. How much of it the launcher manages and how much Allegro code manages is left open on purpose.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The kernel is passive; Phases are configuration; A capability is supplied per target
+- Significance: 4 — one word for everything that makes two runs differ
+- Label: foundational — launching, phases and trust
+- Options recorded: a fixed split between a launcher's configuration and a program's inputs (the review's first proposal; withdrawn: a launcher may be minimal, and what Allegro code manages is open to partial evaluation and to claims)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: the same program is checked on a laptop and run on a server; only the configuration differs.
+- Notes: new, by ruling. The maintainer's definition: "all information that determines how an Allegro execution is performed".
+- Chapter: Configuration
+
+#### Configuration sources have a priority, and a result says which supplied each value
+- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. The result of an execution records which source supplied each value.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Configuration is all the information that determines an execution; Every result says how strongly it holds
+- Significance: 3 — an override is never silent
+- Label: swappable — the sources and their order
+- Options recorded: silent override by the highest source
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a flag on the command line replaces a value from the project's file, and the report shows that it did.
+- Notes: new, by ruling. An environment variable that redirects a capability to another implementation is a risk the chapter on trust takes up.
+- Chapter: Configuration
+
+#### A full configuration is a model, evaluated in a first phase
+- Decides: a configuration is written in a language of its own and evaluated like any model, in a phase that runs before the others. Only the minimum needed to start stays in host form.
+- Status: open, a design to prove; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Configuration is all the information that determines an execution; A model is a value
+- Significance: 3 — a configuration gets the checks every model gets
+- Label: swappable — the configuration's language
+- Options recorded: configuration as files in a host format, read by the launcher only
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a project's configuration claims that no phase is given network access; the claim is checked before anything runs.
+- Notes: new, by ruling; it gives the sources' configuration phase a meaning.
+- Chapter: Configuration
+
+### Launching
+
+#### The launcher does only what cannot be done in Allegro
+- Decides: a launcher is host code invoked on a system to create a kernel and have it evaluate a program. It must load a kernel, give it the first extensions and capabilities, and start the evaluation. Anything more a launcher does is an earlier phase, run ahead of time and saved, so a minimal launcher and a fully loaded one are the same design at different points.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The kernel is passive; What the kernel's interface offers; The kernel contains only what no extension could supply
+- Significance: 4 — the launcher's size is a choice of speed, never of meaning
+- Label: foundational — every launcher, shipped or embedded
+- Options recorded: a launcher with duties fixed by the platform
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: an exported program's launcher holds every extension it needs already built; a development launcher holds a parser and a loader and finds the rest.
+- Notes: new, by ruling. The criterion mirrors the kernel's own. The parser engine and the module loader are the two extensions every launcher provides.
+- Chapter: Launching
+
+#### Only the launcher sets the ceiling
+- Decides: the capabilities a launcher gives an execution are a ceiling: no code inside can exceed it. Within it, code still has to be handed a capability, by value or by being evaluated in a scope that holds it.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The launcher does only what cannot be done in Allegro; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim
+- Significance: 5 — what an execution can do at all is decided outside it
+- Label: foundational — every grant inside
+- Options recorded: capabilities bound by name where all code can reach them (rejected: nothing is granted by name)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a check phase is launched with no capability to act; nothing the program loads can write a file.
+- Notes: new, by ruling.
+- Chapter: Launching
+
+#### Startup, step by step
+- Decides: (1) a launcher is invoked with a configuration and a phase. (2) It creates a kernel, which has its kernel primitives and nothing else. (3) It loads the first extensions, each once and in the order their dependencies require; the first are saved programs, since no text can be read before a parser exists. (4) It creates the capabilities of the ceiling and hands each to the code the configuration names. (5) It builds the main program's expression, usually by asking the loader for the main module, and has the kernel evaluate it. (6) It delivers values that arrive later. (7) When nothing waited for is outstanding it handles the result, or the program has done so through a capability.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; What the kernel requires of an extension; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities
+- Significance: 4 — how the parts fit together
+- Label: swappable — the order within the constraints the steps state
+- Options recorded: none recorded
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken); docs/book/platform/tooling.ir.md C34 to C50
+- Use case: `allegro check project.alg`: the seven steps, with an empty ceiling at step 4.
+- Notes: new, by ruling. Absorbs "File runner as one evaluation with futures drained". The maintainer: the process is defined in detail "so people understand how it all hangs together".
+- Held finding (2026-11-13, DR6): a kernel with no extension loaded cannot load one (carried over from the Part I review).
+- Held finding (2026-11-13, DR6): the suite runs demos through `evalSource` with extensions it chooses, not through the file runner, so a demo can pass the suite and fail the runner.
+- Chapter: Launching
+
+#### One kernel serves many invocations
+- Decides: a launcher may have one kernel evaluate a stream of commands, events or requests, each in its own scope with its own capabilities. The stream may equally be handled by Allegro code through a capability.
+- Status: partly built (the prompt); ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel's interface offers; Only the launcher sets the ceiling; Running a program is evaluating its main module with a configuration's capabilities
+- Significance: 3 — servers, prompts and tools that stay running
+- Label: swappable — who drives the stream
+- Options recorded: a new kernel for every invocation
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a server answers each request in a fresh scope that holds only that request's capabilities.
+- Notes: new, by ruling.
+- Chapter: Launching
+
+### Capabilities and primitive functions
+
+#### A capability is a named set of effectful primitives
+- Decides: a capability is defined once, in Allegro, by its name and its parts, so that a bound on capabilities can name it. It is implemented per target by primitive functions, and it is what gets granted. A primitive function that performs no effect needs no grant.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Host code reaches a program only as primitive functions; A capability is supplied per target; A capability has named parts and narrowed forms; An effect is the use of a capability
+- Significance: 4 — what is granted has a definition a program can read
+- Label: foundational — grants, bounds and targets
+- Options recorded: capability definitions held in configuration only (not chosen: a program's bounds must be able to name them)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: `files` is defined once with the parts read and write; the terminal and the browser each implement it.
+- Notes: new, by ruling. The maintainer: capabilities "are defined abstractly (e.g. file I/O, network I/O)", mostly independent of platform, and mapped to implementations for a target.
+- Chapter: Capabilities and primitive functions
+
+#### A module is a function of the capabilities it declares
+- Decides: a module declares the capabilities it needs. It is evaluated in a scope that holds those and nothing else of the kind, supplied by whoever loads it.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is an extension that arrives as a file; Only the launcher sets the ceiling; A capability is granted, never acquired; The loader reaches files through a capability
+- Significance: 4 — what a module can do is visible where it is loaded
+- Label: foundational — confinement of every dependency
+- Options recorded: capabilities passed only as arguments to an entry function (a narrower form of the same thing)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a logging module declares output; the module that imports it hands over a narrowed form that can only append to one file.
+- Notes: new, by ruling. It needs the kernel primitive for evaluating with names rebound to supply the complete set of names (noted on "The kernel's primitives are pure and few").
+- Chapter: Capabilities and primitive functions
+
+#### Loading is three capabilities of rising strength
+- Decides: loading a module from text, loading a saved program in data form, and loading host code are three capabilities. Text is checked like any program. Data is confined to the kernel's interface. Host code can do anything, so its capability is given only to trusted code and is narrowed to a list of files pinned by content hash. A configuration can claim that no host code is loaded after startup.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is a function of the capabilities it declares; The loader reaches files through a capability; A capability has named parts and narrowed forms; Host code reaches a program only as primitive functions
+- Significance: 4 — untrusted code has a way in that gives it nothing
+- Label: foundational — extensibility at run time, and its control
+- Options recorded: host code loaded by the launcher only (safer; it stops a program choosing its drivers); a list of allowed paths (weaker: a file can change between the check and the load)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a program that connects to several databases loads only the drivers it needs, from a pinned list.
+- Notes: new, by ruling. The maintainer allowed host-code loading from inside the kernel, with these controls, and noted that such features "may be blocked in high-compliance environments".
+- Chapter: Capabilities and primitive functions
+
+#### Every pure primitive the platform ships has a reference definition
+- Decides: the meaning of a pure primitive is a composed function. The host code is an optimisation claimed equal to it, and anyone can run on the definitions alone, trusting only the kernel.
+- Status: open, a goal; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Host code reaches a program only as primitive functions; Machine arithmetic is a set of pure primitives that ships with the platform; No interface limits optimization
+- Significance: 3 — pure host code stops being a matter of trust
+- Label: swappable — which primitives have one
+- Options recorded: purity and meaning of a primitive taken on its author's word (the default until a definition exists)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: integer addition is defined on bits in Allegro; the machine's adder is used, and a doubtful result can be recomputed without it.
+- Notes: new, by ruling: the maintainer holds it a worthwhile goal. Takes the item the Part I review deferred, capability bodies written as Allegro expressions.
+- Chapter: Capabilities and primitive functions
+
+### Phases
+
+#### The platform ships three phases: check, run and export
+- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability to act and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
+- Status: open (the pipeline's stages are fixed in host code); ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Phases are configuration; Only the launcher sets the ceiling; A capability is supplied per target
+- Significance: 4 — what a user does first, named
+- Label: swappable — the shipped set
 - Units: pipeline, evaluator
-- Options recorded: none recorded
-- Sources: docs/book/layers.md §2 (def-precompile); docs/book/platform/build-pipeline.ir.md C81 to C97, C166 to C169
-- Book home (fragments' proposal): The evaluation pipeline
-- Notes: Assembly: the dependency on the stage order was dropped to break a cycle (the stage order places precompile, so it depends on precompile); a dependency on "Types are values that constrain values" was added, since precompile runs over typed placeholders.
-- Chapter: The build pipeline
+- Options recorded: seven phases (invocation, configuration, compile, emit, package, deploy, execute; the sources' list, kept as phases a project may define); a fixed pipeline of stages (what the code does)
+- Sources: docs/book/layers.md §2, §3 (M6); docs/book/platform/README.md (T-build fragments); docs/book/platform/build-pipeline.ir.md C122 to C126; docs/plans/release-track.md §3 D5; docs/book/vision.md §1; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a commit hook runs check; a deploy script runs export and then, on the target, run.
+- Notes: replaces "Multi-phase build as successive partial evaluation" and the build pipeline's entries. What those entries described is ruled elsewhere: precompile by "A claim about every value is decided by evaluating it with the value unknown"; effects deferred by "Phases are configuration"; the cutoff for recursion and the precompile context's entries by "A recursive call is evaluated once for each state of knowledge"; soft failure by Part I's rule that a phase reports every refutation in its result. The diagnostic switches are housekeeping.
+- Held finding (2026-11-13, DR6): phases are hard-coded: `evalSource` runs a fixed list of stages, with precompile, the post-passes and soft failure among them (carried over from the Part I review).
+- Held finding (2026-11-13, DR6): the soundness review of the cutoff for recursive bindings is pending.
+- Chapter: Phases
 
-#### The evalSource stage order
-- Decides: `evalSource` runs, in order, channel sealing, the divergence-analysis placeholder, library-owned collection, grammar merge and parse, `buildProgram`, literal typing, symbol resolution, body-metadata collapse and tail marking, the divergence analysis, precompile, the post-precompile checks, the evaluation scope, the evaluation loop in source order, forward chaining, the proof and `proven` checks, and symbol registration.
-- Status: settled
-- Type: implementation
+#### A phase hands its residual to the next
+- Decides: the residual of a phase is a program: a value that can be saved, loaded and evaluated further. A sequence of phases is a pipeline. A phase may state what it must leave decided before the next begins.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Every program is evaluated the same way, however it arrives; Precompile before the evaluation loop
-- Significance: 3 — each stage's assumptions are the next stage's guarantees
-- Label: foundational — the ordering constraints (resolve before tail marking, collapse before precompile, stamp before the effects check) are load-bearing
-- Units: pipeline
-- Options recorded: none recorded
-- Sources: docs/book/platform/build-pipeline.ir.md C17 to C63; docs/book/concepts.md §29 (cited there)
-- Book home (fragments' proposal): The evaluation pipeline
-- Notes: Significance calibrated from 4.
-- Chapter: The build pipeline
+- Depends on: The platform ships three phases: check, run and export; Evaluation is total over unresolved information; An effect consumes only values whose claims are decided
+- Significance: 4 — building is evaluating in steps
+- Label: foundational — pipelines, saved programs and export
+- Options recorded: phases that each start from source
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a build phase resolves everything but the request data; the server's run phase starts from that residual.
+- Notes: new, by ruling.
+- Chapter: Phases
 
-#### Post-passes registered by layers
-- Decides: the post-passes, Allegro Standard concepts hardcoded into the base's stage list today, should be registered by the layer that owns them, through the plane-interface fix shape.
+#### A project defines a phase or extends one
+- Decides: a phase is defined by naming its extensions, its capabilities, what it must leave decided and what happens to its result. A project extends a shipped phase by adding to any of these.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A phase hands its residual to the next; Nothing is a claim until someone makes it; Configuration is all the information that determines an execution
+- Significance: 3 — a project's process is configuration
+- Label: swappable — the form of a definition
+- Options recorded: a fixed set of phases
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a project extends check with the claim that every function terminates, and adds a package phase after export.
+- Notes: new, by ruling.
+- Chapter: Phases
+
+### Saved programs and export
+
+#### A saved program is a recorded sequence of interface calls
+- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record of calls on the kernel's interface, and can do nothing else. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel's interface offers; A phase hands its residual to the next; Loading is three capabilities of rising strength
+- Significance: 4 — how the first parser, the standard language and every build arrive
+- Label: foundational — startup speed and distribution
+- Options recorded: host code only (the maintainer's first definition: efficient, but loading it is running arbitrary code); data only (cannot hold a primitive function)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: the standard language is built once and saved; every later start replays the record.
+- Notes: new, by ruling. "The platform's parser engine ships already built" is its first use.
+- Chapter: Saved programs and export
+
+#### A saved program names what it needs by content hash
+- Decides: a saved program names each primitive function and each extension it depends on by a hash of its content. A mismatch at load is a refutation.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A saved program is a recorded sequence of interface calls; Order of definition carries no meaning
+- Significance: 3 — a saved program never runs against something else
+- Label: swappable — how a dependency is identified
+- Options recorded: trusting that the loading execution has the same versions; version numbers
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a saved library built against one arithmetic implementation refuses to load beside another.
+- Notes: new, by ruling. The maintainer: this "is inviting dependency hell, but every modular programming platform that's successful goes to dependency hell as punishment. I think hash checks will work for now." A checked mapping between two versions of a model might later serve as a compatibility claim; the maintainer is sceptical on grounds of combinatorial complexity.
+- Chapter: Saved programs and export
+
+#### A stored outcome is restored with its builder's name
+- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. Deciding again is always available.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: No interface call writes a bare claim outcome; A saved program names what it needs by content hash; The same program and the same information give the same result; Every result says how strongly it holds
+- Significance: 5 — a build's results can be reused without being taken on faith silently
+- Label: foundational — saved programs, builds and distribution
+- Options recorded: deciding everything again at every load (nothing trusted, nothing saved; kept as an option); restored outcomes that drop to assumed; restore as a call only a launcher can make (safer, and it stops loaders written in Allegro)
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a team's build server saves a library with its laws decided; a developer's kernel restores them stamped with the server's name, and an auditor decides them again.
+- Notes: new, by ruling. The maintainer: fully rechecking on load "will likely be opt-in"; restore is allowed inside the kernel and is configurable, which "means mostly we need to always analyze for vulnerabilities".
+- Chapter: Saved programs and export
+
+#### A target platform is a model, and export is a transformation into it
+- Decides: export maps a residual expression to a target's code. The target platform is a model, and the mapping is declared as every transformation is. Export includes the target's own capabilities for the phases that follow there: deploy, load, run, invoke. JavaScript is the first target.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A phase hands its residual to the next; A transformation is a model; Two models relate only through a declared mapping; A capability is supplied per target
+- Significance: 4 — a program leaves the platform through a checked mapping
+- Label: foundational — every target
+- Options recorded: a code generator outside the language (the sources' plan; it named continuations and algebraic effects, which go: an effect is the use of a capability)
+- Sources: docs/book/layers.md §2, §3 (M8); docs/book/platform/README.md; B-072; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a service is exported to JavaScript with the target's own implementation of HTTP for its run phase.
+- Notes: replaces "Code generation from the expression graph, JavaScript first". The maintainer's terms: target, target platform, export target; not backend.
+- Chapter: Saved programs and export
+
+#### Saving is export to a target whose model is the kernel's interface
+- Decides: a saved program needs no mechanism of its own: it is what export produces when the target is the kernel's interface.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: implementation — how saving is realised
+- Rationale kind: technical
+- Depends on: A saved program is a recorded sequence of interface calls; A target platform is a model, and export is a transformation into it
+- Significance: 2 — one mechanism in place of two
+- Label: swappable — saving could be built separately
+- Options recorded: a serialiser of its own
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: the tool that saves the parser engine is the export phase with one more target.
+- Notes: new, by ruling.
+- Chapter: Saved programs and export
+
+#### An exported program needs a kernel only if it handles expressions at run time
+- Decides: most exported programs are graphs of functions turned into target code and carry no kernel. A claim over an input that arrives at run time becomes an ordinary check. A program that evaluates constructed code, loads modules, changes grammar over text it receives or reads residuals needs a kernel: it carries one, loads one as a library, or carries one specialised to it once the platform hosts itself.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A target platform is a model, and export is a transformation into it; One operation: partial evaluation
+- Significance: 3 — what an exported program weighs
+- Label: swappable — how a kernel is supplied when one is needed
+- Options recorded: a kernel in every exported program
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a command-line tool exports to a few hundred lines with no kernel; a notebook server exports with one.
+- Notes: new, by ruling. "This residual needs no kernel" can be a claim a target requires.
+- Chapter: Saved programs and export
+
+#### A law licenses a rewrite, and the rewritten program carries the law's strength
+- Decides: an optimiser may rewrite a program by a law. The result is as strong as the law: a rewrite by a decided law changes nothing in what the program rests on; a rewrite by a sampled or assumed law says so. A capability's supplier may declare laws about it; those are assumed.
+- Status: open (laws exist; nothing rewrites by them); ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Lawful interfaces; Four strengths, one vocabulary; No interface limits optimization; A target platform is a model, and export is a transformation into it
+- Significance: 3 — an optimiser anyone can extend and nobody has to trust
+- Label: swappable — which rewrites are offered
+- Options recorded: an optimiser with rules of its own, trusted
+- Sources: docs/plans/release-track.md §3 D5; B-063; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a library proves that mapping twice equals mapping once with the composed function; the optimiser fuses the two loops.
+- Notes: replaces "Laws licence rewrites"; answers the question two earlier reviews sent here, whether a capability's declared laws may license rewrites around its body.
+- Chapter: Saved programs and export
+
+#### How extensions are distributed
+- Decides: open — as text or as saved programs, with a manifest (the hashes of the program, the kernel, its dependencies and its configuration), a signature, and versions; and how the platform itself is packaged for a browser.
 - Status: open
-- Type: implementation — where the post-passes are registered in the code
+- Type: capability
 - Rationale kind: technical
-- Depends on: The evalSource stage order; Each decision lives in one replaceable unit of code
-- Significance: 3 — would make the pipeline layer-neutral
-- Label: foundational — moving the passes changes what L0 knows of L2
-- Units: pipeline
-- Options recorded: hardcoded stage list (today)
-- Sources: docs/book/platform/build-pipeline.ir.md C144 to C146; docs/book/concepts.md §29 (cited there); B-110
-- Book home (fragments' proposal): The evaluation pipeline
-- Chapter: The build pipeline
-
-#### Definition and memo entries in the precompile context
-- Decides: in the precompile context a function definition becomes a definition entry, evaluated once at first lookup and binding the first object built for every later lookup, and any other unresolved binding a memo entry evaluated once at first lookup.
-- Status: settled
-- Type: implementation
-- Rationale kind: technical
-- Depends on: Precompile before the evaluation loop
-- Significance: 2 — gives one object per definition, which the cutoff needs
-- Label: swappable — internal to the pipeline unit
-- Units: pipeline
+- Depends on: A saved program names what it needs by content hash; A stored outcome is restored with its builder's name
+- Significance: 3 — sharing work between projects
+- Label: swappable — the registry and its formats
 - Options recorded: none recorded
-- Sources: docs/book/platform/build-pipeline.ir.md C84 to C87, C160 to C166 (T37); docs/plans/recursive-precompile.md §7 (cited at C175)
-- Book home (fragments' proposal): The evaluation pipeline
-- Chapter: The build pipeline
+- Sources: docs/book/layers.md §2, §3 (M9, M10); docs/book/vivace/README.md (Provides; maintainer ruling 2026-07); docs/book/platform/host.ir.md C126 to C129; B-070; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a team publishes a domain language; another team loads it and sees whose build its results rest on.
+- Notes: replaces the package half of "Self-hosting and a package ecosystem" and "Browser runtime packaging". Self-hosting is no longer an aspiration: Parts I and III require it.
+- Chapter: Saved programs and export
 
-#### Inline cutoff for recursive bindings
-- Decides: during a typed compilation, a speculative call with an unresolved argument into a recursion cycle (found by the divergence analysis, and recognised by the object its definition is bound to in the precompile context or a copy sharing its body) is residualised rather than unfolded, whatever its discharge tier; a fully applied call still executes.
-- Status: partly built
-- Type: implementation — a cutoff for a precompile performance pathology
-- Rationale kind: technical
-- Depends on: A call is evaluated by evaluating the function's body; Definition and memo entries in the precompile context; Termination is a claim; Mutual recursion requires every edge to decrease
-- Significance: 3 — without it precompile unfolds recursion until the stack overflows
-- Label: swappable — one injected predicate
-- Units: evaluator, pipeline; pipeline, evaluator; totality, pipeline
-- Options recorded: key on discharge tier (rejected: penalised proven-total functions about 700×); (a) match by the definition's body; (b) the bound definition object (taken); (c) a registered property naming the source definition (out of scope); none recorded in this source (the recursive-precompile plan holds the chunk record); cutting only `undischarged`/`partial` bindings (rejected on measurement: ~700× penalty for proven-total functions)
-- Sources: docs/decisions.md T-R6; docs/plans/recursive-precompile.md §1 terms, §6 RR1; docs/book/allegretto/evaluator.md §3; docs/book/platform/build-pipeline.ir.md C98, C100, C102, C170 to C175; docs/plans/recursive-precompile.md §7; T-R6 (docs/decisions.md; docs/book/standard/totality.md §7–§8); B-159 R2/R3; B-100, B-180
-- Book home (fragments' proposal): allegretto/evaluator.md §3 / The evaluation pipeline / standard/totality
-- Notes: Merged from fragment A ("Recursion inline cutoff keyed on the bound definition"), fragment C ("Inline cutoff for recursive bindings"), fragment B ("Recursion inlining cutoff on cycle membership"). A: soundness review pending (B-100). `setInlineCutoff` takes no writer capability (evaluator.md §7). The cutoff's identity test silently missed every typed function from B-121 C2 until B-159: an instance of identity-sensitive objects meeting copy-on-attach. C: the cutoff was inert for typed functions after B-121 C2 until B-159 R2 restored it (C175). B: soundness review pending (B-100); the analysis can still reach a host stack overflow through recursion the cutoff does not see. Assembly: three entries merged (fragment A's evaluator view, fragment B's totality view, fragment C's pipeline view). Significance calibrated from 3/3/2.
-- Chapter: The build pipeline
+### Trust
 
-#### Effects deferred during precompile
-- Decides: during precompile, an effectful primitive returns a residual even over resolved arguments, deferring its side effect to the run.
-- Status: settled
-- Type: implementation — a rule of the precompile mechanism
+#### Three things are trusted: the kernel, the launcher and primitive functions
+- Decides: everything else is checked. Allegro code from any source is evaluated like any program; a proposal is never trusted; a saved program is trusted as far as its builder and can be decided again.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
 - Rationale kind: technical
-- Depends on: One operation: partial evaluation; Precompile before the evaluation loop
-- Significance: 2 — compile time runs no effect
-- Label: swappable — inside the evaluator
-- Units: evaluator
+- Depends on: Trust comes from the kernel, not the author; The launcher does only what cannot be done in Allegro; Host code reaches a program only as primitive functions; Every program is evaluated the same way, however it arrives
+- Significance: 5 — a user knows what they are relying on
+- Label: foundational — every assurance the platform gives
 - Options recorded: none recorded
-- Sources: docs/book/allegretto/evaluator.md §3; docs/plans/pe-rules.md §6 RR3
-- Book home (fragments' proposal): allegretto/evaluator.md §3
-- Notes: Assembly: moved from the evaluator to the pipeline chapter and given a dependency on "Precompile before the evaluation loop", whose concept it uses.
-- Chapter: The build pipeline
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: an organization reviews one kernel, one launcher and a dozen primitive functions, and nothing of the four hundred libraries it uses.
+- Notes: new, by ruling. The chapter opens with what a user would otherwise trust. Against a conventional stack Allegro improves four things: dependencies written in Allegro are checked; a dependency can do only what it is handed; a result names what it rests on; a stored build can be reproduced. It improves nothing for host code, and the kernel is trusted, though small. The maintainer: "A big part of the issue is a user (or organization) determining what level of trust they need, and where Allegro reliably improves on what they would otherwise do." The cases, their risks and the counter to each are chapter material: the kernel; the launcher; a capability's implementation; an extension as text; a saved program (altered, built by another kernel or configuration, out of date, carrying keys); exported code; a proposal; a configuration source.
+- Chapter: Trust
 
-#### Soft-fail evaluation for verdict tools
-- Decides: with `softFail` set, the halting post-passes record their error notifications without throwing, and `verify`, `obligations` and `propose` run that way so the verdict can describe the failures.
-- Status: settled
-- Type: capability — it decides what the verdict tools can report
+#### A result names everything it rests on
+- Decides: beside the extensions and capabilities Part I names, a result names the kernel variant, the configuration and its sources, the primitive functions, the builders of saved programs and the target.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
 - Rationale kind: technical
-- Depends on: Claims are evaluated like everything else
-- Significance: 2 — lets tooling report instead of stopping
-- Label: swappable — a flag on one stage
-- Units: pipeline, cli
+- Depends on: Every result says how strongly it holds; Three things are trusted: the kernel, the launcher and primitive functions; A stored outcome is restored with its builder's name; Configuration sources have a priority, and a result says which supplied each value
+- Significance: 4 — trust is read, not presumed
+- Label: foundational — policies and audits
 - Options recorded: none recorded
-- Sources: docs/book/platform/build-pipeline.ir.md C68, C69; docs/book/platform/tooling.ir.md C72, C100
-- Book home (fragments' proposal): The evaluation pipeline
-- Notes: `inspect` runs without soft-fail, so a halting failure never reaches a safety grade (tooling C95).
-- Chapter: The build pipeline
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a report says a property is decided, by this kernel, with these two primitives, on outcomes restored from one named builder.
+- Notes: new, by ruling.
+- Chapter: Trust
 
-#### Evaluation and parse statistics as diagnostics
-- Decides: four environment variables switch on diagnostics (`ALLEGRO_STACK`, `ALLEGRO_TRACE_DEPTH`, `ALLEGRO_PARSE_STATS`, `ALLEGRO_EVAL_STATS`), the two stats variables read inside the pipeline so they reach every caller, with stats sinks for tests and gates.
-- Status: settled
-- Type: implementation — diagnostics of this implementation
+#### A policy is a claim over what a result rests on
+- Decides: a policy is stated on a phase, as what it must leave decided; on a capability, as a requirement on what its inputs rest on; or as a profile, a named set of such claims that an organization adopts whole. A policy can only add requirements, and policies combine by conjunction: code inside can be stricter than its configuration and never looser.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
 - Rationale kind: technical
-- Depends on: The evalSource stage order
-- Significance: 1 — diagnostics
-- Label: swappable — local switches
-- Units: pipeline, evaluator, grammar-formalism, cli
+- Depends on: A result names everything it rests on; Nothing is a claim until someone makes it; Only the launcher sets the ceiling
+- Significance: 4 — a level of trust is chosen, and then enforced
+- Label: foundational — compliance
+- Options recorded: policy as settings of a tool, outside the language
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a profile lets the deploy capability accept only values that rest on no sampled claim and on builders the organization lists.
+- Notes: new, by ruling. A strict profile might also require that no host code is loaded after startup.
+- Chapter: Trust
+
+#### A builder is identified by hash, then manifest, then signature
+- Decides: in stages: content hashes for every artifact; a manifest for each saved program; a signature on the manifest, verified by a pure primitive, with the accepted keys in the configuration. Because evaluation is deterministic, anyone can rebuild a saved program and compare.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A stored outcome is restored with its builder's name; The same program and the same information give the same result
+- Significance: 3 — a builder's name means something
+- Label: swappable — the scheme
 - Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C137 to C154; docs/book/platform/build-pipeline.ir.md C40, C41, C104, C105
-- Book home (fragments' proposal): Tooling
-- Notes: `ALLEGRO_TRACE_DEPTH` treats its value as the step, so the comment's "1 prints every 500 levels" is wrong (tooling R5); the unguarded `process.env` read at `src/evaluator.ts:23` breaks the browser bundle (host C110 to C114).
-- Chapter: The build pipeline
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a user who trusts no builder rebuilds a library from its text and finds the same hash.
+- Notes: new, by ruling.
+- Chapter: Trust
 
-### Tools over the pipeline
+#### One reference kernel is the root of trust
+- Decides: a kernel variant is identified by hash. One variant, small and slow, is the reference. Any other is trusted as far as it agrees with the reference, which deciding again can check. A kernel produced by partial evaluation from the reference is trusted as an export mapping is.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on
+- Significance: 3 — speed does not enlarge what is trusted
+- Label: swappable — which variants exist
+- Options recorded: every variant trusted alike
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a fast kernel runs in production; a nightly job decides a sample of its results again on the reference.
+- Notes: new, by ruling.
+- Chapter: Trust
 
-#### One primer for human and machine provers
-- Decides: the proving guide is one participant-neutral document, and the `prove` loop sends that same file to the language model as its primer.
-- Status: settled
-- Type: capability — it decides what a machine prover is told
-- Rationale kind: vision
+#### A primitive's purity is assumed and named unless something stronger is shown
+- Decides: by default a pure primitive is taken as pure on its declaration, and results name it. Three things are stronger: sampling it; a target that runs it with no access to the outside, which enforces purity; and its reference definition.
+- Status: open; ruled 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Host code reaches a program only as primitive functions; Every pure primitive the platform ships has a reference definition; The same program and the same information give the same result
+- Significance: 3 — determinism rests on it
+- Label: swappable — which means a target offers
+- Options recorded: none recorded
+- Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a string library ships as a WebAssembly module with no imports; it cannot read the clock.
+- Notes: new, by ruling. An effectful primitive cannot be checked this way; it takes data and returns data, and is named.
+- Chapter: Trust
+
+### Tools
+
+#### A tool reads a phase's result and adds no analysis of its own
+- Decides: everything a tool shows was computed by evaluation and is in the result: types, claims and their strengths, what each rests on.
+- Status: settled; reworded 2026-11-13 (DR6)
+- Type: capability — a guarantee to the user
+- Rationale kind: technical
+- Depends on: Phases are configuration; Every result says how strongly it holds
+- Significance: 3 — two tools never disagree about a program
+- Label: foundational — every tool
+- Units: introspect
+- Options recorded: none recorded
+- Sources: docs/book/platform/tooling.ir.md C11, C66 to C84; docs/book/vision.md §3, §5 principles 2 and 6; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: an editor plug-in and the command line show the same strength for the same theorem.
+- Notes: was "Inspect reports only what the pipeline computed".
+- Held finding (2026-11-13, DR6): `inspect` runs without soft failure, so a halting failure never reaches a summary; 19 kind comparisons in `src/introspect.ts` break the discriminator rule.
+- Chapter: Tools
+
+#### A command is a configuration
+- Decides: each command of the platform names a phase and a way of presenting its result. `allegro` with a file runs it; with no argument it starts a prompt.
+- Status: settled; reworded 2026-11-13 (DR6)
+- Type: capability — the command-line surface
+- Rationale kind: technical
+- Depends on: A project defines a phase or extends one; A tool reads a phase's result and adds no analysis of its own
+- Significance: 2 — the commands are not special
+- Label: swappable — the set of commands
+- Units: cli
+- Options recorded: none recorded
+- Sources: docs/book/platform/tooling.ir.md C17, C23 to C33; docs/book/platform/build-pipeline.ir.md C68, C69; docs/book/platform/tooling.ir.md C72, C100; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a project adds its own command by naming a phase and a report.
+- Notes: was "One command-line entry with subcommands"; absorbs "Soft-fail evaluation for verdict tools" (a phase reports every refutation in its result).
+- Held finding (2026-11-13, DR6): `package.json` declares no `bin` entry; `prove` ignores the choice of configuration.
+- Chapter: Tools
+
+#### A module's summary is the weakest strength among its claims
+- Decides: the first thing a user sees about a module is one word: refuted, undecided, assumed, sampled or decided. The detail is one step away.
+- Status: partly built (a grade with its own vocabulary); reworded 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: A tool reads a phase's result and adds no analysis of its own; Four strengths, one vocabulary; From experiment to proof without rewriting
+- Significance: 3 — reviewing a system from the top down
+- Label: swappable — the summary's form
+- Units: introspect
+- Options recorded: a proof transcript as the default surface (rejected by principle 7)
+- Sources: docs/book/vision.md §3, §5 principle 7; docs/book/platform/tooling.ir.md C85 to C98 (def-safety-grade); the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a reviewer scans forty modules, sees three marked sampled, and opens those.
+- Notes: was "Safety grade as the default verification surface"; the concrete half of reviewability, which the Part I review sent here.
+- Held finding (2026-11-13, DR6): the grade has four words of its own (`proven-safe`, `partial`, `has-warnings`, `has-errors`), counts no undecided sub-expression, and nothing produces `has-warnings`.
+- Chapter: Tools
+
+#### Open obligations are listed for any proposer
+- Decides: a tool lists every claim that waits for a value: a theorem without a proof, a gap in a model, a law not yet decided. The list has a form for programs and a form for people, with the last failure and what is in scope.
+- Status: settled for proofs; reworded 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
+- Depends on: Anyone may propose, and the record shows who; Solving is proposing a value for an unknown, and the kernel checks it; A tool reads a phase's result and adds no analysis of its own
+- Significance: 3 — work that is waiting can be found
+- Label: swappable — the forms
+- Units: pcp, cli
+- Options recorded: none recorded
+- Sources: docs/book/platform/tooling.ir.md C111 to C122, C168; docs/plans/planning-loop.md §6; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: an agent reads the list, proposes a catalog entry for a plan's gap, and check is run again.
+- Notes: was "Obligations and proposals as machine and human views", generalised from proofs as the planning-loop stream generalised its worker.
+- Held finding (2026-11-13, DR6): authorship is not kept in the result (carried over from the Part I review).
+- Chapter: Tools
+
+#### One primer for every proposer
+- Decides: the guide to answering obligations is one document, and it is what a tool sends to a language model.
+- Status: settled; reworded 2026-11-13 (DR6)
+- Type: capability
+- Rationale kind: technical
 - Depends on: Anyone may propose, and the record shows who
-- Significance: 2 — makes the protocol's neutrality literal
-- Label: swappable — the primer is data to the worker
+- Significance: 2 — people and machines are told the same thing
+- Label: swappable — the document
 - Units: not yet a unit (`pcp/llm-worker.ts` has no unit)
 - Options recorded: none recorded
 - Sources: docs/book/proving-in-allegro.md (opening); docs/book/platform/tooling.ir.md C129, C19
-- Book home (fragments' proposal): Proving in Allegro
-- Notes: the worker reads the primer relative to the current working directory (tooling C129).
-- Notes (2026-11-12, DR4): moved from Part IV: it is a decision about a tool.
-- Chapter: Tools over the pipeline
+- Use case: a new contributor and a model start from the same page.
+- Notes: was "One primer for human and machine provers".
+- Chapter: Tools
 
-#### One proof-term contract for human and machine provers
-- Decides: humans and LLM provers supply the same proof terms: an LLM prover answers with a fenced `allegro` block holding only the term, which the worker splices into the theorem's `by` slot and re-verifies through `evalSource`, keeping it only when the theorem discharges, for at most `--max-attempts` attempts (five by default); the kernel accepts or rejects every term alike.
-- Status: settled
-- Type: capability
-- Rationale kind: mixed
-- Depends on: A claim about every value is decided by evaluating it with the value unknown; One primer for human and machine provers; A proof term is a proposal
-- Significance: 2 — the machine interface of the loop
-- Label: swappable — the worker is replaceable behind the obligation and verdict schemas
-- Units: pcp; not yet a unit (`pcp/llm-worker.ts`)
-- Options recorded: none recorded
-- Sources: docs/book/proving-in-allegro.md "Output contract for an LLM prover"; vision.md §1–§2 (not read here); docs/book/proving-in-allegro.md (Output contract for an LLM prover); docs/book/platform/tooling.ir.md C123 to C136
-- Book home (fragments' proposal): proposed standard/pcp (planned `pcp.md`) / Proving in Allegro / Tooling
-- Notes: Merged from fragment B ("Participant-neutral proof terms"), fragment C ("Proof-term output contract for an LLM prover"). C: with an API key set, `prove` fails on any file with a `use` header (tooling C133 to C135, R4). Significance calibrated from 3/2.
-- Notes (2026-11-12, DR4): moved from Part IV: it is a decision about a tool.
-- Chapter: Tools over the pipeline
-
-#### Inspect reports only what the pipeline computed
-- Decides: `inspect` adds no analysis of its own: each binding summary (type, refinements, contract, declared and inferred effects, totality notices, proof backings, promotion hints) is read from what parsing, resolution, precompile and evaluation already computed.
-- Status: settled
-- Type: capability — a guarantee to the tool's user
-- Rationale kind: vision
-- Depends on: Types are values that constrain values
-- Significance: 3 — keeps review on the one engine
-- Label: swappable — the `introspect` unit, depending on the pipeline alone
-- Units: introspect
-- Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C11, C66 to C84; docs/book/vision.md §3, §5 principles 2 and 6
-- Book home (fragments' proposal): Tooling
-- Notes: `docs/book/implementation-map.md` puts `src/introspect.ts` in L2 while `units.json` puts it on the track layer (tooling R7). 19 kind comparisons in `src/introspect.ts` break the discriminator rule (C15).
-- Chapter: Tools over the pipeline
-
-#### Safety grade as the default verification surface
-- Decides: the default surface of verification is a coarse safety grade per module (`proven-safe`, `partial`, `has-warnings`, `has-errors`), with theorem-level detail as opt-in drill-down.
-- Status: partly built
-- Type: capability
-- Rationale kind: vision
-- Depends on: Inspect reports only what the pipeline computed; Every result says how strongly it holds; From experiment to proof without rewriting
-- Significance: 3 — the reviewability claim's face
-- Label: swappable — `safetyGradeFor` behind the summary
-- Units: introspect
-- Options recorded: a proof transcript as the default surface (rejected by principle 7)
-- Sources: docs/book/vision.md §3, §5 principle 7; docs/book/platform/tooling.ir.md C85 to C98 (def-safety-grade)
-- Book home (fragments' proposal): Tooling
-- Notes: the implemented grade counts no unproven sub-expression, unlike principle 7's "N warnings about M unproven sub-expressions" (R6); nothing produces `has-warnings` (C92); the code calls the grade a coarse placeholder (C94). Assembly: gained a dependency on "From experiment to proof without rewriting" (inverted from that entry).
-- Chapter: Tools over the pipeline
-
-#### One command-line entry with subcommands
-- Decides: `src/index.ts` is the single command-line entry named `allegro`, where a first argument naming one of five subcommands selects it, any other first argument is a file to run, and no argument starts the REPL, each subcommand's module imported dynamically.
-- Status: settled
-- Type: capability — the command-line surface
-- Rationale kind: technical
-- Depends on: none
-- Significance: 2 — the user's door
-- Label: swappable — the `cli` unit
-- Units: cli
-- Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C17, C23 to C33
-- Book home (fragments' proposal): Tooling
-- Notes: `package.json` declares no `bin` entry (C24); the CLI's startup cost is open as B-161.
-- Chapter: Tools over the pipeline
-
-#### File runner as one evaluation with futures drained
-- Decides: the file runner creates one future manager per run, loads `use` modules and then the body's `import` modules (local `lib/` first, then the system `lib/`), evaluates the stripped body once, waits for every pending future, and turns any error into exit code 1.
-- Status: settled
-- Type: capability — what running a file guarantees: futures drained, an error as exit code 1
-- Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; A missing value is a cell that is filled once
-- Significance: 2 — the reference way a program runs
-- Label: swappable — `runFile` in the `cli` unit
-- Units: cli, module-loading
-- Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C34 to C50; docs/book/platform/host.ir.md C57 to C61
-- Book home (fragments' proposal): Tooling
-- Notes: the suite runs demos through `evalSource` with extensions it chooses, not through the file runner, so a demo can pass the suite and fail the runner (C49, C50).
-- Chapter: Tools over the pipeline
-
-#### REPL as successive evaluations over a persistent scope
-- Decides: the REPL evaluates each buffered entry through `evalSource` with the previous entry's scope as the base scope and one future manager for the session, continuing an entry when the line ends in an operator, comma or open bracket.
-- Status: partly built
-- Type: capability — the REPL's behaviour for its user
-- Rationale kind: technical
-- Depends on: The environment is not a value
-- Significance: 2 — interactive use
-- Label: swappable — `repl` in the `cli` unit
-- Units: cli
-- Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C51 to C65; B-065
-- Book home (fragments' proposal): Tooling
-- Notes: the continuation rule exists in code but every continued entry fails to parse (C62); the REPL loads no `use` or `import` module (C60, C61). No test drives the REPL (C64).
-- Chapter: Tools over the pipeline
-
-#### Obligations and proposals as machine and human views
-- Decides: `obligations` emits one obligation per proof binding, undischarged `div` entry and law or coercion obligation, as JSON lines or text, and `propose` renders the pending ones as a Markdown TODO with the last failure, hints, lemmas in scope and prior attempts.
-- Status: settled
+#### A proposer answers with only the missing value
+- Decides: a proposal is the value an obligation waits for and nothing else: a proof term, a catalog entry. A tool places it, has the claim evaluated again, and keeps it only if the claim is decided, for a bounded number of attempts.
+- Status: settled for proofs; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Anyone may propose, and the record shows who; Soft-fail evaluation for verdict tools
-- Significance: 2 — the protocol's request side
-- Label: swappable — renderings over the `pcp` schemas
-- Units: pcp, cli
+- Depends on: Open obligations are listed for any proposer; One primer for every proposer; A proof term is a proposal
+- Significance: 3 — a proposal cannot change what was asked
+- Label: foundational — the loop between proposers and the kernel
+- Units: pcp
 - Options recorded: none recorded
-- Sources: docs/book/platform/tooling.ir.md C111 to C122, C168
-- Book home (fragments' proposal): Tooling
-- Notes: `--pending` lists failed `proven` clauses while the full listing lists none, against a comment claiming they are covered (R9).
-- Chapter: Tools over the pipeline
+- Sources: docs/book/proving-in-allegro.md "Output contract for an LLM prover"; vision.md §1–§2 (not read here); docs/book/proving-in-allegro.md (Output contract for an LLM prover); docs/book/platform/tooling.ir.md C123 to C136; docs/plans/planning-loop.md §6
+- Use case: a model answers a theorem with a term; the tool splices it and the kernel decides.
+- Notes: was "One proof-term contract for human and machine provers".
+- Chapter: Tools
 
-#### Execution tracing and step-through debugging
-- Decides: the T-tooling track is to provide execution tracing, graph inspection and step-through debugging (milestone M7); the shape is undesigned.
+#### A trace is read from origins
+- Decides: open — tracing, inspecting the graph and stepping through an evaluation are to be built on the origin every value keeps, through a utility for querying origins.
 - Status: open
 - Type: capability
 - Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG
-- Significance: 2 — tooling milestone
-- Label: swappable — a new tooling unit
-- Units: not yet a unit
+- Depends on: Every value keeps its origin; A tool reads a phase's result and adds no analysis of its own
+- Significance: 2 — seeing how a result came about
+- Label: swappable — the tools
 - Options recorded: none recorded
-- Sources: docs/book/layers.md §2, §3 (M7); docs/book/platform/README.md; docs/book/platform/tooling.ir.md C155 to C157; B-064
-- Book home (fragments' proposal): Tooling
-- Notes: the only depth diagnostic prints waterlines, not a trace (C145).
-- Chapter: Tools over the pipeline
+- Sources: docs/book/layers.md §2, §3 (M7); docs/book/platform/README.md; docs/book/platform/tooling.ir.md C155 to C157; B-064; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a user asks why a claim is undecided and is shown the unresolved name it waits on.
+- Notes: was "Execution tracing and step-through debugging".
+- Chapter: Tools
 
-### Hosts: the terminal and the browser
+### The launchers we ship
 
 #### The platform's default configuration is the standard language
 - Decides: every entry of the platform (file runner, prompt, subcommands, sandbox) starts, unless told otherwise, with the configuration that is the standard language. A configuration with no extension is the bare kernel.
-- Status: settled
+- Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
-- Rationale kind: mixed
-- Depends on: Everything above the kernel is an extension, and there is one way to extend
-- Significance: 2 — which language a user meets
-- Label: swappable — a host default
+- Rationale kind: technical
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Configuration is all the information that determines an execution
+- Significance: 3 — what a user gets without asking
+- Label: swappable — the default
 - Units: cli
 - Options recorded: none recorded
 - Sources: docs/book/platform/tooling.ir.md C29 to C31; docs/book/platform/host.ir.md C69, C72; docs/book/vision.md §1 ("In normal use, 'Allegro' means this tier")
-- Book home (fragments' proposal): Tooling
-- Notes: `prove` ignores `--base` (tooling C31); the sandbox creates a future manager under Allegretto while the CLI does not (host C58, C72).
-- Notes (2026-11-12, DR4): moved from Part IV and renamed from "Allegro Standard by default, Allegretto by flag"; a mode and a flag are not concepts.
-- Chapter: Hosts: the terminal and the browser
+- Use case: `allegro file.alg` runs the file in the standard language.
+- Chapter: The launchers we ship
 
-#### Environment capabilities outside the base, effect-labelled
-- Decides: `print`, `fetch` and `delay` are environment-provided capabilities, not base primitives, each carrying an effect label (`io`, `net`, `time`), with the relocation of every non-base primitive out of the base registry as future work.
-- Status: partly built
+#### The terminal and the browser ship output, timers and HTTP
+- Decides: the launchers the platform ships supply capabilities for writing output, waiting and making HTTP requests. Files beyond module loading, processes and sockets are open.
+- Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: The kernel's primitives are pure and few; An effect is the use of a capability
-- Significance: 3 — makes I/O visible to the effect system
-- Label: swappable — the host can offer a different set
-- Units: not yet a unit (T-host track); base-primitives, futures (today; a `host` unit is proposed)
+- Depends on: A capability is a named set of effectful primitives; Only the launcher sets the ceiling
+- Significance: 3 — what a program can do out of the box
+- Label: swappable — the roster
 - Options recorded: IO as base primitives (rejected in the audit)
-- Sources: docs/decisions.md D27; docs/book/allegretto/structures.md §11, Appendix B; docs/book/allegretto/README.md; D27; docs/book/allegretto/structures.md §11 and Appendix B (cited at host C14 to C17); docs/book/platform/host.ir.md C9 to C17, C25
-- Book home (fragments' proposal): platform/host (II.23) or allegretto base-primitives chapter / Host environments
-- Notes: Merged from fragment A ("Environment capabilities are host-provided and effect-labelled"), fragment C ("Environment capabilities outside the base, effect-labelled"). A: units.md row 15 lists `print` in `base-primitives`, contradicting this. C: the capabilities still live in `src/primitives.ts` (C135).
-- Chapter: Hosts: the terminal and the browser
+- Sources: docs/decisions.md D27; docs/book/allegretto/structures.md §11, Appendix B; docs/book/allegretto/README.md; D27; docs/book/allegretto/structures.md §11 and Appendix B (cited at host C14 to C17); docs/book/platform/host.ir.md C9 to C17, C25; docs/book/layers.md §2; docs/book/platform/host.ir.md C123 to C125; B-071; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a script prints a line, waits a second and fetches a page, in a terminal or on a page.
+- Notes: was "Environment capabilities outside the base, effect-labelled"; absorbs "Asynchronous I/O capabilities beyond timers and HTTP GET". "A stated host boundary in a host unit" dissolves: the boundary is the kernel's interface and the capabilities of the ceiling.
+- Held finding (2026-11-13, DR6): `print` is a base primitive, and effects are not gated on decided claims (carried over from the Part I review).
+- Held finding (2026-11-13, DR6): hosts are swapped by capturing output and substituting extensions; `fetch` sends a GET with no body.
+- Chapter: The launchers we ship
 
-#### A stated host boundary in a host unit
-- Decides: open: whether Allegretto states which primitives reach the host and with what effect labels, as an Environment interface in a `host` unit between `futures` and `base-primitives` that the CLI and the web bundle supply, in place of today's swapping by output capture and extension substitution.
-- Status: open
-- Type: capability — the stated boundary is the capability; the unit is its placement
-- Rationale kind: technical
-- Depends on: Environment capabilities outside the base, effect-labelled
-- Significance: 3 — "env-provided capabilities" is a heading until this exists
-- Label: foundational — the primitives would import it and every host would supply it
-- Units: not yet a unit
-- Options recorded: interception (today); an interface with a unit (M10)
-- Sources: docs/book/concepts.md §1 candidate R17; B-141 (the Environment interface); docs/book/platform/host.ir.md C18 to C24, R9, R11, R12; docs/book/units.md §6.1 M10, §4.1 (cited there); B-141
-- Book home (fragments' proposal): concepts.md Part 0 candidates / platform/host / Host environments
-- Notes: Merged from fragment A ("The host boundary as a stated surface"), fragment C ("A host-environment interface and unit"). C: B-141 waits for B-136. The future manager is planted on the scope's host plane and found by a parent-chain walk (C26, C27).
-- Chapter: Hosts: the terminal and the browser
-
-#### Asynchronous host results arrive as future cells
-- Decides: `delay` and `fetch` return future cells filled when their JavaScript Promise settles, through `applyPhase`; a rejection or a non-2xx response fills the cell with an error value, never a throw, and both throw "requires async runtime" without a future manager.
-- Status: settled
+#### A value that arrives later fills a cell, and a failure fills it with an exception
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. A failed request fills it with an exception. A call on a capability the phase lacks stays residual; it does not fail.
+- Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A missing value is a cell that is filled once; A failure a program can handle is supplied by an extension
-- Significance: 3 — the I/O edge of the futures model
-- Label: swappable — the capability implementations
+- Depends on: A missing value is a cell that is filled once; The standard language's handled failure is an exception; What the kernel's interface offers; Completion is totality and liveness
+- Significance: 3 — waiting is ordinary
+- Label: foundational — every capability that takes time
 - Units: futures, base-primitives
 - Options recorded: none recorded
-- Sources: docs/book/platform/host.ir.md C26 to C41; D33
-- Book home (fragments' proposal): Host environments
-- Notes: `fetch` sends a bodiless GET only (C34).
-- Chapter: Hosts: the terminal and the browser
+- Sources: docs/book/platform/host.ir.md C26 to C41; D33; docs/book/platform/host.ir.md C35, C36; D16, D34; docs/book/platform/tooling.ir.md C103; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
+- Use case: a request times out; the program handles the exception and tries a second address.
+- Notes: was "Asynchronous host results arrive as future cells"; "Liveness of host sources declared per source" dissolves into "Completion is totality and liveness".
+- Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
+- Chapter: The launchers we ship
 
-#### Browser sandbox as an IIFE bundle with a library registry
-- Decides: the browser host is one esbuild IIFE bundle setting `window.Allegro` (`eval`, `evalAsync`, `reset`, `formatValue`, `registerLibrary`, `inspect`), keeping the scope between calls, streaming `print` through the future manager's output callback, and resolving `use NAME` only against libraries the page registered.
-- Status: settled
-- Type: capability — the page-facing API and the library registry; the bundle format is its form
-- Rationale kind: technical
-- Depends on: The platform's default configuration is the standard language
-- Significance: 3 — the public sandbox and the maintainer's primary sandbox
-- Label: swappable — `web/allegro-web.ts`, outside the unit DAG
-- Units: none (no file of `web/` is mapped)
-- Options recorded: none recorded
-- Sources: docs/book/platform/host.ir.md C62 to C93; docs/book/process.md §9 (cited at C12, C13)
-- Book home (fragments' proposal): Host environments
-- Notes: `import` silently does nothing in the sandbox (`import math` returns `<symbol:math>`, C80, C81); `scanUses` is duplicated (C79); the pages' copy of `lib/units.alg` is stale (C86); the live site is 372 commits behind (C101).
-- Chapter: Hosts: the terminal and the browser
-
-#### A browser-compatible core
-- Decides: the core uses only APIs available in both Node and browsers (`TextEncoder`/`TextDecoder`, never `Buffer`), and Node globals are read only behind a `typeof process` test.
-- Status: partly built
-- Type: implementation — a coding rule that keeps the browser sandbox possible
-- Rationale kind: technical
-- Depends on: Browser sandbox as an IIFE bundle with a library registry
-- Significance: 3 — keeps the sandbox possible
-- Label: foundational — the web bundle depends on every core file obeying it
-- Units: none (a rule across L0 to L2 files)
-- Options recorded: none recorded
-- Sources: CLAUDE.md (Conventions & invariants, cited at host C102); docs/book/platform/host.ir.md C102 to C122; B-070 title
-- Book home (fragments' proposal): Host environments
-- Notes: no book chapter states the rule (C104); `src/evaluator.ts:23` reads `process.env` unguarded, so a bundle built from the branch fails in a browser (C110 to C117); nothing in CI builds or loads the bundle, and the typecheck uses Node types with no DOM library (C118 to C122).
-- Chapter: Hosts: the terminal and the browser
-
-#### Liveness of host sources declared per source
-- Decides: each asynchronous source declares its liveness: `delay` is live because a timer always fires, and `fetch` is admitted under the assumption that the endpoint eventually responds, visible in the verdict.
-- Status: settled
-- Type: capability
-- Rationale kind: technical
-- Depends on: Asynchronous host results arrive as future cells; Four strengths, one vocabulary; Completion is totality and liveness
-- Significance: 2 — how the ledger records I/O assumptions
-- Label: swappable — per-capability declarations
-- Units: base-primitives, pcp
-- Options recorded: none recorded
-- Sources: docs/book/platform/host.ir.md C35, C36; D16, D34; docs/book/platform/tooling.ir.md C103
-- Book home (fragments' proposal): Host environments
-- Notes: Assembly: gained a dependency on "Completion is totality and liveness", which states the same liveness axioms in general.
-- Chapter: Hosts: the terminal and the browser
-
-#### Module loader takes its file reader from the host
-- Decides: `ModuleLoader` reads no file itself; its caller supplies `readFile`, so the Node CLI passes `fs.readFileSync` and resolves `lib/` from `import.meta.url`.
-- Status: settled
+#### The browser launcher is one bundle
+- Decides: the browser launcher is a single script that sets one global object with calls to evaluate, reset, format a value, register a library and inspect. It keeps its scope between calls and resolves modules only against libraries the page registered.
+- Status: settled; reworded 2026-11-13 (DR6)
 - Type: implementation
 - Rationale kind: technical
-- Depends on: A browser-compatible core
-- Significance: 2 — keeps module loading host-neutral
-- Label: swappable — an injected function
-- Units: module-loading, cli
+- Depends on: The launcher does only what cannot be done in Allegro; The loader reaches files through a capability
+- Significance: 2 — the project's pages
+- Label: swappable — the packaging
 - Options recorded: none recorded
-- Sources: docs/book/platform/host.ir.md C46 to C52
-- Book home (fragments' proposal): Host environments
-- Notes: the web bundle still holds no module loader (C80).
-- Chapter: Hosts: the terminal and the browser
+- Sources: docs/book/platform/host.ir.md C62 to C93; docs/book/process.md §9 (cited at C12, C13); docs/book/platform/host.ir.md C46 to C52
+- Use case: the documentation site runs every example on the page.
+- Notes: was "Browser sandbox as an IIFE bundle with a library registry"; "Module loader takes its file reader from the host" dissolves into "The loader reaches files through a capability".
+- Held finding (2026-11-13, DR6): `import` does nothing in the browser bundle, which holds no module loader; the header scanner is duplicated; the pages' copy of the units library is stale.
+- Chapter: The launchers we ship
 
-#### Asynchronous I/O capabilities beyond timers and HTTP GET
-- Decides: files, processes, sockets and further timers are to be environment-provided, effect-labelled capabilities; none is built.
-- Status: open
-- Type: capability
+#### The core runs in a browser
+- Decides: the kernel and the extensions use only what both Node and browsers provide, and read Node's globals only behind a test.
+- Status: partly built
+- Type: implementation — a coding rule
 - Rationale kind: technical
-- Depends on: Environment capabilities outside the base, effect-labelled; A stated host boundary in a host unit
-- Significance: 2 — breadth of the host
-- Label: swappable — new capabilities behind labels
-- Units: not yet a unit
+- Depends on: The browser launcher is one bundle
+- Significance: 2 — one core for every launcher
+- Label: swappable — the rule could be met by a build step
 - Options recorded: none recorded
-- Sources: docs/book/layers.md §2; docs/book/platform/host.ir.md C123 to C125; B-071
-- Book home (fragments' proposal): Host environments
-- Chapter: Hosts: the terminal and the browser
-
-#### Browser runtime packaging
-- Decides: whether and how the runtime ships as a browser package (ES module build, npm package, versioned release) beyond the one IIFE bundle for the project's pages.
-- Status: open
-- Type: capability — it decides what a tool builder can install
-- Rationale kind: technical
-- Depends on: Browser sandbox as an IIFE bundle with a library registry
-- Significance: 2 — distribution
-- Label: swappable — a build output
-- Units: not yet a unit
-- Options recorded: none recorded
-- Sources: docs/book/platform/host.ir.md C126 to C129; B-070
-- Book home (fragments' proposal): Host environments
-- Chapter: Hosts: the terminal and the browser
-
-### Compiling beyond the interpreter
-
-#### Multi-phase build as successive partial evaluation
-- Decides: the build is to be a chain of phases (invocation, config, compile, emit, package, deploy, execute), each a partial-evaluation step binding more resources, with phase gates that scan the expression graph for unresolved elements before a phase may close.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: One operation: partial evaluation; A missing value is a cell that is filled once
-- Significance: 3 — the T-build milestone M6 and the "config is a compile-time theorem" claim
-- Label: foundational — would define how every later binding stage is reached
-- Units: not yet a unit (only `applyPhase` exists, driven by futures alone)
-- Options recorded: none recorded
-- Sources: docs/book/layers.md §2, §3 (M6); docs/book/platform/README.md (T-build fragments); docs/book/platform/build-pipeline.ir.md C122 to C126; docs/plans/release-track.md §3 D5; docs/book/vision.md §1
-- Book home (fragments' proposal): Capability tracks (`docs/book/platform/README.md`), later its own chapter
-- Notes: the README's track table still lists `build-pipeline.md` as planned while the IR chapter exists for the delivered part. Significance calibrated from 4.
-- Chapter: Compiling beyond the interpreter
-
-#### Code generation from the expression graph, JavaScript first
-- Decides: target code generation is to compile the L0 expression graph, JavaScript first, then WASM or native, with provability-informed optimisation; the continuations decision it requires feeds algebraic effects.
-- Status: open
-- Type: capability — it decides what a program compiles to
-- Rationale kind: technical
-- Depends on: One operation: partial evaluation; Multi-phase build as successive partial evaluation
-- Significance: 3 — milestone M8; a prerequisite of self-hosting
-- Label: foundational — T-bootstrap depends on it
-- Units: not yet a unit
-- Options recorded: the v1 Phase I outline (revalidation-gated)
-- Sources: docs/book/layers.md §2, §3 (M8); docs/book/platform/README.md; B-072
-- Book home (fragments' proposal): Capability tracks (`docs/book/platform/README.md`), later a codegen chapter
-- Chapter: Compiling beyond the interpreter
-
-#### Laws licence rewrites
-- Decides: discharged laws are to license optimiser rewrites, making the optimiser user-extensible and unable to be wrong, with tree shaking by partial evaluation.
-- Status: open
-- Type: capability
-- Rationale kind: vision
-- Depends on: Lawful interfaces; Code generation from the expression graph, JavaScript first
-- Significance: 2 — a payoff of laws
-- Label: swappable — a consumer of laws
-- Units: not yet a unit
-- Options recorded: none recorded
-- Sources: docs/plans/release-track.md §3 D5; B-063
-- Book home (fragments' proposal): Capability tracks
-- Notes: laws exist; no rewrite consumer (D5 table).
-- Chapter: Compiling beyond the interpreter
-
-#### Self-hosting and a package ecosystem
-- Decides: L1 and L2 machinery are to be re-expressed in Allegro (milestone M9, with a Vivace parser generator able to re-host the L1 parser) and a package ecosystem with versioning and a registry built (M10); both are aspirational.
-- Status: open
-- Type: capability — the package ecosystem is user-facing; self-hosting is its implementation half
-- Rationale kind: vision
-- Depends on: Code generation from the expression graph, JavaScript first; Everything above the kernel is an extension, and there is one way to extend
-- Significance: 2 — long-range direction
-- Label: foundational — re-hosting the parser would cascade through L1
-- Units: not yet a unit
-- Options recorded: none recorded
-- Sources: docs/book/layers.md §2, §3 (M9, M10); docs/book/vivace/README.md (Provides; maintainer ruling 2026-07)
-- Book home (fragments' proposal): Capability tracks
-- Chapter: Compiling beyond the interpreter
+- Sources: CLAUDE.md (Conventions & invariants, cited at host C102); docs/book/platform/host.ir.md C102 to C122; B-070 title
+- Use case: the same kernel file is loaded by the command line and by a page.
+- Notes: was "A browser-compatible core".
+- Held finding (2026-11-13, DR6): `src/evaluator.ts:23` reads `process.env` unguarded, so a bundle built from the branch fails in a browser; nothing in CI builds or loads the bundle.
+- Chapter: The launchers we ship
 
 ## The type check, 2026-11-05
 
