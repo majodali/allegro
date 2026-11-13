@@ -83,7 +83,8 @@
         { "doc": "docs/records/book-pass/dr4-part-4-the-standard-language.md", "title": "Book pass, decision review of Part IV: the standard language", "record": true },
         { "doc": "docs/records/book-pass/dr5-part-5-vivace.md", "title": "Book pass, decision review of Part V: Vivace", "record": true },
         { "doc": "docs/records/book-pass/dr6-part-6-building-and-running.md", "title": "Book pass, decision review of Part VI: building and running programs", "record": true },
-        { "doc": "docs/records/book-pass/phase-1-close.md", "title": "Book pass, phase 1 closed", "record": true }
+        { "doc": "docs/records/book-pass/phase-1-close.md", "title": "Book pass, phase 1 closed", "record": true },
+        { "doc": "docs/records/book-pass/adversarial-review.md", "title": "Book pass, an adversarial review of phase 1", "record": true }
       ]
     }
   ]

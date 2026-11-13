@@ -1,0 +1,1181 @@
+# Allegro: the decisions, in book order
+
+Each decision: its name, what it decides, its status against today's code, and the earlier decisions it depends on. A decision is stated as the goal; 'open' or 'partly built' means the code does not yet do it.
+
+
+PART I — THE BET
+
+## Chapter: Why a new language
+> **Why a new language, now.** Writing code was never the hard part of building a system. The hard part is building a shared understanding of what the system is and should do, and keeping that understanding true as it changes. That is a theory, worked out in discourse among people, and now between people and machines. When machines write the code, the theory is what remains. A programming language is where a theory is written down precisely enough to be checked. Allegro is built for that job.
+
+### D1. Trust comes from the kernel, not the author
+- Decides: a program states its intent as claims. The kernel decides those claims by evaluation, whoever or whatever wrote the code. A reviewer reads what was claimed and what was decided, not every line.
+- Status: partly built
+- Depends on: none
+
+### D2. A system is described in the language of its domain, and that language grows with the understanding
+- Decides: code and claims are written in the terms of a domain model, which people and agents can read far more easily than general-purpose code. Nothing is lost by this: a statement in a domain language is checked exactly as strictly as any other. No prewritten domain language is enough. As the people and agents building a system understand it better, they extend its language, and each new concept becomes vocabulary that the kernel checks from then on.
+- Status: partly built
+- Depends on: Trust comes from the kernel, not the author
+
+### D3. Everything above the kernel is an extension, and there is one way to extend
+- Decides: an extension adds values, functions, syntax, metadata fields and the rules that govern them through one interface. That interface is the same for the standard language and for a library a user writes. An extension is written in Allegro and checked like any other program. The standard language is a set of extensions selected by configuration. Nothing in the kernel names it.
+- Status: partly built; to be fully built before release
+- Depends on: none
+
+### D4. The kernel contains only what no extension could supply
+- Decides: something belongs in the kernel only if the platform could not exist without it and no extension could provide it. Everything else is an extension.
+- Status: settled
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+
+### D5. Meaning comes before notation
+- Decides: a program's meaning is the structure of values and expressions it denotes. A syntax is a mapping onto that structure, and two notations that map to the same structure are the same program. Semantics are designed and decided without reference to any notation. A notation can therefore change without changing what any program means.
+- Status: settled
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+
+### D6. The kernel holds no language
+- Decides: the kernel is values, pure primitives, the evaluator, metadata with its capabilities, and the extension interface. It has no syntax. Every concrete syntax, the first grammar included, is an extension.
+- Status: settled
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation
+
+### D7. Order of definition carries no meaning
+- Decides: the order in which definitions and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Only effects have an order: plain effects are not declarations, and happen in the order the program writes them.
+- Status: partly built
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+
+### D8. A language inherits every check of what it is built on
+- Decides: every language on the platform is a set of extensions, the standard language included. A small domain language is therefore checked as strictly as the language it was built from. General-purpose and domain-specific languages differ only in breadth.
+- Status: partly built
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding
+
+### D9. A mapping between models is itself a checked value
+- Decides: a domain model is a language. A mapping from one model to another is written declaratively and is itself a value, so the kernel checks what a mapping produces as it checks anything else. Examples: from a grammar to the values it denotes, from a data model to an interface, from data to an analysis.
+- Status: open (only the grammar mapping exists)
+- Depends on: A language inherits every check of what it is built on; Meaning comes before notation
+
+### D10. A paradigm is a library
+- Decides: a declarative style of programming, such as queries, logic or constraints, is supplied by an extension, not by another language or runtime. Every paradigm shares the one kernel, its checks and its tools, and paradigms can be mixed in one program.
+- Status: open
+- Depends on: A language inherits every check of what it is built on; Order of definition carries no meaning
+
+## Chapter: Keep it simple
+
+### D11. One operation: partial evaluation
+- Decides: Allegro does one thing with a program: it evaluates whatever the available information determines and leaves the rest as a smaller program, the residual. Checking a type, proving a claim, compiling, optimizing and running are all this one operation, given more or less information. An analysis of a program is itself a function, evaluated over the program's expression, which every value carries as metadata.
+- Status: settled
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+
+### D12. Phases are configuration
+- Decides: Allegro has no fixed compile time or run time. A phase is one evaluation, defined by the information and the capabilities available to it. An effect is a call on a capability, such as writing output. Where the capability is absent, the call cannot be evaluated and stays in the residual. Building, validating and executing a program are phases a project configures. A configuration may state what a phase must leave decided.
+- Status: partly built
+- Depends on: One operation: partial evaluation
+
+### D13. Claims are evaluated like everything else
+- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
+- Status: partly built
+- Depends on: One operation: partial evaluation; Phases are configuration
+
+### D14. An effect consumes only values whose claims are decided
+- Decides: an effect is performed only on values that have passed every claim made about them. A value carrying a refuted claim never reaches an effect. A value carrying an undecided claim has that claim evaluated first. After a phase has refuted a claim, it performs no further effect, though it may go on evaluating to report every refutation.
+- Status: partly built
+- Depends on: Claims are evaluated like everything else; Phases are configuration
+
+### D15. Correctness and safety are one kind of claim
+- Decides: what a program computes and what it is allowed to do are both stated as claims and decided by the same evaluation. No kind of claim has a checker of its own: not a type, an effect, a permission or a termination measure. A feature that could only be checked by separate machinery is evidence against the design, and is raised as such, not built.
+- Status: partly built
+- Depends on: Claims are evaluated like everything else
+
+### D16. The kernel trusts only what it has evaluated
+- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, or a statement a program asks it to accept, is reported as assumed, and everything that rests on it says so. A claim decided with the help of a capability is decided, and names the capability.
+- Status: partly built
+- Depends on: Claims are evaluated like everything else; Trust comes from the kernel, not the author
+
+### D17. Anyone may propose, and the record shows who
+- Decides: people, agents and tools propose code and proofs in the same way. The kernel checks every proposal identically. Who proposed what is kept with the result.
+- Status: partly built
+- Depends on: The kernel trusts only what it has evaluated
+
+### D18. A decided claim can be translated into a proof an outside checker accepts
+- Decides: Allegro does not keep proofs in another system's format. It can replay the evaluation that decided a claim as a sequence of named steps, and a translator turns those steps into a proof for an independent checker. Trusting Allegro's kernel is then a choice, not a requirement.
+- Status: open, wording to confirm
+- Depends on: The kernel trusts only what it has evaluated
+
+### D19. Host code reaches a program only as primitive functions
+- Decides: code in the host's language cannot be checked by the kernel, so it enters in one form: as a primitive function, a function whose body is host code. A primitive function is effectful or pure. A capability is a named set of effectful ones: an extension may declare it, and a configuration supplies it. A primitive function takes data and returns data. It cannot write metadata, so it cannot forge a type, a proof or the result of any analysis. Its purity is declared and assumed, where a composed function's is decided from what it holds. A claim about what a primitive returns is either checked when the data arrives or reported as assumed.
+- Status: partly built
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Phases are configuration; Claims are evaluated like everything else
+
+### D20. No interface limits optimization
+- Decides: partial evaluation sees through every extension. An expression that crosses from a program into an extension, or from one extension into another, is evaluated as one expression, so the extension interface costs nothing a program can measure. Optimizations that partial evaluation does not find are functions over a program's expression, open to every extension. The one opaque point is the body of a capability.
+- Status: open
+- Depends on: One operation: partial evaluation; Everything above the kernel is an extension, and there is one way to extend; Host code reaches a program only as primitive functions
+
+### D21. Every result says how strongly it holds
+- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). A result that rests on a weaker result is itself reported at the weaker strength. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently. A result also names the extensions and capabilities it rests on.
+- Status: partly built
+- Depends on: The kernel trusts only what it has evaluated; Host code reaches a program only as primitive functions
+
+### D22. From experiment to proof without rewriting
+- Decides: a program need state no claims. What can be inferred is inferred, and shown. Its authors add claims as their understanding grows, and the same program moves from a quick experiment to a fully decided system without being rewritten.
+- Status: settled
+- Depends on: Claims are evaluated like everything else; Every result says how strongly it holds
+
+### D23. Each decision lives in one replaceable unit of code
+- Decides: the code is divided into the smallest units that each hold one decision. A unit depends only on units it names, and can be replaced without editing the others. A unit is split when its parts could be revised independently, never for size alone.
+- Status: partly built
+- Depends on: Everything above the kernel is an extension, and there is one way to extend
+
+
+PART II — THE KERNEL
+
+## Chapter: Values
+
+### D24. One value universe
+- Decides: everything the evaluator can meet is a value; there are no statements, declarations or types that are not values.
+- Status: settled
+- Depends on: The kernel contains only what no extension could supply; Everything above the kernel is an extension, and there is one way to extend
+
+### D25. Seven representation kinds
+- Decides: a value takes exactly one of seven kinds, fixed at construction: Bits, Symbol, Param, Expression, ComposedFunction, PrimitiveFunction, Structure. A kind says how a value is represented; types come from extensions, so a structure in the kernel carries no type.
+- Status: settled
+- Depends on: One value universe; The kernel contains only what no extension could supply
+
+### D26. The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart and does nothing else with them. What the bits mean, and every operation on them, comes from extensions and from capabilities.
+- Status: partly built (arithmetic and the scalar encodings are kernel primitives today)
+- Depends on: Seven representation kinds
+
+### D27. One composite kind: Structure
+- Decides: the kernel has one composite kind, Structure, the only kind with internal parts, used for records, arrays, types, proofs and module objects.
+- Status: settled
+- Depends on: The kernel contains only what no extension could supply; Seven representation kinds
+
+### D28. Structures immutable by default; derive, never mutate
+- Decides: data structures are born immutable with deep immutability, a value is written in place only while provably unshared during construction, an unresolved future cell counts as immutable, and transient-to-immutable finalisation waits for the mutability track.
+- Status: partly built
+- Depends on: One composite kind: Structure
+
+### D29. Arrays are structures with unkeyed entries
+- Decides: an array is a Structure whose entries all carry a null key, with no separate vector kind and no references inside Bits. Nothing in the kernel tells an empty array from an empty record; that is a type's question.
+- Status: settled
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it computes nothing on them
+
+### D30. Symbol identity is a fully-qualified name
+- Decides: a registered symbol's identity is its defining scope's FQN plus base name (default FQN is the module path), the base name is only a projection for printing, serialisation and loose matching, and an ambiguous base name requires explicit qualification or is an error.
+- Status: settled
+- Depends on: Seven representation kinds
+
+### D31. Value as a contract, seven kind units and an assembly
+- Decides: `Value` is an open registry contract naming no kind; each kind registers itself by declaration merging with its tag, interface, factories, guard and ops; one assembly closes the set per build, holds the ops table and the walkers, and is the fork point.
+- Status: partly built
+- Depends on: Seven representation kinds; Each decision lives in one replaceable unit of code
+
+### D32. The composite is one sequence of optionally-keyed entries
+- Decides: a Structure stores an ordered sequence of optionally-keyed entries, with the by-name map a derived view and a lazy index built on first lookup past eight entries, whatever the structure's role.
+- Status: settled
+- Depends on: One composite kind: Structure; Arrays are structures with unkeyed entries
+
+### D33. Construction only through factories, one host class
+- Decides: every Structure is an instance of one host class with one declared hidden class, constructed only through the factory functions, so a stray object literal fails the boundary invariant.
+- Status: settled
+- Depends on: One composite kind: Structure
+
+### D34. Binding state belongs to the binding, not the value
+- Decides: export-ness, cell origin, completion state and pending dependencies are attributes of a binding in its scope, so copying a value never copies them.
+- Status: settled
+- Depends on: The composite is one sequence of optionally-keyed entries
+
+### D35. Symbols interned by FQN
+- Decides: the same FQN is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
+- Status: settled
+- Depends on: Symbol identity is a fully-qualified name
+
+## Chapter: Programs as values
+
+### D36. Expressions are values, forming a DAG
+- Decides: an unevaluated application (a function value plus arguments) is an ordinary value, so a partially evaluated program is also a value, and expressions form a shared DAG rather than a tree.
+- Status: settled
+- Depends on: One value universe; One operation: partial evaluation
+
+### D37. Positional parameters owned by membership
+- Decides: a Param is a positional placeholder, and a function owns a Param by its membership in the function's parameter list rather than through a back-pointer's identity.
+- Status: settled
+- Depends on: Seven representation kinds
+
+### D38. Functions are data: params plus body
+- Decides: a composed function is a list of declared Params and a body value, so building, inspecting and specialising functions needs no reflection API, and every clone goes through shared helpers that preserve its properties.
+- Status: settled
+- Depends on: Expressions are values, forming a DAG; Positional parameters owned by membership
+
+### D39. Expressions memoize per evaluation context
+- Decides: an Expression carries a memo table keyed by evaluation context, and a clone shares it.
+- Status: settled
+- Depends on: Expressions are values, forming a DAG
+
+### D40. Transient reference symbols resolved by base name
+- Decides: the parser mints a transient Symbol per identifier occurrence, with no identity beyond it, resolved by base name against the enclosing scope, so resolution is not folded into parsing; scope binding keys may stay strings.
+- Status: settled
+- Depends on: Symbol identity is a fully-qualified name
+
+## Chapter: Authority
+
+### D41. Authority is an unforgeable value
+- Decides: the right to do something that not all code may do is a function value that cannot be forged or guessed: writing a metadata field, reading a private member, performing an effect. Any code that holds the value can use it, pass it on, or wrap it in a narrower one. Nothing is granted by name, or by the identity of whoever asks.
+- Status: partly built
+- Depends on: Host code reaches a program only as primitive functions
+
+### D42. Reading an expression never yields authority
+- Decides: any code can read an expression's structure. Where the expression holds an unforgeable value, the reader sees which one it is and cannot obtain it. So a function that wraps a capability in a narrower one does not give the wider one away, and a key inside a function's body stays with the function.
+- Status: open
+- Depends on: Authority is an unforgeable value; Expressions are values, forming a DAG; Functions are data: params plus body
+
+### D43. A capability is granted, never acquired
+- Decides: host code enters only through the configuration of a phase. An extension receives a capability only when the code using that extension passes it one. An extension cannot bring host code of its own, and cannot obtain a capability it was not handed.
+- Status: open
+- Depends on: Authority is an unforgeable value; Host code reaches a program only as primitive functions
+
+### D44. What code may do is bounded by the capabilities it is given, and that bound is a claim
+- Decides: a program, a function or an extension can state which capabilities it uses. The kernel decides that claim like any other.
+- Status: open
+- Depends on: A capability is granted, never acquired; Claims are evaluated like everything else
+
+### D45. A capability is supplied per target
+- Decides: for each kind of phase, whoever supplies a capability gives either an implementation to run or code to emit. Exporting a program is a phase in which capabilities are emitted, not performed. The kernel's own primitives are translated in the same way.
+- Status: open
+- Depends on: A capability is granted, never acquired; Phases are configuration
+
+### D46. Machine arithmetic is a set of pure primitives that ships with the platform
+- Decides: arithmetic and comparison on machine integers and floating-point numbers are pure primitive functions that ship with the platform and are supplied in every standard configuration, build phases included, so known values still fold. Being pure, they need no grant. A claim decided with their help names them.
+- Status: open (to prove)
+- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it computes nothing on them
+
+## Chapter: Metadata
+
+### D47. Metadata fields are independent
+- Decides: each piece of named information about a value is handled by its own declaration, independently of every other, and no operation may disturb a field it does not know about.
+- Status: settled
+- Depends on: One operation: partial evaluation; Everything above the kernel is an extension, and there is one way to extend
+
+### D48. Metadata is a field on every value
+- Decides: every representation kind carries an optional `meta` map, so a typed `42` is a Bits with a `type` field, and attaching metadata yields a new value of the same kind.
+- Status: settled
+- Depends on: Metadata fields are independent; Seven representation kinds
+
+### D49. An extension registers its own fields; the kernel has two
+- Decides: a metadata field is registered by the extension whose concept it holds, with the rule for how it travels. Only a field's owner can write it; any code can read it. A field has one owner: a second registration is a conflict. The kernel registers only two: the outcome of a claim, and a value's origin.
+- Status: partly built
+- Depends on: Metadata fields are independent
+
+### D50. A field's rule is a pure, bounded function
+- Decides: a rule computes a field's value on a result from the field's values on the function applied and on its arguments. It sees nothing else, performs no effect, and always finishes. For now a rule may not recurse, which the kernel can check by itself.
+- Status: partly built
+- Depends on: An extension registers its own fields; the kernel has two; Authority is an unforgeable value
+
+### D51. Every value keeps its origin
+- Decides: the result of evaluating an expression carries that expression as metadata, and no later evaluation discards it. Each residual keeps a reference to the expression immediately before it, so every step of evaluation can be traced back to what was first written or constructed. What is known about an expression is found by evaluating it: each part of the result carries the fields derived so far, and its own origin.
+- Status: partly built (to verify)
+- Depends on: Expressions are values, forming a DAG; An extension registers its own fields; the kernel has two
+
+### D52. Trust in a value needs no seal
+- Decides: a value built by trusted code is trusted for three reasons already in the kernel: only the owner can write the field that marks it, values never change, and the field's rule cannot invent the mark on a new value. No separate sealing operation exists.
+- Status: settled
+- Depends on: Structures immutable by default; derive, never mutate; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function
+
+### D53. Metadata supplied at construction, one attachment operation
+- Decides: factories take an optional metadata argument so a value never exists without what it must carry, `withMeta` is the one attachment operation, and `carryMeta` moves metadata onto a derived value.
+- Status: settled
+- Depends on: Metadata is a field on every value; Structures immutable by default; derive, never mutate
+
+### D54. Metadata slot mixed in from the metadata unit
+- Decides: the `meta` slot is not part of the `Value` contract; the `metadata` unit adds it by augmenting the base interface and stamps it in place while the value is unshared, so no kind unit reads it.
+- Status: partly built
+- Depends on: Value as a contract, seven kind units and an assembly; Metadata is a field on every value
+
+## Chapter: Evaluation
+
+### D55. Evaluation is total over unresolved information
+- Decides: the evaluator has a rule for every value it can meet, and an unresolved input produces a residual, never a failure to proceed; no operation errors on an incomplete value.
+- Status: settled
+- Depends on: One operation: partial evaluation; Expressions are values, forming a DAG
+
+### D56. The environment is not a value
+- Decides: names are resolved in an environment that the evaluator keeps and no program can hold, inspect or pass on. A program reaches only what it can name.
+- Status: partly built (the code still represents a scope as a structure)
+- Depends on: Authority is an unforgeable value; One value universe
+
+### D57. A function may take an argument unevaluated
+- Decides: a parameter can be declared to receive its argument as written: the expression itself, with nothing evaluated, together with the context it was written in, which the function cannot inspect. The function may read the expression, and may hand it back to the kernel to be evaluated in that context, whole, in part or transformed, with names rebound or capabilities withheld as it chooses. There is one unevaluated form; everything else about the argument is found by evaluating it.
+- Status: open (use cases to work through)
+- Depends on: Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
+
+### D58. A call is evaluated by evaluating the function's body
+- Decides: applying a function to arguments means evaluating its body with whatever is known about those arguments. The call survives into the residual only where the body cannot be reduced further. This holds across every boundary: a program's own functions, an extension's, another extension's.
+- Status: partly built
+- Depends on: Evaluation is total over unresolved information; Functions are data: params plus body; No interface limits optimization
+
+### D59. A recursive call is evaluated once for each state of knowledge
+- Decides: while evaluating a function's body, the evaluator may meet a call to the same function with the same information known about its arguments. It does not open that call again. The call stays in the residual, as a call to the function being evaluated. Claims stated about the function's result are assumed at that inner call and decided on the body.
+- Status: open (a design to prove on real cases)
+- Depends on: A call is evaluated by evaluating the function's body; Claims are evaluated like everything else
+
+### D60. A branch that may not be taken is evaluated without capabilities
+- Decides: when a condition cannot be decided, both branches are still evaluated, so that what is true on either path is still discovered. Neither branch is given any capability, so any effect it reaches stays in the residual. The kernel has one conditional; every other branching form is built on it by an extension.
+- Status: partly built
+- Depends on: A call is evaluated by evaluating the function's body; Phases are configuration; Authority is an unforgeable value
+
+### D61. A missing value is a cell that is filled once
+- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, and an input not yet supplied, are cells too.
+- Status: settled
+- Depends on: Evaluation is total over unresolved information; Phases are configuration
+
+### D62. When information arrives, what waited on it is evaluated again
+- Decides: everything left in the residual because of a missing value is evaluated again when the value arrives, within a phase or in a later one. The step from one phase to the next is the same event.
+- Status: settled
+- Depends on: A missing value is a cell that is filled once
+
+### D63. The same program and the same information give the same result
+- Decides: neither the order in which information arrives nor the order in which independent parts are evaluated can change the outcome of an evaluation.
+- Status: to prove
+- Depends on: When information arrives, what waited on it is evaluated again; Order of definition carries no meaning
+
+### D64. Scopes layer by parent chain
+- Decides: extending a scope is O(1) and does not copy; lookup walks the parent chain.
+- Status: settled
+- Depends on: The environment is not a value
+
+### D65. Substitution of params into bodies
+- Decides: applying a composed function substitutes each owned Param by position, leaves Symbols to resolve by name through the scope, shares unchanged subtrees, and copies an inner function whose body changed with fresh Params and its metadata carried.
+- Status: settled
+- Depends on: Positional parameters owned by membership; Functions are data: params plus body
+
+### D66. Tail calls by sentinel and loop
+- Decides: a call in tail position of a function body, marked before precompile, returns a host sentinel that the enclosing application loops on at the first round's depth, so recursion depth is not bounded by the host stack; body wrappers forward the sentinel.
+- Status: partly built
+- Depends on: Substitution of params into bodies
+
+## Chapter: Extensions
+
+### D67. An extension is made of functions and metadata fields
+- Decides: the kernel gives an extension two things to build with: ordinary functions, and metadata fields, each with a rule the extension supplies for how the field travels through evaluation. Every feature above the kernel is built from these: a typed call, an operator on typed values, a check on a member.
+- Status: open (the code installs host functions at fixed points of the evaluator)
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; No interface limits optimization; A field's rule is a pure, bounded function
+
+### D68. The kernel's primitives are pure and few
+- Decides: the kernel's primitives cover six things: telling bits apart; building and reading structures and expressions; one conditional; evaluating an expression with names rebound; registering a metadata field; evaluating a claim. None performs an effect. An effect is always a capability.
+- Status: partly built
+- Depends on: The kernel contains only what no extension could supply; Seven representation kinds
+
+### D69. What the kernel requires of an extension
+- Decides: an extension reaches the kernel as expressions and named values; the kernel reads no text and no files. A configuration names the extensions an evaluation starts with and the capabilities it supplies. At startup the kernel has its primitives and nothing else; it evaluates the configuration's extensions in the order their dependencies require. An extension is evaluated once in a configuration, and everything that names it gets the same values. Parsing, loading and every other service come from those extensions.
+- Status: open (the code builds its extensions in host code and caches a loaded library per process)
+- Depends on: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; A capability is granted, never acquired; An extension registers its own fields; the kernel has two; The kernel holds no language
+
+## Chapter: Correctness
+
+### D70. Only the kernel records the outcome of a claim
+- Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
+- Status: partly built
+- Depends on: Claims are evaluated like everything else; The kernel trusts only what it has evaluated; Authority is an unforgeable value
+
+### D71. A refutation marks everything computed from it
+- Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, a name that nothing declares, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
+- Status: partly built
+- Depends on: Only the kernel records the outcome of a claim; A field's rule is a pure, bounded function; An effect consumes only values whose claims are decided
+
+### D72. A refutation on a path that may be taken refutes the program
+- Decides: if a claim is refuted in a branch whose condition cannot be decided, the program is wrong, unless what is known already rules that branch out. A program that means to handle the bad case uses a handled failure.
+- Status: partly built
+- Depends on: A branch that may not be taken is evaluated without capabilities; A refutation marks everything computed from it
+
+### D73. A failure a program can handle is supplied by an extension
+- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
+- Status: partly built
+- Depends on: An extension is made of functions and metadata fields; A refutation marks everything computed from it
+
+### D74. Evaluation stops early for two reasons only
+- Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
+- Status: partly built
+- Depends on: A refutation marks everything computed from it; Evaluation is total over unresolved information
+
+
+PART III — SYNTAX AND MODULES
+
+## Chapter: Parsing
+
+### D75. Parsing is evaluation
+- Decides: a parser is a function from a grammar and a text to an expression. A text that does not parse is a refutation.
+- Status: open (the engine is host code called by a fixed pipeline)
+- Depends on: One operation: partial evaluation; The kernel holds no language; Expressions are values, forming a DAG; A refutation marks everything computed from it
+
+### D76. No parser is privileged
+- Decides: a parser is an ordinary extension. A configuration may hold several and may replace the one the platform ships.
+- Status: open
+- Depends on: Parsing is evaluation; What the kernel requires of an extension; Everything above the kernel is an extension, and there is one way to extend
+
+### D77. Grammars are values
+- Decides: a grammar is an ordinary structure: named productions over a small set of rule forms (terminal, reference, sequence, alternatives, repetition, option, guard) and a start symbol. It is built, combined and analysed like any other value, and the kernel knows nothing about it.
+- Status: settled
+- Depends on: One composite kind: Structure; The kernel holds no language; An extension is made of functions and metadata fields
+
+### D78. Every notation stands for an expression
+- Decides: a grammar form maps what it matched to an expression and does nothing else. Free names in that expression mean what they meant where the form was defined, never what they mean where the form is used.
+- Status: partly built (the forms of the `grammar { … }` block do this; the base grammar does not)
+- Depends on: Meaning comes before notation; Grammars are values; Symbol identity is a fully-qualified name
+
+### D79. The `grammar { … }` block
+- Decides: a grammar is written declaratively: operator clauses (`infix`, `prefix`, `postfix`), rule clauses that define, extend or remove a production, and form clauses whose body names the parts it matches and gives the expression they stand for. Whitespace is allowed between the items of a sequence unless a rule says otherwise, and the text a named part matched is available as a string.
+- Status: settled
+- Depends on: Every notation stands for an expression; Grammars are values
+
+### D80. A parser records where each expression came from in its text
+- Decides: the position of an expression in its source text is a metadata field the parser's extension registers and writes. The kernel does not know about it. The parse tree stays internal to the parser.
+- Status: open
+- Depends on: Parsing is evaluation; An extension registers its own fields; the kernel has two; Every value keeps its origin
+
+### D81. Scannerless parsing
+- Decides: a grammar reads characters directly; there is no tokenizer. Whitespace is written in the grammar, and keywords and identifiers share one character space.
+- Status: settled
+- Depends on: Grammars are values
+
+### D82. A terminal is a function, so a grammar can define its own
+- Decides: a terminal is a function from the parser's position and state to a match or a failure. The terminals the engine's package ships, those for indentation among them, have no special standing.
+- Status: open (terminals are cases of the host engine)
+- Depends on: Grammars are values; No parser is privileged; Functions are data: params plus body
+
+### D83. Offside rule through stateful indent terminals
+- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of offset and indent stack. `NEWLINE` matches only when the next content is at or below the block's indent, so a continuation line needs no construct of its own.
+- Status: partly built
+- Depends on: A terminal is a function, so a grammar can define its own; Scannerless parsing
+
+### D84. Guards and reserved words separate keywords from identifiers
+- Decides: zero-width guards (not followed by, followed by, reserved) and named, cumulative sets of reserved words keep keywords out of identifiers.
+- Status: settled
+- Depends on: Scannerless parsing
+
+### D85. Named, partially ordered precedence levels
+- Decides: precedence levels are named and related by before and after constraints. A constraint on one side is enough wherever it settles every case that arises, and no numbers appear.
+- Status: settled
+- Depends on: Grammars are values; Order of definition carries no meaning
+
+### D86. Ambiguity is a claim
+- Decides: "this grammar is unambiguous" is a claim, decided, refuted or left undecided like any other. A text with two parses is a refutation. Precedence levels and longest match are the author's means of removing ambiguity; the order of alternatives is not one. The analyses of a grammar (what can match nothing, what is unreachable, what recurses on the left) are ordinary functions over the grammar value.
+- Status: open (the shipped engine resolves ambiguity by the order of alternatives)
+- Depends on: Claims are evaluated like everything else; Grammars are values; Order of definition carries no meaning; Named, partially ordered precedence levels
+
+### D87. Parse failure reporting and recovery
+- Decides: a failed parse reports the farthest point reached, with what was expected and what was found. Error productions and declared recovery points let one parse report several failures.
+- Status: partly built
+- Depends on: Parsing is evaluation; Claims are evaluated like everything else
+
+## Chapter: Changing the grammar
+
+### D88. A text can change the grammar it is read in
+- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
+- Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file)
+- Depends on: Parsing is evaluation; Every notation stands for an expression; Grammars are values; A system is described in the language of its domain, and that language grows with the understanding
+
+### D89. Every production can be extended
+- Decides: a change to a grammar is a set of operations on named productions: add one, append an alternative, replace, remove, wrap. Every production is open to them; none must be marked extensible.
+- Status: settled
+- Depends on: Grammars are values; A text can change the grammar it is read in
+
+### D90. Grammars combine without regard to order
+- Decides: two changes to a grammar give the same language in either order, or they conflict, and a conflict is a refutation raised before any text is read in the combined grammar. Adding a form is always allowed. Replacing or removing another grammar's form is explicit and names what it replaces.
+- Status: partly built (conflicts between operators, keywords and precedence are found before use; a replacement only warns)
+- Depends on: Order of definition carries no meaning; Every production can be extended; Ambiguity is a claim
+
+### D91. A grammar change reaches to the end of its block
+- Decides: a change made inside a block ends with the block; a change at the top of a text ends with the text. It never reaches another text: importing a module's bindings does not bring its notation, and a module does not pass a notation on to those that import it.
+- Status: partly built (a change holds for one file and is not passed on; a change local to a block is not built)
+- Depends on: A text can change the grammar it is read in
+
+## Chapter: The parser engine
+
+### D92. Any parsing algorithm will do that meets five conditions
+- Decides: the algorithm is free. It must accept left recursion; give no meaning to the order of alternatives; report every parse of a text; settle the parse up to each change of grammar; and carry a state through the parse beside the position.
+- Status: open (the shipped engine meets the first and the last)
+- Depends on: Ambiguity is a claim; A text can change the grammar it is read in; A terminal is a function, so a grammar can define its own; Scannerless parsing
+
+### D93. The platform's parser engine ships already built
+- Decides: the engine the platform ships is written in Allegro and delivered as expressions, with its inbuilt grammar definitions as data, so that nothing has to be parsed before a parser exists. There is no parser generator: a parser for one grammar is the engine partially evaluated over that grammar.
+- Status: open (the engine is host code)
+- Depends on: No parser is privileged; What the kernel requires of an extension; No interface limits optimization; Any parsing algorithm will do that meets five conditions
+
+## Chapter: Modules and programs
+
+### D94. A module is an extension that arrives as a file
+- Decides: the module loader is itself an extension: it finds a file, has it parsed, evaluates it and yields an extension. A module refers to another module's bindings by naming the module; the values are handed to it, never fetched at the place of use. Importing bindings and changing the grammar a text is read in are two separate things a file can ask for. A program's main file is loaded as a module, by the same loader.
+- Status: partly built (modules load from files and bindings are handed in; the loader is host code)
+- Depends on: What the kernel requires of an extension; Parsing is evaluation; A capability is granted, never acquired; A text can change the grammar it is read in
+
+### D95. The loader reaches files through a capability
+- Decides: reading a file is an effect. The configuration grants the loader the capability to read; the loader acquires nothing. It looks in the program's own library directory, then the platform's, and a cycle of modules is an error. A browser supplies a different capability to the same loader.
+- Status: partly built (the loader takes its file reader as an option; the browser has its own loading code)
+- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired; A capability is supplied per target; Host code reaches a program only as primitive functions
+
+### D96. Running a program is evaluating its main module with a configuration's capabilities
+- Decides: there is no separate act of running. A session at a prompt is a module whose text arrives one entry at a time: each entry is read in the grammar the earlier entries left and sees the bindings they made. At a prompt a name may be bound again; the new binding holds for the entries that follow, and what earlier entries computed is unchanged.
+- Status: partly built
+- Depends on: A module is an extension that arrives as a file; Phases are configuration; A text can change the grammar it is read in; Order of definition carries no meaning
+
+### D97. Every program is evaluated the same way, however it arrives
+- Decides: a program may arrive as an extension in the configuration, as parsed text, as an imported module, as a script or a prompt entry, or as an expression built by a running program. The same evaluation and the same checks apply to all: a library is checked exactly as the program that uses it, and a program built by a program is checked like any other.
+- Status: partly built (one pipeline serves programs and libraries; whether a constructed program skips checks is not confirmed)
+- Depends on: What the kernel requires of an extension; Parsing is evaluation; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities; Claims are evaluated like everything else; Trust comes from the kernel, not the author
+
+
+PART IV — THE STANDARD LANGUAGE
+
+## Chapter: Types as values
+
+### D98. Types are values that constrain values
+- Decides: a type is an ordinary structure, carried in a value's type field, which the type extension owns. Types are built by ordinary calls. A type is a predicate over values, and a type check is a claim.
+- Status: settled
+- Depends on: One operation: partial evaluation; Metadata is a field on every value; One value universe; An extension registers its own fields; the kernel has two; Claims are evaluated like everything else
+
+### D99. In the standard language every value has a type
+- Decides: the language's notation gives every literal and every constructed value a type. An operator applied to a value with no type is a refutation; nothing falls back to an untyped operation. A function from outside the language enters it wrapped in a type that says so.
+- Status: settled
+- Depends on: Types are values that constrain values; Every notation stands for an expression; A refutation marks everything computed from it
+
+### D100. Kinds are types, and Type is its own type
+- Decides: a kind is a type whose instances are types (`Type`, `Refinement`, `Interface`, `GenericType`, `Proof`), instance-of is shape-of, members live once on the kind, and `Type : Type` is kept with universe stratification left to the proof-export boundary.
+- Status: settled
+- Depends on: Types are values that constrain values
+
+### D101. Members are keyed by symbol and conformance is membership
+- Decides: type members are interned fully-qualified member symbols; a type conforms by drawing another type's member symbols, so two types that each spell `size` do not conform by accident.
+- Status: settled
+- Depends on: Symbol identity is a fully-qualified name; Types are values that constrain values
+
+### D102. One meta-type with an optional name
+- Decides: `NominalType` collapsed into `Type` with an optional name; named versus anonymous is a value-shape distinction, not a type-of-types distinction.
+- Status: settled
+- Depends on: Types are values that constrain values
+
+### D103. One construction surface
+- Decides: `define` is uniform at every meta-level, Interface is a refinement of Type and Refinement a sub-kind of Type, and the reserved `construct` define-spec key is the per-kind minting authority (bottoming out in `struct_new`).
+- Status: settled
+- Depends on: Kinds are types, and Type is its own type
+
+### D104. Loose conformance for data, selected by anonymity
+- Decides: an anonymous expected type (`~T`, inline `{…}`) matches by base name (duck typing for data at boundaries, patterns and the marked escape hatch); a named expected type takes the declared path; anonymity alone is the switch.
+- Status: partly built
+- Depends on: Members are keyed by symbol and conformance is membership; One meta-type with an optional name
+
+### D105. The standard language's handled failure is an exception
+- Decides: an exception is a value a program raises and handles explicitly. Until it is handled it is carried to every result computed from it, in a field the standard extension owns. It is not a refutation: the program is reporting an outcome.
+- Status: partly built (the code has an error value in a kernel field)
+- Depends on: A failure a program can handle is supplied by an extension; Types are values that constrain values; Metadata fields are independent
+
+### D106. The core types are built over bits
+- Decides: the standard language ships Int, Float, String, Bool, Array, Object, Function, None, Any, a type for functions from outside the language, and the exception type. Integers and floats compute through the machine arithmetic capability; a string is bits with a type; Bool is the kernel's two truth values with a type. Array's map, filter and reduce are written in the language, so partial evaluation sees through them. An operator is a method of its operand's type.
+- Status: settled
+- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
+
+### D107. Generics are memoized type constructors
+- Decides: a generic is a function from parameters to concrete types; applied concretes are memoized (identity is physical), parameters may be values (`Vector[3]`), and a bare generic in annotation position applies `Any`.
+- Status: settled
+- Depends on: Kinds are types, and Type is its own type
+
+### D108. Function types with bidirectional call-site unification
+- Decides: a typed function carries `Function[ParamTypes, ReturnType]`; type variables bind progressively at a call, with information flowing both ways, and a contradiction is a refutation at that call.
+- Status: settled
+- Depends on: Generics are memoized type constructors
+
+### D109. A typed function claims its parameter types on entry and its return type on exit
+- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there.
+- Status: open (the evaluator checks a typed call itself)
+- Depends on: Function types with bidirectional call-site unification; Claims are evaluated like everything else; A call is evaluated by evaluating the function's body; An extension is made of functions and metadata fields
+
+### D110. `distinct` mints a fresh-symbol newtype
+- Decides: `distinct` re-declares members under a fresh scope, so a newtype does not conform to or equal its parent unless a coercion is declared.
+- Status: settled
+- Depends on: Members are keyed by symbol and conformance is membership
+
+### D111. The user-facing generics surface and parameter kinds
+- Decides: open — which kinds of parameter the language offers and how users define generics; GenericType's missing construct authority is a deferred public surface, not kernel privacy.
+- Status: open
+- Depends on: Generics are memoized type constructors
+
+## Chapter: Refinement types
+
+### D112. Abstract domains as sound approximations
+- Decides: the standard extension recognises a predicate as an interval, an equality, an inequality or opaque, and each recognised form answers a question about a value as decided or undecided. An opaque predicate stays a residual claim. No search runs.
+- Status: settled
+- Depends on: One operation: partial evaluation; Claims are evaluated like everything else
+
+### D113. Refinement types
+- Decides: a refinement is a type plus a predicate (`Int & _ > 0`) that shares its parent's member set, carries an abstract domain for entailment, and is chained left-associatively one layer per clause; its constructor wraps and checks the parent's.
+- Status: settled
+- Depends on: Types are values that constrain values; Abstract domains as sound approximations
+
+### D114. Shape and knowledge are separate
+- Decides: a value's shape (its type with member-transparent refinement layers walked off) drives dispatch, while knowledge (refinement bounds, domains, predicate sets) is a monotonic lattice excluded from identity, equality and dispatch; a refinement that mints its own members is a shape.
+- Status: settled
+- Depends on: Refinement types
+
+### D115. Declared inheritance dissolves into conformance, refinement and composition
+- Decides: there is no declared is-a edge between concrete types; the relations are member-symbol conformance, refinement (`Type.refines`) and composition (member bundles), with no `extend` sugar.
+- Status: settled
+- Depends on: Members are keyed by symbol and conformance is membership; Refinement types
+
+### D116. Invariants are refinements
+- Decides: a lifecycle invariant is a refinement layer (`T & pred`, records reaching fields through `_`), and it persists down a chain because the layer is structurally present, not because of an inheritance policy.
+- Status: settled
+- Depends on: Refinement types; Declared inheritance dissolves into conformance, refinement and composition
+
+### D117. Constructing a refined value claims its predicate
+- Decides: `Positive(-1)` is a refutation. A program that wants to test a value calls the predicate. Where the argument is not yet known the claim is residual, and so is the construction.
+- Status: open (a failed construction yields an error value today)
+- Depends on: Refinement types; Claims are evaluated like everything else; A refutation marks everything computed from it; Invariants are refinements
+
+### D118. An interface is a type drawn from, not instantiated
+- Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types.
+- Status: partly built
+- Depends on: Declared inheritance dissolves into conformance, refinement and composition; One construction surface
+
+## Chapter: Reaching a member
+
+### D119. A private member is one whose key not all code holds
+- Decides: the key is an unforgeable value made where the type is defined. Code that holds it can reach the member; no other code can, by any name. A key cannot be written out and read back into existence. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
+- Status: open (the code mediates each access and asks whether the requesting scope holds a name)
+- Depends on: Authority is an unforgeable value; Reading an expression never yields authority; Members are keyed by symbol and conformance is membership
+
+### D120. Who may use a member is a claim about where the access was written
+- Decides: private, protected, read-only and caller-based rules are claims over the origins of accesses. Only the kernel writes an origin, so it cannot be forged. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
+- Status: open, a design to prove
+- Depends on: A private member is one whose key not all code holds; Every value keeps its origin; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; A function may take an argument unevaluated
+
+### D121. Export marks the binding, and a module with no exports is open
+- Decides: `export NAME = …` marks the binding, never the value. A module hands out what it exports, and what it does not hand out cannot be reached. A module that declares no exports hands out everything.
+- Status: settled
+- Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired
+
+### D122. Imported modules are typed objects whose type encapsulates
+- Decides: an imported module is a typed object whose members are the module's exports and nothing else.
+- Status: settled
+- Depends on: Export marks the binding, and a module with no exports is open; In the standard language every value has a type
+
+## Chapter: The surface language
+
+### D123. Indentation blocks, with brace and offside both as the goal
+- Decides: the base surface opens blocks by indentation (offside rule) and an expression continues across lines when the next line is indented deeper; Allegro should support both brace-delimited and indentation syntax, and until then every new construct must work in both modes.
+- Status: partly built
+- Depends on: Offside rule through stateful indent terminals
+
+### D124. Refinement types written `T & predicate` with `_` as the value
+- Decides: a refinement is written `Base & predicate` where `_` names the value, and `ensures` uses the same `_` for the return value.
+- Status: settled
+- Depends on: Refinement types
+
+### D125. Function declarations with `=>`
+- Decides: a function is declared `name(params) => body`, a lambda is `x => body` or `(x, y) => body`, and closures are ordinary nested lambdas.
+- Status: settled
+- Depends on: Meaning comes before notation
+
+### D126. Expression-valued `if then else`
+- Decides: `if c then a else b` is an expression built on the kernel's one conditional. A branch that may not be taken is evaluated without capabilities.
+- Status: settled
+- Depends on: A branch that may not be taken is evaluated without capabilities; Every notation stands for an expression
+
+### D127. The `Y of x` component-access form
+- Decides: a metadata field of a value is read by the expression form `Y of x` (`type of x`, `source of x`). Reading a field is free to any code.
+- Status: settled
+- Depends on: Metadata is a field on every value; An extension registers its own fields; the kernel has two
+
+### D128. Type annotations on parameters and returns
+- Decides: parameters and returns carry `: Type` annotations, and generics are written `Array[Int]`. Each annotation stands for a claim.
+- Status: settled
+- Depends on: A typed function claims its parameter types on entry and its return type on exit; Every notation stands for an expression
+
+### D129. Statement forms that declare a binding
+- Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement halts when its check fails.
+- Status: settled
+- Depends on: Every production can be extended; Type annotations on parameters and returns
+
+### D130. `when / is / then` pattern matching
+- Decides: matching uses `when x is P then e` with nominal, structural and nested destructuring and `and`/`or` guards; a type pattern resolves first (value pattern matches the primary, type pattern matches the input's type, or either for a type input). It is built on the kernel's one conditional.
+- Status: settled
+- Depends on: The `grammar { … }` block; Types are values that constrain values; Expression-valued `if then else`
+
+### D131. Combinators before keyword declaration syntax
+- Decides: types, interfaces, refinements and member modifiers are declared through combinator calls (`Type.define`, `Interface.define`, `private(...)`), and keyword declaration syntax waits until the API patterns settle, lowering to the same attributes when it lands.
+- Status: open
+- Depends on: One construction surface; A private member is one whose key not all code holds
+
+### D132. String interpolation with braces
+- Decides: a string literal interpolates `{expr}`, with `\{` and `\}` as escapes.
+- Status: settled
+- Depends on: Meaning comes before notation
+
+## Chapter: Claims and proofs
+
+### D133. Nothing is a claim until someone makes it
+- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
+- Status: partly built
+- Depends on: Claims are evaluated like everything else; Correctness and safety are one kind of claim
+
+### D134. A claim about every value is decided by evaluating it with the value unknown
+- Decides: a proposition is an expression that evaluates to true or false. A claim about every value is decided by evaluating it with the value unknown: if the residual is true, the claim holds for all values. Enumerating a finite type decides it too. Deciding is reduction, never search, and a refuted claim carries its counterexample.
+- Status: settled
+- Depends on: One operation: partial evaluation; Claims are evaluated like everything else; Only the kernel records the outcome of a claim; Evaluation is total over unresolved information
+
+### D135. A proof term is a proposal
+- Decides: a theorem is a named claim, and `verify` makes an anonymous one. `by <term>` offers an expression whose evaluation decides the claim; the kernel checks that it establishes exactly what was stated. Rules such as reflexivity, symmetry, transitivity and congruence are functions of the standard extension, and a result decided with their help names that extension.
+- Status: settled
+- Depends on: A claim about every value is decided by evaluating it with the value unknown; Anyone may propose, and the record shows who; Every result says how strongly it holds
+
+### D136. Discharge mechanisms without search
+- Decides: the standard extension decides claims without search, in order of preference: evaluation; entailment from a refinement's domain; equational rules through `by`; enumeration of a finite type. Bounded sampling gives the strength sampled, not decided. A library of tactics composes them, and there is no outside solver.
+- Status: partly built
+- Depends on: A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Abstract domains as sound approximations
+
+### D137. Bounded sampling for universal claims
+- Decides: induction is checked at the base and four inductive steps, and a function's `proven` clause at four sampled inputs of its parameter type; a failure halts with the counterexample. The result's strength is sampled. Full symbolic induction is a follow-on.
+- Status: partly built
+- Depends on: Discharge mechanisms without search; Every result says how strongly it holds
+
+### D138. Four strengths, one vocabulary
+- Decides: every claim of the standard language carries one of the four strengths: decided, sampled, assumed, undecided. How a claim was decided is found in its origin.
+- Status: open (the code has three vocabularies)
+- Depends on: Every result says how strongly it holds; Bounded sampling for universal claims; Every value keeps its origin
+
+### D139. Tactics as a pure Allegro library
+- Decides: reusable proof strategies (`same`, `flip`, `step`, `chain`, `rewrite`) are a library of plain Allegro over the kernel's combinators, adding no primitive.
+- Status: settled
+- Depends on: A proof term is a proposal; Everything above the kernel is an extension, and there is one way to extend
+
+## Chapter: Equality and laws
+
+### D140. Lawful interfaces
+- Decides: any member set may carry laws: members whose propositions over all values are schemas at declaration, and become one claim per law when a type draws the set. Until decided, each is undecided. Laws attach to the set because a law may reference several members.
+- Status: settled
+- Depends on: Members are keyed by symbol and conformance is membership; A claim about every value is decided by evaluating it with the value unknown
+
+### D141. Equality dispatches on shape, then coerces, else not-equal
+- Decides: `==` compares same-shape values with the shape's `equals`; for different shapes it coerces both operands to a least common type over declared coercions (`Coercion.declare(A, B, fn)` on the pair, with preservation and coherence obligations); with no path the answer is false, never an error.
+- Status: settled
+- Depends on: Shape and knowledge are separate; Lawful interfaces
+
+### D142. Default equality belongs to the standard extension
+- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Its laws are decided once for all types. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int.
+- Status: settled
+- Depends on: Equality dispatches on shape, then coerces, else not-equal
+
+### D143. Law strengths and the transitivity gate
+- Decides: each law claim carries one of the four strengths, and a proof records the equality and the strength it rests on. The transitivity rule refuses a custom equality whose transitivity is neither decided nor assumed.
+- Status: settled
+- Depends on: Lawful interfaces; Four strengths, one vocabulary; A proof term is a proposal
+
+## Chapter: Effects
+
+### D144. An effect is the use of a capability
+- Decides: what a function may do is read from the capabilities it holds: those it is given and those in its body. A function that holds none is pure. A function that takes a function can do what its own capabilities and its argument's allow. An operation the platform cannot analyse is a capability a configuration supplies.
+- Status: open (the code infers sets of effect labels and checks them in a pass of its own)
+- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Reading an expression never yields authority; Host code reaches a program only as primitive functions
+
+### D145. A capability has named parts and narrowed forms
+- Decides: `files.read` is a part of the `files` capability, and reading one path is a narrowed form of `files.read`. Holding a capability means holding its parts; holding a part or a narrowed form gives nothing wider.
+- Status: open
+- Depends on: An effect is the use of a capability; Authority is an unforgeable value
+
+### D146. A bound on capabilities is written in an `effects` clause or a type slot
+- Decides: a function states its bound with an `effects` clause; a parameter's bound is written in its type slot (`f: pure`). Each stands for the claim Part II defines. A function-typed parameter with no bound makes no claim.
+- Status: settled
+- Depends on: An effect is the use of a capability; What code may do is bounded by the capabilities it is given, and that bound is a claim; Every notation stands for an expression
+
+## Chapter: Contracts
+
+### D147. A contract is a predicate that becomes knowledge, discharged by PE
+- Decides: `assert`, `requires` and `ensures` are claims, and a claim that holds becomes knowledge of the value, so a later claim of the same property is decided by what is known. There is no separate contract checker.
+- Status: settled
+- Depends on: Shape and knowledge are separate; One operation: partial evaluation; Nothing is a claim until someone makes it
+
+### D148. What is known about a value travels with the value
+- Decides: knowledge is a field of the standard extension. Inside a branch, the names tested are rebound to values that carry the extra fact; after `assert` or `requires`, for the rest of the scope. The arms of a pattern match narrow knowledge as the branches of `if` do.
+- Status: partly built (the code keeps a second set of facts on the scope and narrows it in place)
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; An extension registers its own fields; the kernel has two; Expression-valued `if then else`; `when / is / then` pattern matching
+
+### D149. A match where no arm matches is a refutation
+- Decides: falling through a pattern match is a wrong program, so a match that can fall through refutes the program, and exhaustiveness needs no analysis of its own. An `else`, a wildcard or a pattern that binds anything covers a match. Where the subject's possible values are not known, the claim is undecided.
+- Status: open (a match that can fall through is reported as information today)
+- Depends on: `when / is / then` pattern matching; A refutation on a path that may be taken refutes the program; What is known about a value travels with the value
+
+### D150. A body clause is a notation
+- Decides: `requires`, `ensures`, a bound on capabilities, `decreases` and `total` are leading statements of a function's body, and each stands for a claim placed in the body.
+- Status: partly built (the clauses exist; they are lowered by host steps)
+- Depends on: The `grammar { … }` block; Every notation stands for an expression; Claims are evaluated like everything else
+
+### D151. Contract checks sit at function entry and return
+- Decides: `requires` is claimed on entry and `ensures` on return. Both are part of the body, so each is evaluated wherever a call is evaluated, with what is known there.
+- Status: partly built
+- Depends on: A contract is a predicate that becomes knowledge, discharged by PE; A body clause is a notation; A call is evaluated by evaluating the function's body
+
+### D152. Unification in patterns
+- Decides: open — full unification in pattern mode.
+- Status: open
+- Depends on: `when / is / then` pattern matching
+
+## Chapter: Termination and completion
+
+### D153. Termination is a claim
+- Decides: that a function terminates is a claim, made by `total` or wholesale by a project. It is decided by a function of the standard extension evaluated over the function's expression. `decreases` offers a measure; `assume terminates` gives the strength assumed; `partial` makes no claim. A function that takes a function terminates if its argument does, and says so.
+- Status: open (the code computes divergence as an effect, in a host pass)
+- Depends on: Nothing is a claim until someone makes it; One operation: partial evaluation; A body clause is a notation; Four strengths, one vocabulary
+
+### D154. Completion is totality and liveness
+- Decides: a program completes if it terminates and every value it waits for arrives. A capability's supplier declares whether its values arrive (a delay does; a fetch is assumed to), and that is never inferred.
+- Status: settled
+- Depends on: Termination is a claim; A missing value is a cell that is filled once; Four strengths, one vocabulary
+
+### D155. Termination by bounded decrease
+- Decides: a recursive call decreases when an argument is `param - K` (literal K > 0) and the callee's parameter type has a non-negative lower bound read from refinement domains; a detected decrease on an untyped parameter stays silent.
+- Status: settled
+- Depends on: Abstract domains as sound approximations; Termination is a claim
+
+### D156. Mutual recursion requires every edge to decrease
+- Decides: over Tarjan SCCs, every in-cycle call must decrease individually; per-function `decreases` covers what the structural test cannot.
+- Status: settled
+- Depends on: Termination by bounded decrease
+
+## Chapter: When a check fails
+
+### D157. Equality, coercion and invariant predicates hold no capability and terminate
+- Decides: the implementation of an equality or a coercion, and an invariant predicate that inspects its value, hold no capability and carry a termination claim. A violation is a refutation that names what was held.
+- Status: settled
+- Depends on: An effect is the use of a capability; Termination is a claim
+
+### D158. An assumption is always on the record
+- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired.
+- Status: partly built
+- Depends on: Four strengths, one vocabulary
+
+### D159. Every failure carries a legible counterexample
+- Decides: termination and exhaustiveness findings carry one-line executable witnesses, contract and refinement failures render the violated constraint and the actual Int value, a refinement predicate may return an error value whose text becomes the message, and an in-body `assert` over parameters is suggested as a `requires`.
+- Status: partly built
+- Depends on: Abstract domains as sound approximations; Termination by bounded decrease; A refutation marks everything computed from it
+
+### D160. A predicate can explain its refusal
+- Decides: a predicate may answer an explanation in place of false. Anything other than true refutes the claim, and the refutation carries what the predicate answered, so a model's failures are reported in the model's own terms with no registry of renderers.
+- Status: partly built
+- Depends on: Refinement types; Constructing a refined value claims its predicate; Every failure carries a legible counterexample
+
+
+PART V — VIVACE (domain models)
+
+## Chapter: Models
+> **What Vivace is for.** A model is a description of a system, written in a language made for its domain and precise enough to be checked. A meta-model is that language: its types, its notation and its claims. Modelling is the practice of building a shared understanding of a system by writing, checking and revising models of it. Allegro is a platform for checked languages. Vivace is narrower: it supplies the meta-models and the tools for constructing models, inspecting them, transforming them, relating them and searching them.
+> Two things are already decided by earlier parts. A model is checked with the same rigour as any other program. Checking a model and running it are the same evaluation, without and with the capability to act.
+> The goal: declarations and rules, findings and failures are each written in the language that expresses them most clearly and efficiently. A language is extended so that it corresponds more closely to a model, never because a rule could not otherwise be said.
+> Two observations. Real problems need several models that interact in subtle ways, which is a central difficulty of model-driven engineering. Many domains need search and optimization, which are hard to state in traditional programming languages.
+> Beyond modelling, Vivace brings meta-modelling: the discipline and the means of building and evolving models. It supplies tools to analyse a model, logically and empirically; it does not supply the answers.
+
+### D161. A model is a value
+- Decides: a model is a value built from a meta-model: the language it is written in, with its types, notation and claims. Ordinary functions construct it, inspect it, transform it and compare it, and Vivace supplies the meta-models and tools for doing so.
+- Status: partly built (plans are values built through a library)
+- Depends on: A system is described in the language of its domain, and that language grows with the understanding; A language inherits every check of what it is built on; One value universe; Types are values that constrain values
+
+### D162. A transformation is a model
+- Decides: a transformation from one model to another is written declaratively, as a model that defines a function, and is never only an imperative function. It can therefore be inspected, compared and checked like the models it relates.
+- Status: open
+- Depends on: A model is a value; A mapping between models is itself a checked value
+
+### D163. Two models relate only through a declared mapping
+- Decides: every relation between two models is a mapping that is declared, formally defined and checked. Vivace defines each kind of mapping through which models can relate.
+- Status: open
+- Depends on: A transformation is a model; A mapping between models is itself a checked value
+
+### D164. A change to a model is a mapping from the old one
+- Decides: evolving a model uses the mechanism that relates two models: the new version is related to the old by a declared mapping, with claims about what it preserves.
+- Status: open
+- Depends on: Two models relate only through a declared mapping
+
+## Chapter: Search and optimization
+
+### D165. Solving is proposing a value for an unknown, and the kernel checks it
+- Decides: a model with parts not yet supplied is a claim waiting for values. A search routine, an outside solver, a person or an AI may supply them. None needs to be trusted, because the candidate is evaluated.
+- Status: partly built (plan templates, catalogs and the proposal loop)
+- Depends on: A model is a value; Anyone may propose, and the record shows who; When information arrives, what waited on it is evaluated again; The kernel trusts only what it has evaluated
+
+### D166. A solver sees its problem unevaluated
+- Decides: an unknown may be represented by an unbound symbol, and ordinary evaluation of an expression that holds one gives a residual. A solver takes its problem unevaluated, evaluates what it chooses, and reads the result: which parts are resolved and which are not. Vivace supplies functions that return the two.
+- Status: open, a design to prove
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function may take an argument unevaluated; Evaluation is total over unresolved information; Reading an expression never yields authority
+
+### D167. Feasible is decided; best says how strongly it holds
+- Decides: that a candidate satisfies a model is decided by evaluation. That no better candidate exists is a claim over all candidates: decided only by exhausting them, and otherwise sampled or assumed. Search finds a feasible answer; optimization claims the best.
+- Status: partly built (enumeration over plan templates)
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; Every result says how strongly it holds; A claim about every value is decided by evaluating it with the value unknown
+
+## Chapter: Analysing models
+
+### D168. A model's quality is a question for analysis
+- Decides: whether a model is effective, efficient or correct, and when it should be split in several, are questions Vivace gives the tools to analyse, logically and empirically. It does not give the answers. A logical finding is a claim about a model or its meta-model; an empirical one is a measurement over the model's uses, and says so in its strength.
+- Status: open
+- Depends on: A model is a value; Every result says how strongly it holds
+
+## Chapter: Units of measure
+
+### D169. Dimensions as data, named dimensions as refinements over one Quantity
+- Decides: a dimension is structural data (the full seven-vector of SI base dimensions) and each named dimension is a refinement over one `Quantity` record, so dimensional soundness is refinement discharge, with a mechanics-focused shipped unit set.
+- Status: settled
+- Depends on: Refinement types; Default equality belongs to the standard extension; A module is an extension that arrives as a file; A language inherits every check of what it is built on; Correctness and safety are one kind of claim
+
+### D170. Quantity laws at honest tiers
+- Decides: the quantity laws are shown at their real strengths (sampled, assumed, undecided), loudly, rather than restricting the demonstration to laws that are decided.
+- Status: settled
+- Depends on: Law strengths and the transitivity gate; Every result says how strongly it holds; Dimensions as data, named dimensions as refinements over one Quantity
+
+### D171. Number-anchored quantity literals
+- Decides: the units DSL works with zero grammar through typed operators; `use units` adds only number-anchored literals (`3 m/s^2`, `^` inside unit expressions only, horizontal whitespace between number and unit), and every computed value goes through the ordinary operator algebra.
+- Status: settled
+- Depends on: Dimensions as data, named dimensions as refinements over one Quantity; The `grammar { … }` block
+
+### D172. Conversion sugar with `in`
+- Decides: open — `5 km in m` sugar is deferred; `.to(m)` is the surface.
+- Status: open
+- Depends on: Number-anchored quantity literals
+
+
+PART VI — BUILDING AND RUNNING PROGRAMS
+
+## Chapter: The kernel's interface
+> **Who does what.** The kernel evaluates, and records the outcome of claims. A launcher is host code that creates a kernel, gives it its first extensions and capabilities, and starts an evaluation. A primitive function is a function whose body is host code; it is effectful or pure, and a capability is a named set of effectful ones. An extension is Allegro code: the parser engine, the module loader, the standard language, a domain language. A saved program rebuilds a program in a kernel without parsing. A configuration is all the information that determines an execution.
+> **How the platform is used.** Running a script. Checking a project. A session at a prompt. Building in one place and running in another. Exporting to a target platform. Embedding a kernel in an application. A page in a browser. A tool reading a phase's result. A person or an agent answering obligations.
+
+### D173. The kernel is passive
+- Decides: the kernel acts only on calls of its interface. It starts nothing, reads nothing and knows nothing of configuration or phases.
+- Status: open
+- Depends on: What the kernel requires of an extension; The kernel's primitives are pure and few
+
+### D174. What the kernel's interface offers
+- Decides: a caller can construct values (bits, symbols, structures, expressions, primitive functions, composed functions); bind a symbol to a value in a scope; create a scope, as a child of another or sharing nothing with any other; evaluate an expression in a scope; fill a cell when a value arrives; read a result with its metadata; obtain a residual; set limits; and receive kernel faults.
+- Status: open (the host calls the evaluator's functions directly)
+- Depends on: The kernel is passive; One value universe; The environment is not a value; A missing value is a cell that is filled once; Evaluation stops early for two reasons only
+
+### D175. No interface call writes a bare claim outcome
+- Decides: the outcome of a claim enters a kernel in two ways only: the kernel decides it, or it is restored with its builder's name. A field an extension owns is never written through the interface; the extension's constructors are replayed.
+- Status: open
+- Depends on: What the kernel's interface offers; Only the kernel records the outcome of a claim; An extension registers its own fields; the kernel has two
+
+### D176. Limits are step budgets
+- Decides: a caller limits an evaluation by a budget of steps, which is deterministic. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided.
+- Status: open (a depth bound exists)
+- Depends on: What the kernel's interface offers; Evaluation stops early for two reasons only; The same program and the same information give the same result
+
+## Chapter: Configuration
+
+### D177. Configuration is all the information that determines an execution
+- Decides: it includes which kernel to use; the definitions of capabilities, phases and pipelines; which implementation each capability maps to; the parser engine and the module loader; information about the environment; and the parameters of the invocation. How much of it the launcher manages and how much Allegro code manages is left open on purpose.
+- Status: open
+- Depends on: The kernel is passive; Phases are configuration; A capability is supplied per target
+
+### D178. Configuration sources have a priority, and a result says which supplied each value
+- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. The result of an execution records which source supplied each value.
+- Status: open
+- Depends on: Configuration is all the information that determines an execution; Every result says how strongly it holds
+
+### D179. A full configuration is a model, evaluated in a first phase
+- Decides: a configuration is written in a language of its own and evaluated like any model, in a phase that runs before the others. Only the minimum needed to start stays in host form.
+- Status: open, a design to prove
+- Depends on: Configuration is all the information that determines an execution; A model is a value
+
+## Chapter: Launching
+
+### D180. The launcher does only what cannot be done in Allegro
+- Decides: a launcher is host code invoked on a system to create a kernel and have it evaluate a program. It must load a kernel, give it the first extensions and capabilities, and start the evaluation. Anything more a launcher does is an earlier phase, run ahead of time and saved, so a minimal launcher and a fully loaded one are the same design at different points.
+- Status: open
+- Depends on: The kernel is passive; What the kernel's interface offers; The kernel contains only what no extension could supply
+
+### D181. Only the launcher sets the ceiling
+- Decides: the capabilities a launcher gives an execution are a ceiling: no code inside can exceed it. Within it, code still has to be handed a capability, by value or by being evaluated in a scope that holds it.
+- Status: open
+- Depends on: The launcher does only what cannot be done in Allegro; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim
+
+### D182. Startup, step by step
+- Decides: (1) a launcher is invoked with a configuration and a phase. (2) It creates a kernel, which has its kernel primitives and nothing else. (3) It loads the first extensions, each once and in the order their dependencies require; the first are saved programs, since no text can be read before a parser exists. (4) It creates the capabilities of the ceiling and hands each to the code the configuration names. (5) It builds the main program's expression, usually by asking the loader for the main module, and has the kernel evaluate it. (6) It delivers values that arrive later. (7) When nothing waited for is outstanding it handles the result, or the program has done so through a capability.
+- Status: open
+- Depends on: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; What the kernel requires of an extension; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities
+
+### D183. One kernel serves many invocations
+- Decides: a launcher may have one kernel evaluate a stream of commands, events or requests, each in its own scope with its own capabilities. The stream may equally be handled by Allegro code through a capability.
+- Status: partly built (the prompt)
+- Depends on: What the kernel's interface offers; Only the launcher sets the ceiling; Running a program is evaluating its main module with a configuration's capabilities
+
+## Chapter: Capabilities and primitive functions
+
+### D184. A capability is a named set of effectful primitives
+- Decides: a capability is defined once, in Allegro, by its name and its parts, so that a bound on capabilities can name it. It is implemented per target by primitive functions, and it is what gets granted. A primitive function that performs no effect needs no grant.
+- Status: open
+- Depends on: Host code reaches a program only as primitive functions; A capability is supplied per target; A capability has named parts and narrowed forms; An effect is the use of a capability
+
+### D185. A module is a function of the capabilities it declares
+- Decides: a module declares the capabilities it needs. It is evaluated in a scope that holds those and nothing else of the kind, supplied by whoever loads it.
+- Status: open
+- Depends on: A module is an extension that arrives as a file; Only the launcher sets the ceiling; A capability is granted, never acquired; The loader reaches files through a capability
+
+### D186. Loading is three capabilities of rising strength
+- Decides: loading a module from text, loading a saved program in data form, and loading host code are three capabilities. Text is checked like any program. Data is confined to the kernel's interface. Host code can do anything, so its capability is given only to trusted code and is narrowed to a list of files pinned by content hash. A configuration can claim that no host code is loaded after startup.
+- Status: open
+- Depends on: A module is a function of the capabilities it declares; The loader reaches files through a capability; A capability has named parts and narrowed forms; Host code reaches a program only as primitive functions
+
+### D187. Every pure primitive the platform ships has a reference definition
+- Decides: the meaning of a pure primitive is a composed function. The host code is an optimisation claimed equal to it, and anyone can run on the definitions alone, trusting only the kernel.
+- Status: open, a goal
+- Depends on: Host code reaches a program only as primitive functions; Machine arithmetic is a set of pure primitives that ships with the platform; No interface limits optimization
+
+## Chapter: Phases
+
+### D188. The platform ships three phases: check, run and export
+- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability to act and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
+- Status: open (the pipeline's stages are fixed in host code)
+- Depends on: Phases are configuration; Only the launcher sets the ceiling; A capability is supplied per target
+
+### D189. A phase hands its residual to the next
+- Decides: the residual of a phase is a program: a value that can be saved, loaded and evaluated further. A sequence of phases is a pipeline. A phase may state what it must leave decided before the next begins.
+- Status: open
+- Depends on: The platform ships three phases: check, run and export; Evaluation is total over unresolved information; An effect consumes only values whose claims are decided
+
+### D190. A project defines a phase or extends one
+- Decides: a phase is defined by naming its extensions, its capabilities, what it must leave decided and what happens to its result. A project extends a shipped phase by adding to any of these.
+- Status: open
+- Depends on: A phase hands its residual to the next; Nothing is a claim until someone makes it; Configuration is all the information that determines an execution
+
+## Chapter: Saved programs and export
+
+### D191. A saved program is a recorded sequence of interface calls
+- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record of calls on the kernel's interface, and can do nothing else. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
+- Status: open
+- Depends on: What the kernel's interface offers; A phase hands its residual to the next; Loading is three capabilities of rising strength
+
+### D192. A saved program names what it needs by content hash
+- Decides: a saved program names each primitive function and each extension it depends on by a hash of its content. A mismatch at load is a refutation.
+- Status: open
+- Depends on: A saved program is a recorded sequence of interface calls; Order of definition carries no meaning
+
+### D193. A stored outcome is restored with its builder's name
+- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. Deciding again is always available.
+- Status: open
+- Depends on: No interface call writes a bare claim outcome; A saved program names what it needs by content hash; The same program and the same information give the same result; Every result says how strongly it holds
+
+### D194. A target platform is a model, and export is a transformation into it
+- Decides: export maps a residual expression to a target's code. The target platform is a model, and the mapping is declared as every transformation is. Export includes the target's own capabilities for the phases that follow there: deploy, load, run, invoke. JavaScript is the first target.
+- Status: open
+- Depends on: A phase hands its residual to the next; A transformation is a model; Two models relate only through a declared mapping; A capability is supplied per target
+
+### D195. Saving is export to a target whose model is the kernel's interface
+- Decides: a saved program needs no mechanism of its own: it is what export produces when the target is the kernel's interface.
+- Status: open
+- Depends on: A saved program is a recorded sequence of interface calls; A target platform is a model, and export is a transformation into it
+
+### D196. An exported program needs a kernel only if it handles expressions at run time
+- Decides: most exported programs are graphs of functions turned into target code and carry no kernel. A claim over an input that arrives at run time becomes an ordinary check. A program that evaluates constructed code, loads modules, changes grammar over text it receives or reads residuals needs a kernel: it carries one, loads one as a library, or carries one specialised to it once the platform hosts itself.
+- Status: open
+- Depends on: A target platform is a model, and export is a transformation into it; One operation: partial evaluation
+
+### D197. A law licenses a rewrite, and the rewritten program carries the law's strength
+- Decides: an optimiser may rewrite a program by a law. The result is as strong as the law: a rewrite by a decided law changes nothing in what the program rests on; a rewrite by a sampled or assumed law says so. A capability's supplier may declare laws about it; those are assumed.
+- Status: open (laws exist; nothing rewrites by them)
+- Depends on: Lawful interfaces; Four strengths, one vocabulary; No interface limits optimization; A target platform is a model, and export is a transformation into it
+
+### D198. How extensions are distributed
+- Decides: open — as text or as saved programs, with a manifest (the hashes of the program, the kernel, its dependencies and its configuration), a signature, and versions; and how the platform itself is packaged for a browser.
+- Status: open
+- Depends on: A saved program names what it needs by content hash; A stored outcome is restored with its builder's name
+
+## Chapter: Trust
+
+### D199. Three things are trusted: the kernel, the launcher and primitive functions
+- Decides: everything else is checked. Allegro code from any source is evaluated like any program; a proposal is never trusted; a saved program is trusted as far as its builder and can be decided again.
+- Status: open
+- Depends on: Trust comes from the kernel, not the author; The launcher does only what cannot be done in Allegro; Host code reaches a program only as primitive functions; Every program is evaluated the same way, however it arrives
+
+### D200. A result names everything it rests on
+- Decides: beside the extensions and capabilities Part I names, a result names the kernel variant, the configuration and its sources, the primitive functions, the builders of saved programs and the target.
+- Status: open
+- Depends on: Every result says how strongly it holds; Three things are trusted: the kernel, the launcher and primitive functions; A stored outcome is restored with its builder's name; Configuration sources have a priority, and a result says which supplied each value
+
+### D201. A policy is a claim over what a result rests on
+- Decides: a policy is stated on a phase, as what it must leave decided; on a capability, as a requirement on what its inputs rest on; or as a profile, a named set of such claims that an organization adopts whole. A policy can only add requirements, and policies combine by conjunction: code inside can be stricter than its configuration and never looser.
+- Status: open
+- Depends on: A result names everything it rests on; Nothing is a claim until someone makes it; Only the launcher sets the ceiling
+
+### D202. A builder is identified by hash, then manifest, then signature
+- Decides: in stages: content hashes for every artifact; a manifest for each saved program; a signature on the manifest, verified by a pure primitive, with the accepted keys in the configuration. Because evaluation is deterministic, anyone can rebuild a saved program and compare.
+- Status: open
+- Depends on: A stored outcome is restored with its builder's name; The same program and the same information give the same result
+
+### D203. One reference kernel is the root of trust
+- Decides: a kernel variant is identified by hash. One variant, small and slow, is the reference. Any other is trusted as far as it agrees with the reference, which deciding again can check. A kernel produced by partial evaluation from the reference is trusted as an export mapping is.
+- Status: open
+- Depends on: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on
+
+### D204. A primitive's purity is assumed and named unless something stronger is shown
+- Decides: by default a pure primitive is taken as pure on its declaration, and results name it. Three things are stronger: sampling it; a target that runs it with no access to the outside, which enforces purity; and its reference definition.
+- Status: open
+- Depends on: Host code reaches a program only as primitive functions; Every pure primitive the platform ships has a reference definition; The same program and the same information give the same result
+
+## Chapter: Tools
+
+### D205. A tool reads a phase's result and adds no analysis of its own
+- Decides: everything a tool shows was computed by evaluation and is in the result: types, claims and their strengths, what each rests on.
+- Status: settled
+- Depends on: Phases are configuration; Every result says how strongly it holds
+
+### D206. A command is a configuration
+- Decides: each command of the platform names a phase and a way of presenting its result. `allegro` with a file runs it; with no argument it starts a prompt.
+- Status: settled
+- Depends on: A project defines a phase or extends one; A tool reads a phase's result and adds no analysis of its own
+
+### D207. A module's summary is the weakest strength among its claims
+- Decides: the first thing a user sees about a module is one word: refuted, undecided, assumed, sampled or decided. The detail is one step away.
+- Status: partly built (a grade with its own vocabulary)
+- Depends on: A tool reads a phase's result and adds no analysis of its own; Four strengths, one vocabulary; From experiment to proof without rewriting
+
+### D208. Open obligations are listed for any proposer
+- Decides: a tool lists every claim that waits for a value: a theorem without a proof, a gap in a model, a law not yet decided. The list has a form for programs and a form for people, with the last failure and what is in scope.
+- Status: settled for proofs
+- Depends on: Anyone may propose, and the record shows who; Solving is proposing a value for an unknown, and the kernel checks it; A tool reads a phase's result and adds no analysis of its own
+
+### D209. One primer for every proposer
+- Decides: the guide to answering obligations is one document, and it is what a tool sends to a language model.
+- Status: settled
+- Depends on: Anyone may propose, and the record shows who
+
+### D210. A proposer answers with only the missing value
+- Decides: a proposal is the value an obligation waits for and nothing else: a proof term, a catalog entry. A tool places it, has the claim evaluated again, and keeps it only if the claim is decided, for a bounded number of attempts.
+- Status: settled for proofs
+- Depends on: Open obligations are listed for any proposer; One primer for every proposer; A proof term is a proposal
+
+### D211. A trace is read from origins
+- Decides: open — tracing, inspecting the graph and stepping through an evaluation are to be built on the origin every value keeps, through a utility for querying origins.
+- Status: open
+- Depends on: Every value keeps its origin; A tool reads a phase's result and adds no analysis of its own
+
+## Chapter: The launchers we ship
+
+### D212. The platform's default configuration is the standard language
+- Decides: every entry of the platform (file runner, prompt, subcommands, sandbox) starts, unless told otherwise, with the configuration that is the standard language. A configuration with no extension is the bare kernel.
+- Status: settled
+- Depends on: Everything above the kernel is an extension, and there is one way to extend; Configuration is all the information that determines an execution
+
+### D213. The terminal and the browser ship output, timers and HTTP
+- Decides: the launchers the platform ships supply capabilities for writing output, waiting and making HTTP requests. Files beyond module loading, processes and sockets are open.
+- Status: partly built
+- Depends on: A capability is a named set of effectful primitives; Only the launcher sets the ceiling
+
+### D214. A value that arrives later fills a cell, and a failure fills it with an exception
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. A failed request fills it with an exception. A call on a capability the phase lacks stays residual; it does not fail.
+- Status: partly built
+- Depends on: A missing value is a cell that is filled once; The standard language's handled failure is an exception; What the kernel's interface offers; Completion is totality and liveness
+
+### D215. The browser launcher is one bundle
+- Decides: the browser launcher is a single script that sets one global object with calls to evaluate, reset, format a value, register a library and inspect. It keeps its scope between calls and resolves modules only against libraries the page registered.
+- Status: settled
+- Depends on: The launcher does only what cannot be done in Allegro; The loader reaches files through a capability
+
+### D216. The core runs in a browser
+- Decides: the kernel and the extensions use only what both Node and browsers provide, and read Node's globals only behind a test.
+- Status: partly built
+- Depends on: The browser launcher is one bundle

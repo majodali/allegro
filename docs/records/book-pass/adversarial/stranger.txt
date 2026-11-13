@@ -1,0 +1,111 @@
+# Stranger's read of the 216 decisions, in book order
+
+Read: decisions-extract.md, lines 1-1182, top to bottom. Each entry uses only what came earlier in the file.
+
+## PART I — THE BET
+
+- D1 "Trust comes from the kernel, not the author" — (a): "claim" is first used with no definition (defined at D13); "kernel" is used before D6 defines it.
+- D3 "Everything above the kernel is an extension, and there is one way to extend" — (a): "configuration" (defined only at the Part VI intro and D177), "standard language" (defined at D212) and "metadata fields" (defined at D47-D48) are used without explanation.
+- D6 "The kernel holds no language" — (a): "capabilities" (defined at D19) and "pure primitives" are used before any explanation.
+- D7 "Order of definition carries no meaning" — (a): "effects" first appears here and is defined only at D12; "plain effects are not declarations" is not explained.
+- D11 "One operation: partial evaluation" — (b): "An analysis of a program is itself a function ... which every value carries as metadata." Reading 1: each value carries the analysis function. Reading 2: each value carries that analysis's result.
+- D14 "An effect consumes only values whose claims are decided" — (b): D13 says a false claim makes "the phase halts"; D14 says that after a refutation the phase "may go on evaluating to report every refutation". Reading 1: halt means all evaluation stops. Reading 2: halt means only effects stop.
+- D16 "The kernel trusts only what it has evaluated" — (b): "A claim decided with the help of a capability is decided." Reading 1: the kernel evaluated the capability's output, so the claim is decided. Reading 2: the capability's answer was not evaluated, so the claim should be "assumed". (a): "assumed" is used before D21 defines it.
+- D19 "Host code reaches a program only as primitive functions" — (a): "composed function" appears here and is defined only at D38.
+- D23 "Each decision lives in one replaceable unit of code" — (a): "unit" is never defined in the file. The only explanation, "the smallest units that each hold one decision", is circular.
+
+## PART II — THE KERNEL
+
+- D26 "The kernel's plain data is a sequence of bits, and it computes nothing on them" — (b): the decision says the kernel computes nothing on bits, but the status line says arithmetic is already a kernel primitive. Reading 1: arithmetic lives outside the kernel. Reading 2: the decision is a goal the code does not yet meet.
+- D28 "Structures immutable by default; derive, never mutate" — (a): "cell" and "mutability track" are used without definition ("cell" is defined at D61). (d): "never mutate" overstates the body, which permits in-place writes during construction.
+- D30 "Symbol identity is a fully-qualified name" — (a): "scope" and "module path" are used and never defined in the file.
+- D31 "Value as a contract, seven kind units and an assembly" — (a): "declaration merging", "assembly", "ops" and "fork point" are unexplained. (d): the name lists nouns and does not say what is decided.
+- D33 "Construction only through factories, one host class" — (a): "boundary invariant" is used without definition.
+- D34 "Binding state belongs to the binding, not the value" — (a): "export-ness" (export is defined at D121), "cell origin", "completion state" and "pending dependencies" are unexplained.
+- D35 "Symbols interned by FQN" — (a): "loader instances" are named before the loader is defined (D94).
+- D52 "Trust in a value needs no seal" — (b): "a value built by trusted code". Reading 1: code the kernel trusts (kernel, launcher, primitives, as D199 later lists). Reading 2: code written by a trusted author, which D1 rejects.
+- D56 "The environment is not a value" — (b): the file also uses "scope" (D30, D64). Reading 1: environment and scope are different things. Reading 2: they are the same thing under two names. The status line ("the code still represents a scope as a structure") does not settle it.
+- D59 "A recursive call is evaluated once for each state of knowledge" — (a): "state of knowledge" uses "knowledge", which is defined only at D114 and D148.
+- D62 "When information arrives, what waited on it is evaluated again" — (b): "The step from one phase to the next is the same event." Reading 1: a phase boundary re-evaluates the residual as an arriving value would. Reading 2: the two mechanisms merely share code. The text does not say which.
+- D66 "Tail calls by sentinel and loop" — (a): "precompile" is undefined. (c): "loops on at the first round's depth" does not say what behaviour a reader could check.
+- D72 "A refutation on a path that may be taken refutes the program" — (a): "handled failure" is used here and defined only at D73.
+
+## PART III — SYNTAX AND MODULES
+
+- D82 "A terminal is a function, so a grammar can define its own" — (a): "engine" and "the engine's package" are used before D93 defines the parser engine.
+- D83 "Offside rule through stateful indent terminals" — (b): "NEWLINE matches only when the next content is at or below the block's indent." Reading 1: at or less indented than the block's indent. Reading 2: at or later in the text. "Below" does not settle it.
+- D85 "Named, partially ordered precedence levels" — (b): "A constraint on one side is enough." Reading 1: one before-or-after constraint between two levels suffices. Reading 2: a constraint on one side of an operator suffices.
+- D92 "Any parsing algorithm will do that meets five conditions" — (b): "settle the parse up to each change of grammar." Reading 1: the parse of the text so far is final before the grammar changes. Reading 2: the algorithm must commit to one parse at each change.
+- D94 "A module is an extension that arrives as a file" — (b): "the values are handed to it, never fetched at the place of use." Reading 1: the loader hands them in. Reading 2: the module that names another hands them over. The text does not say who hands.
+- D96 "Running a program is evaluating its main module with a configuration's capabilities" — (b): "At a prompt a name may be bound again." D7 says "Replacing a definition is an explicit operation." Reading 1: prompt rebinding is an explicit replacement. Reading 2: it is an exception to D7.
+
+## PART IV — THE STANDARD LANGUAGE
+
+- D100 "Kinds are types, and Type is its own type" — (b): "a kind is a type whose instances are types". D25 uses "kind" for the seven representation kinds. (a): "universe stratification", "proof-export boundary" and "shape" are undefined; Refinement and Interface are named before D113 and D118 define them.
+- D104 "Loose conformance for data, selected by anonymity" — (b): anonymous types "match by base name", but D101 says conformance is membership by symbol, so "two types that each spell `size` do not conform by accident". Reading 1: D101 holds only for named types. Reading 2: D101 is overridden for anonymous types. (a): "marked escape hatch" and "declared path" are undefined.
+- D106 "The core types are built over bits" — (b): "Integers and floats compute through the machine arithmetic capability." D46 says arithmetic is pure and needs no grant, and D184 defines a capability as a set of effectful primitives. Reading 1: "capability" is used loosely. Reading 2: arithmetic is granted.
+- D110 "`distinct` mints a fresh-symbol newtype" — (a): "coercion" is used before D141 defines Coercion.declare.
+- D111 "The user-facing generics surface and parameter kinds" — (c): the decision is "open" and states no choice a reader could check. (d): the name names a topic, not a decision.
+- D114 "Shape and knowledge are separate" — (a): "member-transparent refinement layers" and "a refinement that mints its own members" are used without definition.
+- D117 "Constructing a refined value claims its predicate" — (b): "A program that wants to test a value calls the predicate." Reading 1: calling the predicate returns a value and refutes nothing. Reading 2: calling it claims the predicate, so a false answer is a refutation.
+- D119 "A private member is one whose key not all code holds" — (b): "conformance counts only the members the asking code can reach." Reading 1: conformance is absolute, as D101 says. Reading 2: conformance depends on who asks.
+- D123 "Indentation blocks, with brace and offside both as the goal" — (b): "until then every new construct must work in both modes." Reading 1: until brace syntax exists, new constructs need only the indentation form. Reading 2: new constructs must already work in both forms. (d): the name states a goal, not what is decided.
+- D124 "Refinement types written `T & predicate` with `_` as the value" — (a): "ensures" is used before the contracts chapter (D147) defines it.
+- D127 "The `Y of x` component-access form" — (d): the name says "component access", but the decision is about reading a metadata field.
+- D129 "Statement forms that declare a binding" — (a): "stmt_form" and "binding_decl" are identifiers the file never explains.
+- D130 "`when / is / then` pattern matching" — (a): "primary" is used ("value pattern matches the primary") and never defined.
+- D134 "A claim about every value is decided by evaluating it with the value unknown" — (b): "Deciding is reduction, never search", yet "a refuted claim carries its counterexample". Reading 1: the counterexample comes from the residual. Reading 2: finding a counterexample is a search, which the first sentence forbids.
+- D137 "Bounded sampling for universal claims" — (a): the "`proven` clause" is named and never defined. "Induction is checked at the base and four inductive steps" does not say what the four steps are.
+- D140 "Lawful interfaces" — (a): "schemas" is undefined. (b): "laws: members whose propositions over all values are schemas." Reading 1: a law is a member of the set. Reading 2: a member's proposition is a schema.
+- D142 "Default equality belongs to the standard extension" — (a): "the three law claims" are never listed in the file. "Standard extension" is also never defined.
+- D146 "A bound on capabilities is written in an `effects` clause or a type slot" — (b): "A function-typed parameter with no bound makes no claim." Reading 1: such a parameter is unbounded, so any effect is allowed. Reading 2: such a parameter is simply not checked.
+- D147 "A contract is a predicate that becomes knowledge, discharged by PE" — (a): "PE" is never expanded in the file; D11 names the operation as "partial evaluation".
+- D149 "A match where no arm matches is a refutation" — (b): "a match that can fall through refutes the program," but "Where the subject's possible values are not known, the claim is undecided." Reading 1: a possible fall-through refutes. Reading 2: a fall-through refutes only when it is known to happen.
+- D150 "A body clause is a notation" — (a): `decreases` and `total` are used before D153 explains them.
+- D155 "Termination by bounded decrease" — (b): "a detected decrease on an untyped parameter stays silent." Reading 1: no claim is made. Reading 2: the claim is left undecided.
+- D157 "Equality, coercion and invariant predicates hold no capability and terminate" — (c): "A violation is a refutation that names what was held" does not say what "held" refers to: the value, the capability or the claim.
+- D159 "Every failure carries a legible counterexample" — (b): "every failure" is followed by a list of only some kinds (termination and exhaustiveness findings, contract and refinement failures, in-body asserts). Reading 1: every failure, including exceptions and limits, must carry one. Reading 2: only the listed kinds.
+- D160 "A predicate can explain its refusal" — (b): "Anything other than true refutes the claim." D13 says "A claim is never reported as refuted because it could not be decided." Reading 1: a residual, non-true answer refutes. Reading 2: only false or an explanation refutes.
+
+## PART V — VIVACE (domain models)
+
+- D166 "A solver sees its problem unevaluated" — (b): "Vivace supplies functions that return the two." Reading 1: two functions. Reading 2: two results, the resolved and the unresolved parts.
+- D168 "A model's quality is a question for analysis" — (b): "an empirical one is a measurement ... and says so in its strength." D21 and D138 list no empirical strength (only decided, sampled, assumed, undecided). Reading 1: an empirical finding is "sampled". Reading 2: it needs a new strength.
+- D169 "Dimensions as data, named dimensions as refinements over one Quantity" — (b): "a mechanics-focused shipped unit set." Here "unit" means a unit of measure; D23 uses "unit" for a unit of code.
+- D170 "Quantity laws at honest tiers" — (c): "shown ... loudly" gives no test a reader could apply.
+- D171 "Number-anchored quantity literals" — (b): "the units DSL works with zero grammar", but "`use units` adds only number-anchored literals." Reading 1: no grammar change at all. Reading 2: a small grammar change for the literals.
+- D172 "Conversion sugar with `in`" — (c, d): the decision is "open — `5 km in m` sugar is deferred". The name presents it as a feature, but nothing is decided.
+
+## PART VI — BUILDING AND RUNNING PROGRAMS
+
+- D178 "Configuration sources have a priority, and a result says which supplied each value" — (b): "A value missing from one source is taken from the next." The sources are listed, but the direction of priority is not stated. Reading 1: later sources override earlier. Reading 2: earlier override later.
+- D196 "An exported program needs a kernel only if it handles expressions at run time" — (c): "once the platform hosts itself" has no defined meaning here.
+- D198 "How extensions are distributed" — (c): the decision is "open —" followed by a list of options, not a choice.
+- D199 "Three things are trusted: the kernel, the launcher and primitive functions" — (b): "a saved program is trusted as far as its builder", but a saved program is not one of the three. Reading 1: saved programs are trusted. Reading 2: they are checked, and trust passes through the builder only in part.
+- D203 "One reference kernel is the root of trust" — (b): "Any other is trusted as far as it agrees with the reference." D199 trusts only "the kernel". Reading 1: only the reference is trusted. Reading 2: other kernels earn partial trust.
+- D207 "A module's summary is the weakest strength among its claims" — (b): the one-word summary list includes "refuted", which is not one of the four strengths of D21, and the order by which one strength is "weakest" is never stated.
+- D213 "The terminal and the browser ship output, timers and HTTP" — (b): "Files beyond module loading, processes and sockets are open." Reading 1: not yet decided. Reading 2: available without a capability.
+- D216 "The core runs in a browser" — (a): "core" is never defined. (b): "read Node's globals only behind a test." Reading 1: a runtime feature check. Reading 2: a test suite.
+
+## Counts per part
+
+- Part I (D1-D23): 9
+- Part II (D24-D74): 13
+- Part III (D75-D97): 6
+- Part IV (D98-D160): 25
+- Part V (D161-D172): 6
+- Part VI (D173-D216): 8
+- Total: 67
+
+## Ten terms that cost the most
+
+1. configuration — used from D3 and in D12, D43, D69, D96 and D97; defined only at the Part VI intro and D177.
+2. standard extension / standard language — "standard extension" is used from D105 onward and never defined; "standard language" is named at D3 and defined at D212.
+3. scope — used from D30 and throughout Part II; never defined as a term.
+4. unit — used from D23 (also D31, D54, D169, D171); never defined.
+5. module — used from D30 and D35; defined at D94.
+6. engine — used from D75 and D82; defined at D93.
+7. decided / assumed (the strength vocabulary) — used from D12, D13 and D16; defined at D21.
+8. metadata — used from D3 and D11; defined at D47-D48.
+9. capability — used from D6 and D12; defined at D19.
+10. trusted code — used at D52 and D186; defined only through D199.

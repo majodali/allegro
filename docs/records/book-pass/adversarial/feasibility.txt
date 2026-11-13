@@ -1,0 +1,190 @@
+# Adversarial review — feasibility lens
+
+Source read: `decisions-extract.md` only (D1–D216). No other project file was read.
+Program sketches use the surface notation the extract describes (D124–D130); they are sketches, not tested code.
+Fifteen findings, strongest first. Severity counts: blocks 4, needs a ruling 9, costly but workable 2.
+
+---
+
+### F1. Assuming a function's claims at its own inner call proves anything by a circular definition
+- Decisions: D59 (A recursive call is evaluated once for each state of knowledge), D135 (A proof term is a proposal), D153 (Termination is a claim), D21 (Every result says how strongly it holds), D100 (Kinds are types, and Type is its own type).
+- Case:
+  ```
+  lemma(n: Int): Proof[n + 1 == n] => lemma(n)
+  theorem bogus: forall n. n + 1 == n  by lemma
+  ```
+  Evaluating `lemma`'s body with `n` unknown meets `lemma(n)` in the same state of knowledge. D59 does not open it, leaves a residual call, and assumes the return claim `Proof[n + 1 == n]` at that call. The return claim is then "decided on the body", because the body is that call. The same shape without proofs: `absurd(n): Int & (1 == 2) => absurd(n)` gives every caller contradictory knowledge, which entails any later claim (D147).
+- Why the goal fails or costs too much: a sound induction (`if n == 0 then base else step(lemma(n - 1))`) and the circular definition use the same D59 assumption. Only a well-founded decrease separates them. D153 makes termination an optional, separate claim (`partial` makes no claim), so nothing gates the assumption. The result is reported "decided" (D21), yet it rests on nothing. Divergence would normally protect an evaluation-based prover (the paradox term of `Type : Type` just runs out of budget), but D59 is exactly the rule that cuts the divergence.
+- Known result, if any: Curry–Howard needs totality: general recursion inhabits every type (hence Coq's guard condition, Agda's termination checker). Partial versus total correctness in Hoare logic. Girard/Hurkens paradox for `Type : Type` (D100), which D18's export will meet.
+- Severity: blocks
+- Confidence: medium-high (the extract states no gate; if one exists it is not in D59, D134 or D135)
+- What would rescue it: the inner-call assumption is licensed only by a decided decrease on that call edge. Without one, the claim's strength is "assumed" (or a new "holds if it returns"), and a proof term may never rest on it.
+
+### F2. "Same information" does not bound unfolding: a counting loop specialises forever, and inlining grows the residual exponentially
+- Decisions: D59 (A recursive call is evaluated once for each state of knowledge), D58 (A call is evaluated by evaluating the function's body), D60 (A branch that may not be taken is evaluated without capabilities), D55 (Evaluation is total over unresolved information), D114 (Shape and knowledge are separate), D51 (Every value keeps its origin), D49 (An extension registers its own fields; the kernel has two).
+- Case A (termination):
+  ```
+  count(i, n) => if i >= n then i else count(i + 1, n)
+  count(0, n)          // n unknown in the check phase
+  ```
+  The condition is undecided, so D60 evaluates both branches. The inner call has `i = 1`, then `2`, then `3`: no state of knowledge repeats. With `i` unknown but refined, the interval knowledge climbs `[0,∞)`, `[1,∞)`, `[2,∞)`: again never the same.
+- Case B (size): `f0(x) => x * x`, `f_k(x) => f_{k-1}(x) + f_{k-1}(x + 1)` for k = 1..30, called with `x` unknown. No call is recursive, so D58 inlines all of them: about 2^30 residual nodes. DAG sharing does not help because the arguments differ.
+- Case C (the test itself): D59 needs equality of "information known". Every value carries its origin (D51), and origins of two calls always differ. Extensions add fields freely (D49). The extract does not say which fields count.
+- Why the goal fails or costs too much: a loop with a known start and an unknown bound is the commonest loop there is. Each one drives the check phase to its step budget, so every claim downstream ends "undecided" (D74) and D55's totality holds only by exhaustion. Case B makes exported code (D196) unusable in size.
+- Known result, if any: infinite specialisation under static-data growth, the standard termination problem of online partial evaluation (Jones, Gomard, Sestoft 1993, ch. 14). Supercompilation needs a whistle (homeomorphic embedding, Kruskal's theorem) plus generalisation (Turchin; Sørensen and Glück 1995). Infinite-height interval lattices need widening (Cousot and Cousot 1977). Code explosion from unrestricted unfolding and polyvariance is equally standard.
+- Severity: blocks
+- Confidence: high
+- What would rescue it: a generalisation rule (when a call's knowledge grows along a recursion, forget the growing part and re-specialise), widening on the knowledge lattice, a defined projection of metadata that constitutes "state of knowledge", and an unfolding policy (calls stay calls unless specialisation pays).
+
+### F3. Readable, re-evaluable expressions let a holder cut a capability use out from behind its guard
+- Decisions: D42 (Reading an expression never yields authority), D41 (Authority is an unforgeable value), D57 (A function may take an argument unevaluated), D68 (The kernel's primitives are pure and few — "evaluating an expression with names rebound"), D145 (A capability has named parts and narrowed forms), D20 (No interface limits optimization).
+- Case:
+  ```
+  guarded = (p, s) => if allowed(p) then files.write(p, s) else deny(p)
+  ```
+  `guarded` is handed to untrusted code as the narrowed capability. That code reads the body (D38: functions are data; D42: any code can read), selects the existing sub-expression `files.write(p, s)`, and asks the kernel to evaluate it with `p` and `s` rebound (D68, D57). It never "obtains" `files.write`, yet it writes any path. The `allowed(p)` test is skipped.
+- Why the goal fails or costs too much: D42 protects the capability value but not the expression nodes that apply it. Attenuation (D41, D145) fails wherever the wrapper applies the wide capability to a name. The opposite reading also fails: if reading yields inert descriptions, then an optimiser extension (D20, "functions over a program's expression, open to every extension") cannot rebuild an expression that contains a capability, and D57's "hand it back ... in part or transformed" has nothing live to hand back.
+- Known result, if any: object-capability confinement depends on closures being opaque (Rees, "A Security Kernel Based on the Lambda-Calculus", 1996; Miller, "Robust Composition", 2006). The attack is a confused deputy (Hardy 1988).
+- Severity: blocks
+- Confidence: medium-high
+- What would rescue it: evaluating an expression (or any part) that holds an unforgeable value requires holding that value, or whole-expression evaluation only in the original context; rebuilt expressions carry capability slots the rebuilder can move but not apply, with the kernel re-checking that guards dominate the moved use.
+
+### F4. A kernel that only tells bit sequences apart cannot host a reference definition of arithmetic
+- Decisions: D26 (The kernel's plain data is a sequence of bits, and it computes nothing on them), D68 (The kernel's primitives are pure and few), D187 (Every pure primitive the platform ships has a reference definition), D46 (Machine arithmetic is a set of pure primitives that ships with the platform), D203 (One reference kernel is the root of trust), D21 (Every result says how strongly it holds), D204 (A primitive's purity is assumed and named unless something stronger is shown).
+- Case: write `add32(a, b)` as a composed function. D68 lists six kernel primitives; on Bits there is only "telling bits apart". There is no length, index, slice or concatenation. With equality alone, `add32` is a table over 2^64 argument pairs; even `not8` is a 256-way equality chain.
+- Why the goal fails or costs too much: either the kernel gains bit-structure primitives (contradicting D26's "does nothing else") or numbers are structures of one-bit entries. In the second form a ripple-carry 64-bit add is about 64 × (several conditionals and structure reads), roughly 10^3 kernel steps, and an IEEE-754 double multiply or divide with rounding roughly 10^4–10^5. "Run on the definitions alone" (D187) on the "small and slow" reference kernel (D203) is then 10^3–10^5 times slower on numeric code: a five-minute check becomes days. Separately, the host `+` is "claimed equal" to its definition over 2^128 inputs, which can only be sampled or assumed. D21's weakest-link rule then makes every result that used `+` at best "assumed", yet D46 says such a claim is "decided ... names them". Both cannot hold.
+- Known result, if any: none needed for the first part; it is a counting argument. The second part is the usual trusted-computing-base accounting of native arithmetic in proof checkers (Coq's `native_compute` and primitive integers are axioms of the checker for the same reason).
+- Severity: blocks (D26, D68 and D187 cannot all hold as written)
+- Confidence: high on the missing primitives; medium on the cost multipliers
+- What would rescue it: a minimal bit algebra in the kernel (length, index, slice, concatenate), or a ruling that the kernel's Bits are opaque and the reference representation is a structure with a kernel conversion; and a ruling that naming a shipped primitive is a distinct, stated qualification on "decided", not a weakening.
+
+### F5. A grammar change evaluated mid-parse makes definition order meaningful, and "settle here" conflicts with "report every parse"
+- Decisions: D88 (A text can change the grammar it is read in), D7 (Order of definition carries no meaning), D92 (Any parsing algorithm will do that meets five conditions), D86 (Ambiguity is a claim), D81 (Scannerless parsing), D91 (A grammar change reaches to the end of its block), D82 (A terminal is a function, so a grammar can define its own).
+- Case A (order):
+  ```
+  use Lang                 // evaluated at once; its value is the new grammar
+  ...text in Lang's notation...
+  Lang = grammar { ... }   // a legal position under D7
+  ```
+  `Lang`'s defining text lies after the change and must itself be read in the grammar `Lang` denotes. The same holds for any helper the form's expression reaches (`use mk_grammar(3)` with `mk_grammar` defined below). No text is scanned ahead (D88), so the binding cannot be found.
+- Case B (settle versus every parse): an earlier extension added juxtaposition application. At position p two parser threads are alive, as is normal in scannerless generalised parsing. Thread T1 reads `use units` as the grammar-change form; thread T2 reads `use` and `units` as two identifiers applied. Later text would kill one of them, but D88 forbids looking. The engine must either commit (then it does not report every parse, and a D86 refutation is silently missed) or run T1 and T2 under different grammars over the same input (then sharing in the parse forest must be keyed by grammar value as well as position, and the cubic bound of GLL/GLR/Earley is lost; D91's block-scoped changes multiply the live grammars).
+- Case C (count): two extension operators with no declared relative precedence (D85 allows a partial order): `a op1 a op2 a ... a` with 20 operands has about 6.5 × 10^9 parses, each mapped to its own expression (D78).
+- Why the goal fails or costs too much: D7 cannot hold for anything a grammar form evaluates. Conditions three and four of D92 are jointly unsatisfiable without lookahead unless "more than one live thread at a grammar change" is itself declared a refutation, which then rejects texts whose local ambiguity resolves a few characters later.
+- Known result, if any: ambiguity of context-free grammars is undecidable (Cantor 1962; Floyd 1962), so D86's grammar-level claim is "undecided" almost always under "reduction, never search". Parse-time grammar adaptation has the same commit-point problem in the literature (Christiansen's adaptable grammars; Racket's `#lang` fixes the reader per module for this reason; Fortress and SugarJ restrict extension to declaration boundaries). Stateful terminals are data-dependent grammars (Jim, Mandelbaum, Walker, POPL 2010; Afroozeh and Izmaylova 2015), which keep their bounds only with restricted state.
+- Severity: needs a ruling
+- Confidence: high for case A; medium for case B
+- What would rescue it: a stated exception to D7 (a grammar form sees imported and earlier bindings only); grammar changes allowed only where the prefix parse is unique by construction (statement or block boundaries), with any live ambiguity there a refutation; "report every parse" restated as "detect a second parse" with a shared forest.
+
+### F6. Origins that are never discarded turn constant-space loops into linear heaps, and their readability forbids the optimiser from dropping or rewriting them
+- Decisions: D51 (Every value keeps its origin), D127 (The `Y of x` component-access form), D66 (Tail calls by sentinel and loop), D183 (One kernel serves many invocations), D39 (Expressions memoize per evaluation context), D20 (No interface limits optimization), D197 (A law licenses a rewrite, and the rewritten program carries the law's strength), D120 (Who may use a member is a claim about where the access was written).
+- Case A (memory): `total = reduce((a, x) => a + x, 0, xs)` over 10^8 elements. Each partial sum carries the expression that produced it, whose argument is the previous partial sum with its origin. The final integer retains a chain of 10^8 expression nodes: at about 100 bytes a node, 10 GB for one machine word. A server loop under D183 that threads state from request to request retains its whole history.
+- Case B (drop what nothing reads): `log(origin of x)` is legal for any code (D127). After any call to unknown code (a function parameter, constructed code under D196, a D57 argument) the evaluator cannot show an origin unread, so it must keep it.
+- Case C (optimisation becomes observable): inlining (D58), a rewrite by a law (D197) and a memo hit (D39: the second use of a memoised result has the origin of the first computation) all change what `origin of x` returns. A program that prints or branches on an origin distinguishes the optimised program from the original; D120 makes access rights depend on it.
+- Why the goal fails or costs too much: with origins unconditionally present and freely readable, no transformation is meaning-preserving, and space is proportional to steps executed. Proving an origin dead is a whole-program escape analysis, undecidable in general and defeated by first-class functions.
+- Known result, if any: provenance and tracing costs (omniscient debugging, e.g. Pothier and Tanter's TOD, report order-of-magnitude slowdowns and trace sizes proportional to execution length); Rice's theorem for the dead-origin question; Wand 1998 for the loss of equivalences when program structure is observable.
+- Severity: needs a ruling
+- Confidence: high on cost; medium on how much the design intends origins to be read in a run phase
+- What would rescue it: origin reading is a capability (or an origin is opaque to programs and readable only by tools and by the kernel's own access claims), so phases without it may erase; origin depth is bounded per phase with an explicit truncation mark; equality of results under D63 is defined modulo origin.
+
+### F7. A step budget makes the outcome depend on arrival order, evaluation order and memo hits
+- Decisions: D63 (The same program and the same information give the same result), D176 (Limits are step budgets), D62 (When information arrives, what waited on it is evaluated again), D39 (Expressions memoize per evaluation context), D74 (Evaluation stops early for two reasons only), D193 (A stored outcome is restored with its builder's name), D203 (One reference kernel is the root of trust).
+- Case: budget 1000 steps. Claim `C(a, b)` costs 600 steps to reduce while `a` is an unfilled cell, and 600 again when `a` arrives (D62: evaluated again). If `a` arrives before `C` is first reached the cost is about 700 and `C` is decided. If it arrives after, the cost is 1200 and `C` is left undecided (D74). Same program, same information, different outcome. The same occurs with two independent claims of 600 steps each (whichever is evaluated first is decided) and with a memo table hit versus miss.
+- Why the goal fails or costs too much: D176 calls the budget deterministic, but a step count is a property of one evaluation strategy and one arrival schedule. D193 and D202 lean on determinism ("a stored outcome is what the loading kernel would compute"; "anyone can rebuild ... and compare"). A faster kernel variant (D203) that takes different steps then disagrees with the reference on which claims are undecided.
+- Known result, if any: confluence gives equal normal forms, not equal reduction lengths; cost is not invariant under evaluation order (the standard gap between Church–Rosser and cost semantics). Fuel-indexed semantics are deterministic only for a fixed strategy.
+- Severity: needs a ruling
+- Confidence: high
+- What would rescue it: D63 restated to exclude "undecided for lack of budget" (a claim is never decided differently, only decided or not yet); budgets accounted per claim against a canonical cost; every arrival starts a fresh budget; stored outcomes record the budget and are restored only as "decided", never as "undecided".
+
+### F8. A fresh unforgeable key is either not fresh or not a function of the program
+- Decisions: D119 (A private member is one whose key not all code holds), D110 (`distinct` mints a fresh-symbol newtype), D41 (Authority is an unforgeable value), D63 (The same program and the same information give the same result), D60 (A branch that may not be taken is evaluated without capabilities), D62 (When information arrives, what waited on it is evaluated again), D189 (A phase hands its residual to the next), D191 (A saved program is a recorded sequence of interface calls), D186 (Loading is three capabilities of rising strength).
+- Case:
+  ```
+  mkCounter() => Type.define({ n: private(Int), next: ... })
+  A = mkCounter()
+  B = mkCounter()
+  ```
+  If minting is pure, D63 and D39 give `A` and `B` the same key, and `A`'s code reads `B`'s private member. If minting yields a new key each time, then speculative evaluation of an undecided branch (D60), re-evaluation on arrival (D62) and the next phase (D189) each mint another: a value built in the check phase under key K1 sits in the residual, and the run phase's re-evaluated type holds K2. A saved program (D191) must recreate K1 by an interface call; a data-form saved program is "confined to the kernel's interface" (D186), so that same call lets any author of saved data mint a key that equals K1.
+- Why the goal fails or costs too much: generativity is an effect. A design in which everything is one re-runnable, order-free evaluation has to say where that effect happens and how often.
+- Known result, if any: generative versus applicative abstraction (Leroy, POPL 1995; Dreyer, Crary, Harper 2003); `gensym` across phases in macro systems (Flatt, "Composable and Compilable Macros: You Want it When?", ICFP 2002); persistence of capabilities (E's sturdy references need a trusted persistence layer).
+- Severity: needs a ruling
+- Confidence: medium-high
+- What would rescue it: a key's identity is a deterministic function of its definition's origin (applicative keys), unforgeable because only the kernel writes origins; or minting is a capability performed once per configuration, with restore of a key covered by the builder-stamped restore capability of D193.
+
+### F9. An unevaluated parameter blocks evaluation of every argument to an unknown function, and an unbound name is both a residual and a refutation
+- Decisions: D57 (A function may take an argument unevaluated), D166 (A solver sees its problem unevaluated), D71 (A refutation marks everything computed from it), D58 (A call is evaluated by evaluating the function's body), D40 (Transient reference symbols resolved by base name), D197 (A law licenses a rewrite, and the rewritten program carries the law's strength), D203 (One reference kernel is the root of trust).
+- Case A: `apply2(f, a) => f(a + 0)`, checked as a library with `f` unknown. The evaluator may not reduce, share or rewrite `a + 0`, because `f` may declare its parameter unevaluated: `quote(e) => e` returns the expression and distinguishes `a + 0` from `a`, and `1 + 2` from `3`. Every call through a function parameter in the standard library (`map`, `filter`, `reduce`, D106) is in this position.
+- Case B: the callee evaluates the argument "with names rebound". Names resolve by base name (D40), so `f(x + y)` with a callee that rebinds `y` captures the caller's local. Renaming a local variable in the caller changes the program.
+- Case C: D166 says an unbound symbol evaluates to a residual. D71 says "a name that nothing declares" is a refutation. `solve(x * x == 4)` and the typo `prnt("hi")` are the same situation.
+- Case D: a solver "reads the result: which parts are resolved". The residual's shape depends on how far a given kernel reduces, so two kernel variants that agree on every value (D203) give a solver different inputs.
+- Why the goal fails or costs too much: with first-class unevaluated parameters, D58 and D20 hold only where the callee is known, and D197's rewrites are observable.
+- Known result, if any: Wand, "The Theory of Fexprs is Trivial" (1998): contextual equivalence collapses to syntactic identity. Pitman, "Special Forms in Lisp" (1980), the reason Lisp dropped fexprs for compiled code. Shutt's Kernel/vau work (2010) accepts the loss.
+- Severity: needs a ruling
+- Confidence: high for A and C; medium for B and D
+- What would rescue it: taking an argument unevaluated is visible in the function's type and must be decided at the call site (an unknown callee is treated as evaluating its arguments, and passing an unevaluated-taking function there is a refutation); rebinding is limited to names the argument declares open; unknowns are declared, so only a declared unknown is residual; the residual form a solver reads is specified, not incidental.
+
+### F10. "Where the access was written" has no stable answer once expressions are inlined, generated by a notation, or re-evaluated
+- Decisions: D120 (Who may use a member is a claim about where the access was written), D51 (Every value keeps its origin), D78 (Every notation stands for an expression), D58 (A call is evaluated by evaluating the function's body), D66 (Tail calls by sentinel and loop), D42 (Reading an expression never yields authority).
+- Case A: module M exports `audit(acct) => if caller_ok() then acct.balance else deny()`. Code in module U reads the body, takes the node `acct.balance` (its origin says "written in M") and has it evaluated with `acct` rebound to a victim. The origin-based claim passes. This is F3's attack against the claim rather than the key.
+- Case B: M defines a form `deposit 5 into acct` (D78) expanding to an expression that touches `acct.balance`. The text is in U; the expression comes from M's form. If the access counts as written in M, every user of the form reaches the member through any argument position the form splices. If it counts as written in U, M cannot offer notation over its own private members.
+- Case C ("caller-based rules"): `helper(t) => t.secret` is called from M and from U. After D58 inlines both, and after D66 drops frames for tail calls, the caller is not in the access's written origin; it needs the dynamic call chain, which the origin of an expression does not hold.
+- Why the goal fails or costs too much: the origin chain "back to what was first written or constructed" has several links (text position, defining form, constructing code, inlining site). The claim must pick one, and each choice either admits case A or forbids case B. D120 itself falls back on combining with keys, which is F3 and F8.
+- Known result, if any: Racket's syntax certificates and later taints / dye packs (Flatt et al.) exist because macro expansions expose protected identifiers to exactly this extraction. Stack inspection is unstable under inlining and tail calls (Wallach; Fournet and Gordon, "Stack Inspection: Theory and Variants", POPL 2002; Clements and Felleisen 2004).
+- Severity: needs a ruling
+- Confidence: medium
+- What would rescue it: the claim ranges over the whole origin chain with a stated rule (every link must be permitted, and a notation's module explicitly lends its permission to named splice positions); sub-expressions extracted by reading lose their written origin; caller-based rules are dropped or stated over an explicit passed token.
+
+### F11. An effect that waits for undecided claims never fires when the claim cannot be decided even with all information present
+- Decisions: D14 (An effect consumes only values whose claims are decided), D153 (Termination is a claim), D155 (Termination by bounded decrease), D133 (Nothing is a claim until someone makes it), D140 (Lawful interfaces), D22 (From experiment to proof without rewriting), D144 (An effect is the use of a capability).
+- Case: a project claims wholesale that every function terminates (D133).
+  ```
+  gcd(a, b) => if b == 0 then a else gcd(b, a mod b)
+  print(gcd(1071, 462))
+  ```
+  D155 recognises only `param - K`; `a mod b` is not that, so the termination claim is undecided. The value handed to `print` rests on it. D14: "a value carrying an undecided claim has that claim evaluated first". Evaluating it again changes nothing: the run phase has every input, and the claim is about all inputs. The same holds for a value of a type whose laws (D140) are undecided, and for any claim that ran out of budget (D74).
+- Why the goal fails or costs too much: either the effect is withheld, so adding one wholesale claim stops a working program from printing (against D22), or it proceeds, so D14 only guards claims that concrete evaluation decides, which is ordinary run-time checking and is silent on the claims the design cares most about.
+- Known result, if any: the halting problem for the termination instance; more generally universal claims are not decided by a single concrete run.
+- Severity: needs a ruling
+- Confidence: medium-high
+- What would rescue it: D14 restated over claims about the value's own data (decidable by evaluating on that value); claims about functions, laws and termination gate effects only through an explicit policy (D201), with "undecided" passing or blocking by the phase's stated requirement.
+
+### F12. The kernel cannot compute a reproducible key for a claim that mentions an unforgeable value or a fresh parameter
+- Decisions: D193 (A stored outcome is restored with its builder's name), D175 (No interface call writes a bare claim outcome), D192 (A saved program names what it needs by content hash), D119 (A private member is one whose key not all code holds), D116 (Invariants are refinements), D65 (Substitution of params into bodies), D147 (A contract is a predicate that becomes knowledge, discharged by PE).
+- Case: `Account = Type.define({ balance: private(Int) }) & _.balance >= 0`. The invariant claim on a stored `Account` value mentions the private member's key. D119: a key "cannot be written out and read back into existence". The building kernel and the loading kernel therefore hold different key objects, and a key has no content to hash. The claim's key, computed "from the claim and what it rests on", differs, so the stored outcome attaches to nothing. Types with private members are the ones whose invariants are most worth storing.
+- Second case: `sorted(xs) ensures ordered(_)` decided inside a caller after `requires len(xs) < 10` became knowledge (D147). "What it rests on" includes that knowledge, the bodies of `sorted` and `ordered`, every extension rule that travelled a field, the primitives, and the budget (F7). D65 copies inner functions with fresh Params, so the key must be canonical up to renaming and across recursive binding groups.
+- Why the goal fails or costs too much: without a canonical, content-addressed form for every value kind (unforgeable values included) the key is either unstable (nothing restores) or too coarse (an outcome can be attached to a claim that differs in a dependency the key omitted, which is the forgery D193 rules out). Computing the transitive closure of "what it rests on" costs as much as re-deciding for cheap claims.
+- Known result, if any: content-addressed code with canonical naming of binding groups (Unison) shows the hashing is possible for pure terms; proof-carrying code (Necula 1997) binds a proof to its statement by re-checking, not by trusting a key; persistence of capabilities needs a trusted layer (F8).
+- Severity: needs a ruling
+- Confidence: medium
+- What would rescue it: a specified canonical hash for all seven kinds; applicative, origin-derived key identities (F8); the stored record lists the dependency hashes explicitly so the loader compares them instead of recomputing; cheap claims are never stored.
+
+### F13. Evaluating with the value unknown decides few universal claims without rewriting or induction
+- Decisions: D134 (A claim about every value is decided by evaluating it with the value unknown), D112 (Abstract domains as sound approximations), D136 (Discharge mechanisms without search), D137 (Bounded sampling for universal claims), D46 (Machine arithmetic is a set of pure primitives that ships with the platform), D207 (A module's summary is the weakest strength among its claims).
+- Case A: `forall a b: Int. a + b == b + a`. With `a`, `b` unknown, `+` is an opaque primitive (D46), so the residual is `a + b == b + a`, not `true`. A `by` step with a commutativity law decides it only at the law's strength, and a law about a primitive is assumed (D197).
+- Case B: `forall xs. len(map(f, xs)) == len(xs)`. It needs induction over `xs`; D137 gives base plus four steps, strength sampled.
+- Case C: `for i in 0 .. len(xs): xs[i]`. The bounds claim `i < len(xs)` relates two unknowns. D112's domains (interval, equality, inequality over one value) do not express it.
+- Case D: `x > 0` entails `x + 1 > 0` in an interval domain over mathematical integers; on machine integers it is false at the maximum. Either the domain models wrap-around, deciding less, or it reports a false claim as decided.
+- Why the goal fails or costs too much: the goal is honest about strength, so it is not unsound (case D aside). But with the weakest-link summary of D207, any module with one list lemma or one loop index reads "sampled" or "undecided". The one-word summary then separates almost no real modules, and most claims become run-time checks on export (D196).
+- Known result, if any: Rice's theorem. Supercompilation used as a prover needs driving, generalisation and folding, which is controlled search (Klyuchnikov and Romanenko, "Proving the Equivalence of Higher-Order Terms by Means of Supercompilation", 2009). Refinement-type systems in practice rest on SMT for these cases (Liquid Types, Rondon, Kawaguchi, Jhala 2008; Dafny; F*). Relational numeric facts need octagons or polyhedra (Miné 2006; Cousot and Halbwachs 1978).
+- Severity: costly but workable
+- Confidence: high
+- What would rescue it: symbolic induction with the gate of F1; a relational domain for index bounds; an outside solver whose answers arrive as checkable certificates (so D16 still holds); a summary that reports counts per strength instead of the minimum.
+
+### F14. Floating point and target-specific primitives break "rebuild and compare"
+- Decisions: D46 (Machine arithmetic is a set of pure primitives that ships with the platform), D45 (A capability is supplied per target), D26 (The kernel's plain data is a sequence of bits, and it computes nothing on them), D63 (The same program and the same information give the same result), D202 (A builder is identified by hash, then manifest, then signature), D193 (A stored outcome is restored with its builder's name), D194 (A target platform is a model, and export is a transformation into it).
+- Case A: `nan = 0.0 / 0.0`, then a claim or a hash over the resulting bits. x86 SSE produces a quiet NaN with the sign bit set; ARM and RISC-V produce the positive default NaN; JavaScript engines canonicalise NaN bits as they please. The kernel tells bit sequences apart (D26), so the difference is observable.
+- Case B: `sin(1e22)`, `pow`, `exp`: results differ in the last place between C libraries and JavaScript engines. A build phase that folds `sin(1e22) < c` decides the claim on the build machine; the exported JavaScript (D194) computes a different bit pattern.
+- Case C: a JavaScript target has no 64-bit machine integer; `Int` through `BigInt` is tens of times slower, and through doubles is wrong above 2^53.
+- Why the goal fails or costs too much: D202 says "because evaluation is deterministic, anyone can rebuild a saved program and compare". That holds only if every pure primitive is bit-exact across hosts and targets, which IEEE 754 does not guarantee for NaN payloads or for functions beyond the basic five.
+- Known result, if any: WebAssembly specifies NaN bit patterns as nondeterministic for this reason; cross-platform floating-point reproducibility (Goldberg 1991; Monniaux, "The pitfalls of verifying floating-point computations", 2008).
+- Severity: needs a ruling
+- Confidence: high
+- What would rescue it: canonicalise NaN after every floating operation; ship only correctly rounded operations as pure primitives and make the rest capabilities or software definitions; state the integer width per target as part of the primitive's hash.
+
+### F15. A parser obtained by partially evaluating a general engine over a grammar is unlikely to be fast enough, and must be re-specialised at every grammar change
+- Decisions: D93 (The platform's parser engine ships already built), D92 (Any parsing algorithm will do that meets five conditions), D88 (A text can change the grammar it is read in), D82 (A terminal is a function, so a grammar can define its own), D58 (A call is evaluated by evaluating the function's body), D59 (A recursive call is evaluated once for each state of knowledge).
+- Case: a generalised engine (the five conditions force GLL, GLR or Earley with a shared forest) written in Allegro over immutable structures (D28), specialised over the standard grammar of a few hundred productions, parsing a library of a few thousand lines; then a file with three `use` forms.
+- Why the goal fails or costs too much: the engine's work list, graph-structured stack and memo tables are indexed by input position, so they are unknown when only the grammar is known. Specialisation removes the grammar lookups and leaves the general loop: typically a small constant factor, on top of an interpreter that is itself 10^2–10^3 times slower than host code. Getting real speed requires writing the engine in a specialisation-friendly style and controlling unfolding by hand, which F2 says the evaluator does not yet do. Each grammar change at parse time (D88) triggers a fresh specialisation of the whole engine in the middle of a parse; a computed grammar (`use dsl(n)`) defeats caching.
+- Known result, if any: the first Futamura projection gives good parsers only after binding-time improvements (Sperber and Thiemann, "Generation of LR Parsers by Partial Evaluation", TOPLAS 2000; Mogensen on specialising Earley-style parsers). Self-applicable specialisers needed offline binding-time analysis to be practical (Jones, Gomard, Sestoft 1993).
+- Severity: costly but workable
+- Confidence: medium
+- What would rescue it: keep the shipped engine's inner loop as a pure primitive with an Allegro reference definition (D187 already allows this); cache specialised parsers by grammar hash; allow the engine to interpret a new grammar unspecialised until a parser for it is built.
