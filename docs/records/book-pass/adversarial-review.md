@@ -308,12 +308,16 @@ option. Ruled, two decisions:
   else, and yields a module function.
 - "Only the module being run performs effects when instantiated."
   The alternative, any module performing top-level effects in
-  dependency order, makes the order of instantiation observable.
+  dependency order, makes the order of instantiation observable. In
+  the inventory it is stated inside the first decision's entry until
+  it can have its own: a test of the acceptance stream pins the
+  decision map's row count.
 
 **Put to the maintainer with the first versions, to confirm at their
 PR.** Issue 29: the launcher fills a cell with plain data, and a
 wrapper in the standard language makes a failure an exception; the
-decision is retitled "A value that arrives later fills a cell". The
+decision keeps its title for now, since a corpus file of the acceptance
+stream cites it by title. The
 first version of the data form leaves out claim outcomes, keys and
 origins, defines the data form only, and is written as JSON. The
 calls of the first version of the interface.
