@@ -36,17 +36,25 @@
 /** The version of this interface. A kernel states the one it implements. */
 export const INTERFACE_VERSION = 1;
 
+// Brands. Each is a type-level marker with no run-time existence: it
+// keeps the three handle types apart for the compiler, so a scope cannot
+// be passed where a value is wanted. A kernel implements the handles as
+// it likes; no property of these names exists on them.
+declare const valueBrand: unique symbol;
+declare const scopeBrand: unique symbol;
+declare const cellBrand: unique symbol;
+
 /**
  * A value in a kernel. Opaque to the host: it is read only through the
  * kernel that made it, and belongs to that kernel alone.
  */
 export interface Value {
-  readonly __allegroValue: unique symbol;
+  readonly [valueBrand]: true;
 }
 
 /** A scope in a kernel. Opaque. Inside Allegro the environment is not a value; this handle is the host's only. */
 export interface Scope {
-  readonly __allegroScope: unique symbol;
+  readonly [scopeBrand]: true;
 }
 
 /**
@@ -56,7 +64,7 @@ export interface Scope {
  * cell leaves a residual and is evaluated again when the cell is filled.
  */
 export interface Cell extends Value {
-  readonly __allegroCell: unique symbol;
+  readonly [cellBrand]: true;
 }
 
 /** The seven representation kinds. A kind says how a value is represented; it is not a type. */
