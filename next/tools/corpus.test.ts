@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   pinsOf, pinnedPrograms, deriveSource, initialCorpus, checkCorpus, compareRegistered, syncCorpus,
-  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository,
+  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository, applyOverlay,
   type Corpus, type RegisteredTest, type RegisteredList, type Case,
 } from "./corpus.js";
 
@@ -182,6 +182,29 @@ test("sync keeps hand-edited fields, renumbers pins around an inserted one, adds
 });
 
 // ── The committed files ──
+
+test("an overlay classes its cases whole, and refuses an id that is no case or a field it may not set", () => {
+  const c = good(); set(c, 0, { class: "changes", ruling: "Alpha", becomes: "b2", milestone: 2 });
+  const r = applyOverlay(c, {
+    "pin:demos/r1/b.alg#1": { class: "survives", decisions: ["Beta"], milestone: 3, note: "the source changes" },
+    "pin:tests/a.alg#2": { class: "detail" },
+  });
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.applied, 2);
+  const first = r.corpus.cases[0] as Record<string, unknown>;
+  assert.deepEqual([first.class, first.decisions, first.milestone, first.note], ["survives", ["Beta"], 3, "the source changes"]);
+  assert.equal("ruling" in first, false, "a field the entry leaves out is removed");
+  assert.equal("becomes" in first, false);
+  assert.deepEqual(check(r.corpus).findings, []);
+  assert.equal(r.corpus.cases[1].class, null, "a case with no entry is untouched");
+
+  const bad = applyOverlay(good(), { "pin:nowhere#1": { class: "detail" }, "pin:tests/a.alg#1": { class: "detail", expect: "x" } });
+  assert.deepEqual(bad.errors, [
+    "overlay: pin:nowhere#1 is not a case of the corpus",
+    "overlay: pin:tests/a.alg#1 sets expect, which an overlay may not set",
+  ]);
+  assert.equal(bad.applied, 0);
+});
 
 test("the committed inventory is consistent with the present tree, by a fresh dry listing", () => {
   const r = checkRepository(ROOT);

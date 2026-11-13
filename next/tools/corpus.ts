@@ -19,6 +19,11 @@
 //                                           add cases for new pins and tests,
 //                                           drop and print cases whose source is
 //                                           gone, keep every hand-edited field
+//   npx tsx next/tools/corpus.ts --apply <overlay.json>
+//                                           class cases from an overlay: a map
+//                                           from case id to class, ruling,
+//                                           becomes, decisions, milestone and
+//                                           an optional note; run the check after
 //
 // Where the cases come from.
 //   A pin is a line of a program matching the suite's own pattern
@@ -293,6 +298,43 @@ export function serializeCorpus(corpus: Corpus): string {
   return `{\n  "_": ${JSON.stringify(corpus._)},\n  "cases": [\n${rows.join("\n")}\n  ]\n}\n`;
 }
 
+// ── Classing from an overlay ──────────────────────────────────────────
+
+/** The fields an overlay may set on a case: the hand-edited ones, and a note. */
+export const OVERLAY_FIELDS = ["class", "ruling", "becomes", "decisions", "milestone", "note"] as const;
+export type Overlay = Record<string, Record<string, unknown>>;
+export interface ApplyResult { corpus: Corpus; applied: number; errors: string[] }
+
+/**
+ * Class cases from an overlay: a map from case id to the hand-edited
+ * fields. An entry replaces those fields on its case whole, so a field the
+ * entry leaves out (a `ruling` on a case that no longer changes) is
+ * removed. An id that is no case, or a field outside OVERLAY_FIELDS, is an
+ * error and nothing is applied. Whether the result is well formed is the
+ * check's question, not this function's.
+ */
+export function applyOverlay(corpus: Corpus, overlay: Overlay): ApplyResult {
+  const errors: string[] = [];
+  const ids = new Set(corpus.cases.map((c) => c.id));
+  for (const [id, entry] of Object.entries(overlay)) {
+    if (!ids.has(id)) errors.push(`overlay: ${id} is not a case of the corpus`);
+    for (const k of Object.keys(entry)) if (!(OVERLAY_FIELDS as readonly string[]).includes(k)) errors.push(`overlay: ${id} sets ${k}, which an overlay may not set`);
+  }
+  if (errors.length > 0) return { corpus, applied: 0, errors };
+  let applied = 0;
+  const cases = corpus.cases.map((c) => {
+    const entry = overlay[c.id];
+    if (!entry) return c;
+    applied++;
+    const out: Record<string, unknown> = { ...c };
+    for (const k of OVERLAY_FIELDS) delete out[k];
+    out.class = null; out.decisions = []; out.milestone = null;
+    for (const [k, v] of Object.entries(entry)) out[k] = v;
+    return out as Case;
+  });
+  return { corpus: { _: corpus._, cases }, applied, errors };
+}
+
 /** What the present tree fixes: the derived cases, in order. */
 export interface Source { pins: PinCase[]; tests: TestCase[] }
 
@@ -509,6 +551,17 @@ function main(): void {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
   const argv = process.argv.slice(2);
   const casesFile = path.join(root, CASES_PATH);
+
+  if (argv[0] === "--apply") {
+    if (!argv[1]) { console.error("--apply takes the path of an overlay file"); process.exit(1); }
+    const corpus = JSON.parse(fs.readFileSync(casesFile, "utf-8")) as Corpus;
+    const overlay = JSON.parse(fs.readFileSync(path.resolve(argv[1]), "utf-8")) as Overlay;
+    const r = applyOverlay(corpus, overlay);
+    if (r.errors.length > 0) { for (const e of r.errors) console.error(e); process.exit(1); }
+    fs.writeFileSync(casesFile, serializeCorpus(r.corpus));
+    console.log(`${CASES_PATH}: ${r.applied} case(s) classed from ${argv[1]}`);
+    return;
+  }
 
   if (argv[0] === "--dry-list") { void dryListChild(root, argv[1]); return; }
 
