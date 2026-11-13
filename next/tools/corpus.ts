@@ -24,6 +24,16 @@
 //                                           from case id to class, ruling,
 //                                           becomes, decisions, milestone and
 //                                           an optional note; run the check after
+//   npx tsx next/tools/corpus.ts --by-decision
+//                                           one line per decision of the map,
+//                                           in its order: its owner and the
+//                                           number of cases that list it, by
+//                                           class; then the decisions no case
+//                                           lists
+//   npx tsx next/tools/corpus.ts --by-decision "<title>"
+//                                           the ids of the cases that list
+//                                           that decision, each with its class
+//                                           and milestone
 //
 // Where the cases come from.
 //   A pin is a line of a program matching the suite's own pattern
@@ -508,6 +518,23 @@ export function decisionTitles(root: string): Set<string> {
   return new Set(map.rows.map((r) => r.title));
 }
 
+export interface DecisionCases { title: string; owner: string; survives: string[]; changes: string[]; detail: string[] }
+
+/**
+ * The cases by decision: for each decision, in the order given, the ids of
+ * the cases that list it, by class. A case that lists a title not among the
+ * decisions is skipped here; the check reports it.
+ */
+export function casesByDecision(decisions: { title: string; owner: string }[], corpus: Corpus): DecisionCases[] {
+  const rows = new Map<string, DecisionCases>();
+  for (const d of decisions) rows.set(d.title, { title: d.title, owner: d.owner, survives: [], changes: [], detail: [] });
+  for (const c of corpus.cases) {
+    if (c.class === null) continue;
+    for (const t of new Set(c.decisions)) rows.get(t)?.[c.class].push(c.id);
+  }
+  return [...rows.values()];
+}
+
 function readJson(root: string, rel: string): { value: unknown; error: string | null } {
   const file = path.join(root, rel);
   if (!fs.existsSync(file)) return { value: null, error: `${rel} does not exist (generate it with --init)` };
@@ -564,6 +591,25 @@ function main(): void {
   }
 
   if (argv[0] === "--dry-list") { void dryListChild(root, argv[1]); return; }
+
+  if (argv[0] === "--by-decision") {
+    const map = JSON.parse(fs.readFileSync(path.join(root, DECISIONS_PATH), "utf-8")) as { rows: { title: string; owner: string }[] };
+    const corpus = JSON.parse(fs.readFileSync(casesFile, "utf-8")) as Corpus;
+    const rows = casesByDecision(map.rows, corpus);
+    if (argv[1]) {
+      const row = rows.find((r) => r.title === argv[1]);
+      if (!row) { console.error(`no decision titled "${argv[1]}" in ${DECISIONS_PATH}`); process.exit(1); }
+      const byId = new Map(corpus.cases.map((c) => [c.id, c]));
+      for (const cls of CLASSES) for (const id of row[cls]) console.log(`${cls}\t${byId.get(id)!.milestone ?? "-"}\t${id}`);
+      console.log(`${row.title} (owner ${row.owner}): survives ${row.survives.length}, changes ${row.changes.length}, detail ${row.detail.length}`);
+      return;
+    }
+    for (const r of rows) console.log(`${r.owner}\t${r.survives.length}\t${r.changes.length}\t${r.detail.length}\t${r.title}`);
+    const none = rows.filter((r) => r.survives.length + r.changes.length + r.detail.length === 0);
+    const owners = [...new Set(rows.map((r) => r.owner))].sort();
+    console.log(`decisions ${rows.length} · listed by a case ${rows.length - none.length} · listed by none ${none.length} (${owners.map((o) => `${o} ${none.filter((r) => r.owner === o).length}`).join(", ")}) — columns: owner, survives, changes, detail, title`);
+    return;
+  }
 
   if (argv.includes("--init") || argv.includes("--sync")) {
     const init = argv.includes("--init");
