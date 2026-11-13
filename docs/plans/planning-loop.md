@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: active
+status: closed
 backlog: B-187
 lane: D
 merge: human-gated
@@ -37,11 +37,14 @@ boundary:
 
 # The planning loop, the next validating demo — the planning-loop stream
 
-> **Status: active** (K-007 (the plan lifecycle)) — drafted 2026-11-06
-> from the maintainer's direction of that day, on `origin/main` at
-> `a8e19c8`; active since the merge of PR #167 on 2026-11-07, with
-> every recommendation taken (§6). The status line and the header's
-> `status` say the same thing.
+> **Status: closed → B-187** (K-007 (the plan lifecycle)) — closed
+> 2026-11-13 with its first part, the loop, delivered (§7, the closing
+> entry). The software system model and the documentation model are
+> carried to the acceptance stream of the rebuild,
+> `docs/plans/rebuild-acceptance.md`, on the maintainer's ruling of that
+> day. Drafted 2026-11-06 on `origin/main` at `a8e19c8`; active from the
+> merge of PR #167 on 2026-11-07. Kept for its §2, §2b and §7 records.
+> The status line and the header's `status` say the same thing.
 >
 > **Reader**: the maintainer, who ruled on §6 at PR #167; the session that runs the
 > [stream](parallel-streams.md#def-stream). Assumed known: the planning
@@ -207,6 +210,10 @@ before it.
   that a finding of the composed program can name both. This plan uses
   it for (2) and (3) only. B-082 (model composition) holds the general
   question.
+- <a id="def-splice-site"></a>**Splice site**: the place in a file where
+  the loop puts a proposal: a theorem's `theorem NAME:` line, or the
+  `catalog NAME:` block an obligation names. Ratified on the
+  maintainer's review of PR #192, 2026-11-12.
 
 **Reserved ids.** The header reserves B-188 (first out-of-scope finding
 of the planning-loop stream) and B-189 (second out-of-scope finding of
@@ -427,6 +434,379 @@ stream:
 | B-185 (a sampled induction proof reported as discharged) | independent | The plan loop proves no induction. It matters to L5 by analogy: the ledger must not report a weaker tier as discharged, which is the rule L5 applies to fixtures |
 | B-156 (short-circuit over an error value) | independent | The planning library explains its refusals with `if`, not `\|\|`. The primer section L2 writes says so, for a proposer that writes a fixture |
 | B-183 (a trailing comment breaks a contract body's parse) | independent | A proposal is a node block, not a contract body. If one hits it, the parse error is a refusal the loop reports like any other |
+
+## 2b. The second model, measured
+
+> **Kept as evidence.** This section was written for an amendment that
+> planned row SY1 as five chunks with eight rulings (PR #194).
+> The amendment closed unmerged on 2026-11-13, when the maintainer
+> ruled that the pilots are specified first and built on the rebuilt
+> kernel (§7). Where the text below names those rows and rulings, it
+> names proposals that were not taken. The measurements stand, and are
+> the evidence for the software system model's specification, a chunk
+> of `docs/plans/rebuild-acceptance.md`.
+
+**Question.** Before row SY1 is designed (R7 (a), taken 2026-11-12):
+what can the planning model say about another model's value today; can
+two grammar-bearing models share a file; does a second model's check
+meet B-188 (a recursive binding or a library-named list stalls the
+precompile or the load); what does the loop need from a second model;
+what can the ledger say across two models; and what does a new library
+cost the load gates?
+
+**Method.** Read and run on `origin/main` at `1d63a6b` (the merge of
+PR #192), 2026-11-12, through the CLI (`npx tsx src/index.ts`). The
+probes lived in a scratch directory outside the repository; a probe's
+library sat in its `lib/` subdirectory, which the module loader searches
+before the system `lib/` (`src/index.ts:65`). Their text is given below,
+shortened where marked. No file in the repository was changed. This
+section is new rather than §2.6 onward, because §2 measured
+`origin/main` at `a8e19c8` for (1), and its findings stand as they were.
+
+### 2b.1 What the planning model can say about another model's value: nothing
+
+A port is `Port(type: String, fixture)` (`lib/planning.alg:46`). A plan
+whose ports name `Duration`, a type of `lib/units.alg`, and one whose
+port names `Durashun`, which is no type at all:
+
+```allegro
+use units
+use planning
+a = with_estimate(leaf("Time", [port("Order")], [port("Duration")]), est(10 min, none, none))
+b = with_estimate(leaf("Use", [port("Duration")], [port("Done")]), est(10 min, none, none))
+p = plan("P", [port("Order")], [port("Done")], [a, b])
+c = leaf("Typo", [port("Order")], [port("Durashun")])
+q = plan("Q", [port("Order")], [port("Durashun")], [c])
+print(plan_show(p))       // plan P: Order -> Done; 2 nodes, 2 leaves, 0 handlers
+print(check_plan(p).length)   // 0
+print(plan_show(q))       // plan Q: Order -> Durashun; 1 nodes, 1 leaves, 0 handlers
+print(check_plan(q).length)   // 0
+print(completions(q, []).length)  // 1
+```
+
+Both check clean. Nothing checks that a port's name is a type, and
+nothing relates it to a value: `Duration` is a string that happens to
+equal a binding's name.
+
+**The smallest change, a type value in the port.** Three probes on
+record types defined in the file (`Order`, `Invoice` and `Receipt`,
+each `Type.define({ id: Int, total: Float })`):
+
+| Expression | Output |
+|---|---|
+| `Order == Order` | `true` |
+| `Order == Invoice` (the same fields) | `false`: a type is compared by identity |
+| `Duration == Duration` | `true` |
+| `"{Order}"` | halts: `type_dispatch: 'toString' not found on Type` |
+| `Port(Order, none) instanceof Error` | `false`: the port is built |
+| `Port(42, none)`, then `.type + 1` | `43`: the declared `type: String` is not checked at construction |
+| `check_plan` of a well-wired plan whose ports hold `Order` and `Invoice` | `0` findings: wiring's `==` works by identity |
+| `check_plan` of the same plan with outcome `Receipt` | halts: `type_dispatch: 'toString' not found on Type` |
+
+So a type value can sit in `Port.type` today, and wiring by identity
+works, but every text the model builds from a port halts on it: each
+finding's message, `port_show`, `plan_show`, `gap_show`, the obligation's
+renderings, `plan_surface` and therefore the identity hash, and the
+ledger's lines. A type value carries no name the library can render.
+The surface cannot supply one either: `inputs: Order` is read by
+`pname`, a pattern, as text (`lib/planning.alg:1192`), and a grammar
+label hands a statement form either a value or its matched text, never
+both (§7, L1's third default). The smallest change is therefore not
+small: it needs a name beside every value, a second rendering path,
+and a hash over something other than text.
+
+**Finding, out of this stream's scope.** `Type.define`'s field types are
+not checked when a record is built (`Port(42, none)` is a `Port`). A
+candidate finding, unfiled; the ruled decision "Constructing a refined
+value claims its predicate" covers it on the rebuilt kernel.
+
+### 2b.2 Two grammars in one file: they compose, and they collide by name
+
+A scratch library `sysprobe` (1,647 characters) with `Component`
+records, `check_system` (a fold over the components, as `check_plan`
+folds over nodes) and a `component NAME:` offside form built as
+`plan NAME:` is (`lib/planning.alg:1191` to `:1233`), with rule names of
+its own (`sy_name`, `sy_items`). Four grammar-bearing libraries in one
+file:
+
+```allegro
+use units
+use planning
+use planning_loop
+use sysprobe
+component Billing:
+  provides: Invoice
+  requires: Order
+component Shop:
+  provides: Order
+plan Fulfil:
+  inputs: Order
+  outcomes: Invoice
+  Bill:
+    inputs: Order
+    outcomes: Invoice
+    estimate: 10 min
+shop = system("Shop", [Billing, Shop])
+print(check_system(shop).length)                  // 0
+print(check_system(system("Partial", [Billing]))) // [Order, which Billing requires, is provided by no component of Partial]
+print(plan_show(Fulfil))                          // plan Fulfil: Order -> Invoice; 1 nodes, 1 leaves, 0 handlers
+```
+
+It runs, 1.66 s of wall clock. `ALLEGRO_PARSE_STATS=1`: `lib/planning.alg`
+653,908 match attempts (its baseline), `lib/planning_loop.alg` 140,566,
+`sysprobe` 22,162, the program (481 characters) 5,236. A binding named
+`component` beside the `component` form also runs: a statement keyword
+is not reserved.
+
+Three collisions, none reported:
+
+- **Rule names are one namespace.** A library `sysclash` whose grammar
+  declares `rule pname = txt:/[a-z]+/` (lowercase only) and a `service`
+  form. With `use planning` then `use sysclash`, the file's `plan
+  Fulfil:` fails: "Parse error at position 133: expected ' ', …, got
+  'F'". In the other order the plan parses. The later library's `rule
+  X =` replaces the earlier's rule of the same name, silently. The
+  `use` scanner reads the header as text and checks nothing
+  (`src/use-scanner.ts:47`); fragment validation
+  (`validateFragments`, `src/grammar2/fragments.ts:124`) reports
+  operator and expression-keyword clashes and a rule that replaces a
+  BASE production, not one library's rule replacing another's, and not
+  two statement forms on one keyword. `planning_loop_grammar` relies on
+  the shared namespace on purpose: it reuses `pname` and `node_items`
+  of `planning_grammar` (`lib/planning_loop.alg:374` to `:383`).
+- **Top-level names are one scope.** A library `sysname` that binds its
+  own `Finding = Type.define({ rule: String, text: String })` and its
+  own `join`. With `use planning` then `use sysname`, planning's
+  `check_plan` builds sysname's `Finding`: "Constructor expects 2 args,
+  got 4". In the other order, sysname's own constructor fails the same
+  way. This is the mechanism of B-190 (name capture) between two
+  libraries: a library's free names resolve in the scope the function
+  runs in, and the later binding wins for both.
+- **The names a system library would want are taken.** The planning
+  libraries bind about 295 top-level names (243 in `lib/planning.alg`, 52 in
+  `lib/planning_loop.alg`), `lib/units.alg` 64. Taken among the obvious
+  ones: `Port`, `port`, `Finding`, `finding`, `catalog`, `uses`, `join`,
+  `contains`, `dedupe`, `item`.
+
+So a second model's grammar and records compose with planning's in one
+file, and its library must take no rule name and no top-level name that
+a planning library binds, unless it means to reuse it. Ruling R11 (one
+library or one per DSL, and their names) names the libraries; §3 makes
+the names a check.
+
+### 2b.3 A component graph's check against B-188: within SY1, not before
+
+Six probes, each time-boxed at 60 s (`timeout 60`), wall clock by
+`date`:
+
+| Probe | What the file holds | Result |
+|---|---|---|
+| `p3a` | `use units`, `use planning`, `use sysprobe`; `f(p) => check_plan(p)`; `g(s) => check_system(s)`; `cnt(n) => if n == 0 then 0 else cnt(n - 1)` | no finish in 60 s (exit 124): B-188 (1) holds with a second model |
+| `p3b` | the same without `cnt` | 1.46 s |
+| `p3c` | `use sysrec` alone: a library whose check is plain named recursion over nested components (`all_provided`, `missing_in`, each `assume terminates`) | 0.79 s: `[Payments, which Shop requires, is provided by nothing inside it]` |
+| `p3d` | `sysrec` beside a file function that calls `check_plan` | 1.35 s |
+| `p3h` | a third library, `use units`, `use planning`, `use sysrec`, holding `cross_findings(c, p) => missing_in(c).concat(check_plan(p).map(f => f.message))` and no recursive binding of its own | 1.37 s |
+| `p3f` | the fold over a list the caller passes (`walk(c, levels)`, as `plan_walk` is), beside `f(p) => check_plan(p)` | 1.39 s |
+
+And B-189 (a self-applied function exhausts the JS stack) on nested
+components: `w(self, c) => c.parts.reduce((acc, m) => acc + self(self,
+m), 1)` answers 2 at nesting depth 2 and fails with "Maximum call stack
+size exceeded" at depth 3.
+
+So B-188 stalls only a compilation unit that holds both a recursive
+binding and a caller of `check_plan`. A second model's library may
+recurse over its own graph when it does not call `check_plan`; a third
+library that calls both checks loads when it holds no recursive binding
+of its own. Neither B-188 nor B-189 needs fixing before SY1: each is a
+rule SY1's libraries obey (R16), at no measured cost. The 32-level
+`walk_levels` fold is needed only where a walk must sit beside a caller
+of `check_plan`.
+
+### 2b.4 What the loop needs from a second model: a reading that is an open plan
+
+R7's recommendation named four things the loop took from the planning
+model: dead-end records, a surface hash, a splice site, the kernel's
+answer stored in the value. The probe: a mapping declared in the file as
+a record, and read as the plan with the mapped artifacts added to its
+declared outcomes, as an open plan over the plan's own catalog
+(shortened; `component`, `system` as in 2b.2):
+
+```allegro
+use units
+use planning
+use planning_loop
+use sysprobe
+component Billing:
+  provides: Invoice
+  requires: Order
+component Shop:
+  provides: Order
+shop = system("Shop", [Billing, Shop])
+catalog yard:
+  Pack:
+    inputs: Order
+    outcomes: Packed
+    estimate: 20 min
+plan Fulfil from yard:
+  inputs: Order
+  outcomes: Packed
+  Take:
+    inputs: Order
+    outcomes: Packed
+    estimate: 10 min
+Delivers = Type.define({ plan: String, system: String, artifacts: Array })
+delivers = Delivers("Fulfil", "Shop", ["Invoice"])
+mapped_plan(op, m) => Plan(op.plan.name, op.plan.inputs, op.plan.outcomes.concat(m.artifacts.map(port)), op.plan.nodes, op.plan.budget, op.plan.handlers)
+fulfil_for_shop = open_plan(mapped_plan(Fulfil, delivers), Fulfil.catalog)
+print(open_state(Fulfil))                      // solved
+print(open_state(fulfil_for_shop))             // open
+print(open_obligations_show(fulfil_for_shop))  // [nothing in the catalog produces Invoice, which the plan declares]
+print(fulfil_for_shop.surface)                 // plan Fulfil; inputs Order; outcomes Packed, Invoice; no budget
+```
+
+```
+$ allegro obligations p4a-cross-obligation.alg --pending      (the plan line)
+Obligation: plan `fulfil_for_shop`: Invoice, which the plan declares
+  stop:        nothing in the catalog produces Invoice, which the plan declares
+  catalog:     yard
+  hash:        381e99c5
+
+$ allegro prove p4a-cross-obligation.alg --proposals p4a-proposals.md
+Summary: 1 discharged, 0 pending
+  ✓ fulfil_for_shop: Invoice, which the plan declares (1 attempt(s))
+      attempt 1: accepted: the gap is closed and the plan solved: Invoice from Bill; bound effort none, duration 15 min
+      entry: Bill:
+      by scripted:p4a-proposals.md in 1 attempt(s)
+  - Quantity.law_mul_comm (no prepared proposal)
+  …                                     (the other four laws)
+```
+
+The proposals file held one section, ``## `fulfil_for_shop: Invoice,
+which the plan declares` ``, with the node block `Bill:` (inputs
+`Packed`, outcomes `Invoice`, estimate `5 min`).
+
+Each of the four, for the plan kind of the
+[kind registry](#def-kind-registry) to serve a cross-model obligation
+unchanged:
+
+| What the loop needs | What the probe used | What the system model must provide |
+|---|---|---|
+| A dead end as records | `planning_loop`'s `PlanObligation`, built by `open_plan` | nothing: the mapping's reading is an open plan |
+| An identity over what the author wrote | `plan_surface` of the mapped plan: the plan's surface with the mapped artifacts among its outcomes, so an edit to the mapping's artifacts moves the hash | artifacts with names, since the surface is text |
+| A splice site | the plan's own `catalog yard:` block, found by value (`src/pcp.ts:1324` to `:1328`) | nothing: the answer is a node block, as for any plan obligation |
+| The kernel's answer stored in the value | `OpenPlan.state` and `answer` | nothing |
+
+No line of `src/pcp.ts`, `src/index.ts` or `pcp/**` was needed. What the
+probe does not do is the mapping's own check: its record is strings,
+and nothing confirms that `Invoice` is an artifact `Shop` provides or
+that `Fulfil` names the plan. That check is the mapping's (S3).
+
+**What a second kind would cost.** An artifact that no mapping assigns
+to any plan is not a gap in a plan, and a catalog entry cannot answer
+it: the answer is a mapping entry, its splice site the mapping's
+declaration, its success test the mapping's check. That is a second
+obligation kind. In the code as it stands: the `ObligationKind` union
+(`src/pcp.ts:76`); a content interface beside `PlanObligationContent`
+(`:80`); an extraction, a splice, a judgement, an answer and a TODO
+section, each of which the plan kind has as its own function (17
+exported plan-specific names in `src/pcp.ts`, 3 in
+`pcp/llm-worker.ts`); the eight dispatch sites on `kind === "plan"` in
+`src/pcp.ts` (`:588`, `:1031`, `:1704`, `:1757`, `:1763`, `:1848`,
+`:1885`, `:1971`) and one in `src/index.ts` (`:798`); an
+`ObligationKindSpec` (`pcp/llm-worker.ts:633`: request, splice, judge,
+primer, site) and its entry in `OBLIGATION_KINDS` (`:752`); and the
+five places that find a library's records by a type's name in the
+file's scope (`"OpenPlan"` at `src/pcp.ts:1318`, `:1533`, `:1576`;
+`"Plan"`, `"Solution"` and `"OpenPlan"` at `:1616`; `"PlanLedger"` at
+`:1642`), which 2b.2's name collisions make fragile. So the first
+composition point reuses the plan kind, and an unassigned artifact is a
+finding in the mapping's words until a demo needs it as an obligation
+(S3).
+
+### 2b.5 The ledger across two models: it names the plan only
+
+`verify` on 2b.4's file, then with the probe's transcript twin
+(`prove … --transcript`, then `verify … --transcript`):
+
+```
+  plans: 1/2 discharged, 1 pending
+    ✓ Fulfil: every gap closed — ; bound effort none, duration 10 min
+    ? fulfil_for_shop: Invoice, which the plan declares — nothing in the catalog produces Invoice, which the plan declares
+  assumption ledger: rests on 0 admitted, 0 sampled; 5 obligation(s) pending
+  plan ledger: 1/1 well-formed (discharged); 0 promise(s) admitted
+    ✓ Fulfil: open plan Fulfil, solved, well-formed; bound effort none, duration 10 min, money none; decisions no choices; catalog entries none; rests on no promises
+
+  plans: 2/2 discharged
+    ✓ Fulfil: every gap closed — ; bound effort none, duration 10 min
+    ✓ fulfil_for_shop: every gap closed — Invoice from Bill; bound effort none, duration 15 min
+  …
+  plan ledger: 2/2 well-formed (discharged); 0 promise(s) admitted
+    ✓ Fulfil: open plan Fulfil, solved, well-formed; …; catalog entries none; rests on no promises
+    ✓ fulfil_for_shop: open plan Fulfil, solved, well-formed; bound effort none, duration 15 min, money none; decisions no choices; catalog entries Bill for Invoice, by scripted:p4a-proposals.md; rests on no promises
+  transcript: …/p5-transcript.json: 1 accepted entry applied
+    + Bill in `yard` for `fulfil_for_shop: Invoice, which the plan declares`, by scripted:p4a-proposals.md in 1 attempt(s)
+```
+
+- **Nothing names the system or the mapping.** `planLedgerBindings`
+  (`src/pcp.ts:1613`) finds a file's records by the three planning
+  types, and `plan_ledger` (`lib/planning_loop.alg:347`) renders them.
+  `shop`, its components and `delivers` have no record, and the mapped
+  plan's "rests on" is the plan's fixtures only. A cross-model ledger
+  needs a record of the mapping (checked, or its finding) and of the
+  system model, each rendered by the library that owns it, and a way
+  for the protocol to collect records of more than the planning types:
+  a change in `src/pcp.ts` (S4).
+- **Which library renders the "rests on" line.** For a mapped plan, the
+  planning library renders its promises; the mapping it rests on is the
+  mapping library's to render, since only it knows the mapping's kind.
+- **The name ambiguity of `entryAuthorsByValue`.** Two records read
+  "open plan Fulfil": a mapped reading keeps the plan's name and shares
+  its catalog, so every cross-model obligation creates the case L7
+  named (two open plans whose catalogs hold an entry of the same name).
+  Here it is benign: `entryAuthorsByValue` (`src/pcp.ts:1801`) credits
+  `Bill` to `fulfil_for_shop` only, because `Fulfil`'s solution does not
+  use it. Had both solutions used it, both records would carry the
+  author, which is right for one value; two entries of one name would
+  leave both "by the file".
+- **A wording wart.** "every gap closed — ; bound …": L2's record line
+  renders an empty step list when the solution adds no catalog entry
+  (`Fulfil` above). Not this row's; noted for the stream's close.
+
+### 2b.6 The load corpus: the gate does not see the loop's library
+
+`bench/load.ts`'s corpus (`:67` to `:82`) holds `lib/units.alg`,
+`lib/planning.alg` and three programs in its gated group.
+`lib/planning_loop.alg` is not in it: R10 (a)'s step, "lane P adds the
+new library to the load corpus in its own commit after L1", has not
+been taken, as the L2, L5 and L7 entries of §7 say. `npm run bench`
+(`bench/run.ts` over `bench/corpus/`) runs no planning file. So a new
+library costs nothing on either gate until lane P adds it, and nothing
+gates its parse cost until then.
+
+Its cost, from 2b.2's parse stats: `lib/planning_loop.alg` parses at
+8.3 match attempts per character (140,566 for 16,875), `lib/planning.alg`
+at 12.5, `sysprobe`'s offside form and checks at 13.5. A system library
+the size of `lib/planning_loop.alg` adds of the order of 140,000 to
+230,000 match attempts to each process that loads it, once per process
+(B-155 (library load per module)). R10 (a) applies as written: lane P
+adds `lib/planning_loop.alg` and SY1's libraries to the load corpus in
+its own commit, after the chunk that lands each.
+
+### 2b.7 What the measurements decide, and what they leave
+
+- A port keeps its name. Whatever relates it to another model's value
+  holds the name and the value together, outside `Port` (R12).
+- A second model shares the file with planning under one rule: no
+  shared rule name or top-level name unless reused on purpose (R11, §3).
+- B-188 and B-189 are rules SY1 obeys, not chunks before it (R16).
+- The first cross-model obligation is a plan obligation of an open plan
+  the mapping reads; the plan kind serves it with no host change (S3).
+- The ledger across two models is the one host change SY1 needs (S4).
+- Not measured: the UI DSL (later, R7 (a)); a keyed run over a composed
+  model; how a mapping's surface form reads to a stakeholder (none was
+  written: library-first); the cost of the mapping's own check, which
+  depends on the record shapes of S2 (the data DSL and the first
+  mapping).
 
 ## 3. Oracle and stop conditions
 
@@ -750,7 +1130,11 @@ R7 and R8 at their rows' time.
     component graph's check, so it is worth taking before SY1's first
     chunk or in it; and R5 (a)'s note to revisit a lane of the Vivace
     models' own falls due here, with a second library in lane D.
-  - **Taken:**
+  - **Taken:** (a), on the maintainer's review of PR #192, 2026-11-12:
+    components and data first, UI later, all from B-080's roster; the
+    composition point a plan's outcome typed by a system model's
+    artifact, with a cross-model check whose findings are plan
+    obligations for the same loop; library-first.
 - **R8** — **What the documentation or comprehension model is for.** A
   question for the maintainer; no design is offered. Readings the raw
   material of §5 supports:
@@ -2330,3 +2714,65 @@ R7 and R8 at their rows' time.
     The filter matches no test name of the scene's file test (`file:
     01-loop.alg`); the shards run it, and `ALLEGRO_TEST_FILTER="file:
     01-loop"` runs it alone: 1 passed.
+- **2026-11-12 — L7's asks ruled.** The maintainer, on the review of
+  PR #192: "PR#192 reviewed and ratified. Go with recommendation on
+  R7."
+  - R7 taken as (a) (§6): components and data first, UI later; the
+    composition point a plan's outcome typed by a system model's
+    artifact, with a cross-model check whose findings are plan
+    obligations; library-first. Row SY1 was then planned by an
+    amendment at PR #194, which closed unmerged (the closing entry
+    below).
+  - The `verify --transcript` shape ratified, with ask A8 of
+    `docs/book/platform/tooling.ir.md`: claims C205 to C210 and clusters
+    G28 and G29 are decided, ask A8 resolved.
+  - The skip's order and scope ratified as the default: a theorem the
+    client declines is asked about first, then the splice site; a plan
+    obligation whose catalog is not a top-level binding is still asked
+    once (its splice refuses it as `no-catalog`).
+  - The four register lines of `docs/plans/release-track.md` ratified:
+    D3's new row, D2's result-level roll-up, D6's "to advance", and §8's
+    rung 4 scene 1 entry. None carried a "to ratify" clause.
+  - The stale claims of `docs/book/demo-ladder.ir.md` (the L7 entry's
+    list) go to the review session; this stream does not edit them.
+  - The term [splice site](#def-splice-site) ratified and added to §1.
+  - The finding's cause confirmed: an indexed `open_obligations(Fulfil)[0]`
+    halts the accepting turn, because the solved plan's obligation list
+    is empty; the loop reports the file's own fault as the proposal's
+    refusal (`refused (halt)`). Not filed unless the maintainer asks.
+- **2026-11-13 — closed, with the loop delivered.** The maintainer's
+  rulings of the day, to the orchestrating session:
+  - The hold on pilots stated in the book pass's review of Part V "was
+    directed only at the book pass, since it was incorporating
+    decisions from this session regarding the pilots. This stream
+    should continue with it's work."
+  - After a review of both streams against the 231 decisions that
+    phase 1 of the book pass ruled: "I agree with the
+    recommendations." The pilots are specified first; new pilot code
+    on the present implementation is library-only probes; the code is
+    rebuilt in a tree beside the present one. "The split, gate and
+    freeze are all approved as recommended." The record is §6 of
+    `docs/plans/rebuild.md`.
+  - **What closes.** Part (1) of §1, the loop: delivered at L7, its
+    done-condition checked in the L7 entry above. B-187 closes on it.
+  - **What is carried.** Parts (2) and (3), the software system model
+    and the documentation model, go to the model specifications chunk of
+    `docs/plans/rebuild-acceptance.md`, and are built
+    on the rebuilt kernel at its milestone 7 and after. R7 (a) stands
+    as the model's direction. R8 is asked again there.
+  - **The amendment of PR #194** closed unmerged. Its record of the
+    rulings of 2026-11-12 and its measurements were carried here (the
+    entry above, and §2b). Its five rows, its eight rulings, its seven
+    terms and its two reserve ids were not taken.
+  - **What the stream leaves.** `lib/planning_loop.alg`, the worker's
+    plan kind, the scripted and Claude Code proposers, the ledger, and
+    rung 4 scene 1 with its transcripts, all suite-pinned on the
+    present implementation, which is frozen from this day. They are
+    cases of the acceptance corpus. The engine findings B-188 (a
+    recursive binding or a library-named list stalls the precompile or
+    the load) and B-189 (a self-applied function exhausts the JS stack)
+    stay open as cases for the rebuilt kernel's recursion design;
+    B-194 (one vocabulary of four strengths in the planning loop) is
+    met on the new tree, not by a rename here. The backlog's triage
+    under the freeze (chunk G2 of `docs/plans/rebuild.md`) classes
+    each.
