@@ -1078,6 +1078,20 @@ chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
 
+### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
+
+B-196 (the rebuild's acceptance side).
+`next/models/specs/software-system.md` states the second pilot's model
+against the ruled decisions of the inventory's Part V and the planning
+specification's rulings: two languages, components and data; their
+values and claims; six declared mappings, among them a plan's outcome
+typed by a system model's artifact and a system model mapped to the
+code that realises it; what is left open and how the loop serves it;
+what the model needs of the kernel. The project's own unit structure
+is its first use case and its worked example. It puts nine questions
+to the maintainer and introduces two terms, artifact and remainder.
+Nothing of the model is built. No code changed.
+
 ### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
 
 B-196 (the rebuild's acceptance side). `next/models/specs/planning.md`

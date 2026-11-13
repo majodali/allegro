@@ -402,3 +402,30 @@ policy is the gate ruled there.
     The search's bound comes from the residual of the plan with its
     choices unknown. A model value's names live in a field of the
     value. The 15 held planning decisions stay the review session's.
+- **2026-11-13 — Q4, part 2 drafted: the software system model specified.**
+  `next/models/specs/software-system.md`, for the maintainer's ruling.
+  Nothing of this model is built; its evidence is the measurements of
+  the planning-loop plan's §2b, one library-only probe, the project's
+  own structure and the ruled decisions. It builds on the planning
+  specification's thirteen rulings and asks none of them again. Five
+  use cases, the first the project itself: its units, their permitted
+  dependencies and the decisions each holds, as model values the
+  platform checks. Two languages, components and data, each a library;
+  the values and the claims of each. Six mappings, each with its kind,
+  its claim and who checks it: components to data twice, plans to a
+  system model, a system model to code, decisions to a system model,
+  and a system model to its next version. The plan mapping is worked
+  on three units. An artifact no plan is assigned is a second kind of
+  unknown, with the catalog remainder's form. Nine needs of the
+  kernel, each with its owning decision and the adversarial review's
+  issue that leaves it open. A table of the Part V decisions with what
+  would test each, six of which no case tests today. Nine questions,
+  each with options and a recommendation. Two terms are new: artifact
+  and remainder.
+  - **A finding about the present tree, from the probe.** With the
+    wildcard of `scripts/analyze/units.json` read as every unit, the
+    permitted relation has a cycle through `pipeline`, `introspect`
+    and `cli`. The host script checks edges and never the relation.
+    The 43 unit-to-unit edges of the code have no cycle. The tree is
+    frozen, so nothing changes; the specification keeps the rule and
+    acyclicity as two claims.
