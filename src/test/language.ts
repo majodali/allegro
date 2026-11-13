@@ -701,6 +701,14 @@ const demosRung3Dir = path.resolve("demos", "rung3");
 fileTest(path.join(demosRung3Dir, "01-model.alg"));
 fileTest(path.join(demosRung3Dir, "02-solve.alg"));
 
+// B-187 chunk L7 (the planning loop): rung 4 scene 1 is suite-validated the
+// same way. It holds an open plan, its obligation in planning words, three
+// proposals and the kernel's answers, and the solved plan's ledger record;
+// its "break it" block's captured halt lives in demos/rung4/transcripts/.
+// The loop itself is the CLI's (`allegro prove`), pinned in src/test/pcp.ts.
+const demosRung4Dir = path.resolve("demos", "rung4");
+fileTest(path.join(demosRung4Dir, "01-loop.alg"));
+
 // The statement form's enforcement shape (chapter §7): `plan NAME:` declares
 // NAME as a WellFormedPlan, so a plan that does not check HALTS the build
 // with the refinement's message. The demo files can only pin plans that

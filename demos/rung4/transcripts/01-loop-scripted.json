@@ -1,0 +1,61 @@
+{
+  "version": "transcript/1",
+  "file": "demos/rung4/01-loop.alg",
+  "prover": "scripted:01-loop-proposals.md",
+  "date": "2026-11-12T18:07:54.486Z",
+  "maxAttempts": 5,
+  "turnTimeoutMs": 30000,
+  "replyTimeoutMs": 120000,
+  "skipped": [
+    "Quantity.law_mul_comm",
+    "Quantity.law_conv_roundtrip",
+    "Quantity.law_refl",
+    "Quantity.law_sym",
+    "Quantity.law_trans"
+  ],
+  "obligations": [
+    {
+      "name": "Fulfil: Shipped, which Depot needs",
+      "kind": "plan",
+      "discharged": true,
+      "attempts": 2,
+      "authorship": {
+        "provers": [
+          {
+            "prover": "scripted:01-loop-proposals.md",
+            "attemptsUsed": 2,
+            "effortBudgetUsed": {
+              "attempts": 2
+            },
+            "role": "primary"
+          }
+        ],
+        "verifiedAt": "2026-11-12T18:08:05.087Z"
+      },
+      "turns": [
+        {
+          "attempt": 1,
+          "request": "Attempt 1 for plan obligation `Fulfil: Shipped, which Depot needs`.\n\n**Gap:** nothing in the catalog produces Shipped, which Depot needs\n\n**Search so far:** Delivered from Van, Sorted from Depot\n\n**Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.\n\n**Hash:** `5444505e` (over: plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot)\n\nReply with ONE fenced ```allegro code block holding ONE node block that produces `Shipped`, as it would appear in a plan's body, with no `catalog` and no `plan` keyword. The kernel will add it to the catalog `yard` and check the plan again.",
+          "primer": "§2.9 \"Output contract for a plan proposer\" of `docs/book/vivace/planning-dsl.md`",
+          "kernel": "refused (open): nothing in the catalog produces Labelled, which Messenger needs",
+          "accepted": false,
+          "replyMs": 1,
+          "reply": "```allegro\nMessenger:\n  inputs: Labelled\n  outcomes: Shipped\n  estimate: 40 min, 0.25 person-hours\n```",
+          "candidate": "Messenger:\n  inputs: Labelled\n  outcomes: Shipped\n  estimate: 40 min, 0.25 person-hours",
+          "kernelMs": 2325
+        },
+        {
+          "attempt": 2,
+          "request": "Attempt 2 for plan obligation `Fulfil: Shipped, which Depot needs`.\n\n**Gap:** nothing in the catalog produces Shipped, which Depot needs\n\n**Search so far:** Delivered from Van, Sorted from Depot\n\n**Catalog to extend:** `yard`: add one node block that produces `Shipped`; leave the plan `Fulfil` as written.\n\n**Hash:** `5444505e` (over: plan Fulfil; inputs Order; outcomes Delivered; budget duration 160 min, effort none, money none; gap Shipped by Depot)\n\nLast attempt's refusal:\n- refused (open): nothing in the catalog produces Labelled, which Messenger needs\n\nAttempts so far: 1\n- 1: `Messenger`, refused (open): nothing in the catalog produces Labelled, which Messenger needs\n\nReply with ONE fenced ```allegro code block holding ONE node block that produces `Shipped`, as it would appear in a plan's body, with no `catalog` and no `plan` keyword. The kernel will add it to the catalog `yard` and check the plan again.",
+          "primer": "§2.9 \"Output contract for a plan proposer\" of `docs/book/vivace/planning-dsl.md`",
+          "kernel": "accepted: the gap is closed and the plan solved: Delivered from Van, Sorted from Depot, Shipped from Dispatch; bound effort 1.5 person-hours, duration 155 min",
+          "accepted": true,
+          "replyMs": 0,
+          "reply": "```allegro\nDispatch:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours\n```",
+          "candidate": "Dispatch:\n  inputs: Packed\n  outcomes: Shipped\n  estimate: 45 min, 0.25 person-hours",
+          "kernelMs": 4116
+        }
+      ]
+    }
+  ]
+}

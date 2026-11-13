@@ -215,6 +215,34 @@ and no completion solves, "solved") and the planning words for it (the
 next dead end, the counterexample of `solve_from`, or the solution). A
 solved plan passes what the `WellFormedPlan` annotation checks.
 
+**The loop, as delivered.** [The loop](../../plans/planning-loop.md#def-the-loop)
+(chunks L3 to L7 of B-187) runs over an open plan's obligations through
+`allegro prove`, the prover protocol's loop with the plan obligation as
+a second kind beside the theorem. Each turn sends the obligation's words
+and §2.9 as the system prompt, splices the reply into the catalog the
+obligation names, checks and solves the plan again, and on a refusal
+sends the next request with the refusal's text, up to an attempt limit
+and within a time box per turn. Two kinds of
+[proposer](../../plans/planning-loop.md#def-proposer) answer it: a
+scripted one, which reads prepared answers from a
+[proposals file](../../plans/planning-loop.md#def-proposals-file)
+(`--proposals`), so the loop runs without a key or the network; and a
+language model, through the SDK on API billing or through Claude Code's
+scripted mode on a Claude subscription (`--proposer claude-code`). An
+accepted entry's authorship names the proposer and the attempts.
+`allegro verify` carries a solved plan's record into the verdict, the
+[plan ledger](../../plans/planning-loop.md#def-plan-ledger): its
+well-formedness, its bound and decisions, each catalog entry it uses and
+who proposed it, and its fixtures as admitted
+[promises](../../plans/planning-loop.md#def-promise). With `--transcript
+T.json`, `verify` puts a transcript's accepted entries back into the
+catalog with the loop's own splice and names their proposers. Rung 4
+scene 1, `demos/rung4/01-loop.alg` with its walkthrough `01-loop.md`,
+shows it end to end. Deferred: obligations beyond a gap (a budget miss,
+another finding of `check_plan`), which the plan's ruling R1 (what a
+plan obligation is) kept for later evidence; a second model composed with this one, which the plan stages
+as SY1; and execution (Shape 2), which would let a promise be checked.
+
 ### 2.9 Output contract for a plan proposer
 
 This section is what a worker sends a proposer with a
@@ -868,7 +896,15 @@ decisions and catalog entries with their authors; `allegro verify` lists
 the fixtures in the assumption ledger as admitted promises ("rests on 6
 admitted" on `demos/rung3/02-solve.alg`) and the records under `plan
 ledger:`, and `allegro inspect` prints each record's lines under its
-binding.
+binding. Chunk L7 packaged the loop as rung 4 scene 1 (§2.8):
+`demos/rung4/01-loop.alg` (suite-pinned, with a break-it halt), its
+walkthrough `01-loop.md` (`obligations`, `propose`, the scripted loop
+and the maintainer's run with a language model, each refused once and
+accepted once), and the transcripts, which a test reproduces;
+`allegro prove` skips a theorem the file does not declare (a library's
+law) before any request, and `allegro verify --transcript T.json` names
+the loop's proposers in the plan ledger. L6 (the rest of B-081) was
+dropped: both loops converged from the refusal text alone.
 The work plan, its stages, the rulings it asks for and its chunk log are
 `docs/plans/planning-pilot.md`. The backlog items are B-079 (this
 revalidation), B-151 (the pilot's stages), B-081 (legibility, deferred),
