@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-196
 lane: Q
 merge: merge-on-green
@@ -10,6 +10,9 @@ oracle:
   - npm run lint:docs:check
   - npx tsx scripts/doc-ref-lint.ts
   - npx tsx scripts/analyze/lane-lint.ts --check
+  - npm run lint:decisions
+  - npm run test:next
+  - npm run typecheck:next
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
@@ -26,11 +29,11 @@ boundary:
 
 # What the rebuilt kernel must pass, and what runs on it — the acceptance stream
 
-> **Status: draft** — written 2026-11-13 by the orchestrating session
-> with the program plan `docs/plans/rebuild.md`, from the maintainer's
-> rulings of that day. Active when the plans' PR merges; chunk Q1's
-> first commit flips the header. The status line and the header's
-> `status` say the same thing.
+> **Status: active** since the merge of PR #197 (2026-11-13) — written
+> that day by the orchestrating session with the program plan
+> `docs/plans/rebuild.md`, from the maintainer's rulings of that day.
+> Chunk Q1 (the decision map) is its first chunk. The status line and
+> the header's `status` say the same thing.
 >
 > **Reader**: the maintainer, and the session that runs the stream.
 > Assumed known: the program plan, whose §1 defines
@@ -165,7 +168,8 @@ and planning libraries ported at milestones 6 and 7.
 **Taken 2026-11-13**: those of the program plan's §6. The stream's merge
 policy is the gate ruled there.
 
-**Open at the plans' PR**, with defaults taken at the merge:
+**Put at the plans' PR, each default taken** at the merge of PR #197 on
+2026-11-13, where the maintainer wrote "All defaults accepted":
 
 - **A1 — The four terms of §1.** Default: ratified.
 - **A2 — Reserves.** B-197 is the hand-off item of the program plan's
@@ -180,3 +184,22 @@ policy is the gate ruled there.
 
 - **2026-11-13 — planned.** Written with the program plan on
   `origin/main` at `e399222`. No code changed.
+- **2026-11-13 — Q1 landed.** The decision map `next/decisions.json`,
+  generated from the inventory, and its check
+  `next/tools/decision-map.ts`. The check prints:
+  `decision-map: 231 rows · R 141 · Q 67 · none 23 · state none 231, carried 0, adapted 0, written 0, proved 0 — consistent`.
+  The owner split: Part I, 23 rows, none; Parts II, III and IV, 51, 23
+  and 63 rows, R; Part V, 27 rows, Q; Part VI, 44 rows, of which the 4
+  of "The kernel's interface" are R and 40 are Q. The status against the
+  present code reproduces the inventory's count: 93 settled, 62 partly
+  built, 76 open; 15 rows are held. No entry's `- Chapter:` line
+  disagrees with the heading it sits under; no title appears twice; every
+  entry has a `- Type:` and a `- Status:` line. Oracle, each green:
+  `npm run typecheck:next`, `npm run test:next` (19 tests, among them
+  probes with a row removed, duplicated, orphaned, misowned, out of
+  order, a state with no unit and a unit outside `next/`),
+  `npm run lint:decisions`, `npm run lint:streams`,
+  `npm run lint:docs:check`, `npx tsx scripts/doc-ref-lint.ts`,
+  `npx tsx scripts/analyze/lane-lint.ts --check`, the lane check of the
+  PR's files against lane Q, and
+  `ALLEGRO_TEST_FILTER="tooling|lane|stream" npm test`.

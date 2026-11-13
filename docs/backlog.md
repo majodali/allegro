@@ -3693,6 +3693,7 @@ table and the stream plans.
   minimal launcher, and the speed tests of milestone 3. Carries parts
   (2) and (3) of B-187 (the planning loop, the next validating demo).
   Stream plan: `docs/plans/rebuild-acceptance.md` (eight chunks).
+  Q1 (the decision map) at its PR.
   **Pointer**: the plan's §5
 - [ ] **B-197** (evidence against a ruled decision) · L0 · **The
   hand-off from either stream of the rebuild to the review session.** A
