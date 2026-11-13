@@ -148,7 +148,24 @@
         "src/**",
         "lib/**",
         "tests/**",
-        "demos/**"
+        "demos/**",
+        "next/kernel/**",
+        "next/prims/**",
+        "next/ext/**",
+        "next/decisions.json"
+      ]
+    },
+    "Q": {
+      "name": "the rebuild's acceptance side",
+      "globs": [
+        "next/decisions.json",
+        "next/corpus/**",
+        "next/bootstrap/**",
+        "next/launch/**",
+        "next/tools/**",
+        "next/models/**",
+        "package.json",
+        ".github/workflows/ci.yml"
       ]
     }
   }

@@ -879,7 +879,27 @@ comment trailing `x + x`, runs and verifies "1/1 discharged".
 
 Plan `docs/plans/planning-loop.md`; lane D; human-gated. Opened
 2026-11-06 with the plan, ratified 2026-11-07 at the merge of PR #167;
-entries newest first, directly below this line.
+closed 2026-11-13. Entries newest first, directly below this line.
+
+### 2026-11 — The planning loop closed, with the loop delivered (B-187)
+
+B-187 (the planning loop, the next validating demo) closes on its first
+part: the loop over a plan's obligations, delivered at chunk L7 as rung
+4 scene 1. The maintainer ruled on 2026-11-13 that the pilots are
+specified first and built on the rebuilt kernel, so the software system
+model and the documentation model are carried to the acceptance stream
+of the rebuild (`docs/plans/rebuild-acceptance.md`, its chunk of model
+specifications). The plan
+records the rulings of 2026-11-12 on PR #192 (R7 taken as (a); ask A8
+of `docs/book/platform/tooling.ir.md` resolved; the term splice site),
+and keeps as its §2b the measurements made for the second model: a port
+names another model's type as an unchecked string; two grammar-bearing
+libraries compose in one file and collide silently by name; B-188 (a
+recursive binding or a library-named list stalls the precompile or the
+load) stalls only a unit holding both a recursive binding and a caller
+of `check_plan`; a mapping read as an open plan yields an obligation the
+loop serves with no host change. The amendment that planned the second
+model (PR #194) closed unmerged.
 
 ### 2026-11 — Rung 4 scene 1: the planning loop demonstrated (B-187, chunk L7)
 
@@ -1020,6 +1040,45 @@ catalog's name recovered by the protocol, and the concurrent stream.
 Every `tests/*.alg` and `demos/**/*.alg` run gives identical output
 before and after (272 runs). `docs/book/platform/tooling.ir.md`
 re-proposes C111 as C171 and C172 (ask A3).
+
+## Stream S — the rebuild program
+
+Plan `docs/plans/rebuild.md`; lane S; human-gated. Opened 2026-11-13
+with the plan; entries newest first, directly below this line.
+
+### 2026-11 — The rebuild planned: a kernel beside the present code (B-195, chunk G1)
+
+B-195 (the rebuild program). Phase 1 of the book pass ruled 231
+decisions, of which the code settles 93, and left 83 held findings
+against it, most of them structural. The maintainer ruled on 2026-11-13
+that both sessions turn to the rebuild. The program plan states the
+approach (a new tree `next/` built beside the present one, in the
+inventory's order, the present implementation kept as bootstrap host
+and comparison oracle), the split between the kernel stream (the review
+session, lane R) and the acceptance stream (the orchestrating session,
+the new lane Q), nine milestones, the gate (merge on green under D-2
+(merge-on-green streams), the maintainer's gate on a contract change,
+on evidence against a ruled decision and on each milestone), the freeze
+of the present tree, and the rules by which the two sessions meet. The
+lane manifest gains lane Q and lane R's paths in `next/`.
+B-197 (evidence against a ruled decision) is the hand-off item. No code
+changed.
+
+## Stream Q — the rebuild's acceptance side
+
+Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
+chunk's row says so. Opened 2026-11-13 with the plan; entries newest
+first, directly below this line.
+
+### 2026-11 — The acceptance stream planned (B-196)
+
+B-196 (the rebuild's acceptance side). Eight chunks: the decision
+map, the acceptance corpus with every case classed as one that
+survives, changes by a named ruling or is an implementation detail, the
+ten scenes as scenarios, the model specifications of the planning and
+software system pilots, the first notation and the bootstrap emitter,
+the comparison harness, the minimal launcher, and the speed tests of
+milestone 3. Written with the program plan; no code changed.
 
 ## Unstreamed
 

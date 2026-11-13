@@ -54,6 +54,7 @@ cache — amend it upstream, never here.
 - **File-level map + evalSource pipeline:** `docs/book/implementation-map.md`
 - **Durable design truth per area:** `docs/book/` (structures, type system, core types, effects, pattern matching, grammar, modules)
 - **Plans:** `docs/plans/` — read `README.md` (manifest) first
+- **The rebuild (2026-11-13):** `docs/plans/rebuild.md` is the program: the code is rebuilt to the ruled decisions of `docs/plans/book-pass-inventory.md` in a new tree `next/`, beside the present one. Read its §4 (paths and lanes), §5 (milestones) and §8 (how the two sessions meet) before any work; the orchestrating session's stream is `docs/plans/rebuild-acceptance.md`
 - **What's next:** `docs/backlog.md` · **What landed:** `docs/CHANGELOG.md` (incl. the migrated v1-era record) · **v1 dispositions:** `V1-INVENTORY.md`
 - **Consumables:** `docs/book/getting-started.md`, `docs/book/language-reference.md` (syntax by example), `docs/book/grammar-formalism.md`, `docs/book/proving-in-allegro.md`
 
@@ -276,6 +277,15 @@ evaluator/runtime set; this is the complete session list):
 - This file changes ONLY for commands, invariants, architecture —
   never history (→ CHANGELOG), never design rationale (→ design
   docs), never status (→ BACKLOG) (PROCESS §1).
+- **The present tree is frozen** (`docs/plans/rebuild.md` §4): `src/`,
+  `lib/`, `tests/`, `demos/`, `pcp/`, `bench/`, `web/`, `website/` and
+  `scripts/` change only where the bootstrap or the comparison with the
+  new kernel needs it, by a PR the maintainer merges. New code goes in
+  `next/`, in the paths of the session's lane. The present tree's gate
+  stays green: it is the oracle the new kernel is compared with.
+- Every PR body of the rebuild carries a part named "For the other
+  stream"; read the other session's merges on `origin/main` before
+  starting a chunk (`docs/plans/rebuild.md` §8).
 - Tier-0 docs (`VISION.md`, `PROCESS.md`) are never edited without
   explicit maintainer sign-off; surface conflicts, don't pick a side.
 - Branch practice (W-006): single-use outcome-named branches off
