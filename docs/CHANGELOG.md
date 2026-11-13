@@ -1090,6 +1090,21 @@ they halt, the verdict's `auto-PE` in place of a proposer. The
 scenarios are the acceptance statement for milestones 5, 6 and 7 of
 the rebuild. No code changed.
 
+### 2026-11 — The comparison harness on a stub kernel (B-196, chunk Q6 (the comparison harness), part 1)
+
+B-196 (the rebuild's acceptance side). `next/corpus/harness.ts` runs
+the pinned programs of the acceptance corpus through a runner and
+compares each printed line with its pin by class: a survives pin
+passes on the exact text, a changes pin is to review, a detail pin is
+not compared. It reports the cases due and passing per milestone. Its
+tests in `next/corpus/harness.test.ts` probe the comparison with stub
+runners that are wrong in known ways. `npm run harness:present` runs
+the present tree on its own pins: 586 of 589 surviving pins pass and
+no printed line differs. The 3 others belong to
+`tests/proofs-proven-demo.alg`, which the file runner cannot parse
+without the extension the suite passes it; the command names the
+program and counts its pins as not run.
+
 ### 2026-11 — The corpus's tests classed (B-196, chunk Q2 (the corpus inventoried and classed), part 3)
 
 B-196 (the rebuild's acceptance side). Each of the 1,379 tests of the
