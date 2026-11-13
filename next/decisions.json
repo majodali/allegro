@@ -201,6 +201,7 @@
     {"title":"One kernel serves many invocations","part":"VI","chapter":"Launching","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"A capability is a named set of effectful primitives","part":"VI","chapter":"Capabilities and primitive functions","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"A module is a function of the capabilities it declares","part":"VI","chapter":"Capabilities and primitive functions","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
+    {"title":"Only the module being run performs effects when instantiated","part":"VI","chapter":"Capabilities and primitive functions","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"Loading is three capabilities of rising strength","part":"VI","chapter":"Capabilities and primitive functions","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"Every pure primitive the platform ships has a reference definition","part":"VI","chapter":"Capabilities and primitive functions","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"The platform ships three phases: check, run and export","part":"VI","chapter":"Phases","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
@@ -229,7 +230,7 @@
     {"title":"A trace is read from origins","part":"VI","chapter":"Tools","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"The platform's default configuration is the standard language","part":"VI","chapter":"The launchers we ship","type":"capability","present":"settled","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"The terminal and the browser ship output, timers and HTTP","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null,"cases":[]},
-    {"title":"A value that arrives later fills a cell, and a failure fills it with an exception","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null,"cases":[]},
+    {"title":"A value that arrives later fills a cell","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"The browser launcher is one bundle","part":"VI","chapter":"The launchers we ship","type":"implementation","present":"settled","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"The core runs in a browser","part":"VI","chapter":"The launchers we ship","type":"implementation","present":"partly built","owner":"Q","state":"none","unit":null,"cases":[]}
   ]

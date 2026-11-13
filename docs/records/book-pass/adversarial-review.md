@@ -278,6 +278,47 @@ phases and saved programs. Each is design work with known literature
 behind it, and the reviewers name it. None was visible to the
 mechanical checks phase 1 ran.
 
+## Rulings taken
+
+**The order of work, 2026-11-13.** The maintainer asked how many
+findings must be resolved before the kernel's interface and the
+saved-program data form, which the rebuild program
+(`docs/plans/rebuild.md`) makes the kernel stream's first chunk. The
+review session's answer, agreed: stage the two contracts. Issues 25
+and 29 block a first version; identity (issues 11 and 12) and
+strength (issues 8 to 10) block the second; the rest block neither.
+The order agreed: the first versions; issue 15 with the first
+milestone; identity and strength, then the second versions; cluster 1
+with issues 14 and 23 as one design; recursion, proved by building;
+the rest with their parts.
+
+**Issue 25, ruled 2026-11-13.** The maintainer asked what happens to
+a saved program's top-level effects, and to a module's when it is
+loaded: construct-and-bind alone has no place for them, and an
+evaluate call in the record would perform them at load. The
+maintainer suggested gathering them into a function under a reserved
+name, called at the caller's discretion, and asked for another
+option. Ruled, two decisions:
+
+- "A module is a function of the capabilities it declares", taken
+  literally. Its parameters are what it declares; its body holds its
+  bindings and its top-level effects in written order. Loading
+  constructs the function and evaluates nothing; instantiating it is
+  a call. A saved program's data form constructs values and nothing
+  else, and yields a module function.
+- "Only the module being run performs effects when instantiated."
+  The alternative, any module performing top-level effects in
+  dependency order, makes the order of instantiation observable.
+
+**Put to the maintainer with the first versions, to confirm at their
+PR.** Issue 29: the launcher fills a cell with plain data, and a
+wrapper in the standard language makes a failure an exception; the
+decision is retitled "A value that arrives later fills a cell". The
+first version of the data form leaves out claim outcomes, keys and
+origins, defines the data form only, and is written as JSON. The
+calls of the first version of the interface.
+
 ## Terms introduced
 
-No terms introduced.
+- **Instantiate**: to call a module's function with its capabilities
+  and inputs, yielding its bindings.

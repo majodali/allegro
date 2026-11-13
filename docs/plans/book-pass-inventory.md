@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 231 decisions in 6 parts and 38 chapters after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 232 decisions in 6 parts and 38 chapters after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -109,8 +109,8 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
    - Decisions: Configuration is all the information that determines an execution; Configuration sources have a priority, and a result says which supplied each value; A full configuration is a model, evaluated in a first phase.
 32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
    - Decisions: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; Startup, step by step; One kernel serves many invocations.
-33. **Capabilities and primitive functions** (4 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
-   - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
+33. **Capabilities and primitive functions** (5 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
+   - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Only the module being run performs effects when instantiated; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
 34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
    - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
 35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
@@ -120,7 +120,7 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
 37. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
    - Decisions: A tool reads a phase's result and adds no analysis of its own; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
 38. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
-   - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell, and a failure fills it with an exception; The browser launcher is one bundle; The core runs in a browser.
+   - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell; The browser launcher is one bundle; The core runs in a browser.
 
 ## Findings held for their decisions
 
@@ -164,7 +164,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts | DR4, rulings of 2026-11-12 |
 | The verdict is assembled outside evaluation; undecided contracts do not reach it | Every result says how strongly it holds | Keep it simple | DR4, rulings of 2026-11-12 |
 | There is no stated kernel interface; each host calls the evaluator's internals | What the kernel's interface offers | The kernel's interface | DR6, rulings of 2026-11-13 |
-| Hosts are swapped by capturing output and substituting extensions; a failed request fills a cell with an error value; a missing runtime throws | The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell, and a failure fills it with an exception | The launchers we ship | DR6, rulings of 2026-11-13 |
+| Hosts are swapped by capturing output and substituting extensions; a failed request fills a cell with an error value; a missing runtime throws | The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell | The launchers we ship | DR6, rulings of 2026-11-13 |
 | The module summary has a vocabulary of its own | A module's summary is the weakest strength among its claims | Tools | DR6, rulings of 2026-11-13 |
 | The browser bundle holds no module loader and fails on an unguarded Node global | The browser launcher is one bundle; The core runs in a browser | The launchers we ship | DR6, rulings of 2026-11-13 |
 
@@ -3238,7 +3238,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of the capabilities it declares
-- Decides: a module declares the capabilities it needs. It is evaluated in a scope that holds those and nothing else of the kind, supplied by whoever loads it.
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3249,6 +3249,21 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a logging module declares output; the module that imports it hands over a narrowed form that can only append to one file.
 - Notes: new, by ruling. It needs the kernel primitive for evaluating with names rebound to supply the complete set of names (noted on "The kernel's primitives are pure and few").
+- Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open.
+- Chapter: Capabilities and primitive functions
+
+#### Only the module being run performs effects when instantiated
+- Decides: instantiating the module a launcher runs performs its top-level effects, in written order. Instantiating any other module performs none: a library holds capabilities inside its functions and uses them when called, and one that must act at startup offers a function for the program to call. A session at a prompt is the module being run.
+- Status: open; ruled 2026-11-13
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is a function of the capabilities it declares; Order of definition carries no meaning; The same program and the same information give the same result
+- Significance: 3 — importing a library never does anything
+- Label: foundational — the order in which modules are instantiated cannot be observed
+- Options recorded: any module may perform top-level effects, in dependency order, with the order among independent modules unspecified (rejected: that order would be observable); a saved program that evaluates at load (rejected: the loader loses control of when effects happen); top-level effects gathered into a function under a reserved name (the maintainer's suggestion; the module as one function is the same idea without the name)
+- Sources: the maintainer's rulings of 2026-11-13 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Use case: a library's author leaves a `print` at its top level; the check phase refutes it, where another platform would print on every import.
+- Notes: new, by ruling. It is checkable as a claim: instantiated with no capabilities, a library's residual has no effect call outside a function body. Registering a metadata field is a kernel primitive, not an effect in this sense.
 - Chapter: Capabilities and primitive functions
 
 #### Loading is three capabilities of rising strength
@@ -3329,7 +3344,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Saved programs and export
 
 #### A saved program is a recorded sequence of interface calls
-- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record of calls on the kernel's interface, and can do nothing else. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
+- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record that constructs values and can do nothing else: it cannot evaluate, fill a cell, set a limit or reach any scope. What it yields is a module function. It names the pure primitives it needs by content hash and never names a capability; a capability reaches it only as an argument when the module is instantiated. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3340,6 +3355,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: the standard language is built once and saved; every later start replays the record.
 - Notes: new, by ruling. "The platform's parser engine ships already built" is its first use.
+- Notes (2026-11-13, after the adversarial review): reworded by ruling, answering issue 25 of the adversarial review (a record could contain any interface call). The first version of the data form, `next/kernel/saved-program.ts`, holds no claim outcomes, no keys and no origins, and defines the data form only; those return with the rulings on identity and on strength.
 - Chapter: Saved programs and export
 
 #### A saved program names what it needs by content hash
@@ -3668,8 +3684,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): hosts are swapped by capturing output and substituting extensions; `fetch` sends a GET with no body.
 - Chapter: The launchers we ship
 
-#### A value that arrives later fills a cell, and a failure fills it with an exception
-- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. A failed request fills it with an exception. A call on a capability the phase lacks stays residual; it does not fail.
+#### A value that arrives later fills a cell
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. The standard language wraps each capability it ships so that a failure becomes an exception; another language may wrap it otherwise. A call on a capability the phase lacks stays residual; it does not fail.
 - Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3682,6 +3698,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a request times out; the program handles the exception and tries a second address.
 - Notes: was "Asynchronous host results arrive as future cells"; "Liveness of host sources declared per source" dissolves into "Completion is totality and liveness".
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
+- Notes (2026-11-13, after the adversarial review): was "A value that arrives later fills a cell, and a failure fills it with an exception"; answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle
