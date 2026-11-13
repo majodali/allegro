@@ -179,7 +179,8 @@ and planning libraries ported at milestones 6 and 7.
 **Taken 2026-11-13**: those of the program plan's §6. The stream's merge
 policy is the gate ruled there.
 
-**Open at the plans' PR**, with defaults taken at the merge:
+**Put at the plans' PR, each default taken** at the merge of PR #197 on
+2026-11-13, where the maintainer wrote "All defaults accepted":
 
 - **A1 — The four terms of §1.** Default: ratified.
 - **A2 — Reserves.** B-197 is the hand-off item of the program plan's
