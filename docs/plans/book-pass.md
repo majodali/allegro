@@ -1391,6 +1391,17 @@ its approval.
   the pilot stream's review of where it stands and of this stream's
   findings; §2.7, §2.8 and §5 describe phase 2 as planned before that
   review and are to be revised with it.
+- **2026-11-13 — an adversarial review of phase 1** (the review
+  session, at the maintainer's request). Four independent reviewers
+  read an extract of the 216 ruled decisions for consistency,
+  feasibility, security and as a newcomer; the review session checked
+  each finding. 45 findings reduce to 31 issues, none ruled, recorded
+  in `docs/records/book-pass/adversarial-review.md` with what each
+  ruling must choose. Five clusters are design work that bears on the
+  plan's revision: expressions read and evaluated again against
+  authority held in them; recursion; what a notation may do to a
+  text; the strength words; identity across evaluations and saved
+  programs.
 
 ## 8. Sessions
 
