@@ -1070,6 +1070,18 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The decision map (B-196, chunk Q1)
+
+B-196 (the rebuild's acceptance side), chunk Q1. `next/decisions.json`
+holds one row per decision of `docs/plans/book-pass-inventory.md`, 231
+in its order, one per line: part, chapter, type, status against the
+present code, held, owning stream (R 141, Q 67, none 23), and the new
+tree's state, unit and cases, all at none. `next/tools/decision-map.ts`
+generates it once, checks it against the inventory and the owner rule,
+and syncs it when the inventory changes. Its tests probe the check
+against known-bad maps. Three npm scripts, `lint:decisions`,
+`test:next` and `typecheck:next`, run in a CI step of their own.
+
 ### 2026-11 — The acceptance stream planned (B-196)
 
 B-196 (the rebuild's acceptance side). Eight chunks: the decision
