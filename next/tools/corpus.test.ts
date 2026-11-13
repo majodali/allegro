@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   pinsOf, pinnedPrograms, deriveSource, initialCorpus, checkCorpus, compareRegistered, syncCorpus,
-  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository, applyOverlay,
+  serializeCorpus, serializeRegistered, testCases, duplicateNames, moduleId, checkRepository, applyOverlay, casesByDecision,
   type Corpus, type RegisteredTest, type RegisteredList, type Case,
 } from "./corpus.js";
 
@@ -204,6 +204,20 @@ test("an overlay classes its cases whole, and refuses an id that is no case or a
     "overlay: pin:tests/a.alg#1 sets expect, which an overlay may not set",
   ]);
   assert.equal(bad.applied, 0);
+});
+
+test("the cases by decision: every listing counted once under its class, in the decisions' order; an unclassed case and an unknown title are left out", () => {
+  const c = good();
+  const [a, b, d] = [c.cases[0], c.cases[1], c.cases[2]];
+  Object.assign(a, { class: "survives", decisions: ["Beta", "Alpha", "Beta"], milestone: 3 });
+  Object.assign(b, { class: "changes", ruling: "Alpha", becomes: "x", decisions: ["Alpha", "Gamma"], milestone: 3 });
+  Object.assign(d, { decisions: ["Alpha"] });
+  const rows = casesByDecision([{ title: "Alpha", owner: "R" }, { title: "Beta", owner: "Q" }, { title: "Delta", owner: "none" }], c);
+  assert.deepEqual(rows, [
+    { title: "Alpha", owner: "R", survives: [a.id], changes: [b.id], detail: [] },
+    { title: "Beta", owner: "Q", survives: [a.id], changes: [], detail: [] },
+    { title: "Delta", owner: "none", survives: [], changes: [], detail: [] },
+  ]);
 });
 
 test("the committed inventory is consistent with the present tree, by a fresh dry listing", () => {
