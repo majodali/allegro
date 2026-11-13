@@ -3051,6 +3051,13 @@ the maintainer at its PR.
     choose. It drafts SY1 so that each row is evidence for one of the
     foundations the review ruled (§5's last column), and asks which
     reading holds before any other SY1 ruling.
+    **Ruled 2026-11-13**, by the maintainer to the orchestrating
+    session: "the instruction to hold off on the pilots was directed
+    only at the book pass, since it was incorporating decisions from
+    this session regarding the pilots. This stream should continue
+    with it's work." SY1 is not held by the book pass's review. The
+    same message opened a review of the approach of both streams;
+    R11 to R18 wait for its outcome.
   - **The rulings it awaits**, each with its recommendation: R11 (one
     library per DSL and one per mapping), R12 (a declared mapping record, not a type value or a
     shared name), R13 (a third library for the cross-model check), R14
