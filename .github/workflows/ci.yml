@@ -59,3 +59,8 @@ jobs:
         env:
           MTOOL_HOME: ${{ runner.temp }}/methodology-tools
         run: npm run test:shards
+      - name: "New tree (B-196): typecheck, tests and the decision map"
+        run: |
+          npm run typecheck:next
+          npm run test:next
+          npm run lint:decisions
