@@ -1072,7 +1072,7 @@ first, directly below this line.
 
 ### 2026-11 — The decision map (B-196, the stream's first chunk)
 
-B-196 (the rebuild's acceptance side), chunk Q1. `next/decisions.json`
+B-196 (the rebuild's acceptance side), chunk Q1 (the decision map). `next/decisions.json`
 holds one row per decision of `docs/plans/book-pass-inventory.md`, 231
 in its order, one per line: part, chapter, type, status against the
 present code, held, owning stream (R 141, Q 67, none 23), and the new
