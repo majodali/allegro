@@ -91,7 +91,7 @@ On `origin/main` at `e399222`, 2026-11-13.
 | Pinned output lines in them and in `basics.alg` | 653 |
 | Of those, the programs the suite runs against their pins, and their pinned lines | 71, of 613 |
 | Tests of the suite, `src/test/` and `src/boundary-tests.ts` | 1,379 |
-| Demo scenes, rungs 1 to 4 | 10 |
+| Demo scenes, rungs 1 to 4 | 11: ten programs and rung 1's prover-loop walkthrough |
 | Libraries, `lib/*.alg` | 17, of 2,765 lines |
 
 **Corrected at Q2, part 1.** The suite registers 1,379 tests, not
@@ -162,7 +162,7 @@ saved-program data form.
 |---|---|---|---|
 | Q1 | **The decision map.** `next/decisions.json`, generated once from the inventory: one row per decision with its part, chapter, type, status against the present code, owning stream, state (none), unit and cases. Its check, `next/tools/decision-map.ts`, run as `npm run lint:decisions`: every decision of the inventory has exactly one row and every row a decision; an owner is R, Q or none; a state other than none names a path that exists. A CI step for the new tree's commands | the check passes on 231 rows; a probe with a row removed fails it | merge on green |
 | Q2 | **The corpus, inventoried and classed.** `next/corpus/cases.json`: every [case](#def-case) with its source, its text and its [class](#def-class); a *changes* case names its ruled decision and states the new result; each case that survives or changes lists the decisions it tests, and the decision map's rows gain them. Its check: every pin and every test of the present tree has exactly one case | the check passes; the counts of §2 are met | merge on green; classes reviewed at their milestone (program plan, P5) |
-| Q3 | **The scenarios.** Each of the ten scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
+| Q3 | **The scenarios.** Each of the eleven scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
 | Q5 | **The first notation and the bootstrap.** The notation's forms, each standing for one kernel expression; an emitter under `next/bootstrap/` that has the present tree's parser read a text in it and writes a saved program in the data form | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
 | Q6 | **The comparison harness.** Under `next/corpus/`: runs a program on the present tree and on the new one and compares by class; reports the cases passing per milestone | its tests on a stub kernel, then on the kernel | merge on green |
@@ -236,3 +236,16 @@ policy is the gate ruled there.
   what its name says, a test registered only inside another test's
   body, a pin compared by some runner other than the two it knows by
   their tests' names, or whether a class or a ruling is right.
+- **2026-11-13 — Q3 drafted: the scenarios.** Eleven files under
+  `next/corpus/scenarios/` and an index, for the maintainer's ruling:
+  one [scenario](#def-scenario) per scene, each with who acts and why,
+  its steps as what the actor does and what the platform must find,
+  its break-it case, what changes by ruling with the decision's title,
+  its open questions, and its program's pinned lines against the steps.
+  The ten programs hold 65 pinned lines and every one is covered by a
+  step. The index states eight changes that touch several scenes, and
+  one question the rulings leave open: whether an effect waits on a
+  claim that a run can never decide. The scenes are eleven, not the ten
+  this plan first said: rung 1's prover loop is a walkthrough with no
+  program. 37 open questions are put, four of them shared by several
+  scenes and asked first.

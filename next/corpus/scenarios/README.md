@@ -69,3 +69,16 @@ The ten programs hold 65 pinned lines. Every pin is covered by a step.
   record".** The planning library's 36 tree walks carry `assume
   terminates`, which today's ledger does not show. Each is on the
   record, and the plan claims of rungs 3 and 4 rest on them.
+
+## One question the scenes share that the rulings leave open
+
+"An effect consumes only values whose claims are decided", read with
+the summaries above: every program that draws the units library has
+undecided claims, the five Quantity laws, and prints quantities. If the
+rule holds an effect back for a claim that a run can never decide, the
+scenes of rungs 2, 3 and 4 print nothing. If it covers only the claims
+a concrete value decides, they print as they do today. The review
+session's adversarial review of phase 1 raises the same point (its PR
+#199, unmerged at this writing). Each scenario's steps say "the run
+prints" on the second reading; a ruling for the first changes every
+such step.

@@ -1070,6 +1070,19 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+
+### 2026-11 — The demo scenes restated as scenarios (B-196, chunk Q3 (the scenarios))
+
+B-196 (the rebuild's acceptance side). Each of the eleven scenes of
+rungs 1 to 4 is restated under `next/corpus/scenarios/` as who acts,
+what they do and what the platform must find, in the words of the ruled
+decisions and with no dependence on exact output. Each names what
+changes by ruling: the strength words in four pinned lines, ten pinned
+lines that read an error value, four break-it cases that print before
+they halt, the verdict's `auto-PE` in place of a proposer. The
+scenarios are the acceptance statement for milestones 5, 6 and 7 of
+the rebuild. No code changed.
+
 ### 2026-11 — The acceptance corpus inventoried (B-196, chunk Q2 (the corpus inventoried and classed), part 1)
 
 B-196 (the rebuild's acceptance side), chunk Q2 (the corpus inventoried and classed), part 1.
