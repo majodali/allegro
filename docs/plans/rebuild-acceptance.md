@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-196
 lane: Q
 merge: merge-on-green
@@ -10,6 +10,10 @@ oracle:
   - npm run lint:docs:check
   - npx tsx scripts/doc-ref-lint.ts
   - npx tsx scripts/analyze/lane-lint.ts --check
+  - npm run lint:decisions
+  - npm run test:next
+  - npm run typecheck:next
+  - npm run lint:corpus
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
@@ -26,11 +30,11 @@ boundary:
 
 # What the rebuilt kernel must pass, and what runs on it — the acceptance stream
 
-> **Status: draft** — written 2026-11-13 by the orchestrating session
-> with the program plan `docs/plans/rebuild.md`, from the maintainer's
-> rulings of that day. Active when the plans' PR merges; chunk Q1's
-> first commit flips the header. The status line and the header's
-> `status` say the same thing.
+> **Status: active** since the merge of PR #197 (2026-11-13) — written
+> that day by the orchestrating session with the program plan
+> `docs/plans/rebuild.md`, from the maintainer's rulings of that day.
+> Chunk Q1 (the decision map) is its first chunk. The status line and
+> the header's `status` say the same thing.
 >
 > **Reader**: the maintainer, and the session that runs the stream.
 > Assumed known: the program plan, whose §1 defines
@@ -85,9 +89,19 @@ On `origin/main` at `e399222`, 2026-11-13.
 |---|---|
 | Demo and test programs, `tests/*.alg` and `demos/*/*.alg` | 73 |
 | Pinned output lines in them and in `basics.alg` | 653 |
-| Tests of the suite, `src/test/` | 1,378 |
+| Of those, the programs the suite runs against their pins, and their pinned lines | 71, of 613 |
+| Tests of the suite, `src/test/` and `src/boundary-tests.ts` | 1,379 |
 | Demo scenes, rungs 1 to 4 | 10 |
 | Libraries, `lib/*.alg` | 17, of 2,765 lines |
+
+**Corrected at Q2, part 1.** The suite registers 1,379 tests, not
+1,378: a full run's total is 1,379, of which one, the IR lint, needs a
+methodology-tools checkout and fails without one; 1,378 was the count
+of tests passing. Two programs carry 40 of the 653 pinned lines and
+the suite does not run them: `tests/grammar-regex.alg` (12) and
+`tests/stdlib.alg` (28). `basics.alg` has no pinned line; the suite
+runs it against output pinned in the tests' own code. The corpus
+therefore holds 613 pins.
 
 **Pins are exact text, and the rulings change text.** Fourteen programs
 use the strength words that the ruling "Four strengths, one
@@ -165,7 +179,8 @@ and planning libraries ported at milestones 6 and 7.
 **Taken 2026-11-13**: those of the program plan's §6. The stream's merge
 policy is the gate ruled there.
 
-**Open at the plans' PR**, with defaults taken at the merge:
+**Put at the plans' PR, each default taken** at the merge of PR #197 on
+2026-11-13, where the maintainer wrote "All defaults accepted":
 
 - **A1 — The four terms of §1.** Default: ratified.
 - **A2 — Reserves.** B-197 is the hand-off item of the program plan's
@@ -180,3 +195,44 @@ policy is the gate ruled there.
 
 - **2026-11-13 — planned.** Written with the program plan on
   `origin/main` at `e399222`. No code changed.
+- **2026-11-13 — Q1 landed.** The decision map `next/decisions.json`,
+  generated from the inventory, and its check
+  `next/tools/decision-map.ts`. The check prints:
+  `decision-map: 231 rows · R 141 · Q 67 · none 23 · state none 231, carried 0, adapted 0, written 0, proved 0 — consistent`.
+  The owner split: Part I, 23 rows, none; Parts II, III and IV, 51, 23
+  and 63 rows, R; Part V, 27 rows, Q; Part VI, 44 rows, of which the 4
+  of "The kernel's interface" are R and 40 are Q. The status against the
+  present code reproduces the inventory's count: 93 settled, 62 partly
+  built, 76 open; 15 rows are held. No entry's `- Chapter:` line
+  disagrees with the heading it sits under; no title appears twice; every
+  entry has a `- Type:` and a `- Status:` line. Oracle, each green:
+  `npm run typecheck:next`, `npm run test:next` (19 tests, among them
+  probes with a row removed, duplicated, orphaned, misowned, out of
+  order, a state with no unit and a unit outside `next/`),
+  `npm run lint:decisions`, `npm run lint:streams`,
+  `npm run lint:docs:check`, `npx tsx scripts/doc-ref-lint.ts`,
+  `npx tsx scripts/analyze/lane-lint.ts --check`, the lane check of the
+  PR's files against lane Q, and
+  `ALLEGRO_TEST_FILTER="tooling|lane|stream" npm test`.
+- **2026-11-13 — Q2, part 1 landed: the corpus inventoried.** The
+  acceptance corpus `next/corpus/cases.json` holds one
+  [case](#def-case) per pin of the 71 programs the suite runs against
+  their pins and one per test the suite registers, every
+  [class](#def-class) null; `next/corpus/registered-tests.json` lists
+  the registrations. Its check, `next/tools/corpus.ts`, run as
+  `npm run lint:corpus`, prints:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 0 (survives 0, changes 0, detail 0) · unclassed 1992 — consistent`.
+  The registered names come from the suite itself, by a dry listing:
+  the suite's index is imported in a child process with its name
+  filter set to a pattern no name matches, so every test registers and
+  no body runs; the listing takes about a second, and matched a full
+  traced run name for name. Two tests of `src/test/types-battery.ts`
+  share a name; the second's id ends in `#2`. The check catches a pin
+  or a test with no case, or with two; a pin case whose pin is gone or
+  whose line or text differs; a test case with no registration; a
+  registered-tests list that differs from the dry listing; cases out of
+  the stable order; and a class, ruling, result, decision or milestone
+  outside the rules of §1 and §5. It cannot catch whether a test does
+  what its name says, a test registered only inside another test's
+  body, a pin compared by some runner other than the two it knows by
+  their tests' names, or whether a class or a ruling is right.
