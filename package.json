@@ -31,7 +31,8 @@
     "lint:decisions": "tsx next/tools/decision-map.ts --check",
     "lint:corpus": "tsx next/tools/corpus.ts --check",
     "test:next": "node --import tsx --test \"next/**/*.test.ts\"",
-    "typecheck:next": "node node_modules/typescript/lib/tsc.js -p next/tools/tsconfig.json"
+    "typecheck:next": "node node_modules/typescript/lib/tsc.js -p next/tools/tsconfig.json",
+    "harness:present": "tsx next/corpus/harness.ts --present"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",
