@@ -26,6 +26,10 @@
 //
 // Who runs it: both sessions of the rebuild. Each edits only its own rows
 // (`owner` R or Q) and moves a row's `state` in the PR that earns the move.
+// A row that `--rename` moved keeps its former titles in `was`. The corpus
+// check (next/tools/corpus.ts) accepts a case that still cites a former
+// title, so a retitle passes the gate before the corpus follows it.
+//
 // A change to the inventory that renames, adds or removes a decision
 // carries the map's `--sync` in the same PR. `--sync` never guesses a
 // rename: a renamed decision shows as one missing row and one orphan row
@@ -181,6 +185,8 @@ export interface Row extends Derived {
   state: State;
   unit: string | null;
   cases: string[];
+  /** The titles this decision had before a rename, oldest first; written by `--sync --rename`. */
+  was?: string[];
 }
 
 export interface DecisionMap { _: string; rows: Row[] }
@@ -202,14 +208,15 @@ export function initialMap(derived: Derived[]): DecisionMap {
   return { _: NOTE, rows: derived.map(freshRow) };
 }
 
-const ROW_KEYS = ["title", "part", "chapter", "type", "present", "held", "owner", "state", "unit", "cases"] as const;
+const ROW_KEYS = ["title", "part", "chapter", "type", "present", "held", "owner", "state", "unit", "cases", "was"] as const;
 
-/** One row as one line of JSON, its fields in the fixed order; `held` only when true. */
+/** One row as one line of JSON, its fields in the fixed order; `held` only when true, `was` only when it names a title. */
 export function serializeRow(row: Row): string {
   const r = row as unknown as Record<string, unknown>;
   const ordered: Record<string, unknown> = {};
   for (const k of ROW_KEYS) {
     if (k === "held" && r.held !== true) continue;
+    if (k === "was" && !(Array.isArray(r.was) && r.was.length > 0)) continue;
     ordered[k] = r[k];
   }
   for (const k of Object.keys(r)) if (!(ROW_KEYS as readonly string[]).includes(k)) ordered[k] = r[k];
@@ -280,6 +287,10 @@ export function checkMap(derived: Derived[], map: unknown, fileExists: (rel: str
       if (r.owner === "none") findings.push(`${label}: state ${state} on a row owned by none`);
     }
     if (!Array.isArray(r.cases) || r.cases.some((c) => typeof c !== "string")) findings.push(`${label}: cases is not a list of strings`);
+    if ("was" in r) {
+      if (!Array.isArray(r.was) || r.was.length === 0 || r.was.some((t) => typeof t !== "string")) findings.push(`${label}: was is not a list of former titles (omit the field when there is none)`);
+      else for (const t of r.was as string[]) if (index.has(t)) findings.push(`${label}: was names "${t}", which is a decision of the inventory now`);
+    }
   });
 
   for (const d of derived) {
@@ -315,6 +326,7 @@ export function syncMap(derived: Derived[], map: DecisionMap, renames: [string, 
     if (!known.has(to)) { errors.push(`rename: "${to}" is not a decision of the inventory`); continue; }
     if (rows.some((r) => r.title === to)) { errors.push(`rename: a row titled "${to}" exists already`); continue; }
     hits[0].title = to;
+    hits[0].was = [...(hits[0].was ?? []), from];
   }
   if (errors.length > 0) return { map, added: [], orphans: [], errors };
 
@@ -334,7 +346,7 @@ export function syncMap(derived: Derived[], map: DecisionMap, renames: [string, 
   for (const d of derived) {
     const existing = byTitle.get(d.title);
     if (existing === undefined) { out.push(freshRow(d)); added.push(d.title); }
-    else for (const r of existing) out.push({ ...d, state: r.state, unit: r.unit, cases: r.cases });
+    else for (const r of existing) out.push({ ...d, state: r.state, unit: r.unit, cases: r.cases, ...(r.was !== undefined && r.was.length > 0 ? { was: r.was } : {}) });
     out.push(...(after.get(d.title) ?? []));
   }
   return { map: { _: map._, rows: out }, added, orphans, errors };
