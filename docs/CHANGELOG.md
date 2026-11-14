@@ -1088,6 +1088,20 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The minimal launcher against the kernel's interface (B-196, chunk Q7 (the minimal launcher), part 1)
+
+B-196 (the rebuild's acceptance side). `next/launch/launcher.ts` runs a
+saved program as "Startup, step by step" has it, as far as milestone 2
+needs: it creates a kernel, checks and loads the record, refuses a
+declared capability the ceiling does not grant, applies the module
+function to its capabilities under a step budget, fills cells whose
+answers arrive and advances, and returns the lines printed and how the
+run ended. `next/launch/output.ts` is the capability `output`, with its
+one part `write`. `npm run launch -- <file>` is the terminal's entry;
+until the kernel stream provides `next/kernel/create.ts` it says that
+no kernel is built yet and exits 2. The 17 tests run on a stand-in
+kernel kept with them.
+
 
 ### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
 
