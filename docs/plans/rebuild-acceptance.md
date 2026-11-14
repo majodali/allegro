@@ -415,8 +415,8 @@ policy is the gate ruled there.
     The search's bound comes from the residual of the plan with its
     choices unknown. A model value's names live in a field of the
     value. The 15 held planning decisions stay the review session's.
-- **2026-11-14 — Q4, part 2 drafted twice: the software system model specified.**
-  `next/models/specs/software-system.md`, for the maintainer's ruling.
+- **2026-11-14 — Q4, part 2: the software system model specified and ruled.**
+  `next/models/specs/software-system.md`.
   The first draft, of 2026-11-13, specified a structural model:
   components, ports, a dependency rule, data entities. The maintainer
   then described the model he has in mind, in a design session, and
@@ -443,9 +443,15 @@ policy is the gate ruled there.
     rebuilt Allegro, the first being milestone 2's run of a saved
     program, and the launcher decomposed one level with its agreement
     claim worked by hand. Four things it could not express are listed.
-  - **Thirteen questions remain**, each with options and a
-    recommendation. The largest: how an activity relates to a plan,
-    since the two models are close at five points.
+  - **Thirteen questions, all ruled 2026-11-14.** Three in the
+    maintainer's words. An activity and a plan stay uncoupled: no
+    mapping reads one as the other until a case needs it, and a
+    generic graph library may serve both without stating a relation.
+    A guarantee the check finds false is a flag, since a goal is a
+    predicate and a guarantee is no claim in the platform's sense; the
+    one claim is that a declared model is well-formed. An interaction
+    is always directed. Of the other ten: "Everything else looks
+    good", so each recommended option is taken.
   - **Carried from the first draft.** The mappings to plans, to code,
     to decisions and between versions, restated over the new elements,
     and the probe's finding: with the wildcard of
