@@ -340,6 +340,24 @@ ready, under a step budget, each waiter once after all it depends on.
 Cells stay opaque handles and all logic is in the kernel's calls. The
 order of effects that become ready together waits on issue 17.
 
+**On PR #207, 2026-11-14.** The maintainer merged the first versions
+of the two contracts: "Everything looks good." Confirmed with it: the
+interface with `advance`; a record that constructs values and binds
+nothing; issue 29, plain data in a cell; what the first version
+leaves out. The kernel stream's remaining chunks are approved
+(`docs/plans/book-pass.md` §2.9 and §5).
+
+**Issue 15, under discussion, 2026-11-14.** The review session
+recommended that a name is declared when something binds it, and that
+a name bound to nothing is a refutation. The maintainer leans the
+other way: "I want Allegro to support using a name before it is
+defined, as in function hoisting in Javascript, nonterminals in
+grammar definitions, or variables in Prolog. Since there are a few
+use cases, and we're supporting it as an extension mechanism, there
+doesn't seem to be a simple rule to govern when an unidentified
+symbol becomes a refutation. I'm not greatly concerned about finding
+misspellings late. This needs more thought." Not ruled.
+
 ## Terms introduced
 
 - **Instantiate**: to call a module's function with its capabilities
