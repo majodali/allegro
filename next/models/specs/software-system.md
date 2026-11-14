@@ -65,7 +65,7 @@
 > - **Foundational claim**: one of the few claims that indicate a model is sound (§6).
 > - **Choreography failure**: a participant that cannot tell which branch of a choice was taken.
 >
-> **Rulings needed** are the eleven questions of §13. Where a section
+> **Rulings needed** are the thirteen questions of §13. Where a section
 > depends on one, it says so and continues under the recommended
 > option.
 
@@ -138,8 +138,8 @@ and its response kept apart, a dialogue left whole. Each is one
 interaction, and may later be refined into an activity (§4).
 
 **Initiator and responder.** The design session says an interaction is
-one-to-one. This document reads it as directed: one endpoint
-initiates, the other responds. In a whole call the content has two
+one-to-one. This document reads it as directed (question 13): one
+endpoint initiates, the other responds. In a whole call the content has two
 parts, what the initiator sends and what the responder returns.
 
 **Content and references.** Content is typed in a domain model's
@@ -306,7 +306,8 @@ and the element that supplies it is the one that needs a validation. A
 refuted guarantee claim carries its counterexample and, under "Nothing
 is a claim until someone makes it", halts: a refutation is never
 softened. "Flagged" covers a goal with no guarantee claim and the parts
-a partial claim leaves out.
+a partial claim leaves out. This is this document's reading (question
+12).
 
 **The claims.** Strengths are the four of "Four strengths, one
 vocabulary". Each row is a claim only when someone makes it.
@@ -647,6 +648,9 @@ Ordered so that a question comes after the ones it depends on.
 | 9 | **A rule the code does not yet meet** | Two edges are known forbidden | (a) The rule carries its known exceptions, a weaker rule stated as such, and the changes mapping claims they only shrink. (b) The whole rule claimed and refuted. (c) Not claimed, a report | (b) halts the project's check while an edge is held; (c) loses the claim over every other edge | **(a)** |
 | 10 | **How code is read** | Imports and the decision map are outside the model | (a) A capability that reads a file's imports, supplied by the configuration as the TypeScript binder is today; claims over its answer are decided and name it; the decision map is read the same way. (b) A parser for the code's language written in Allegro. (c) A list a host script writes, claims over it assumed | (b) is out of reach for TypeScript; (c) puts an unchecked step before the claim | **(a) for host code, (b) for Allegro code** |
 | 11 | **The scope ruled for the second model** | The ruling said "components and data first, UI later"; the design session lists a user interacting with a UI as an interaction kind | (a) A UI interaction is in the model as a kind, and a model of screens stays later. (b) UI interactions later too | (b) leaves users with no interaction kind | **(a)** |
+
+| 12 | **A guarantee claim that is refuted** | The design session says a goal that is not guaranteed is flagged and the model is still valid; it does not say what happens when a guarantee claim is made and the check finds a counterexample | (a) It is a refutation like any other and halts, as §6 states; "flagged" covers a goal nobody claimed and the parts a partial claim leaves out. (b) It is a flag too, and the model stays valid | (b) softens a refutation, against "Nothing is a claim until someone makes it"; (a) means a modeller withdraws or narrows a claim to keep working | **(a)** |
+| 13 | **An interaction's direction** | The design session says one-to-one | (a) Directed: an initiator and a responder, and a whole call has a sent part and a returned part, as §3 reads it. (b) Undirected, with direction a detail that may be undetermined | (b) leaves reachability and choice visibility nothing to follow until the direction is determined | **(a)** |
 
 ## 14. Evidence and limits
 

@@ -1082,15 +1082,18 @@ first, directly below this line.
 
 B-196 (the rebuild's acceptance side).
 `next/models/specs/software-system.md` states the second pilot's model
-against the ruled decisions of the inventory's Part V and the planning
-specification's rulings: two languages, components and data; their
-values and claims; six declared mappings, among them a plan's outcome
-typed by a system model's artifact and a system model mapped to the
-code that realises it; what is left open and how the loop serves it;
-what the model needs of the kernel. The project's own unit structure
-is its first use case and its worked example. It puts nine questions
-to the maintainer and introduces two terms, artifact and remainder.
-Nothing of the model is built. No code changed.
+as the maintainer described it in a design session: system
+participants (users by role, components, external systems), activities
+made of one-to-one interactions toward a goal, and domain models that
+supply the language of content and goals. A component is decomposed
+into interfaces, subcomponents and internal activities, an interaction
+is refined into an activity, and modelling may stop at any level. A
+goal is a description; a guarantee is a claim, decided against the
+model's rules and constraints. A few foundational claims make a model
+sound. The first example is Allegro as the new tree rebuilds it. A
+first draft, a structural model of components and data, is replaced.
+Thirteen questions are put to the maintainer. Nothing of the model is
+built. No code changed.
 
 ### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
 

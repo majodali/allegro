@@ -415,30 +415,41 @@ policy is the gate ruled there.
     The search's bound comes from the residual of the plan with its
     choices unknown. A model value's names live in a field of the
     value. The 15 held planning decisions stay the review session's.
-- **2026-11-13 — Q4, part 2 drafted: the software system model specified.**
+- **2026-11-14 — Q4, part 2 drafted twice: the software system model specified.**
   `next/models/specs/software-system.md`, for the maintainer's ruling.
-  Nothing of this model is built; its evidence is the measurements of
-  the planning-loop plan's §2b, one library-only probe, the project's
-  own structure and the ruled decisions. It builds on the planning
-  specification's thirteen rulings and asks none of them again. Five
-  use cases, the first the project itself: its units, their permitted
-  dependencies and the decisions each holds, as model values the
-  platform checks. Two languages, components and data, each a library;
-  the values and the claims of each. Six mappings, each with its kind,
-  its claim and who checks it: components to data twice, plans to a
-  system model, a system model to code, decisions to a system model,
-  and a system model to its next version. The plan mapping is worked
-  on three units. An artifact no plan is assigned is a second kind of
-  unknown, with the catalog remainder's form. Nine needs of the
-  kernel, each with its owning decision and the adversarial review's
-  issue that leaves it open. A table of the Part V decisions with what
-  would test each, six of which no case tests today. Nine questions,
-  each with options and a recommendation. Two terms are new: artifact
-  and remainder.
-  - **A finding about the present tree, from the probe.** With the
-    wildcard of `scripts/analyze/units.json` read as every unit, the
-    permitted relation has a cycle through `pipeline`, `introspect`
-    and `cli`. The host script checks edges and never the relation.
-    The 43 unit-to-unit edges of the code have no cycle. The tree is
-    frozen, so nothing changes; the specification keeps the rule and
-    acyclicity as two claims.
+  The first draft, of 2026-11-13, specified a structural model:
+  components, ports, a dependency rule, data entities. The maintainer
+  then described the model he has in mind, in a design session, and
+  the second draft states it. Participants are users by role, system
+  components and external systems. An activity is a set of one-to-one
+  interactions toward a goal, with choices and loops, ordered by shared
+  content and by explicit constraints, concurrent where unordered. A
+  component is decomposed into interfaces, subcomponents and internal
+  activities; an interaction is refined into an activity; modelling
+  stops at any level. Domain models supply the language of content and
+  goals and add attributes to elements. A goal is a description owned
+  by the initiating participant, and a guarantee is a claim someone
+  makes. The earlier partial use of the model is the chapter
+  `docs/book/actors-and-activities.md`.
+  - **Ruled in the session, 2026-11-14.** Six additions: valid and
+    sound as two levels; a reachability claim; a flag on concurrent
+    writes to one stateful component; a partial guarantee as clauses
+    with their own strengths; quantitative attributes combined along an
+    activity; an intermediary in a refinement only if declared at the
+    enclosing level. The example is Allegro as the `next/` tree. The
+    term stays "participant", written "system participant" where the
+    vision's sense is near.
+  - **The example.** Eight participants and three activities of the
+    rebuilt Allegro, the first being milestone 2's run of a saved
+    program, and the launcher decomposed one level with its agreement
+    claim worked by hand. Four things it could not express are listed.
+  - **Thirteen questions remain**, each with options and a
+    recommendation. The largest: how an activity relates to a plan,
+    since the two models are close at five points.
+  - **Carried from the first draft.** The mappings to plans, to code,
+    to decisions and between versions, restated over the new elements,
+    and the probe's finding: with the wildcard of
+    `scripts/analyze/units.json` read as every unit, the permitted
+    relation has a cycle through `pipeline`, `introspect` and `cli`,
+    while the code's 43 unit-to-unit edges have none. The tree is
+    frozen, so nothing changes.
