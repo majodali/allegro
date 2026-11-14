@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-13 — The kernel's interface and the saved-program data
+  form, first versions (K1).** The kernel stream of the rebuild
+  program begins. `next/kernel/interface.ts` states what host code can
+  ask of a kernel: constructing the seven kinds of value, scopes,
+  binding, cells, evaluation under a step budget, and reading results.
+  `next/kernel/saved-program.ts` defines the data form of a saved
+  program, with its check and its loader: a record that constructs
+  values and nothing else, and yields a module function. Two rulings
+  made them possible: a module is a function of what it declares, and
+  only the module being run performs effects when instantiated. Left
+  for the second versions: restored outcomes, keys, origins.
 - **2026-11-13 — An adversarial review of phase 1's decisions.** Four
   independent reviewers attacked the 216 ruled decisions of
   `docs/plans/book-pass-inventory.md` for consistency, feasibility and

@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -20,6 +20,10 @@ boundary:
   - docs/plans/book-pass-briefs.md
   - docs/plans/book-pass.md
   - docs/plans/book-pass-inventory.md
+  - next/kernel/**
+  - next/prims/**
+  - next/ext/**
+  - next/decisions.json
   - scripts/doc-lint-baseline.json
 ---
 
@@ -538,6 +542,7 @@ are:
 | DR4 (the decision review, Part IV) | 1 | Part IV, Allegro Standard: chapters 16 to 25 | as DR1; likely two or three PRs |
 | DR5 (the decision review, Part V) | 1 | Part V, Domains built on the kernel: chapters 26 to 29 | as DR1 |
 | DR6 (the decision review, Part VI) | 1 | Part VI, Building and running programs: chapters 30 to 33 | as DR1 |
+| K1 (the kernel stream's first chunk) | rebuild | the kernel's interface file and the saved-program data form, first versions, under `next/kernel/` | the two contracts of `docs/plans/rebuild.md` §8, which both streams build against |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1402,6 +1407,17 @@ its approval.
   authority held in them; recursion; what a notation may do to a
   text; the strength words; identity across evaluations and saved
   programs.
+- **2026-11-13 — the kernel stream begins; K1** (the review session).
+  `docs/plans/rebuild.md` makes this session the kernel stream of the
+  rebuild program and this file its plan. Its first chunk, K1, is
+  delivered: the first versions of the kernel's interface and of the
+  saved-program data form, under `next/kernel/`, after the maintainer
+  ruled issue 25 of the adversarial review. The header's boundary
+  gains the kernel stream's paths. The revision of this plan for the
+  kernel stream (its chunks after K1, and what becomes of phase 2) is
+  owed and is the maintainer's to gate; until then §2.7, §2.8 and the
+  chapter rows of §5 describe a phase 2 that the rebuild program has
+  replaced.
 
 ## 8. Sessions
 
