@@ -1,10 +1,9 @@
 # The software system model: a model specification
 
-> **Status: draft, 2026-11-13.** For the maintainer's ruling. Nothing of
-> this model is built. Its evidence is the measurements of
-> `docs/plans/planning-loop.md` §2b, one library-only probe made for
-> this document (§12), the project's own structure, and the ruled
-> decisions.
+> **Status: draft, second version, 2026-11-14.** For the maintainer's
+> ruling. The first draft specified a structural model of components,
+> ports and data; this one states the maintainer's model from the
+> design session of 2026-11-13. Nothing of the model is built.
 >
 > **Reader.** The maintainer and the review session. The reader knows the
 > ruled decisions of the inventory, Parts I to VI; the program plan
@@ -12,27 +11,52 @@
 > [model specification](../../../docs/plans/rebuild-acceptance.md#def-model-specification);
 > and the planning specification `next/models/specs/planning.md` with
 > its thirteen rulings, which this document builds on and does not
-> restate. Two things are ruled and not reopened here: the scope of the
-> ruling on the second model (`docs/plans/planning-loop.md` §6:
-> components and data first, UI later, the first composition point a
-> plan's outcome typed by a system model's artifact, the artifacts no
-> plan produces each an obligation for the same loop), and the planning
-> specification's rulings.
+> restate. The earlier partial use of the model is the draft chapter
+> `docs/book/actors-and-activities.md`, which says "actor" where this
+> model says "participant".
 >
-> **Terms.** Component, port, interface, dependency, entity, field,
-> relation and constraint keep their ordinary software meanings, made
-> exact by the tables of §3. The planning terms keep the planning
-> specification's meanings. Two terms are new. An **artifact** is a type
-> value that a system model declares, whose values are things the
-> system's parts hand to each other or deliver (§3, question 1). A
-> **remainder** is a cell at the end of a list inside a model value,
-> filled by one entry and a new remainder; the planning specification's
-> catalog remainder is one (§6).
+> **The source of truth.** The maintainer's description in the design
+> session, in two parts: a sketch and clarifications. What it says is
+> marked *maintainer* in the tables below. What the orchestrating
+> session proposed in that discussion, and every choice of this
+> document, is a numbered question of §13 with the proposal as the
+> recommended option.
 >
-> **Rulings** are numbered in §11. Where a section depends on one, it
-> says so and continues under the recommended option. §9 lists the open
-> issues of the adversarial review (`docs/records/book-pass/adversarial-review.md`)
-> that the model rests on.
+> **Terms.** This document defines them, one sentence each.
+>
+> - **System model**: a value that describes one system by its participants, activities and domain models.
+> - **Participant**: an element that takes part in interactions: a user, a system component or an external system.
+> - **User**: a participant that is a person or an agent acting in a role, identified by its **user role**, a name and a description.
+> - **System component** (component): a participant that is part of the system; at the top level, a whole application or service reachable by other participants.
+> - **External system**: a participant outside the system that the system interacts with.
+> - **Interface**: a port of a component, where interactions from outside it connect; distinct from the standard language's interface type (question 1).
+> - **Endpoint**: a participant at the top level, or an interface or a subcomponent inside a component.
+> - **Interaction**: a one-to-one exchange between two endpoints, its **initiator** and its **responder**, at the granularity the modeller chooses.
+> - **Content**: what an interaction carries, typed in a domain model's language.
+> - **Reference**: content that designates a participant or a component instance, so that its holder can interact with it.
+> - **Result**: one of the named ways an interaction can end, normally or with a failure such as a timeout.
+> - **Activity**: a set of related interactions toward a goal, with choices and loops.
+> - **Dependency**: the order between an activity's steps, derived from shared content, results and **ordering constraints** (pairs the modeller orders); two steps neither of which depends on the other are **concurrent**.
+> - **Choice**: a point of an activity where one named participant selects one of several branches.
+> - **Loop**: a part of an activity that may be repeated.
+> - **Subcomponent** and **internal activity**: a component inside another, and an activity between a component's interfaces and subcomponents.
+> - **Parameter mapping**: the function from an interaction's content to an interface's or a call's parameters, which may transform it.
+> - **State**: what a stateful component holds across interactions.
+> - **Goal**: a claim over domain facts that belongs to an activity's initiating participant.
+> - **Guarantee claim**: the modeller's claim that the system as defined guarantees a goal, fully or in part.
+> - **Validation**: a formal check, partial or full, that an element applies to content or state.
+> - **Domain model**: a model of the facts relevant to the problem and solution space; it supplies the language of content and goals.
+> - **Attribute**: a fact a domain model attaches to an element, such as a latency or a security level.
+> - **Instance annotation**: the mark on an element saying whether it has one instance per system instance, or many.
+> - **Refined**, **decomposed**, **determined**: an interaction replaced in detail by an activity (distinct from the standard language's refinement type, question 1); a component given interfaces, subcomponents and internal activities; a detail left open given a value.
+> - **Realisation**: what an element is where modelling stops: a description, a formal definition, or code.
+> - **Valid**, **sound**, **flagged**: a model that is well-formed; one whose foundational claims are decided; an element or goal a report names, the model still valid (question 5).
+> - **Foundational claim**: one of the few claims that indicate a model is sound (question 6).
+> - **Choreography failure**: a participant that cannot tell which branch of a choice was taken.
+>
+> **Rulings needed** are the eighteen questions of §13. Where a section
+> depends on one, it says so and continues under the recommended
+> option.
 
 ## 1. What the model is for
 
@@ -40,537 +64,601 @@ Five use cases. Every later section names the ones it serves.
 
 | # | Who | What they have | What they want from the platform |
 |---|---|---|---|
-| 1 | The project itself: the maintainer and the two sessions of the rebuild | 35 units, each with the units it may depend on, and 34 source files assigned to them, 5 of them mixed (`scripts/analyze/units.json`); 231 decisions, each with a column for the unit that realises it (`next/decisions.json`); two host scripts that check them (`scripts/analyze/index.ts units`, `next/tools/decision-map.ts`) | The units, their permitted dependencies and the decisions each holds stated as model values. The dependency rule decided over the import edges of the code, each forbidden edge named (today: `evaluator` to `effects` and to `refinements`). Each decision with exactly one unit once it has one. The platform does this in place of the host scripts; reading the code is an effect |
-| 2 | A team describing a service (`docs/plans/planning-loop.md` §2b.2's probe) | Components with what each provides and requires (`Shop` provides `Order`; `Billing` requires `Order` and provides `Invoice`), and the records those artifacts carry | Every required artifact provided once, a missing provider named ("`Order`, which `Billing` requires, is provided by no component"). Every data type a component uses resolved to an entity of the data model. The data model well-formed. A finding that spans the two models names both |
-| 3 | The project delivering its own system (`docs/plans/rebuild.md` §5: milestones whose chunks deliver units under `next/`; the planning specification's use case 5) | A system model as in use case 1, and plans whose outcomes are realised components | The components no plan delivers listed as obligations. Proposals checked as for an open plan, and a record of who proposed each |
-| 4 | An operations designer with a business process (§2b.4's probe: the plan `Fulfil` delivering `Invoice` to the system `Shop`) | A plan, and a system that takes artifacts from outside | The artifacts the system takes in that no plan produces listed, and answered by the planning specification's loop |
-| 5 | A maintainer evolving the model (`scripts/analyze/units-baseline.json`; the project's rule that a ratchet baseline may only fall) | A rule the code does not yet meet, with its known exceptions, and a new version of the model | The new version related to the old, with the claim that the known exceptions only shrink |
+| 1 | The project describing itself (§10; `scripts/analyze/units.json`, `next/decisions.json`) | A platform with users, a launcher, a kernel, extensions and tools; units of code and decisions assigned to them | The platform's participants and activities as a model value, refined as far as the rebuild has determined them, related to the code and the decisions by declared mappings. The first example |
+| 2 | A team describing a service, from broad strokes to detail | User roles, the service, the external systems it uses, and the activities between them, each with a goal | To start at the top level with informal descriptions, decompose and refine where details are known, and leave the rest open. A valid model at every step |
+| 3 | A designer asking what a design guarantees | A model with goals and rules, constraints and validations on its elements | Which goals the system as defined guarantees, fully or in part, at what strength; for each goal that falls short, the element that needs a validation; choreography failures named |
+| 4 | A system delivered by plans (`docs/plans/rebuild.md` §5; the planning specification's use case 5) | A system model, and plans whose outcomes are elements of it realised | The elements no plan delivers listed as obligations, answered by the planning specification's loop, with a record of who proposed each answer |
+| 5 | A maintainer evolving the model (`scripts/analyze/units-baseline.json`) | A model, a new version of it, and a rule the code does not yet meet | The new version related to the old, with claims about what it preserves: goals guaranteed stay guaranteed, known exceptions only shrink |
 
-Use cases 3 and 4 differ in what an artifact is; question 1 asks
-which the model supports.
-
-## 2. The two languages and why two
-
-Serves use cases 1 to 5.
-
-**The components language** states what parts a system has and how
-they may depend on each other. A component provides and requires
-artifacts and interfaces through ports. A dependency is an edge from
-one component to another. A dependency rule says which edges are
-permitted. Use case 1's units are this language alone: units, their
-permitted dependencies, and edges read from code.
-
-**The data language** states what information a system holds. An
-entity is a record type with named, typed fields. A field typed by
-another entity is a relation. A constraint is a predicate over an
-entity's values. Use case 2's records are this language.
-
-**Why two models.** Under "A paradigm is a library", each
-language is an extension: a meta-model and its library. Under "Two
-models relate only through a declared mapping", what relates a
-component to an entity (it reads it, owns it, carries it on a port) is
-a mapping value, declared and checked, and neither meta-model names
-the other. Each is useful alone: use case 1 has no data, and a data
-model without components is a schema. §2b.2 of
-`docs/plans/planning-loop.md` measured what one shared namespace costs
-two libraries: a second library's `Finding` was built by the first
-library's check. Question 2 asks whether each language and each
-mapping is its own library.
-
-**Left out for now.**
-
-| Left out | What it would state | What would bring it in |
-|---|---|---|
-| UI | Screens and what each shows of the data | The ruling on the second model defers it. A use case with screens, and a mapping from the UI model to the data model |
-| Behaviour | What a component does over time: its operations' effects, protocols, order of calls | Running a model, which the planning specification's question 8 left out for plans; a use case in which a component's behaviour is checked |
-| Deployment | Where components run and what each target supplies | "A target platform is a model, and export is a transformation into it": deployment would be a mapping from the components model to a target platform's model, when a use case exports a system |
-
-## 3. The values
+## 2. The elements
 
 Serves use cases 1 to 5. Under "A model is a value", a system model is
-a value built from its meta-model, and ordinary functions construct,
-inspect, transform and compare it. A model value's names are fields of
-the value, as the planning specification's question 13 ruled. The mark
-is one of: a ruled decision, named; a section of the planning
-specification; *open*, with its question. The constructors' names
-are placeholders for the rebuild to choose.
+a value built from the system model's meta-model, and ordinary
+functions construct, inspect, transform and compare it. A model
+value's names are fields of the value, as the planning specification's
+question 13 ruled. Constructors are placeholders for the rebuild to
+choose. The mark is *maintainer* (the design session); a ruled
+decision, named; or *open*, with its question.
 
-**Components.**
-
-| Value | What it holds | Constructs it | Mark |
+| Element | What it holds | Constructs it | Mark |
 |---|---|---|---|
-| System | A name, its components, the artifacts it declares, the artifacts it takes from outside (its inputs), and its dependency rule | `system(name, components, rule)` | "A model is a value"; the name a field, planning §11 question 13 |
-| Component | A name, its ports, its declared dependencies if any, and its realisation artifact | `component(name, ports)` | "A model is a value". The realisation artifact is *open*, question 1 |
-| Port | Provides or requires, and a type value: an artifact or an interface | `provides(T)`, `requires(T)` | Planning §11 question 1: a port's type is a type value, compared by identity, possibly another model's |
-| Artifact | A named type value the system declares | `artifact(name)`, or a type of another model through a mapping (§5) | "Types are values that constrain values"; "One meta-type with an optional name". Which artifacts exist is *open*, question 1 |
-| Interface | A type that declares member symbols and is never instantiated | the type extension's construction | "An interface is a type drawn from, not instantiated"; satisfied by conformance under "Members are keyed by symbol and conformance is membership" |
-| Dependency | An edge from one component to another, and where it came from: derived from a required port and its provider, declared by the author, or read from code through the realisation mapping | derived by the library; `depends(a, b)`; the code reader (§5) | Derived edges follow the planning specification's wiring, §3. Declared edges follow "Each decision lives in one replaceable unit of code" ("a unit depends only on units it names"). Read edges depend on question 7 |
-| Dependency rule | A predicate over pairs of components. The shipped form: for each component, the components it may depend on, closed transitively, or every component | `permits(component, [names])`, `permits_any(component)` | "Claims are evaluated like everything else": the rule is an expression. The two forms are those of `scripts/analyze/units.json`. Exceptions are *open*, question 8 |
-| Finding | Which claim failed, the values it names, and the predicate's explanation | the checks | Planning §2, the row "Finding": the explanation refers to model values and is rendered by the library that owns each |
+| System model | Its participants, its top-level activities, the domain models it uses, the claims made of it | `system(name, participants, activities, domains)` | *maintainer*; "A model is a value" |
+| User | A user role: its name and description; attributes; rules and constraints | `user(role)` | *maintainer*. A type with many instances, "effectively a role or category" |
+| System component | Interfaces, subcomponents, internal activities; whether it is stateful, and its state; its realisation | `component(name, interfaces, parts, activities)` | *maintainer*. The form of a change of state is *open*, question 6 |
+| External system | Its description, attributes, rules and constraints; interfaces where the modeller gives them | `external(name)` | *maintainer* for the kind. Interfaces on an external system are *open*, question 6 |
+| Interface | Its parameters and what it returns, typed in a domain model; the kinds of interaction it accepts | `port(name, params, returns)` | *maintainer* ("Interfaces or ports") |
+| Interaction | Initiator and responder; content; kind, synchrony and locality, each possibly undetermined; constraints on content; its results; a parameter mapping where an endpoint is an interface; a refinement, possibly absent | `interact(from, to, content)` | *maintainer*. Initiator and responder are this document's reading (§3) |
+| Activity | Its initiating participant, its goal, its interactions, ordering constraints, choices and loops | `activity(name, by, goal, steps)` | *maintainer*. What it is as a value is stated in §3 |
+| Ordering constraint | A pair of interactions, the first before the second | `before(i, j)` | *maintainer* ("explicit ordering constraints are necessary") |
+| Choice | The participant that makes it; its branches, each a set of steps | `choice(by, branches)` | *maintainer* ("made by a specific participant") |
+| Loop | Its body; the participant whose choice repeats or ends it | `loop(by, body)` | *maintainer* for loops; that participant's choice is *open*, question 9 |
+| Result | Its name; normal or failure | `ends(name)`, `fails(name)` | *maintainer* |
+| Reference | A designation of a participant or of a component instance, carried as content | a content field typed by a participant | *maintainer*; "Authority is an unforgeable value" for what holding one means in code |
+| Parameter mapping | A function from content to parameters, possibly transforming them | an ordinary function | *maintainer*; "A typed function claims its parameter types on entry and its return type on exit" |
+| Goal | Its description; its predicate over domain facts, possibly absent; its owner | `goal(owner, description, holds)` | *maintainer* |
+| Guarantee claim | A goal, and full or the parts claimed | `guarantees(goal, parts)` | *maintainer*. What "partially" means is *open*, question 8 |
+| Validation | A predicate an element applies to content or state | a constraint on the element | *maintainer* |
+| Domain model | Types, facts, constraints and attributes | the domain model's own library | *maintainer*; its relation to the system model is *open*, question 3 |
+| Attribute | A field a domain model adds to elements | the domain model's library | *maintainer*; as a metadata field with a combining rule, *open*, question 4 |
+| Instance annotation | One per system instance, or many | a field of every element | *maintainer* |
+| Realisation | A description only; a formal definition; code | §4 | *maintainer*; code through a mapping, §8 |
 
-A component carries no layer. Under "Each decision lives in one
-replaceable unit of code", a layer is to be done away with; a grouping
-of components that a reader wants is a view, one of the candidate
-mapping kinds.
+**Every element has two parts.** An informal description, written by
+the modeller and read by people. A formal part: attributes, rules and
+constraints, each an expression in a domain model's language. Either
+part may be all there is. A claim that rests on a description is
+assumed (question 8).
 
-**What an artifact is.** An artifact is a type value. The system model
-declares it, gives it a name, and uses it as a port's type. The plan
-mapping types a plan's outcome by it (planning §11 question 1). Two
-kinds appear in the use cases. An *interface artifact* is a thing one
-component hands another, such as `Order` (use cases 2 and 4). A
-*realisation artifact* is a component realised, such as the unit
-`symbol` written (use case 3); its values are what the realisation
-mapping of §5 points to. Question 1 asks whether the model has one kind
-or both; the recommendation is both.
+**Every element is a type.** A user is a type with potentially many
+instances. A top-level component is likely a singleton in each
+instance of the system. The instance annotation records which. This
+document reads an instance of an activity or an interaction as one
+occurrence of it in a running instance of the system, so the
+annotation applies to every element.
 
-**Data.**
+## 3. Interactions and activities
 
-| Value | What it holds | Constructs it | Mark |
-|---|---|---|---|
-| Data model | A name and its entities | `data_model(name, entities)` | "A model is a value" |
-| Entity | A named record type: its fields and its invariant | `entity(name, fields)` | "Types are values that constrain values"; "One meta-type with an optional name" |
-| Field | A name and a type value: a core type of the standard language or an entity | `field(name, T)` | Planning §11 question 1, applied to fields |
-| Relation | A field whose type is another entity of the model | a field typed by an entity | "Types are values that constrain values". Cardinality is left out: no use case asks for it |
-| Constraint | A predicate over an entity's values, its refusal explained in the model's words | `entity_where(name, fields, holds)` | "Invariants are refinements"; "Constructing a refined value claims its predicate"; "A predicate can explain its refusal" |
-| Key | The fields that identify a value among a collection of the entity's values | none yet | *Open*, question 9 |
+Serves use cases 2 and 3.
 
-## 4. The claims
+**Granularity.** An interaction is modelled at the granularity that is
+clearest: a one-way transfer, a whole call with its answer, a request
+and its response kept apart, a dialogue left whole. Each is one
+interaction, and may later be refined into an activity (§4).
 
-Serves use cases 1 to 5. Under "Nothing is a claim until someone makes
-it", each row is a claim only when its author makes it. Declaring a
-system with a dependency rule claims the rule over its graph; declaring
-a mapping claims the mapping's own claims (§5). A model built through
-the library and bound with no claim gets a report. Strengths are the
-four of "Four strengths, one vocabulary".
+**Initiator and responder.** The design session says an interaction is
+one-to-one. This document reads it as directed: one endpoint
+initiates, the other responds. In a whole call the content has two
+parts, what the initiator sends and what the responder returns.
 
-| Claim | Who makes it | What deciding it takes | Possible outcomes | Strength |
-|---|---|---|---|---|
-| Every dependency is permitted by the rule | The system's author | Evaluating the rule over each edge of a finite graph. For edges read from code, the reading is an effect (§5) | True; refuted, naming each forbidden edge. The worked case: 43 unit-to-unit edges of the present tree, 2 refuted, `evaluator` to `effects` and to `refinements` (§12) | Decided over declared and derived edges. Over read edges, decided and naming the capability that read them, under "The kernel trusts only what it has evaluated" |
-| The dependencies are acyclic | The system's author | Evaluating over the graph of actual dependencies | True; refuted, naming the components on a cycle | Decided, as above |
-| Every required port has exactly one provider in its scope | The system's author | Evaluating the wiring, as the planning specification's §3 does for inputs | True; refuted, naming the port and its component, or the providers of an ambiguous one | Decided |
-| A provided type satisfies the interface it is wired to | The system's author | Conformance by member symbols, under "Members are keyed by symbol and conformance is membership" | True; refuted, naming the member symbols missing | Decided |
-| The data model is well-formed: field names distinct, every field typed by a type value, every relation naming an entity of the model | The data model's author | Evaluating over the model | True; refuted, naming the field | Decided |
-| A value satisfies its entity's constraint | Whoever constructs the value, under "Constructing a refined value claims its predicate" | Evaluating the predicate at construction | True; refuted, with the predicate's explanation | Decided |
-| Every use of a data type by a component resolves to an entity of the related data model | The author of the components-to-data mapping | Evaluating each pair of the mapping (§5) | True; refuted, naming the component, the type and both models | Decided |
-| Every entity has one owner, and only its owner writes it | The same author, when the author claims it | As above | True; refuted, naming the entity and its writers; a report when unclaimed | Decided when claimed |
-| Every decision with a unit has exactly one | The author of the decisions-to-units mapping | Evaluating the mapping. That the unit's path exists is an effect | True; refuted, naming the decision | Decided; the path's existence decided and naming the capability |
-| Every file has a component | The author of the realisation mapping | Listing the files: an effect | True; refuted, naming the file | Decided and naming the capability |
-| Every artifact in the mapping's scope is produced by a mapped plan | The author of the plan mapping | The plans' claims under the mapping's reading (§5, §6) | True; undecided while a remainder waits | Undecided, then decided |
-| The new version's exceptions are among the old version's | The author of a change (use case 5) | Evaluating over the two versions | True; refuted, naming the new exception | Decided |
-| The library's walks over a graph terminate | The library's author | A decrease that "Termination by bounded decrease" does not recognise (below) | Assumed and named until recognised | Assumed today |
+**Content and references.** Content is typed in a domain model's
+language and carries constraints there. It may include references to
+participants: a notification about a customer can lead to a phone call
+with that customer. It may include references to components, such as
+a stateful entity component the receiver then interacts with.
 
-**Recursion over a graph that may have cycles.** A component graph can
-have a cycle; the claim of acyclicity exists because the author may be
-wrong. A check that follows edges by plain recursion, "`b` is
-permitted from `a` when `a` lists `b` or a unit `a` lists permits
-`b`", cannot end on a cyclic rule: it reaches the same pair again.
-That version was not run. The probe of §12 ends because
-its walk carries the set of components already visited, on the 35
-units of `scripts/analyze/units.json` and on a copy with a cycle
-added. The walk's measure is the number of components not yet
-visited, which falls at every call. "Termination by bounded decrease"
-recognises only an argument of the form `param - K` with a
-non-negative bound, so the claim that the walk terminates is assumed
-and named, as the planning walks' is (planning §3). The adversarial
-review's issue 5 says why that matters: under "A recursive call is
-evaluated once for each state of knowledge", a claim at a recursive
-call is assumed at the inner call and decided on the body, so a
-reachability check written without the visited set could record a
-cycle's answer as decided. The model therefore needs its walks
-decided by a decrease over a finite set (§9). The review's issue 6
-applies too: the visited set grows at each call, so no state of
-knowledge recurs and only the decrease ends the walk. §2b.3 of
-`docs/plans/planning-loop.md` measured the present tree's limits on
-such walks (a recursive binding beside a caller of the planning check
-stalls the load; a self-applied walk exhausts the host stack at depth
-3). They are cases for the rebuilt kernel's recursion design.
+**Kinds and undetermined details.** An interaction's kind (a user
+using a UI, an HTTP request and response, a service call, an event
+notification, or a kind a domain model adds), its synchrony and its
+locality are three fields. Each may be stated or left undetermined
+(§7).
 
-**A finding about the worked case.** With `units.json`'s "any" read as
-every unit, the permission relation has a cycle: `pipeline` may depend
-on every unit, and `introspect` and `cli` depend on `pipeline`. The
-host script checks only edges and never the relation (`reachable` in
-`scripts/analyze/index.ts`). The 43 actual unit-to-unit edges have no
-cycle. The model keeps the two claims apart: the rule is a predicate,
-and acyclicity is claimed of actual dependencies.
+**Results and failures.** An interaction declares its results: its
+normal end and the failures it can end with, such as a timeout or a
+failed content constraint. A failure can also be communicated by an
+interaction, as an error or a validation failure sent as content. A
+failure nobody modelled, such as a service outage, is handled by the
+element that detects it, which initiates an activity to notify or
+remediate (question 12). Broadcast is modelled with a bus component or
+similar.
 
-## 5. The mappings
+**An activity as a value.** It holds its name and description; its
+initiating participant (question 10); its goal (§6); its steps, which
+are interactions, choices and loops; its explicit ordering
+constraints, pairs of steps; and constraints over its content.
 
-Serves use cases 1 to 5. Under "Two models relate only through a
-declared mapping", "A mapping between models is itself a checked
-value" and "A transformation is a model", every relation this model
-takes part in is one of the values below. The kinds are the
-inventory's candidates: one model's values typed by another's; a claim
-that spans two models; a translation with claims about what it
-preserves; one model as a more detailed version of another; a view of
-part of a model. A mapping's reading, where it has one, is defined by
-its library (question 3).
+Its **dependency relation** is derived. Step *j* depends directly on
+step *i* when one of three holds:
 
-| Mapping | Models | Kind | What it maps | What is claimed, and who checks | Total? |
-|---|---|---|---|---|---|
-| Carries | Components to data | One model's values typed by another's | Each interface artifact whose values are data, to an entity | The artifact is the components model's; the entity is the data model's; the port's type is the entity's type value by identity. The mapping's author claims it; evaluation decides it | Partial: a realisation artifact or an interface of operations carries no entity |
-| Uses | Components to data | A claim that spans two models | Pairs of a component and an entity, each with a mode: owns, reads or writes | Every pair names a component and an entity of the two models; when claimed, one owner per entity and writes by the owner only. Decided by evaluation | Partial on components; total on entities when ownership is claimed |
-| Delivers | Plans to a system model | One model's values typed by another's, and a claim that spans two models | Plan outcomes to artifacts; a scope of artifacts the plans must produce. Its reading: each mapped plan as an open plan with its mapped artifacts among its declared outcomes (§2b.4) | Each artifact is the system's; each outcome's type is that artifact by identity; every artifact in scope is produced. The mapping's author claims it; decided, or undecided while a remainder waits (§6) | Partial by design: an artifact in scope that no plan produces is an obligation |
-| Realises | System model to code | One model as a more detailed version of another | Components to files, a mixed file to several components (`units.json`'s `files`) | Without reading files: every component named is the model's, every file appears once. With reading, an effect: every file has a component, and every import edge between files, mapped to components, is permitted by the rule. Decided, naming the capability that read the files | Claimed total on files; partial on components (a unit not yet written) |
-| Holds | Decisions to a system model | A claim that spans two models | Each decision to the component that realises it (`next/decisions.json`'s `unit`) | Each decision with a unit has exactly one, under "Each decision lives in one replaceable unit of code". Decided; the unit's path existing is an effect. Depends on question 6 | Partial while a decision's state is none, as the decision map's own check allows |
-| Changes | A system model to its next version | "A change to a model is a mapping from the old one" | Each component, rule and exception of the old to the new | The exceptions of the new are among the old's (use case 5). Decided | Total |
+1. *Shared content.* *i* and *j* involve a common participant *p*, and
+   content that *p* supplies to *j* is, or is computed from, content
+   *p* sent or received in *i*. This is this document's reading of
+   "share content with subsequent Interactions involving one of the
+   same Participants".
+2. *Results.* *j* happens only after *i* ends with a named result, as
+   a failure path depends on the timeout that opens it.
+3. *Ordering.* (*i*, *j*) is an ordering constraint.
 
-**What the platform can and cannot check about code without reading
-files.** Without reading files it checks the realisation mapping
-against the model: the components it names exist, no file is listed
-twice, the rule is well-formed. Everything about the code itself needs
-a reader with a capability: which files exist, what each imports, and
-the unit document's discriminator rule (`docs/book/units.md` §3.2),
-which counts comparisons inside the code. Under "The loader reaches
-files through a capability" reading a file is an effect, and under "An
-effect is the use of a capability" an operation the platform cannot
-analyse, such as resolving TypeScript imports, is a capability a
-configuration supplies. Question 7 asks how the edges are read. This
-model does not state the discriminator rule: it is a claim about what
-the code inside a component does.
+The dependency relation is the transitive closure of these, acyclic
+within one pass of a loop. Two steps neither of which depends on the
+other are concurrent: they may happen in either order or together.
+Shared content may be governed by a data constraint over the content
+of both.
 
-**Lanes are out of scope.** `scripts/analyze/lanes.json` maps streams
-of work to paths. As a model it would compose two mappings above:
-plans to components, and components to files. No use case here needs
-it.
+**Choices.** A choice is made by one named participant. Its branches
+are sets of steps. A step in a branch depends on the choice; a step
+after the choice that depends on it depends on whichever branch was
+taken. Whether the others are notified is the activity's design; in
+most cases the following interactions make the choice clear. A
+participant that behaves differently in two branches and cannot tell
+which was taken is a choreography failure, which should be checkable
+(question 6).
 
-**The plan mapping, worked.** Three units of `units.json`, use case 3,
-under question 1's recommended option.
+**Loops.** A loop's body is a set of steps that may repeat, each pass
+depending on the one before. This document models the repeat-or-exit
+step as a choice made by a named participant at the end of each pass
+(question 9).
 
-| Component | May depend on | Realisation artifact |
+## 4. Decomposition and refinement
+
+Serves use cases 1, 2 and 4. An element gains detail in three ways, at
+any time; modelling may stop at any level.
+
+| Way | What it adds | What stays the same |
 |---|---|---|
-| `value` | nothing | `value` realised |
-| `bits` | `value` | `bits` realised |
-| `symbol` | `value` | `symbol` realised |
+| A component decomposed | Interfaces, subcomponents and internal activities | The interactions at the component's boundary |
+| An interaction refined into an activity | An activity between the two endpoints, possibly involving subcomponents of either (question 11) | The endpoints, content and results, as the activity's boundary |
+| An undetermined detail determined | A value for a field left open | Everything else |
 
-A plan, "Kernel values", has two outcomes: one typed by `value`
-realised, one by `bits` realised. Its nodes produce both from its
-catalog. A mapping "Kernel delivery" relates the system to the list of
-plans [Kernel values], with all three realisation artifacts in scope,
-and ends in a remainder (question 4).
+**A decomposed component** has interfaces, which external interactions
+connect with; subcomponents; and internal activities made of
+interactions between interfaces and subcomponents in any pairing,
+interface to interface and subcomponent to subcomponent included. A
+subcomponent is decomposed further, left at the detail the modeller
+chooses, or defined as a single function with a single call interface.
 
-1. The mapping's claim is evaluated. `value` realised and `bits`
-   realised are outcomes of a mapped plan whose claim is true. `symbol`
-   realised is an outcome of no plan.
-2. The claim stays undecided. Its explanation, in the mapping's words:
-   "`symbol` realised, which Kernel delivery requires, is produced by
-   no plan". The obligation is the claim, waiting for the mapping's
-   remainder.
-3. A proposer answers with one mapping entry: `symbol` realised by
-   Kernel values. The trial evaluation reads Kernel values with the new
-   outcome: an open plan whose catalog produces nothing typed `symbol`
-   realised. The mapping's claim is still undecided, now waiting for
-   that plan's catalog remainder, with planning's explanation: "nothing
-   in the catalog produces `symbol` realised, which the plan declares".
-   The entry is kept, and the next obligation is planning's own kind.
-   Planning §4 keeps a candidate only when the claim comes out true;
-   a mapping entry kept while the mapping's claim still waits is a
-   different rule (depends on question 4).
-4. A proposer answers that obligation with one catalog entry, a node
-   "Write symbol" with outcome `symbol` realised and input `value`
-   realised. The plan's claim comes out true, and so does the
-   mapping's: decided.
+**State, data and repositories.** A component can be stateful, and a
+low-level component can be a simple data element or a data
+repository. A datum is a stateful component whose interfaces read and
+write it. Its state is typed in a domain model, and an invariant over
+it is a constraint. The chapter's §3.7 reaches the same place:
+"Internal state is modelled as state-carrying actors".
 
-An entry that names a plan the mapping does not hold, or an artifact
-the system does not declare, is refuted on its own claim and fills
-nothing. Use case 4 runs the same steps with an interface artifact,
-`Invoice`, and the plan `Fulfil`, as §2b.4 did.
+**Interface mappings and transformations.** An interaction that
+reaches a component's interface carries a mapping from its content to
+the interface's or call's parameters, which may transform it. A
+transformation is an ordinary function, so the platform checks it:
+its type is a claim, under "A typed function claims its parameter
+types on entry and its return type on exit". Under "A transformation
+is a model", one written declaratively is inspected like a model.
 
-## 6. Unknowns, obligations and proposals
+**Where modelling stops.**
 
-Serves use cases 2, 3 and 4. Under "Solving is proposing a value for
-an unknown, and the kernel checks it", a model with parts not yet
-supplied is a claim waiting for values. The loop of the planning
-specification's §4 serves every unknown below: the
-obligation is listed under "Open obligations are listed for any
-proposer"; a proposal is one entry, under "A proposer answers with
-only the missing value"; a trial evaluation judges it; a refusal is
-the claim's explanation with that candidate; an accepted entry fills
-the cell once, under "A missing value is a cell that is filled once".
-The one difference is when a mapping entry is kept (question 4).
+| Realisation | What it is | What a claim over it can reach |
+|---|---|---|
+| Described | The informal description alone | Nothing formal: a claim that rests on it is assumed |
+| Defined formally | Attributes, rules, constraints and validations; for a leaf, a function | Every claim of §6, relative to the system as defined |
+| Realised by code | An Allegro function or module, or code in another language through a declared mapping (§8) | The mapping's claims, under "The kernel trusts only what it has evaluated" |
 
-| What is left open | Its unknown | The claim waiting | A proposal |
-|---|---|---|---|
-| A component that a mapped plan should deliver, where the plan cannot | The plan's catalog remainder, under the mapping's reading | The mapped plan's feasibility (planning §11 question 3), and through it the mapping's claim | One catalog entry |
-| An artifact in the mapping's scope that no plan is assigned | The mapping's remainder | The mapping's claim that every artifact in scope is produced | One mapping entry: an artifact and a plan the mapping holds. Depends on question 4 |
-| A required port with no provider | None under question 5's recommendation: a finding of the wiring claim | The system's wiring claim, refuted | None until a use case asks for one |
+Going all the way to a fully realised set of Allegro components is
+possible and not required.
 
-**One kind or two.** §2b.4 of `docs/plans/planning-loop.md` measured
-the first row: a mapping read as an open plan gave a plan obligation
-that the loop answered with no change to its host code. That
-obligation is the planning model's catalog remainder under another
-reading. The second row is a second kind of unknown, and §2b.4 says
-so: "an artifact that no mapping assigns to any plan is not a gap in a
-plan, and a catalog entry cannot answer it: the answer is a mapping
-entry". Under the recommendation of question 4 it has the catalog
-remainder's form, a remainder at the end of the mapping's entries, so
-the loop serves it with one more entry form and the acceptance rule
-of question 4. The ruling on the second model asks that each artifact no plan
-produces be an obligation for the same loop; both rows meet it.
+## 5. Domain models
 
-**Declaring an open mapping.** As the planning specification's
-question 3 ruled for an open plan, declaring a mapping that ends in a
-remainder claims that a complete assignment exists: an entry for every
-artifact in scope, each produced by its plan. The claim is undecided
-while a remainder is a cell.
+Serves use cases 2 and 3. "Domain model" is an open term in the design
+session: a model of any facts relevant to the problem and solution
+space.
 
-**What a proposal must leave unchanged.** The system model, the plans
-and the mapping's existing entries. Each proposal fills one cell, so
-nothing else can change, as planning §4 states for plans.
+**The language of content and goals.** A domain model supplies the
+types in which content, state and goals are written, and the facts and
+constraints over them. Under "A system is described in the language of
+its domain, and that language grows with the understanding", it grows
+with the modellers' understanding, and each new concept is checked
+from then on.
 
-## 7. The notation
+**Attributes on elements.** A domain model can add attributes to the
+system model's elements: quality (latency, availability), deployment
+(where a component runs), security (a level, a classification).
+Question 4 asks how an attribute combines along an activity.
 
-Serves use cases 1, 2 and 4. Both languages are library-first, as the
-ruling on the second model says and as the planning model was: values
-are built by the functions of §3, and a notation comes when a use case
-reads better with one. The table lists the forms the use cases would
-need then; only the last is needed from the start. Under "Every notation stands for an
-expression", each form maps what it matched to an expression and does
-nothing else; the names the user writes, such as a port's type, are
-the user's bindings, and the library's builders are the library's.
+**Extending and specialising.** A domain model can extend or
+specialise the system model: add an interaction kind (an HTTP request
+with a method and a path), a kind of component (a queue), a rule over
+elements (which components may interact).
+
+**With "Two models relate only through a declared mapping".** A domain
+model and a system model are two models. Content typed by a domain
+model's types is "one model's values typed by another's", a candidate
+mapping kind of the inventory. Specialising the system model's
+elements is a second relation, and question 3 asks how it is declared.
+
+## 6. Goals and claims
+
+Serves use cases 3, 4 and 5.
+
+**The goal, as the maintainer states it.** "Goals are claims over
+domain facts." A goal is ascribed to an activity as belonging to its
+initiating participant: the user's goal, the component's expected
+postcondition. The modeller writes it. Nothing requires an element to
+validate a goal; an element may include a partial or full validation.
+The model can claim that the system as defined guarantees a goal,
+fully or partially, and that claim is checked against all the rules
+and constraints of the activity, its interactions and its
+participants. Checking it can identify an element that needs a formal
+validation. A goal that is not guaranteed is flagged, and the model is
+still valid.
+
+**Deciding a guarantee.** The goal's predicate is evaluated over the
+domain facts the activity establishes, every value no constraint fixes
+left unknown, with the constraints of the activity, its interactions
+(content constraints, results, parameter mappings) and its
+participants (rules, validations, invariants) as premises. Under "A
+claim about every value is decided by evaluating it with the value
+unknown", the claim holds when the residual is true. Otherwise each
+part of the residual mentions content or state no premise constrains,
+and the element that supplies it is the one that needs a validation. A
+refuted guarantee claim carries its counterexample and, under "Nothing
+is a claim until someone makes it", halts: a refutation is never
+softened. "Flagged" covers a goal with no guarantee claim and the parts
+a partial claim leaves out (question 5).
+
+**The claims.** Strengths are the four of "Four strengths, one
+vocabulary". Each row is a claim only when someone makes it.
+
+| Claim | Who makes it | What deciding it takes | Outcomes | Strength | Mark |
+|---|---|---|---|---|---|
+| Well-formed: every endpoint exists in its scope, every content type resolves in a domain model, every mapping and transformation checks as an ordinary function, the dependency relation is acyclic within a pass | The modeller, by declaring the system model | Evaluating over the model value | True; refuted, naming the element | decided | *open*, questions 5 and 6 |
+| A goal is guaranteed, fully or in the parts claimed | The modeller, by a guarantee claim | Evaluating the goal under the premises, unconstrained values unknown | True; refuted with a counterexample; undecided, naming the elements that need a validation | decided over the formal part; assumed where a premise rests on a description; undecided while a detail it needs is open | *maintainer*; strength per part, question 8 |
+| Agreement: a component's internal activities agree with the external interactions at its interfaces | The modeller of the decomposition | The projection of the internal activities onto the interfaces, against the external interactions (below) | True; refuted, naming the interaction and the interface | decided | *maintainer* for the claim; its form, question 6 |
+| Invariants on stateful components hold across every interaction that changes their state | The modeller of the component | The invariant on the new state, with the old state unknown and satisfying it, under "Invariants are refinements" | True; refuted with the interaction and a counterexample | decided | *maintainer* for the claim; a change of state, question 6 |
+| Reachability: a responder is wired by the decomposition, or is a reference the initiator received as content or holds in state | The modeller | Evaluating over the dependency relation | True; refuted, naming the interaction | decided | *open*, question 6 |
+| Choice visibility: every participant whose behaviour differs between branches receives something that depends on the choice | The modeller | Evaluating over the branches and the dependency relation | True; refuted, naming the participant and the choice | decided | *maintainer* that it is checkable; its form, question 6 |
+| Concurrent writes: two concurrent interactions that change one component's state are ordered or declared safe | The modeller | Evaluating over the dependency relation | True; refuted, naming the pair | decided | *open*, question 7 |
+| A loop terminates | The modeller, when claimed | A decrease per pass, under "Termination by bounded decrease", or the claim written as assumed | True; assumed; flagged when unclaimed | decided, or assumed | *open*, question 9 |
+| An element's validation holds of the code realising it | The author of the realisation mapping | Evaluating the code's claims through the mapping (§8) | True; refuted | decided where the code is evaluated | *open*, question 16 |
+
+**Valid, sound and flagged** (depends on question 5). A model is valid
+when it is well-formed, and sound when the foundational claims
+(question 6) are decided true. Whatever else falls short is flagged: a
+report, never a refusal. The model's summary is the weakest strength
+among its claims, as "A module's summary is the weakest strength among
+its claims" has it for a module.
+
+**Agreement, stated** (depends on question 6). For a component *C* and
+each external activity *C* takes part in, project *C*'s internal
+activities onto its interfaces: keep the interactions with an
+interface endpoint and the dependency relation between them. Three
+conjuncts:
+
+1. Every external interaction at an interface *f* matches an internal
+   interaction at *f*: the same direction; its content, through *f*'s
+   parameter mapping, of the type the internal one accepts; every
+   result the internal one can end with declared by the external one.
+2. Where the projection orders an interaction the outside initiates
+   after another at *C*'s interfaces, the external activity orders the
+   matching pair the same way: *C* never waits on something the outside
+   may send later.
+3. Every result of an external interaction that the external activity
+   depends on is one the projection can produce.
+
+## 7. Incremental specification, unknowns and proposals
+
+Serves use cases 2, 3 and 4.
+
+**An undetermined detail is an unknown.** A field left open (a kind, a
+content type given only by description, a component not decomposed,
+an interaction not refined) is a cell, under "A missing value is a
+cell that is filled once". A claim that holds whatever the cell holds
+is decided with the cell unknown; one that depends on it is undecided
+and waits.
+
+**What is listed as open.** Every claim waiting on a cell, under "Open
+obligations are listed for any proposer"; every flagged goal and every
+claim resting on a description, with its strength, under "Every
+result says how strongly it holds".
+
+**What a proposal can be.** Under "A proposer answers with only the
+missing value": a determination, a validation for the element a
+guarantee check named, a refinement of one interaction, or a
+decomposition of one component. Each fills one cell, so the model as
+written is unchanged. A change outside a cell is a new version (§8).
+
+**The loop.** The planning specification's §4 serves every unknown
+here: the obligation is listed, a proposal is evaluated in trial, a
+refusal is the claim's explanation with that candidate, and an
+accepted proposal fills its cell once with its proposer recorded,
+under "Anyone may propose, and the record shows who". A refinement or
+a decomposition brings cells of its own, so its claim may still wait;
+question 14 asks when it is kept.
+
+## 8. Mappings to other models
+
+Serves use cases 1, 4 and 5. Under "Two models relate only through a
+declared mapping" and "A mapping between models is itself a checked
+value", each relation is a mapping value, declared and checked.
+
+| Mapping | Kind | What it maps | What is claimed | Mark |
+|---|---|---|---|---|
+| Delivers: plans to a system model | One model's values typed by another's; a claim that spans two models | A plan's outcome to an element realised (a component, an interface, a datum); a scope of elements the plans must deliver | Every element in scope is an outcome of a mapped plan whose claims hold; one no plan delivers is an obligation for the planning loop | The composition point ruled on the second model; the element in place of the first draft's artifact, questions 13 and 14 |
+| Realises: a system model to code | One model as a more detailed version of another | Components to units and files (`scripts/analyze/units.json`'s `files`); interactions to imports and calls | Every file has a component; every import between files maps to an interaction the model permits. A rule over which components may interact is a constraint the modeller adds | *open*, questions 15 and 16 |
+| Holds: decisions to a system model | A claim that spans two models | Each decision to the component that realises it (`next/decisions.json`'s `unit`) | Each decision with a unit has exactly one, under "Each decision lives in one replaceable unit of code" | Reading the map is an effect, question 16 |
+| Changes: a model to its next version | "A change to a model is a mapping from the old one" | Each element of the old to its counterpart: a refined interaction to its activity, an open detail to its value | Goals guaranteed stay guaranteed; claims decided stay decided; known exceptions only shrink | *open* for the last, question 15 |
+
+**The present code, read as this model.** The first draft's probe
+built the 35 units of `scripts/analyze/units.json` and their permitted
+dependencies as values. Two findings carry over. A rule is a predicate
+over pairs and acyclicity is a claim over actual interactions, and
+they differ: with "any" read as every unit the permission relation has
+a cycle (`pipeline` may depend on every unit, and `introspect` and
+`cli` depend on `pipeline`), while the actual unit-to-unit edges have
+none. And the code does not meet its rule:
+`npx tsx scripts/analyze/index.ts units` reports two forbidden edges,
+`evaluator` to `effects` and to `refinements` (question 15).
+
+**What needs a reader of files.** Which files exist, what each
+imports, and the discriminator rule of `docs/book/units.md` §3.2.
+Under "The loader reaches files through a capability", reading a file
+is an effect; under "An effect is the use of a capability", an
+analysis the platform cannot do, such as resolving TypeScript imports,
+is a capability a configuration supplies.
+
+## 9. Notation and views
+
+Serves use cases 1 and 2. Library-first, as the planning model was: a
+notation comes when a use case reads better with one. Under "Every
+notation stands for an expression", each form maps what it matched to
+an expression and does nothing else.
 
 | Form | The expression it stands for | Needed by |
 |---|---|---|
-| `component NAME:` and a block of `provides:`, `requires:` and `depends on:` | A binding of `NAME` to `component(NAME, ports)`, each port's type the user's binding of that name | Use case 2; §2b.2's probe wrote this form |
-| `system NAME:` and a block naming its components, inputs and rule | A binding of `NAME` to `system(...)`, with the claims of §4 | Use cases 1 and 2 |
-| `entity NAME:` and a block of `field: Type` lines, with an optional `where` predicate | A binding of `NAME` to `entity(...)` or `entity_where(...)` | Use case 2 |
-| An entry of a mapping: `ARTIFACT by PLAN` | One mapping entry | The loop: a proposal written as text is read by the entry's form, as planning §4 states for catalog entries, so the mapping's entry needs a form even while mappings are built by functions |
+| `participant NAME: user ROLE` (and `component`, `external`), with `one` or `many` | A binding of `NAME` to the element, with its instance annotation | Use cases 1 and 2 |
+| `activity NAME by P:` and a block of `A -> B: content` lines, `before:`, `choice by P:`, `loop by P:`, `goal:` | A binding of `NAME` to the activity | Use cases 2 and 3 |
+| `component NAME:` and a block of `port`, `part` and `activity` entries | A binding of `NAME` to the decomposed component | Use cases 1 and 2 |
+| One determination, refinement, decomposition or validation | One value for one cell | The loop, as the planning specification's §4 states for catalog entries |
 
-A port's type written in the text is an expression that names a type
-value. §2b.1 measured why that matters: a port that held a type's name
-as text checked clean when the name was misspelt, and a port that held
-the type value halted every rendering. Under this form the misspelt
-name is an undeclared name, and the rendering reads the type's name
-field (planning §11 question 13).
+**Views.** An activity diagram, a sequence view or a component diagram
+is a view of the value, the inventory's candidate mapping kind "a view
+of part of a model". It shows only what the result holds, under "A
+tool reads a phase's result and adds no analysis of its own". The
+tables of §10 are sequence views written by hand.
 
-**A text that holds a plan and a system model.** §2b.2 measured three
-collisions when four notations shared one file. Under the ruled
-decisions:
+## 10. The first example: Allegro
 
-- **Rule names in one namespace.** A second library's rule of the same
-  name replaced planning's without a word, and a plan parsed in one
-  order of the `use` lines and failed in the other. Under "Grammars
-  combine without regard to order" that is a conflict refuted before
-  any text is read in the combined grammar, and a replacement names
-  what it replaces. Under "Grammars are values" and "Symbol identity
-  is a fully-qualified name", each library's productions are its own
-  grammar value's, so the components grammar has no reason to name a
-  planning rule.
-- **Top-level names in one scope.** A second library's `Finding` was
-  built by planning's check. "Every notation stands for an expression"
-  and "Imported modules are typed objects whose type encapsulates"
-  remove the mechanism: a library's free names mean what they meant
-  where it was written.
-- **Keywords.** A binding named `component` beside the `component`
-  form ran. Under "A grammar change reaches to the end of its block", a
-  text can confine the components notation to one block, and a plan
-  block beside it is read in planning's notation.
+Serves use case 1. Depends on question 17: under its recommended
+option, the example models Allegro as the ruled decisions rebuild it,
+with the chapter `docs/book/actors-and-activities.md` as evidence, so
+the example doubles as the architecture of `next/`. The option not
+taken models the present tree, as the chapter does. Sources: *ch* (the
+chapter), a ruled decision by its title, or *choice* (this document's
+modelling).
 
-## 8. The result and the tools
+**Level 1: the participants.** One system instance is one running
+invocation of the platform.
 
-Serves use cases 1 to 5. The planning specification's §9 holds for
-each plan. For a composed model, under "A tool reads a phase's result
-and adds no analysis of its own" and "A result names everything it
-rests on", a phase's result adds:
+| Participant | Kind | Instances | What it is | Source |
+|---|---|---|---|---|
+| Author | User | many | Writes programs, extensions and models, and runs commands | *ch* (UserCode, a type); Part VI's introduction |
+| Proposer | User | many | A person or an agent answering obligations | "Anyone may propose, and the record shows who"; *ch* (ExternalAgent) |
+| Launcher | Component | one per system instance | Host code that creates a kernel, gives it its first extensions and capabilities, and starts an evaluation | "The launcher does only what cannot be done in Allegro" |
+| Kernel | Component | many: the launcher creates one, an embedding application may create several | Evaluates and records the outcome of claims, acting only on calls of its interface | "The kernel is passive"; "What the kernel's interface offers" |
+| Extension | Component | many | Allegro code the kernel evaluates: the parser engine, the module loader, the standard language, a domain language | "Everything above the kernel is an extension, and there is one way to extend" |
+| Tool | Component | many | Reads a phase's result and presents it, or places a proposal | "A tool reads a phase's result and adds no analysis of its own" |
+| Host platform | External system | one per system instance | Files, the terminal, the clock, the network | *ch* (Environment); "The terminal and the browser ship output, timers and HTTP" |
+| Embedding application | External system | many | Creates a kernel and calls its interface | "What the kernel's interface offers", its use case |
 
-- each system model, data model and mapping value, with each claim
-  made about it and its strength;
-- for a refuted claim that spans two models, one explanation that
-  refers to values of both: the artifact and the plan, the component
-  and the entity, each rendered by the library that owns it;
-- for a mapped plan, that its reading rests on the mapping, rendered
-  by the mapping's library, beside the plan's promises, rendered by
-  planning's (§2b.5: today the ledger names the plan only, and the
-  mapping and the system have no record);
-- for a mapping's reading of a plan, its own name, a field the
-  mapping sets. §2b.5 measured two records that both read "open plan
-  Fulfil", the plan and its reading, because the reading kept the
-  plan's name;
-- the obligations of both kinds of §6, each with its form for
-  programs and its form for people, the latter written by the library
-  that owns the unknown;
-- each entry that filled a remainder, who proposed it and in how many
-  attempts, recorded with the filling under "Anyone may propose, and
-  the record shows who";
-- for a claim over code, the capability that read the files, and the
-  files read.
+The Kernel's interface is the proposed `next/kernel/interface.ts` of
+the kernel stream's contracts branch: construct, bind, create scopes,
+fill cells, evaluate, settle, read. The example's domain model holds
+programs, claims, outcomes, strengths, capabilities and their parts,
+cells, obligations, proposals and results, in the ruled decisions'
+sense.
 
-No tool looks a model up by a type's name in the file's scope, as
-`src/pcp.ts` does for plans today (planning §9).
+**Activity 1: run a saved program that prints through a capability**
+(milestone 2). Initiated by the Author. Goal: the terminal shows the
+text the program passed to its output capability, once, and the
+program held no capability beyond the configuration's ceiling.
 
-## 9. What the model needs of the kernel and of the other stream
+| # | From | To | Content | Kind | Depends on | Source |
+|---|---|---|---|---|---|---|
+| 1 | Author | Launcher | A configuration naming the run phase and a saved program | UI use (a command); synchronous; local | | "Startup, step by step" (1) |
+| 2 | Launcher | Kernel | Create a kernel; returned: the kernel | service call; synchronous; local | 1 | "Startup, step by step" (2) |
+| 3 | Launcher | Host platform | The saved program's path; returned: its bytes | service call | 1 | *choice* |
+| 4 | Launcher | Kernel | The recorded interface calls; returned: the main expression | service call, refined into one interaction per recorded call | 2, 3 | "A saved program is a recorded sequence of interface calls" |
+| 5 | Launcher | Kernel | An effectful primitive function of the output capability, bound in the program's scope: a reference to the Launcher's output part | service call | 2 | "Startup, step by step" (4); "A capability is a named set of effectful primitives" |
+| 6 | Launcher | Kernel | Evaluate the main expression in that scope | request | 4, 5 | "Startup, step by step" (5) |
+| 7 | Kernel | Launcher | The output part called with the text | service call | 5, 6 | "An effect is the use of a capability" |
+| 8 | Launcher | Host platform | The text, to the terminal | service call | 7 | *choice* |
+| 9 | Kernel | Launcher | The result of 6 | response | 7 | the interface's `evaluate` |
+| 10 | Host platform | Author | The text shown | UI use | 8 | *choice* |
 
-A need, the decision that owns it, and the adversarial review's
-issues that leave it open. The kernel's designs are not this
-document's.
+Interaction 5 carries a reference to a component as content, and 7 is
+reachable because the Kernel received it in 5 (question 6). The
+guarantee claim is partial: it covers the goal's first part, in two
+clauses under question 8. The text reaches the Launcher unchanged,
+decided, since 7's mapping is the identity; the host writes it,
+assumed, since the Host platform is only described. The claim's
+strength is assumed, and the check names the Host platform's write as
+the element that needs a validation. The second part is flagged: no
+claim is made of it, and the last list of this section says why.
+
+**Activity 2: decide a claim and report a refutation.** Initiated by
+the Author. Goal: every refuted claim of the program appears in the
+report with its explanation, and the summary is the weakest strength
+among its claims.
+
+| # | From | To | Content | Kind | Depends on | Source |
+|---|---|---|---|---|---|---|
+| 1 | Author | Launcher | A configuration naming the check phase and the main module | UI use | | "A command is a configuration" |
+| 2 | Launcher | Kernel | Create a kernel | service call | 1 | "Startup, step by step" (2) |
+| 3 | Launcher | Kernel | The first extensions as saved programs, each once, in dependency order | service call, refined | 2 | "Startup, step by step" (3); "The platform's parser engine ships already built" |
+| 4 | Launcher | Kernel | The loading capability, handed to the loader; no other | service call | 3 | "Startup, step by step", its use case "with an empty ceiling at step 4" |
+| 5 | Launcher | Kernel | Evaluate the loader's call for the main module | request | 3, 4 | "Startup, step by step" (5) |
+| 6 | Kernel | Launcher | Read a file: its path; returned: a cell | service call; asynchronous | 4, 5 | "The loader reaches files through a capability" |
+| 7 | Launcher | Host platform | Read the file; returned: its bytes, or a failure | service call | 6 | *choice* |
+| 8 | Launcher | Kernel | Fill the cell with the bytes, or with an exception on failure | service call | 7 | "A value that arrives later fills a cell, and a failure fills it with an exception" |
+| 9 | Kernel | Launcher | The result: a refutation on the main value, with its explanation | response | 8; a choice by the Kernel among refuted, decided and undecided | "Only the kernel records the outcome of a claim"; "A predicate can explain its refusal" |
+| 10 | Launcher | Tool | The result | service call | 9 | "A tool reads a phase's result and adds no analysis of its own" |
+| 11 | Tool | Author | The summary word, and the refuted claim with its explanation | UI use | 10 | "A module's summary is the weakest strength among its claims" |
+
+The choice at 9 is the Kernel's. The Author's behaviour differs
+between its branches and the Author receives 11, which depends on it,
+so choice visibility holds (question 6).
+
+**Activity 3: propose a value for an open obligation.** Initiated by
+the Proposer. Goal: the obligation's claim comes out true, the program
+as written is unchanged, and the record names the Proposer.
+
+| # | From | To | Content | Kind | Depends on | Source |
+|---|---|---|---|---|---|---|
+| 1 | Proposer | Tool | Ask for the open obligations of a module | request | | "Open obligations are listed for any proposer" |
+| 2 | Tool | Launcher | Check the module; returned: the result | service call, refined into activity 2's interactions 2 to 9 | 1 | *choice* |
+| 3 | Tool | Proposer | The obligations, each with its form for people, the last refusal and what is in scope | response | 2 | "Open obligations are listed for any proposer" |
+| 4 | Proposer | Tool | One value, and a reference to the obligation it answers | request | 3 | "A proposer answers with only the missing value" |
+| 5 | Tool | Kernel | Evaluate the claim with the value in the cell, in trial; returned: the outcome as data | service call | 4 | none yet (§11) |
+| 6 | Tool | Kernel | Fill the cell, the Proposer recorded with the filling | service call | 5, on the branch "true" of a choice by the Tool | "Anyone may propose, and the record shows who" |
+| 7 | Tool | Proposer | Accepted, with the record; or the refusal with the claim's explanation | response | 5, 6 | "A predicate can explain its refusal" |
+
+A loop holds 4 to 7: after a refusal the Proposer chooses whether to
+try again, for at most the Tool's number of attempts, so its
+termination is decided by a decrease of the attempts left (question
+9). The value proposed holds no capability, the adversarial review's
+candidate ruling on accepted proposals.
+
+**One component decomposed: the Launcher.** Its interfaces and
+subcomponents are a *choice*; its internal activity follows "Startup,
+step by step".
+
+| Interface | Direction | What it carries |
+|---|---|---|
+| Command | in, from the Author | A configuration and a phase |
+| Kernel calls | out, to the Kernel; in, its answers | Calls of the kernel's interface |
+| Capability parts | in, from the Kernel | Calls of the effectful primitives the Launcher supplied |
+| Host | out, to the Host platform | Reads and writes |
+| Result | out, to a Tool | A phase's result |
+
+| Subcomponent | Realisation | Instances |
+|---|---|---|
+| Configuration reader | A single function: a configuration's sources to a configuration value | one |
+| Starter | Stateful: the kernel it created and the scope it built | one |
+| Saved-program player | A single function: a recorded call sequence to the kernel calls it makes | one |
+| Ceiling | The primitive functions of the capabilities the configuration grants | one per capability |
+| Cell deliverer | Stateful: the cells waiting on an answer from the Host platform | one |
+
+The internal activity "Start up and run", projected onto the
+interfaces, against activity 1:
+
+| # | Internal interaction | Interface | Activity 1 | Depends on |
+|---|---|---|---|---|
+| a | Command → Configuration reader: the configuration | Command | 1 | |
+| b | Starter → Kernel calls: create a kernel | Kernel calls | 2 | a |
+| c | Saved-program player → Host: read the saved program | Host | 3 | a |
+| d | Saved-program player → Kernel calls: the recorded calls | Kernel calls | 4 | b, c |
+| e | Ceiling → Kernel calls: the output part, bound | Kernel calls | 5 | b |
+| f | Starter → Kernel calls: evaluate | Kernel calls | 6 | d, e |
+| g | Capability parts → Ceiling: the text | Capability parts | 7 | e |
+| h | Ceiling → Host: write the text | Host | 8 | g |
+| i | Kernel calls → Starter: the result | Kernel calls | 9 | f |
+
+The agreement claim, by its conjuncts (question 6). Each external
+interaction of activity 1 at the Launcher matches one row, with the
+same direction and content. The outside initiates a, g and i; the
+projection orders g after e and i after f, and activity 1 orders 7
+after 5 and 9 after 6. The results activity 1 depends on are normal
+ends, which the projection produces. The claim is decided true over
+the model.
+
+**What the example could not express.**
+
+- *Determinism.* "The same program and the same information give the
+  same result" is a claim over two instances of an activity, and a goal
+  belongs to one.
+- *The ceiling.* "Only the launcher sets the ceiling" is a claim over
+  every program an Author may write. Reachability covers the
+  references of the activities modelled.
+- *Phases in sequence.* A residual handed from a check phase to a run
+  phase elsewhere spans two system instances, and the model relates no
+  activities across instances.
+- *An interaction inside a whole call.* Interaction 7 of activity 1
+  happens while 6 is open. Keeping request and response apart
+  expresses it; with 6 as one whole call, 7 has no place.
+
+## 11. What the model needs of the kernel and of the other stream
+
+A need, the decision that owns it, and the open issue of the
+adversarial review (`docs/records/book-pass/adversarial-review.md`)
+that bears on it. The kernel's designs are not this document's.
 
 | Need | Owning decision | Open in the review |
 |---|---|---|
-| A trial evaluation whose outcome, a refutation included, is data to the caller: the loop judging a mapping entry or a catalog entry | none yet (planning §4, "Two open kernel designs") | Issue 14 |
-| A remainder: a cell at the end of a list whose shape is otherwise complete | "A missing value is a cell that is filled once" | No |
-| A walk over a graph decided to terminate by a decrease of the set not yet visited | "Termination by bounded decrease" | Issues 5 and 6 |
-| A type value imported by two modules is one value, so a plan module and a mapping module compare an artifact by identity | "Symbol identity is a fully-qualified name"; "Imported modules are typed objects whose type encapsulates" | Issue 13: a module evaluated once yet a function of the capabilities each loader supplies |
-| A type value's name readable for findings | "One meta-type with an optional name" | No |
-| Conformance by member symbols for interfaces | "Members are keyed by symbol and conformance is membership" | No |
-| Reading files and resolving imports through a capability, and the strength of a claim decided with its help | "The loader reaches files through a capability"; "An effect is the use of a capability"; "The kernel trusts only what it has evaluated" | Issue 8: a capability's answer gives decided, an outside solver's assumed |
-| Two notations in one text, refuted on conflict before the text is read | "Grammars combine without regard to order" | Issue 7: a notation can wrap the forms that make a user's claims |
-| A proposed entry holds no capability | the review's own candidate ruling | Issue 24, as in planning §13 |
+| Evaluating a goal with unconstrained values unknown, under premises from the model's constraints | "A claim about every value is decided by evaluating it with the value unknown"; "What is known about a value travels with the value" | No |
+| A trial evaluation whose outcome, a refutation included, is data: the loop judging a proposal, the guarantee check naming an element | none yet (the planning specification's §4) | "A refutation cannot be tested for, and search, proposal loops, parse recovery and budgeted evaluation all must" |
+| An undetermined detail as a cell, filled once | "A missing value is a cell that is filled once" | No |
+| Walks over a model's graphs decided to terminate by a decrease of the set not yet visited | "Termination by bounded decrease" | "A circular definition is decided"; "The same information never recurs in an ordinary loop" |
+| A domain type imported by two modules is one value, so content types compare by identity | "Symbol identity is a fully-qualified name"; "Imported modules are typed objects whose type encapsulates" | "A module is evaluated once, and is a function of the capabilities whoever loads it supplies" |
+| Reading code and the decision map through a capability, and the strength of a claim decided with its help | "The loader reaches files through a capability"; "The kernel trusts only what it has evaluated" | "Two rules give one mechanism two strengths" |
+| A proposed value holds no capability | the review's candidate ruling | "A proposal that is accepted runs later with the capabilities of the place it filled" |
+| Of the kernel stream: the kernel's interface file and the saved-program data form, which the example models as the Kernel's interface and interaction 4 of activity 1 | "What the kernel's interface offers"; "A saved program is a recorded sequence of interface calls" | No |
 
-## 10. Decisions this specification gives cases to
+## 12. Decisions this specification gives cases to
 
-For the acceptance stream. `npx tsx next/tools/corpus.ts --by-decision`
-lists no case for the decisions marked 0.
+For the acceptance stream. "Cases today" is the first count of
+`npx tsx next/tools/corpus.ts --by-decision`, the cases that must
+survive.
 
 | Decision | Cases today | What would test it |
 |---|---|---|
-| "A model is a value" | 33 | Use case 1: the units manifest built, inspected and compared as a value |
-| "A transformation is a model" | 0 | The reading of the plan mapping (§5), inspected and compared like the models it relates (question 3) |
-| "Two models relate only through a declared mapping" | 0 | The worked example of §5: one finding names the system and the plan; and use case 2's carries mapping refuting a port typed by an entity the data model lacks |
-| "A change to a model is a mapping from the old one" | 2 | Use case 5: a version with a new exception refuted, a version with one fewer decided |
-| "Solving is proposing a value for an unknown, and the kernel checks it" | 32 | Steps 3 and 4 of the worked example: a mapping entry, then a catalog entry |
-| "A solver sees its problem unevaluated" | 0 | None beyond planning's. The cross-model claim is judged by trial evaluation; no case here reads a residual |
-| "Feasible is decided; best says how strongly it holds" | 31 | None new: this model searches for no best |
-| "A model's quality is a question for analysis" | 0 | Use case 1: the mixed files measured as a property of the model (a file mapped to several components), reported, never claimed; the granularity rule of `docs/book/units.md` §2 stays a question for analysis |
-| "A mapping between models is itself a checked value" | 0 | The realisation mapping refuting an import edge read from code |
-| "A paradigm is a library" | 0 | A file that asks for the components, data and planning notations together and is read the same in either order |
-| "A target platform is a model, and export is a transformation into it" | 0 | None until deployment comes in (§2) |
+| "A model is a value" | 33 | Use case 1: the example of §10 built, inspected and compared as a value |
+| "Two models relate only through a declared mapping" | 0 | The delivers mapping naming an element no plan delivers; content typed by a type the domain model lacks, refuted |
+| "A transformation is a model" | 0 | A parameter mapping written declaratively, inspected like a model |
+| "A change to a model is a mapping from the old one" | 2 | A refined interaction in a new version with its goal still guaranteed; a version with a new exception to the rule, refuted |
+| "Solving is proposing a value for an unknown, and the kernel checks it" | 32 | A determination for an open detail kept, a second refused with the explanation |
+| "A model's quality is a question for analysis" | 0 | The mixed files measured as a property of the realises mapping, reported, never claimed |
+| "A mapping between models is itself a checked value" | 0 | The realises mapping refuting an import edge read from code |
+| "A paradigm is a library" | 0 | A text that asks for the system model and the planning notation together, read the same in either order |
+| "Startup, step by step" | 0 | The agreement claim of §10 on the Launcher; a version that binds the capability after evaluating, refuted |
+| "The launcher does only what cannot be done in Allegro" | 0 | The Launcher's decomposition: every subcomponent host code, everything else an extension |
+| "Open obligations are listed for any proposer" | 57 | A model's open details listed as obligations |
+| "A proposer answers with only the missing value" | 32 | Activity 3 of §10, run against a model's cell |
 
-The units of measure and the planning chapters are evidence for the
-planning model and give this model no case.
-
-## 11. Questions for the maintainer
+## 13. Questions for the maintainer
 
 Ordered so that a question comes after the ones it depends on.
 
-1. **What an artifact is.** (a) Interface artifacts only: things one
-   component hands another, as in §2b.2 and §2b.4. The cross-model
-   claim covers the system's inputs. Use case 3 is lost. (b)
-   Realisation artifacts only: one per component, a component realised.
-   The cross-model claim covers every component in scope. Use case 4 is
-   lost. (c) Both, as two kinds the model declares; a mapping's scope
-   lists the artifacts of either kind that plans must produce. (c)
-   costs one field per component and a kind on each artifact.
-   **Recommended: (c).** Questions 4 and §5's worked example depend on
-   it.
-2. **Libraries.** (a) One library per language and one per mapping:
-   components, data, the components-to-data mappings, the plan mapping.
-   Neither model's library uses the other. (b) One system library
-   holding both languages and their mappings, one `use` line. (c) One
-   library per language, the mappings inside the components library.
-   (b) leaves nothing that separates a mapping from a model's own code.
-   (c) has the components library read data values, the coupling "Two
-   models relate only through a declared mapping" rejects. (a) costs
-   more files and `use` lines. **Recommended: (a)**, under "Each
-   decision lives in one replaceable unit of code".
-3. **How a mapping's reading is defined before a meta-model of mappings
-   exists.** The kinds of mapping are a design to prove (the record of
-   phase 1's close). (a) Each mapping kind's reading and claims are
-   functions of its library now, named in the result as such, and
-   restated as models when the mapping meta-model exists. (b) Build no
-   mapping until that meta-model exists. (a) meets "A transformation is
-   a model" only in part, as the planning specification's units mapping
-   does. (b) leaves use cases 2 to 5 unbuilt. **Recommended: (a).**
-4. **An artifact that no plan is assigned.** (a) The mapping ends in a
-   remainder, filled by one mapping entry; declaring it claims a
-   complete assignment exists. A mapping entry is kept when its own
-   claim is true (its artifact is the system's, its plan the
-   mapping's), even if the mapping's claim then waits on that plan's
-   catalog remainder. (b) As (a), with planning §4's rule: an entry is
-   kept only when the mapping's claim comes out true. (c) The reading
-   assigns each unassigned artifact to a plan the author names as the
-   default, so every obligation is a catalog remainder of one kind.
-   (a) costs a second entry form for the loop (§7) and a second
-   acceptance rule. (b) refuses every mapping entry whose plan cannot
-   yet produce the artifact, and that plan has no obligation until the
-   entry is kept, so the loop cannot proceed. (c) keeps one kind, but
-   the default plan receives outcomes its author never chose, and the
-   proposer cannot say which plan should produce an artifact.
-   **Recommended: (a).** Depends on question 1.
-5. **An open system.** (a) The system's component list may end in a
-   remainder, so a missing provider is an obligation answered by a
-   proposed component. (b) A missing provider is a refutation of the
-   wiring claim, or a report when unclaimed, and no remainder exists
-   until a use case asks for proposals of components. Use case 2's
-   source asks for the finding only. **Recommended: (b)**; the form of
-   (a) is the remainder's and can be added.
-6. **Decisions as a model.** The holds mapping relates decisions to
-   units. (a) A minimal decisions model: a decision is a value with its
-   title and the decisions it depends on, read from the inventory by a
-   reader with a capability. (b) Decisions as names in the mapping:
-   the option "models coupled implicitly, through shared names or code
-   that reads both", which the decision records as not chosen. (c) Wait
-   for the documentation model, which the planning-loop plan asks
-   about separately. **Recommended: (a)**, stating nothing a use case
-   does not need.
-7. **How import edges are read from code.** (a) A capability that
-   reads a file's imports, supplied by the configuration as the
-   TypeScript binder is today; claims over its answer are decided and
-   name it. (b) A parser for the code's language written in Allegro, so
-   that only reading the file is an effect. (c) The edges kept as a
-   declared list that a host script writes; claims over them are
-   assumed. (b) is out of reach for TypeScript and in reach for code
-   written in Allegro. (c) puts an unchecked step between the code and
-   the claim. **Recommended: (a)** for host code, and (b) where the
-   code is Allegro, which the platform already parses.
-8. **A rule the code does not yet meet.** The project holds two
-   forbidden edges as known, and "Nothing is a claim until someone
-   makes it" forbids softening a refutation. (a) The rule carries its
-   exceptions: "every edge is permitted except these", a weaker rule
-   stated as such, with the change mapping's claim that exceptions only
-   shrink. (b) The whole rule is claimed and refuted, which halts. (c)
-   The rule is not claimed; its findings are a report, and the ratchet
-   is a claim over two reports. (b) stops the project's check while
-   any edge is held. (c) loses the claim that every other edge is
-   permitted. **Recommended: (a).**
-9. **Keys.** (a) Left out until a use case holds a collection of an
-   entity's values: a key's uniqueness is a claim over a collection, and
-   none of the use cases has one. (b) In now, as a field list on the
-   entity, with the uniqueness claim made over any collection the
-   program builds. **Recommended: (a).**
+| # | Question | What is open | Options | Costs | Recommended |
+|---|---|---|---|---|---|
+| 1 | **Naming** | The vision uses "participant" for whoever authors code, and its text is not edited; the standard language has interface types and refinement types | (a) Keep "participant", "interface" and "refined"; a document that also uses the vision's sense writes "system participant" at first use, and this model says "refined into an activity", never "a refinement". (b) Other words | (a) costs a qualifier where two senses meet; (b) drops the maintainer's words | **(a)** |
+| 2 | **Libraries** | How the model's code is divided | (a) One library for the meta-model; each domain model its own; each mapping to another model its own. (b) One library for the meta-model and its mappings | (a) costs more files and `use` lines; (b) leaves nothing that separates a mapping from a model's code | **(a), under "Each decision lives in one replaceable unit of code"** |
+| 3 | **A domain model that extends or specialises the system model** | The design session says it can, not how | (a) A library that builds on the system model's library: its new element kinds conform to the system model's, and its types reach content as one model's values typed by another's. (b) A declared mapping, "one model as a more detailed version of another", for each specialisation | (b) puts a mapping between a model and each of its extensions | **(a); depends on 2** |
+| 4 | **Attributes as fields with combining rules** | How an attribute such as a latency is carried | (a) A metadata field in the ruled sense, under "An extension registers its own fields; the kernel has two"; where quantitative, the domain model gives the rule that combines it along an activity (a sum along a dependency chain, a maximum over concurrent branches); otherwise a plain annotation. (b) Every attribute a plain annotation | (b) leaves a claim over an activity's latency to each modeller | **(a); depends on 3** |
+| 5 | **Valid and sound as two levels** | What the result says of a model as a whole | (a) Valid when well-formed: every endpoint exists, every content type resolves in a domain model, every mapping and transformation checks as an ordinary function. Sound when the foundational claims are decided. Everything beyond is flagged, never refused, under "Nothing is a claim until someone makes it". (b) Valid alone | (b) leaves the claims "required to indicate the model is sound" without a place | **(a)** |
+| 6 | **The foundational claims** | Which claims indicate soundness; the design session names three and leaves the rest open | (a) Five beside the goals: well-formedness; agreement, in the form of §6; reachability (a responder is wired by the decomposition, or is a reference the initiator received as content or holds in state, the authority design of the chapter's §4.2 and "An effect is the use of a capability"; a participant annotated *many* is reached only by reference); choice visibility; invariants on stateful components, a change of state stated as a function of the old state and the content. Interfaces on an external system are optional. (b) The three named | (a) adds two checks the session did not name; reachability is what ties the model to capabilities | **(a); depends on 5** |
+| 7 | **Concurrent access to state** | Two concurrent interactions that change one component | (a) Flagged unless an ordering constraint relates them or the component declares the pair safe. (b) No claim | (b) leaves races unreported | **(a); depends on 6** |
+| 8 | **What "partially guaranteed" means** | The strength of a goal in part guaranteed | (a) A goal is a conjunction of clauses, each with its own strength in the four words, its summary the weakest, as "A module's summary is the weakest strength among its claims" has it; a validation that rests on an informal description is assumed and says so. (b) One strength per goal | (b) cannot say which part holds | **(a)** |
+| 9 | **Loops** | Whether a loop's termination is claimed | (a) Unclaimed and flagged unless the modeller claims it; the repeat-or-exit step is a choice made by a named participant. (b) Every loop claimed to terminate | (b) refutes a service loop that runs for ever by design | **(a)** |
+| 10 | **The initiating participant** | The design session gives it the goal and does not say what initiating means | (a) A field of the activity, and every step with no dependency is initiated by it; an activity two participants start independently is two activities. (b) A field only, unchecked | (a) refuses some activities as written; (b) checks nothing | **(a)** |
+| 11 | **Whether a refinement may introduce a participant** | Refining an interaction may involve subcomponents of either endpoint | (a) It may also name an intermediary only if the intermediary is declared at the enclosing level. (b) Any intermediary | (b) adds a participant the enclosing activity does not show | **(a)** |
+| 12 | **Unmodelled failures in the model** | The element that detects one initiates an activity to notify or remediate | (a) An element may name one activity it initiates on any failure it detects that no activity it takes part in models. (b) Nothing in the model | (b) leaves the rule with no element to check | **(a)** |
+| 13 | **An activity and a plan** | Both are graphs with wiring derived from shared content, choices and failure paths | (a) Two models related by declared mappings: a plan's outcome is an element of a system model realised; an activity may be read as a plan. (b) One shared graph meta-model | (b) couples the two libraries | **(a), under "Two models relate only through a declared mapping"** |
+| 14 | **An element no plan delivers** | The ruling on the second model types a plan's outcome by a system model's artifact | (a) The artifact is an element realised: a component, an interface or a datum. The delivers mapping ends in a remainder, filled by one mapping entry, kept when its own claim is true even if the mapping's claim then waits on the plan's catalog; the same rule keeps a refinement or decomposition that brings cells of its own. (b) A proposal kept only when the claim comes out true, as the planning specification's §4 has it | (a) costs a second acceptance rule; (b) stops the loop when the answer is itself a step that waits | **(a); depends on 13** |
+| 15 | **A rule the code does not yet meet** | Two edges are known forbidden | (a) The rule carries its known exceptions, a weaker rule stated as such, and the changes mapping claims they only shrink. (b) The whole rule claimed and refuted. (c) Not claimed, a report | (b) halts the project's check while an edge is held; (c) loses the claim over every other edge | **(a)** |
+| 16 | **How code is read** | Imports and the decision map are outside the model | (a) A capability that reads a file's imports, supplied by the configuration as the TypeScript binder is today; claims over its answer are decided and name it; the decision map is read the same way. (b) A parser for the code's language written in Allegro. (c) A list a host script writes, claims over it assumed | (b) is out of reach for TypeScript; (c) puts an unchecked step before the claim | **(a) for host code, (b) for Allegro code** |
+| 17 | **Which Allegro the example models** | The chapter describes the present tree | (a) Allegro as the ruled decisions rebuild it, with the chapter as evidence, so the example doubles as the architecture of `next/`. (b) The present tree | (b) models code due for deletion | **(a)** |
+| 18 | **The scope ruled for the second model** | The ruling said "components and data first, UI later"; the design session lists a user interacting with a UI as an interaction kind | (a) A UI interaction is in the model as a kind, and a model of screens stays later. (b) UI interactions later too | (b) leaves users with no interaction kind | **(a)** |
 
-## 12. Evidence and limits
+## 14. Evidence and limits
 
-**Read.** `docs/plans/rebuild.md` §1 and §2;
-`docs/plans/rebuild-acceptance.md` §1, §5 and §7;
-`next/models/specs/planning.md` whole; the inventory's contents, all of
-Part V from "Models" to the units of measure, and the entries of other
-parts named above; `docs/records/book-pass/dr5-part-5-vivace.md`,
-`docs/records/book-pass/phase-1-close.md` and
-`docs/records/book-pass/adversarial-review.md`;
-`docs/plans/planning-loop.md` §2b, the staged row for the second model
-in §5, and the ruling on it in §6; the closed amendment that planned
-that row, from the repository's history, as evidence only;
-`docs/book/vision.md` §4; the modelling languages roster in
-`docs/backlog.md`; `docs/book/vivace/planning-dsl.md` §1;
-`docs/book/units.md` §1 to §3.2 and §8; `docs/book/architecture-vocabulary.md`
-§1 and §2; `scripts/analyze/units.json`, `units-baseline.json`,
-`lanes.json` and the `reachable` function of `scripts/analyze/index.ts`;
-`next/decisions.json`.
+**Read.** The design session's description as the brief quotes it;
+`docs/book/actors-and-activities.md` whole;
+`docs/book/architecture-vocabulary.md` §2.5 and §3;
+`docs/book/units.md` §6; `next/models/specs/planning.md`; the first
+draft of this file; the inventory's contents, Part V's ruled decisions
+and each decision cited; the adversarial review; `docs/plans/rebuild.md`
+§1, §4 and §5; the scenarios' README on the acceptance stream's
+scenarios branch; `next/kernel/interface.ts` on the kernel stream's
+contracts branch; `docs/plans/planning-loop.md` §6.
 
-**Ran.** `npx tsx scripts/analyze/index.ts units --json`: 166 import
-edges, 60 permitted, 2 forbidden, 104 with a mixed end; 456 kind
-comparisons. One library-only probe on the present tree, kept in the
-scratchpad: the 35 units and their permitted dependencies as records,
-the 43 distinct unit-to-unit edges of the report that have no mixed
-end, a reachability walk with a visited set, and a check of every edge.
-It printed the 2 forbidden edges the host script reports, in 5.9 s. Its
-first version read "any" as a unit name and reported 4 more forbidden
-edges from `introspect`, which is how the wildcard's meaning surfaced.
-With "any" read as every unit, the walk found `introspect` and `cli`
-on a cycle of the permission relation. A copy with a cycle added
-through `value` ended in 6.6 s. The walk carries `assume terminates`,
-as the planning walks do; it was not run without it.
-`npx tsx next/tools/corpus.ts --by-decision` for §10's counts.
+**Ran.** `npx tsx scripts/analyze/index.ts units`: two forbidden edges,
+five mixed files, 456 kind comparisons outside allowed units.
+`npx tsx next/tools/corpus.ts --by-decision` for §12.
 
-**Not checked.** Nothing ran on a rebuilt kernel. No mapping value was
-built: §5's worked example is stated from §2b.4's probe and the
-planning specification's loop; it was not run. The data language has no
-probe. The cost of reading the project's imports through a capability
-is not measured. The decisions model of question 6 was not built.
+**Not checked.** Nothing ran on a rebuilt kernel. No model value was
+built: §10 and its agreement claim are worked by hand. The first
+draft's probe was not run again; §8 cites it. The kernel's interface
+is a branch's proposal, not merged.
 
-**What rests on what.** Use cases 1 and 5, the dependency rule's two
-forms, the finding about the wildcard and the realisation and holds
-mappings rest on the project's own structure. Use cases 2 and 4, the
-notation's collisions and the first row of §6 rest on §2b's
-measurements. The claims' strengths, the second kind of unknown, the
-result of §8 and every recommendation rest on the ruled decisions and
-the planning specification's rulings alone.
+**What rests on what.** The elements, granularity, results, the rules
+of order, concurrency and choice, decomposition, goals and the three
+named foundational claims rest on the design session. Their formal
+statements, the other two foundational claims and every recommendation
+rest on the ruled decisions and this document's reading. The example
+rests on Parts V and VI of the inventory, and its Launcher
+decomposition is this document's choice.
