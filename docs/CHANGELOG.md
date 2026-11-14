@@ -1101,6 +1101,25 @@ they halt, the verdict's `auto-PE` in place of a proposer. The
 scenarios are the acceptance statement for milestones 5, 6 and 7 of
 the rebuild. No code changed.
 
+### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
+
+B-196 (the rebuild's acceptance side).
+`next/models/specs/software-system.md` states the second pilot's model
+as the maintainer described it in a design session: system
+participants (users by role, components, external systems), activities
+made of one-to-one interactions toward a goal, and domain models that
+supply the language of content and goals. A component is decomposed
+into interfaces, subcomponents and internal activities, an interaction
+is refined into an activity, and modelling may stop at any level. A
+goal is a description; a guarantee is a claim, decided against the
+model's rules and constraints. A few foundational claims make a model
+sound. The first example is Allegro as the new tree rebuilds it. A
+first draft, a structural model of components and data, is replaced.
+The maintainer ruled its thirteen questions in the session: among
+them, an activity and a plan stay uncoupled, and a guarantee the check
+finds false is a flag, not a refutation. Nothing of the model is
+built. No code changed.
+
 ### 2026-11 — The planning model specified (B-196, chunk Q4 (the model specifications), part 1)
 
 B-196 (the rebuild's acceptance side). `next/models/specs/planning.md`
