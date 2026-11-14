@@ -430,8 +430,8 @@ policy is the gate ruled there.
   budget. While the kernel waits on cells it fills those whose answers
   have arrived and calls `advance`. It returns the lines printed and an
   end: completed, refuted, limit, waiting (a cell no capability will
-  answer), refused, or fault (the kernel or a capability threw). The
-  last two were not in the chunk's brief and are added. A runner of
+  answer), refused, or fault (the kernel or a capability threw). A
+  runner of
   `next/corpus/harness.ts` maps the end to its `RunEnd`. Inputs, module
   parameters and capabilities of more than one part are refused with a
   plain reason. `npm run launch -- <file>` runs
@@ -471,7 +471,7 @@ policy is the gate ruled there.
     cell" says a call on a capability the phase lacks stays residual.
     The launcher refuses a module that declares a capability outside
     the ceiling, before it runs, as "Only the launcher sets the
-    ceiling" and the chunk's brief have it. The two meet if the
+    ceiling" has it. The two meet if the
     residual rule is read as one for a call inside an evaluation and
     the refusal as one for a declaration.
   - **Where the launcher differs from the software system
