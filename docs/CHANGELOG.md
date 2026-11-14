@@ -1064,6 +1064,19 @@ re-proposes C111 as C171 and C172 (ask A3).
 Plan `docs/plans/rebuild.md`; lane S; human-gated. Opened 2026-11-13
 with the plan; entries newest first, directly below this line.
 
+### 2026-11 — The backlog classed under the freeze (B-195, chunk G2 (the backlog under the freeze))
+
+B-195 (the rebuild program). Every open item of the backlog carries a
+recommended class under the freeze of the present tree, in
+`docs/records/rebuild/backlog-under-the-freeze.md`. Of 117 items, 49
+are dissolved by a named ruled decision, 6 stay as cases of the
+acceptance corpus, 18 are still needed in the kernel stream, 18 in the
+acceptance stream, 6 outside the rebuild, 13 stop with the freeze, and
+7 belong to another session. The record groups each stream's share by
+chapter of the inventory. No backlog item is marked until the
+maintainer rules. The program plan is active since PR #197 merged. No
+code changed.
+
 ### 2026-11 — The rebuild planned: a kernel beside the present code (B-195, chunk G1)
 
 B-195 (the rebuild program). Phase 1 of the book pass ruled 231

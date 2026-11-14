@@ -3681,7 +3681,8 @@ table and the stream plans.
   models; chunks merge on green, with the maintainer's gate on a
   contract change, on evidence against a ruled decision and on each of
   nine milestones; the present tree is frozen. Program plan:
-  `docs/plans/rebuild.md` (chunks G1 and G2).
+  `docs/plans/rebuild.md` (chunks G1 and G2). G2 (the backlog under
+  the freeze) at its PR: `docs/records/rebuild/backlog-under-the-freeze.md`.
   **Pointer**: the plan's §5 (the milestones) and §8 (how the two
   sessions meet)
 - [ ] **B-196** (the rebuild's acceptance side) · Track R · lane Q ·
