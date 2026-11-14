@@ -459,3 +459,80 @@ policy is the gate ruled there.
     relation has a cycle through `pipeline`, `introspect` and `cli`,
     while the code's 43 unit-to-unit edges have none. The tree is
     frozen, so nothing changes.
+- **2026-11-14 — Q7, part 1 landed: the minimal launcher against the kernel's interface.**
+  `next/launch/launcher.ts` exports `launch`, a host-neutral function.
+  It takes a kernel factory, a saved program as parsed JSON, a
+  configuration (the capabilities the ceiling grants and a step budget)
+  and a target (the capabilities it supplies and its pure primitives).
+  It performs steps 2 to 7 of "Startup, step by step" for one saved
+  program. It creates the kernel once. It checks the record and the
+  needs it names, and refuses with the findings before any kernel call.
+  It refuses a declared capability the ceiling does not grant, by name,
+  before any value is made. It makes the ceiling's capabilities as
+  effectful primitive functions and applies the module function to the
+  declared ones, in the function's order, in a fresh scope, under the
+  budget. While the kernel waits on cells it fills those whose answers
+  have arrived and calls `advance`. It returns the lines printed and an
+  end: completed, refuted, limit, waiting (a cell no capability will
+  answer), refused, or fault (the kernel or a capability threw). A
+  runner of
+  `next/corpus/harness.ts` maps the end to its `RunEnd`. Inputs, module
+  parameters and capabilities of more than one part are refused with a
+  plain reason. `npm run launch -- <file>` runs
+  `next/launch/terminal.ts`, which reads the file, writes the lines to
+  stdout and exits 0 on completed, 1 otherwise. It takes the kernel
+  factory from `next/kernel/create.ts`, export `createKernel`, which
+  the kernel stream is asked to provide. Until that file exists it
+  prints `no kernel is built yet: next/kernel/create.ts does not exist`
+  and exits 2, as it does today on
+  `next/launch/fixtures/hello.json`. The launcher's 17 tests run on a
+  stand-in kernel, `next/launch/stand-in-kernel.for-tests.ts`, which
+  evaluates by substitution only.
+  - **The output capability's names.** The capability is `output` and
+    its one part is `write`, from "supply capabilities for writing
+    output" in "The terminal and the browser ship output, timers and
+    HTTP" and the use case "a logging module declares output". The
+    data form's own test already declares `output`. The part takes
+    bits read as UTF-8 text, writes one line and answers with an empty
+    structure. These names are a contract for every saved program that
+    prints, so they are the maintainer's to confirm.
+  - **What the interface and the data form did not allow.** The data
+    form has no sequencing form: two effects in written order need a
+    kernel primitive. The two-line test uses a structure of two
+    applications as the body, which the stand-in evaluates in entry
+    order; that order is the stand-in's. A refutation is a flag on
+    `evaluate`'s result and a list of values on `advance`'s; the
+    interface gives no explanation and no claim, so the launcher says
+    only that a refutation is recorded. The interface does not say
+    that `waiting` returns the same handle for a cell each time; the
+    launcher keys the answers it awaits by handle. It does not say
+    what a primitive function's throw becomes; the launcher reports it
+    as a fault. A capability of several parts reaches a module as one
+    value only with a way to select a part, which is a kernel
+    primitive's; a capability of one part is handed as that part's
+    primitive function.
+  - **One reading to confirm.** "A value that arrives later fills a
+    cell" says a call on a capability the phase lacks stays residual.
+    The launcher refuses a module that declares a capability outside
+    the ceiling, before it runs, as "Only the launcher sets the
+    ceiling" has it. The two meet if the
+    residual rule is read as one for a call inside an evaluation and
+    the refusal as one for a declaration.
+  - **Where the launcher differs from the software system
+    specification's model** (`next/models/specs/software-system.md`
+    §10). Reading the saved program from
+    the host (interaction 3, the player's read at c) is the terminal
+    entry's: the launcher is host-neutral and is given parsed JSON.
+    Loading returns the module function, not the main expression
+    (interaction 4); the launcher builds the main expression as the
+    application of that function. The output part is not bound in the
+    program's scope (interaction 5): it is an argument of the module
+    function, as "A module is a function of the capabilities it
+    declares" and the data form have it, and the scope is empty. There
+    is no configuration reader: the configuration arrives as a value,
+    and the terminal entry sets it (the ceiling `output`, a budget from
+    `--steps`) without recording which source supplied each value.
+    Writing to the terminal (interactions 8 and 10) is the sink the
+    terminal entry passes. The starter, the ceiling and the cell
+    deliverer are parts of the one function `launch`, with their state
+    local to one run.

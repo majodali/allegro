@@ -1,0 +1,13 @@
+{
+"format": "allegro-saved-program",
+"version": 1,
+"needs": [],
+"nodes": [
+{"k":"param","name":"out"},
+{"k":"bits","hex":"68656c6c6f2c20776f726c64","bits":96},
+{"k":"expression","fn":0,"args":[1]},
+{"k":"function","params":[0],"body":2}
+],
+"module": 3,
+"declares": [{"param":0,"role":"capability","name":"output"}]
+}
