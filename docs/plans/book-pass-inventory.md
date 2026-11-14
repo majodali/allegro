@@ -3087,6 +3087,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: an application embeds a kernel, binds its own data as values, evaluates a rule and reads back the result and what it rests on.
 - Notes: new, by ruling. The maintainer listed constructing, binding, evaluating and creating scopes; the review added cells, results, residuals, limits and faults. A scope that shares nothing with any other is what lets specific code be given specific capabilities. Inside Allegro the environment is still not a value: a scope is a handle of the interface.
 - Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
+- Notes (2026-11-13, with the first version of the interface): filling a cell records the value and evaluates nothing. A kernel-wide call evaluates again everything that waited on cells filled since, under a step budget: the kernel tracks what waits on what, and the host says when the work happens. Ruled against the host asking for each result it kept (it cannot know every waiter) and against evaluation inside the fill (no budget, and effects in arrival order).
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome
@@ -3238,7 +3239,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of the capabilities it declares
-- Decides: a module declares the capabilities it needs. It is evaluated in a scope that holds those and nothing else of the kind, supplied by whoever loads it.
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. Only the module being run performs effects when instantiated: instantiating the module a launcher runs performs its top-level effects in written order, and instantiating any other module performs none. A library holds capabilities inside its functions and uses them when called; one that must act at startup offers a function for the program to call. A session at a prompt is the module being run.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3249,6 +3250,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a logging module declares output; the module that imports it hands over a narrowed form that can only append to one file.
 - Notes: new, by ruling. It needs the kernel primitive for evaluating with names rebound to supply the complete set of names (noted on "The kernel's primitives are pure and few").
+- Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open. The rule on top-level effects is a second ruled decision, "Only the module being run performs effects when instantiated", stated here until it has an entry of its own: adding an entry changes the decision map's row count, which a test of the acceptance stream pins. Rejected for it: any module performing top-level effects in dependency order (the order of instantiation would be observable); a saved program that evaluates at load; effects gathered into a function under a reserved name (the maintainer's suggestion, of which the module as one function is the form without the name). It is checkable as a claim: instantiated with no capabilities, a library's residual has no effect call outside a function body. Registering a metadata field is a kernel primitive, not an effect in this sense.
 - Chapter: Capabilities and primitive functions
 
 #### Loading is three capabilities of rising strength
@@ -3329,7 +3331,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Saved programs and export
 
 #### A saved program is a recorded sequence of interface calls
-- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record of calls on the kernel's interface, and can do nothing else. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
+- Decides: a saved program rebuilds a program in a kernel without parsing. Its data form is a record that constructs values and can do nothing else: it cannot evaluate, fill a cell, set a limit or reach any scope. What it yields is a module function. It names the pure primitives it needs by content hash and never names a capability; a capability reaches it only as an argument when the module is instantiated. A host-code form is also offered: it can hold primitive functions and even implement a capability, and is loaded as host code is.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3340,6 +3342,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: the standard language is built once and saved; every later start replays the record.
 - Notes: new, by ruling. "The platform's parser engine ships already built" is its first use.
+- Notes (2026-11-13, after the adversarial review): reworded by ruling, answering issue 25 of the adversarial review (a record could contain any interface call). The first version of the data form, `next/kernel/saved-program.ts`, holds no claim outcomes, no keys and no origins, and defines the data form only; those return with the rulings on identity and on strength.
 - Chapter: Saved programs and export
 
 #### A saved program names what it needs by content hash
@@ -3669,7 +3672,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The launchers we ship
 
 #### A value that arrives later fills a cell, and a failure fills it with an exception
-- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. A failed request fills it with an exception. A call on a capability the phase lacks stays residual; it does not fail.
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. The standard language wraps each capability it ships so that a failure becomes an exception; another language may wrap it otherwise. A call on a capability the phase lacks stays residual; it does not fail.
 - Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3682,6 +3685,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a request times out; the program handles the exception and tries a second address.
 - Notes: was "Asynchronous host results arrive as future cells"; "Liveness of host sources declared per source" dissolves into "Completion is totality and liveness".
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
+- Notes (2026-11-13, after the adversarial review): the title is kept for now, though the launcher no longer makes the exception: a corpus file of the acceptance stream cites decisions by title, so a retitle is that stream's to coordinate. Answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle
