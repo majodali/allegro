@@ -32,7 +32,8 @@
     "lint:corpus": "tsx next/tools/corpus.ts --check",
     "test:next": "node --import tsx --test \"next/**/*.test.ts\"",
     "typecheck:next": "tsx next/tools/typecheck.ts",
-    "harness:present": "tsx next/corpus/harness.ts --present"
+    "harness:present": "tsx next/corpus/harness.ts --present",
+    "launch": "tsx next/launch/terminal.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",
