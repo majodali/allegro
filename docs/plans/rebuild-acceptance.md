@@ -520,7 +520,7 @@ policy is the gate ruled there.
     the refusal as one for a declaration.
   - **Where the launcher differs from the software system
     specification's model** (`next/models/specs/software-system.md`
-    §10 on the branch of Q4, part 2). Reading the saved program from
+    §10). Reading the saved program from
     the host (interaction 3, the player's read at c) is the terminal
     entry's: the launcher is host-neutral and is given parsed JSON.
     Loading returns the module function, not the main expression
