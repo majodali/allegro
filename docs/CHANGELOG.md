@@ -1088,6 +1088,14 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — One corpus case restated after the cell decision's rewording (B-196)
+
+B-196 (the rebuild's acceptance side). The kernel stream reworded the
+decision on values that arrive later: the launcher fills a cell with
+plain data and the standard language's wrapper makes a failure an
+exception. The corpus case of the rejected request states that, and is
+due at milestone 4.
+
 ### 2026-11 — The minimal launcher against the kernel's interface (B-196, chunk Q7 (the minimal launcher), part 1)
 
 B-196 (the rebuild's acceptance side). `next/launch/launcher.ts` runs a

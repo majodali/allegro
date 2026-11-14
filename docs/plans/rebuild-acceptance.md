@@ -536,6 +536,19 @@ policy is the gate ruled there.
     terminal entry passes. The starter, the ceiling and the cell
     deliverer are parts of the one function `launch`, with their state
     local to one run.
+- **2026-11-14 — One case restated after the kernel stream's first chunk.**
+  The cell decision was reworded there: the launcher fills a cell with
+  plain data, and the standard language's wrapper makes a failure an
+  exception. The one case that changes by it, the rejected request of
+  `src/test/async-futures.ts`, now says so, and moves from milestone 2
+  to 4, since the exception needs the standard language. The filling
+  alone is held by the launcher's tests.
+  - **No row of the decision map moved for the launcher.** It realises
+    "Startup, step by step" and "Only the launcher sets the ceiling"
+    as far as milestone 2 needs, on a stand-in kernel. This stream
+    moves a row when the unit realises the decision's whole statement
+    and a case passes on the kernel, as the kernel stream left its
+    rows at none for an interface that is declared and not built.
 - **2026-11-13 — Q3 drafted: the scenarios.** Eleven files under
   `next/corpus/scenarios/` and an index, for the maintainer's ruling:
   one [scenario](#def-scenario) per scene, each with who acts and why,
