@@ -358,6 +358,39 @@ doesn't seem to be a simple rule to govern when an unidentified
 symbol becomes a refutation. I'm not greatly concerned about finding
 misspellings late. This needs more thought." Not ruled.
 
+**Issue 15, ruled 2026-11-14.** The maintainer set out three ways to
+make the handling of identifiers depend on the language, since it
+"may even be specific to certain symbols within a parsed expression":
+a property on symbols; a kernel primitive in expressions that checks
+a symbol is bound; the loader calling the kernel to check bindings,
+which "would make the loader responsible for something that only the
+parse grammar knows about". The review session withdrew its proposal
+of closing a scope and offered a fourth, which adds nothing to the
+kernel. Ruled: "This approach is the right way to handle issue 15."
+
+- The kernel never refutes an unbound name; evaluating one gives a
+  residual.
+- A language checks the names it cares about. From the expression it
+  built, it computes the names used and the names bound, and states
+  the result as a claim on that constant. The claim is about the
+  expression, so it is decided at once; a claim on the name's value
+  would wait for ever. The maintainer: it checks "which symbols are
+  bound and which are not for the expression as a whole - up to that
+  point", with "a utility function for doing this kind of check being
+  defined outside the kernel, but available to parsers and language
+  specific loaders".
+- The standard language checks at the end of a text.
+- A form's mapping from what it matched to its expression is a pure
+  function that may compute.
+
+In the inventory: the new entry "A language checks the names it cares
+about"; "a name that nothing declares" leaves the causes listed in "A
+refutation marks everything computed from it"; a name nothing has
+bound is a cell, in "A missing value is a cell that is filled once".
+"Only the module being run performs effects when instantiated" now
+has its own entry, the acceptance stream having loosened the test
+that pinned the decision map's row count.
+
 ## Terms introduced
 
 - **Instantiate**: to call a module's function with its capabilities
