@@ -482,9 +482,9 @@ invocation of the platform.
 | Host platform | External system | one per system instance | Files, the terminal, the clock, the network | *ch* (Environment); "The terminal and the browser ship output, timers and HTTP" |
 | Embedding application | External system | many | Creates a kernel and calls its interface | "What the kernel's interface offers", its use case |
 
-The Kernel's interface is the proposed `next/kernel/interface.ts` of
-the kernel stream's contracts branch: construct, bind, create scopes,
-fill cells, evaluate, settle, read. The example's domain model holds
+The Kernel's interface is `next/kernel/interface.ts`, the kernel
+stream's first version: construct, bind, create scopes, fill cells,
+evaluate, advance, read. The example's domain model holds
 programs, claims, outcomes, strengths, capabilities and their parts,
 cells, obligations, proposals and results, in the ruled decisions'
 sense.
@@ -691,8 +691,9 @@ was weighed.
 draft of this file; the inventory's contents, Part V's ruled decisions
 and each decision cited; the adversarial review; `docs/plans/rebuild.md`
 §1, §4 and §5; the scenarios' README on the acceptance stream's
-scenarios branch; `next/kernel/interface.ts` on the kernel stream's
-contracts branch; `docs/plans/planning-loop.md` §6.
+scenarios branch; `next/kernel/interface.ts`, first on the kernel
+stream's contracts branch and then as merged;
+`docs/plans/planning-loop.md` §6.
 
 **Ran.** `npx tsx scripts/analyze/index.ts units`: two forbidden edges,
 five mixed files, 456 kind comparisons outside allowed units.
@@ -701,7 +702,8 @@ five mixed files, 456 kind comparisons outside allowed units.
 **Not checked.** Nothing ran on a rebuilt kernel. No model value was
 built: §10 and its agreement claim are worked by hand. The first
 draft's probe was not run again; §8 cites it. The kernel's interface
-is a branch's proposal, not merged.
+is its first version; the example follows it and will follow its
+changes.
 
 **What rests on what.** The elements, granularity, results, the rules
 of order, concurrency and choice, decomposition, goals and the three
