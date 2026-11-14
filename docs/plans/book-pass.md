@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -318,6 +318,8 @@ merges, this list is their text.
 
 ### 2.7 The monotonic pass: how a decision is taken
 
+> **Superseded 2026-11-13** by the rebuild program (`rebuild.md`) and §2.9. Kept as the record of how phase 2 was planned. Its rule that a ruled decision is fixed, and that evidence against one goes to the maintainer, stands: the hand-off is now B-197 (evidence against a ruled decision).
+
 Proposed at the PR of chunk P1b (the decision types), under R28 (the monotonic pass), R29
 (capability and implementation decisions) and R30 (who makes a
 decision's code changes); accepted by the maintainer on PR #164,
@@ -369,6 +371,8 @@ chapter whose decisions change code waits for it.
 
 ### 2.8 The two phases
 
+> **Superseded in part, 2026-11-13.** Phase 1 ran as described and closed on 2026-11-13. Phase 2, the chapters' IR, prose and code changes, is replaced by the kernel stream of §2.9: the code is rebuilt first, in a new tree, and the chapters are written from it afterwards.
+
 Ruled 2026-11-10 (R37 (two phases), §6). The pass runs in two phases so
 that every decision is sanity-checked before any chapter content is
 written.
@@ -403,6 +407,44 @@ written.
 The pilot (P2 (the pilot chapter)) stands as a phase-2 dry run of
 chapter 7; chapter 7 is reviewed again in phase 1 under R34, in its
 part.
+
+### 2.9 The kernel stream
+
+Ruled 2026-11-13 and 2026-11-14. The rebuild program
+(`rebuild.md`) makes this session the kernel stream and this file its
+plan. The stream builds, under `next/`, the kernel and its interface,
+the pure primitives, and the standard language and the parser engine
+as extensions written in Allegro: Parts II, III and IV of the
+inventory and the chapter "The kernel's interface".
+
+**How it works.** Chapter by chapter in the inventory's order. Each
+decision is taken one of three ways: its unit is carried over where
+the decision is settled in the present tree, adapted where partly
+built, written where open. The kernel is tested by host code calling
+its interface. The present tree is not edited (`rebuild.md` §4, the
+freeze).
+
+**The adversarial review comes first where it bears.** The review of
+phase 1 (`docs/records/book-pass/adversarial-review.md`) left 31
+issues. An issue is ruled before the chunk that builds on the
+decisions it concerns, in the order of that record's "Rulings taken".
+A design to prove is proved by building it, before its chapter is
+final.
+
+**The gate.** As `rebuild.md` §3: a chunk merges on green where a
+mechanical oracle decides it, no ruling is open in it and its files
+are the stream's own. The maintainer's gate stays on a change to a
+contract between the streams, on evidence against a ruled decision,
+on a milestone, and on any chunk that opens a ruling, introduces a
+term or changes this plan.
+
+**Every pull request carries a part named "For the other stream"**
+(`rebuild.md` §8).
+
+**The chapters of the book** are written after the code they
+describe exists, each from its ruled decisions and with a use case
+for each decision (R46 (DR6 ruled; every part reviewed)). No chapter
+is scheduled yet.
 
 ## 3. Oracle and stop conditions
 
@@ -542,7 +584,12 @@ are:
 | DR4 (the decision review, Part IV) | 1 | Part IV, Allegro Standard: chapters 16 to 25 | as DR1; likely two or three PRs |
 | DR5 (the decision review, Part V) | 1 | Part V, Domains built on the kernel: chapters 26 to 29 | as DR1 |
 | DR6 (the decision review, Part VI) | 1 | Part VI, Building and running programs: chapters 30 to 33 | as DR1 |
-| K1 (the kernel stream's first chunk) | rebuild | the kernel's interface file and the saved-program data form, first versions, under `next/kernel/` | the two contracts of `docs/plans/rebuild.md` §8, which both streams build against |
+| K1 (the contracts) | rebuild | the kernel's interface file and the saved-program data form, first versions, under `next/kernel/` | done 2026-11-13, PR #207 |
+| K2 (the reference kernel) | rebuild | values, scopes, cells, and evaluation of names, structures, calls and pure primitives, tested through the interface | milestone 1 of `rebuild.md`, and the kernel's half of milestone 2; needs the ruling on issue 15 of the adversarial review |
+| K3 (identity and strength) | rebuild | the rulings on issues 8 to 12, then the second versions of both contracts, with restore and keys | the maintainer's rulings; a contract change |
+| K4 (what Allegro code may do with an expression) | rebuild | one design for the review's cluster 1 with issues 14 and 23, which fixes the kernel's own primitive list | design discussion with the maintainer |
+| K5 (recursion) | rebuild | recursion and the policy for opening calls, proved by building | milestone 3, with the acceptance stream; needs K4 |
+| K6 (the rest, listed when K5 is in sight) | rebuild | the rest of Part II (metadata fields and their rules, refutation, the remaining evaluation issues); then Part IV as extensions in the first notation; then Part III's parser engine | further chunks are named by an amendment of this plan |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1418,6 +1465,14 @@ its approval.
   owed and is the maintainer's to gate; until then §2.7, §2.8 and the
   chapter rows of §5 describe a phase 2 that the rebuild program has
   replaced.
+- **2026-11-14 — the contracts merged; the plan revised for the kernel stream**
+  (the review session). The maintainer merged PR #207 with every ask
+  confirmed, and approved the kernel stream's remaining chunks. §2.9
+  states the stream; §5 lists its chunks; §2.7 and §2.8 are marked
+  superseded and kept. Issue 15 of the adversarial review (what
+  evaluating an unbound name returns) is under discussion: the
+  maintainer leans to an unbound name giving a residual, so that a
+  name may be used before it is defined.
 
 ## 8. Sessions
 
