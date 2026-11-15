@@ -275,7 +275,7 @@ Ruled 2026-11-14: where an attribute is quantitative, the domain model
 gives the rule that combines it along an activity, such as a sum along
 a dependency chain or a maximum across concurrent branches. Any other
 attribute is a plain annotation. Under "An extension registers its own
-fields; the kernel has two", an attribute is a metadata field its
+fields", an attribute is a metadata field its
 domain model registers.
 
 **Extending and specialising.** A domain model can extend or
@@ -532,7 +532,7 @@ among its claims.
 | 5 | Launcher | Kernel | Evaluate the loader's call for the main module | request | 3, 4 | "Startup, step by step" (5) |
 | 6 | Kernel | Launcher | Read a file: its path; returned: a cell | service call; asynchronous | 4, 5 | "The loader reaches files through a capability" |
 | 7 | Launcher | Host platform | Read the file; returned: its bytes, or a failure | service call | 6 | *choice* |
-| 8 | Launcher | Kernel | Fill the cell with the bytes, or with an exception on failure | service call | 7 | "A value that arrives later fills a cell, and a failure fills it with an exception" |
+| 8 | Launcher | Kernel | Fill the cell with the bytes, or with an exception on failure | service call | 7 | "A late answer or its failure fills a cell as plain data" |
 | 9 | Kernel | Launcher | The result: a refutation on the main value, with its explanation | response | 8; a choice by the Kernel among refuted, decided and undecided | "Only the kernel records the outcome of a claim"; "A predicate can explain its refusal" |
 | 10 | Launcher | Tool | The result | service call | 9 | "A tool reads a phase's result and adds no analysis of its own" |
 | 11 | Tool | Author | The summary word, and the refuted claim with its explanation | UI use | 10 | "A module's summary is the weakest strength among its claims" |
@@ -551,7 +551,7 @@ as written is unchanged, and the record names the Proposer.
 | 2 | Tool | Launcher | Check the module; returned: the result | service call, refined into activity 2's interactions 2 to 9 | 1 | *choice* |
 | 3 | Tool | Proposer | The obligations, each with its form for people, the last refusal and what is in scope | response | 2 | "Open obligations are listed for any proposer" |
 | 4 | Proposer | Tool | One value, and a reference to the obligation it answers | request | 3 | "A proposer answers with only the missing value" |
-| 5 | Tool | Kernel | Evaluate the claim with the value in the cell, in trial; returned: the outcome as data | service call | 4 | none yet (§11) |
+| 5 | Tool | Kernel | Evaluate the claim with the value in the cell, in trial; returned: the outcome as data | service call | 4 | "An evaluation can be returned as data" (§11) |
 | 6 | Tool | Kernel | Fill the cell, the Proposer recorded with the filling | service call | 5, on the branch "true" of a choice by the Tool | "Anyone may propose, and the record shows who" |
 | 7 | Tool | Proposer | Accepted, with the record; or the refusal with the claim's explanation | response | 5, 6 | "A predicate can explain its refusal" |
 
@@ -628,7 +628,7 @@ that bears on it. The kernel's designs are not this document's.
 | Need | Owning decision | Open in the review |
 |---|---|---|
 | Evaluating a goal with unconstrained values unknown, under premises from the model's constraints | "A claim about every value is decided by evaluating it with the value unknown"; "What is known about a value travels with the value" | No |
-| A trial evaluation whose outcome, a refutation included, is data: the loop judging a proposal, the guarantee check naming an element | none yet (the planning specification's §4) | "A refutation cannot be tested for, and search, proposal loops, parse recovery and budgeted evaluation all must" |
+| A trial evaluation whose outcome, a refutation included, is data: the loop judging a proposal, the guarantee check naming an element | "An evaluation can be returned as data": the kernel primitive `attempt` now exists (PR #216 (values and descriptions, solving ruled, titles made accurate)) | "A refutation cannot be tested for, and search, proposal loops, parse recovery and budgeted evaluation all must", answered by that decision |
 | An undetermined detail as a cell, filled once | "A missing value is a cell that is filled once" | No |
 | Walks over a model's graphs decided to terminate by a decrease of the set not yet visited | "Termination by bounded decrease" | "A circular definition is decided"; "The same information never recurs in an ordinary loop" |
 | A domain type imported by two modules is one value, so content types compare by identity | "Symbol identity is a fully-qualified name"; "Imported modules are typed objects whose type encapsulates" | "A module is evaluated once, and is a function of the capabilities whoever loads it supplies" |
