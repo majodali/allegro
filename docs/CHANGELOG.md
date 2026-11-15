@@ -1133,7 +1133,9 @@ order, the conditional, claims, recursion by self-application,
 structures and printing through `output`. Any other form is a finding
 and no record. `next/bootstrap/census.ts` counts, for the 216 cases due
 at milestone 3, the cases waiting on each need. The comparison harness
-gains the new tree's runner and `npm run harness:next`.
+gains the new tree's runner and `npm run harness:next`. The launcher's
+`limit` end says so when a kernel stops at its own limit with no step
+budget set.
 
 ### 2026-11 — The launcher on the reference kernel (B-196, chunk Q7 (the minimal launcher), part 2)
 

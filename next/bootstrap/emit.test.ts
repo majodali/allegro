@@ -117,6 +117,13 @@ test("a recursion whose state repeats runs to the step budget: the reference ker
   assert.equal(o.end.kind, "limit");
 });
 
+test("with no step budget the same recursion ends at the kernel's own limit, and the end says no budget was set", async () => {
+  const program = emitted("loop(x) => loop(x)\nloop(true)");
+  const o = await launch({ createKernel, program: JSON.parse(encode(program)), configuration: { ceiling: ["output"] }, target: { capabilities: [output] } });
+  assert.equal(o.end.kind, "limit");
+  assert.equal(o.end.kind === "limit" && o.end.reason, "the kernel reached its own limit; no step budget was set");
+});
+
 test("a claim that holds lets the program go on; one that does not refutes it, and no later statement runs", async () => {
   await prints('claim(true)\nprint("on")', ["on"]);
   const o = await run('print("before")\nclaim(false)\nprint("after")');

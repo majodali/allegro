@@ -247,7 +247,11 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     const left = (spent: number): { steps?: number } => (budget === undefined ? {} : { steps: Math.max(0, budget - spent) });
     const result = kernel.evaluate(kernel.expression(moduleFn, args), kernel.scope(), left(0));
     let steps = result.steps;
-    const atLimit = (): LaunchOutcome => ({ lines, end: { kind: "limit", steps, reason: `the step budget of ${budget} ran out` } });
+    // A kernel may end at a limit of its own with no budget set (its stack runs out).
+    const atLimit = (): LaunchOutcome => ({
+      lines,
+      end: { kind: "limit", steps, reason: budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out` },
+    });
     const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
       const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
       return { lines, end: { kind: "refuted", steps, reason: reasons.join("; "), reasons } };
