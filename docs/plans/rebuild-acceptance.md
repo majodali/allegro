@@ -746,4 +746,9 @@ policy is the gate ruled there.
   program through the emitter and the launcher; all 71 are reported as
   cannot be emitted yet, and no pin fails. One wording fix in the
   launcher: a run that ends at the kernel's own limit with no step
-  budget set says that, where it named a budget of `undefined`.
+  budget set says that, where it named a budget of `undefined`. After the
+  maintainer's question on signedness (2026-11-15): question 3 now asks
+  the bits, the reading the bare operators take (signed recommended),
+  where unsigned integers enter (the standard language, as a type) and
+  a literal's range; and the emitter refuses a whole-number literal of
+  2^53 or more, which the present parser rounds through a double.

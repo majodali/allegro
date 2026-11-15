@@ -79,6 +79,7 @@ export const NEEDS = {
   "method": { title: "a method of a value's type (a name after a dot on a text or a number)", state: "standard language", owner: "\"The core types are built over bits\": an operator is a method of its operand's type; milestone 4" },
   "unbound": { title: "a name the text does not bind", state: "question", owner: "question 4 (\"A language checks the names it cares about\")" },
   "block-binding": { title: "a binding inside a block, which the present tree builder substitutes at each use", state: "bootstrap", owner: "this stream: a reader of the present parse tree that keeps the binding (question 5)" },
+  "large-literal": { title: "a whole-number literal of 2^53 or more, which the present parser rounds", state: "bootstrap", owner: "this stream: a reader that takes the literal's digits from the text (question 3)" },
   "forward-value": { title: "a value binding used before its line", state: "question", owner: "question 5 (\"Order of definition carries no meaning\")" },
   "print-value": { title: "the value of print used", state: "question", owner: "question 7: the part write answers an empty structure; the present print answers its argument" },
   "print-sort": { title: "print of a value whose sort the emitter cannot see", state: "standard language", owner: "question 7: rendering by type needs the standard language's types; milestone 4" },
@@ -264,6 +265,9 @@ class Emitter {
       case "bits": {
         this.forms.add("number");
         if (n.length !== 64) return { ref: this.find("parse", `bits of width ${n.length}`, "the first notation's numbers are 64 bits"), sort: "unknown" };
+        // The present parser reads a whole-number literal through a double: from 2^53 up the value it built may not be the one written.
+        if (BigInt("0x" + (n.hex === "" ? "0" : n.hex)) >= 1n << 53n)
+          return { ref: this.find("large-literal", "a whole-number literal of 2^53 or more", "the present parser rounds it (9007199254740993 is read as 9007199254740992), so the record would hold another number than the text"), sort: "number" };
         return { ref: this.b.bits(numberBytes(n.hex, 64), 64), sort: "number" };
       }
       case "symbol":

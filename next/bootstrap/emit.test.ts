@@ -117,6 +117,12 @@ test("a recursion whose state repeats runs to the step budget: the reference ker
   assert.equal(o.end.kind, "limit");
 });
 
+test("a whole-number literal the present parser rounds is refused, and one below 2^53 is kept exactly", () => {
+  for (const text of ["x = 9007199254740993", "x = 9223372036854775807", "x = 0xFFFFFFFFFFFFFFFF", "x = 9007199254740992"]) refused(text, "large-literal");
+  const program = emitted("x = 9007199254740991");
+  assert.ok(program.nodes.some((n) => n.k === "bits" && n.bits === 64 && n.hex === "001fffffffffffff"), JSON.stringify(program.nodes));
+});
+
 test("with no step budget the same recursion ends at the kernel's own limit, and the end says no budget was set", async () => {
   const program = emitted("loop(x) => loop(x)\nloop(true)");
   const o = await launch({ createKernel, program: JSON.parse(encode(program)), configuration: { ceiling: ["output"] }, target: { capabilities: [output] } });

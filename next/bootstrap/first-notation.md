@@ -62,7 +62,8 @@ builds (`src/grammar2/tree-builder.ts`), which is what the emitter reads.
 | Form, as written | Read from (present parse) | Kernel expression | State on `origin/main` | State once #216 merges |
 |---|---|---|---|---|
 | A text `"hello"` | `typed_string(bits)` | `bits`, the UTF-8 bytes (question 2) | expressible today | the same |
-| A number `42`, `0xFF`, `1.5` | 64-bit `bits`; `typed_float(bits)` | `bits`, 64 bits, most significant byte first (question 3) | expressible today; nothing computes on one yet | the same |
+| A number `42`, `0xFF`, `1.5` | 64-bit `bits`; `typed_float(bits)` | `bits`, 64 bits, most significant byte first; the operators read a whole number as signed (question 3) | expressible today below 2^53; nothing computes on one yet | the same |
+| A whole number of 2^53 or more | 64-bit `bits`, rounded through a double | refused (question 3) | needs the bootstrap's own reader of the text | the same |
 | `true`, `false` | the names `true`, `false` | `bits` of length one, 1 and 0 | expressible today | the same |
 | A name bound in the text | a symbol, or a `param` | the node it is bound to; the record holds no name | expressible today | the same |
 | A name the text does not bind | a symbol | refused (question 4) | question 4 | the same |
@@ -110,6 +111,10 @@ read as a claim. A name bound twice, which the present tree takes as the
 later value. A binding inside a block, whose effects the present tree
 builder moves to each use and repeats: `f() =>` with `x = print("a")`,
 `print("b")`, `x`, `x` prints `b`, `a`, `a` in the present parse. A
+whole-number literal of 2^53 or more, which the present parser reads
+through a double: `9007199254740993` is built as 9007199254740992, and
+`print(9223372036854775807)` prints `-9223372036854775808` in the
+present tree. A
 `use` line, because `use contracts` and `use effects` are part of the
 standard language by rulings A and E of the scenarios, and every other
 `use` changes the grammar.
@@ -249,7 +254,7 @@ a milestone 3 case.
    each with a reference definition ("Every pure primitive the platform
    ships has a reference definition"), supplied by the launcher's target
    ("Machine arithmetic is a set of pure primitives that ships with the
-   platform"). By need: 64-bit integer `add`, `sub`, `mul`, `div`, `mod`
+   platform"). By need: 64-bit signed integer (question 3) `add`, `sub`, `mul`, `div`, `mod`
    and negation (91 cases); integer `eq`, `ne`, `lt`, `gt`, `le`, `ge`
    (67); an integer's decimal text (16); text concatenation (19); 64-bit
    float arithmetic (13), comparison (1) and text (13). The pins fix the
@@ -334,13 +339,48 @@ encoding. The output capability's part `write` already reads UTF-8
 standard language ("The kernel's plain data is a sequence of bits, and
 it computes nothing on them", its note). **Recommended: (a).**
 
-**3. A number's bits.** (a) 64 bits; an integer in two's complement, a
-float in IEEE 754 binary64; most significant byte first. (b) The same,
-least significant byte first, as the present tree stores a text. (c)
-Arbitrary precision. Cost of (a): it fixes a byte order the shipped
-primitives must take. Cost of (c): every pin that shows overflow or a
-float changes. **Recommended: (a)**, unless the kernel stream's
-primitives choose otherwise, in which case the emitter follows them.
+**3. A number's bits, and how they are read.** A whole-number literal
+is written without a sign: the present parser reads `-1` as `0 - 1`. Its
+record is 64 bits. The bits hold no sign. The sign is in the primitive
+that reads them: addition, subtraction, multiplication and equality give
+the same bits under either reading; division, remainder, ordering and
+decimal text differ. So the question has four parts.
+
+*The bits.* (a) 64 bits, most significant byte first; a literal with a
+decimal point is IEEE 754 binary64. (b) The same, least significant
+byte first, as the present tree stores a text. (c) Arbitrary precision.
+Cost of (a): it fixes a byte order the shipped primitives must take.
+Cost of (c): every pin that shows overflow or a float changes.
+
+*The reading the bare operators take.* (d) Signed, two's complement:
+`/`, `%`, the orderings and `print` on a whole number use the signed
+primitives, as the present pins have it (`-7 / 2` prints `-3`, `-7 % 3`
+prints `-1`). (e) Unsigned.
+
+*Unsigned integers.* They are the same 64 bits, read by a second set of
+shipped primitives for the operations that differ. The first notation
+has no types, so no form of it can pick them. (f) They arrive with the
+standard language, as a type whose methods are those primitives ("The
+core types are built over bits": an operator is a method of its
+operand's type). That decision's roster names Int and Float and no
+unsigned type, so the type is an addition to the roster. (g) A suffix on
+the literal in the first notation. Cost of (g): the present parser does
+not read one, so it waits on this stream's own reader and adds a form
+the standard language may not keep.
+
+*The range of a literal.* Today a literal of 2^53 or more is refused,
+because the present parser rounds it. Once this stream's reader takes
+the digits from the text: (h) accepted up to 2^63 - 1 and refused above,
+since the signed reading has no such value; (i) accepted up to 2^64 - 1
+as a bit pattern, so `0xFFFFFFFFFFFFFFFF` is the bits a signed reading
+calls -1.
+
+**Recommended: (a), (d), (f) and (h).** Under them the kernel stream
+ships three families over 64 bits: signed integer, unsigned integer and
+float. A primitive is named by its reading wherever the readings differ,
+so each has its own content hash and reference definition; those that
+agree are shipped once. The emitter follows the kernel stream's
+primitives if they choose another byte order.
 
 **4. A name the text does not bind.** (a) A finding: the emitter
 computes the names used and bound and refuses a text with any left
@@ -434,7 +474,7 @@ the tree builder's block handling and the `assert` primitive.
 path, so the new tree's typecheck does not compile `src/`. The present
 tree is not changed.
 
-**Ran.** The emitter's 23 tests, on `origin/main`. The five fixtures on
+**Ran.** The emitter's 25 tests, on `origin/main`. The five fixtures on
 `origin/main` and on the #216 kernel, with the same lines and ends on
 both. The record of a statement as an unused argument, on both: it
 loses its effect on #216. The census over the 216 cases. `npm run
