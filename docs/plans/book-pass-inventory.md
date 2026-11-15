@@ -369,6 +369,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/vision.md §1, §5
 - Notes: replaces "Language extensions are declarative". Supersedes the standing ruling that an `add` over an existing production only warns.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
+- Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
@@ -1128,7 +1129,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### A function may take an argument unevaluated
-- Decides: there are no unevaluated arguments. A delayed expression is a function with no parameters, and the notation wraps it. A callee is handed functions and values, never the text of its caller. A form that must give a branch more knowledge passes the branch as a function of the names its condition tested, and the conditional calls it with values that carry the extra fact. A solver's problem is a function of its unknowns; a solver that works on the problem's form is handed a description by the caller, who owns it. A grammar's forms work on descriptions, before anything is built.
+- Decides: no argument can be inspected. An argument is evaluated when it is needed: a composed function's arguments go into its body as written, and each is evaluated when something in the body needs its value, which in the end is a primitive function. An argument is evaluated at most once, however often the body uses it, and in the scope where it was written. An argument nothing needs is never evaluated. A function never holds a value of an expression's kind that it can look into; the one way to look inside a function is to describe it, under a right. A form that must give a branch more knowledge makes the branch a function of the names its condition tested, and applies it to values that carry the extra fact. A solver's problem is a function of its unknowns.
 - Status: open, a design to prove on the conditional first; ruled 2026-11-15, replacing the ruling of 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1138,7 +1139,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: laziness as a privilege of kernel primitives (what the code does today); passing a partly evaluated form (not needed: the function asks the kernel to evaluate what it wants evaluated)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling; it replaces the `lazy` and `sourceAware` declarations of primitives. The declaration is a property of the parameter, since the kernel has no syntax. The maintainer: the function cannot know which other extensions are loaded, so that information is carried in the expression; here each part of an expression holds the function it applies, and the context stays with the expression. Use cases to work through: `if` with branch knowledge (first), pattern matching, `&&` and `||`, reading a function's body for termination, diagnostics that show an expression, rewriting by laws.
-- Notes (2026-11-15, values and descriptions): replaced by ruling; the title is the old decision's and is kept only until the acceptance stream, whose corpus cites it 54 times, can take a retitle: the decision is now "A delayed expression is a function". The old decision let a callee hand a transformed expression back to be evaluated in its caller's context, which made the context a thing to probe by name (issue 2 of the adversarial review) and stopped any rewriting of an argument passed to an unknown function (issue 3). The maintainer had suggested it for four use cases, and now sees "separate solutions for each": conditionals passing knowledge into branches (this entry); language features such as solving and grammars (functions of unknowns, and descriptions); analysis, optimisation and transforms (descriptions, under the right to describe); reporting in the terms of the original code (origins as descriptions).
+- Notes (2026-11-15, values and descriptions): replaced by ruling; the title is the old decision's and is kept only until the acceptance stream, whose corpus cites it 54 times, can take a retitle: the decision is now "No argument can be inspected". The review session first wrote it as "a delayed expression is a function, and the notation wraps it", which is needed only in a kernel that evaluates arguments before a call; the maintainer pointed out that this confused two things. Evaluating an argument when it is needed is lazy evaluation, which was always the design and raises none of the review's objections. An unevaluated argument, in the sense that was removed, is an argument of an expression's kind that the function may inspect. The old decision let a callee hand a transformed expression back to be evaluated in its caller's context, which made the context a thing to probe by name (issue 2 of the adversarial review) and stopped any rewriting of an argument passed to an unknown function (issue 3). The maintainer had suggested it for four use cases, and now sees "separate solutions for each": conditionals passing knowledge into branches (this entry); language features such as solving and grammars (functions of unknowns, and descriptions); analysis, optimisation and transforms (descriptions, under the right to describe); reporting in the terms of the original code (origins as descriptions).
 - Chapter: Evaluation
 
 #### A call is evaluated by evaluating the function's body
@@ -1152,6 +1153,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: leaving a call as a residual behind its signature (rejected: it hides everything inside the callee); the two exceptions of the former rule, a recursion cycle during a typed compilation and a call inside a speculated `when` arm (replaced by the next decision and by sharing)
 - Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "PE Rule 1: residualise, but unfold composed calls", without its exceptions.
+- Notes (2026-11-15, arguments are evaluated when needed): the arguments go into the body as written and are evaluated when needed, at most once, in the scope where they were written ("A function may take an argument unevaluated", as replaced).
 - Chapter: Evaluation
 
 #### A recursive call is evaluated once for each state of knowledge
@@ -1941,6 +1943,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling.
 - Held finding (2026-11-12, DR4): the evaluator checks a typed call before substitution (`applyComposed`, `src/evaluator.ts`), through an installed host function.
+- Notes (2026-11-15, arguments are evaluated when needed): a consequence to test: evaluating the claim on a parameter needs the argument, so a typed function evaluates its arguments on entry. Typed code is strict in practice and long chains of pending arguments arise only in untyped code.
 - Chapter: Types as values
 
 #### `distinct` mints a fresh-symbol newtype
@@ -2198,7 +2201,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): Surface syntax of Allegro Standard (proposed)
 - Notes: planning-dsl.md §6 records two evaluator bugs caused by thunked branches in non-tail positions, fixed in `src/evaluator.ts`.
 - Notes (2026-11-12, DR4): the parser no longer wraps branches in thunks for a lazy primitive.
-- Notes (2026-11-15, values and descriptions): the form passes each branch as a function of the names its condition tested, and the conditional calls the branch taken with values that carry the extra fact. This is the first case to build under "A function may take an argument unevaluated" as replaced.
+- Notes (2026-11-15, values and descriptions): a branch is evaluated only if it is the one taken, because arguments are evaluated when needed; no wrapper is written. A form that gives a branch more knowledge makes the branch a function of the names its condition tested and applies it to values that carry the extra fact.
 - Chapter: The surface language
 
 #### The `Y of x` component-access form

@@ -1504,9 +1504,12 @@ its approval.
   is an authority; a live expression is built only from live values;
   there are no unevaluated arguments; an evaluation can be returned as
   data; an origin is a description. The reference kernel implements
-  the first four: the conditional takes its branches as functions,
-  and `describe`, `build` and `attempt` are kernel primitives;
-  quotation is gone. The kernel's primitive list is fixed at eight
+  the first four: arguments are evaluated when needed and none can be
+  inspected, and `describe`, `build` and `attempt` are kernel
+  primitives; quotation is gone. On PR #216 the maintainer corrected
+  the session's confusion of lazy evaluation with unevaluated
+  arguments, and ruled that an effect happens when its value is
+  needed. The kernel's primitive list is fixed at eight
   things, of which fields and the questions about keys are not built.
   The maintainer: this design is judged by another adversarial review
   round.

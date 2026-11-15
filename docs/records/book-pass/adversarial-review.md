@@ -458,9 +458,9 @@ agreed, two of them reversing earlier rulings:
    right a configuration grants. This reverses "any code can read an
    expression's structure". A description never yields authority.
 2. A live expression is built only from live values.
-3. There are no unevaluated arguments: a delayed expression is a
-   function, and the notation wraps it. This replaces "A function may
-   take an argument unevaluated".
+3. No argument can be inspected. This replaces "A function may take
+   an argument unevaluated". (First written as "a delayed expression
+   is a function, and the notation wraps it"; corrected below.)
 4. One kernel primitive evaluates a function under a budget and
    returns how it ended as data.
 5. An origin is a description, read under the same authority; a phase
@@ -481,6 +481,32 @@ the terms of the original code. "One solution for all this was
 tempting and ambitious. But I think we have separate solutions for
 each." And: "We'll judge all this with another adversarial review
 round."
+
+**Lazy evaluation and unevaluated arguments are two things, ruled
+2026-11-15, on PR #216.** The review session had built the reference
+kernel to evaluate arguments before a call, and so wrote decision 3
+as "a delayed expression is a function, and the notation wraps it",
+with the conditional taking its branches as functions. The maintainer
+asked when a delayed expression is needed at all, and then named the
+confusion: "what you're describing appears to be lazy evaluation. All
+composed functions have their arguments evaluated lazily, i.e. the
+arguments are passed into the function body to the functions/
+operations inside as expressions, which are only evaluated when they
+are applied to eager primitive functions. 'Unevaluated arguments'
+means the argument is of type `expression` and may be inspected
+directly within the function body." Confirmed and built:
+
+- A composed function's arguments are evaluated when needed, at most
+  once, in the scope where they were written. An argument nothing
+  needs is never evaluated.
+- No argument can be inspected. That is what decision 3 removes.
+- The conditional needs its condition and then only the branch taken;
+  a conditional a user defines needs no wrapper.
+- An effect happens when its value is needed, and the statements of a
+  body are needed in written order.
+- A consequence to test, not a rule: a typed function claims its
+  parameter types on entry, which needs the arguments, so typed code
+  is strict in practice.
 
 ## Terms introduced
 

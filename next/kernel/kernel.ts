@@ -25,22 +25,35 @@
 // symbol is a name: it evaluates to what its scope binds it to, and to a
 // residual that waits on the name where nothing binds it yet. A cell
 // evaluates to what it was filled with, and to itself until then. An
-// expression applies what its function evaluates to. A composed
-// function is applied by putting the arguments in place of its
-// parameters in the body and evaluating that. A primitive function is
-// run when every argument is fully known, and the application stays a
-// residual until then. A function's free names are tied to the scope in
-// which the function value is first evaluated, so a function means the
-// same wherever it is later called.
+// expression applies what its function evaluates to.
+//
+// Arguments are evaluated when they are needed. A composed function is
+// applied by putting its arguments, not yet evaluated, in place of its
+// parameters in the body, and evaluating that. An argument is evaluated
+// when something in the body needs its value, which in the end is a
+// primitive function: a primitive function needs every argument, and
+// runs when each is fully known. An argument is evaluated at most once,
+// however often the body uses it, and in the scope where it was
+// written. An argument nothing needs is never evaluated: an effect in it
+// does not happen and a refutation in it marks nothing. No argument can
+// be inspected: there is no value of an expression's kind that a
+// function can look into.
+//
+// An effect happens when its value is needed. A structure needs its
+// entries in order, so the statements of a body written as a structure
+// happen in the order written. A function's free names are tied to the
+// scope in which the function value is first evaluated, so a function
+// means the same wherever it is later called.
 //
 // The kernel's own primitives, by name (chunk K4 fixed the list; fields
 // and the questions about keys are not built yet):
-//   "if"        if(condition, then, else). The condition must come to one
-//               of the kernel's two truth values. Each branch is a
-//               function of no parameters, and only the one taken is
-//               called. While the condition is unknown the whole stays a
-//               residual. A form that gives a branch more knowledge makes
-//               the branch a function of the names its condition tested.
+//   "if"        if(condition, then, else). It needs its condition, which
+//               must come to one of the kernel's two truth values, and
+//               then only the branch taken. While the condition is
+//               unknown the whole stays a residual and neither branch is
+//               evaluated. A form that gives a branch more knowledge
+//               makes the branch a function of the names its condition
+//               tested, and applies it to values that carry the fact.
 //   "claim"     claim(x). True records the outcome "decided". Anything
 //               else fully known is a refutation. Unknown stays a residual.
 //   "describe"  describe(right, function). A description of the function,
@@ -51,16 +64,14 @@
 //   "build"     build(description). The function a description describes.
 //               A refutation where the description holds the identity of
 //               an unforgeable value: nothing makes authority from data.
-//   "attempt"   attempt(function, budget). Calls a function of no
-//               parameters under a budget of steps and answers how it
-//               ended, as data: a value, a refutation with its reason, or
-//               the limit reached. A refutation inside marks nothing
-//               outside.
+//   "attempt"   attempt(x, budget). Evaluates its first argument under a
+//               budget of steps and answers how that ended, as data: a
+//               value, a refutation with its reason, or the limit
+//               reached. A refutation inside marks nothing outside.
 // The truth values are the bits of length one: 1 is true, 0 is false.
-// There is no quotation and no argument taken unevaluated: a callee is
-// handed functions and values, never the text of its caller. A symbol
-// that is data comes from a description, from a cell or from a
-// primitive function.
+// There is no quotation, and no argument can be inspected. A symbol that
+// is data comes from a description, from a cell or from a primitive
+// function.
 //
 // A description is a structure whose first entry is a symbol naming its
 // form, all in the names `description.*`:
@@ -155,12 +166,22 @@ class Quoted {
 class Decided {
   constructor(readonly inner: V, readonly rests: readonly Rest[]) {}
 }
+/**
+ * An argument that has not been needed yet: an expression, the scope it
+ * was written in, and, once it has been needed, its value. It is shared
+ * by every use of the parameter, so it is evaluated at most once.
+ */
+class Lazy {
+  done = false;
+  rests: readonly Rest[] = [];
+  constructor(public value: V, readonly scope: ScopeV) {}
+}
 /** A refutation. Whatever is computed from it is it. */
 class Refuted {
   constructor(readonly reason: string, readonly about: V | undefined) {}
 }
 
-type V = Bits | Sym | Param | Struct | Expr | Fn | Prim | KernelPrim | CellV | NameRef | Quoted | Decided | Refuted | Key;
+type V = Bits | Sym | Param | Struct | Expr | Fn | Prim | KernelPrim | CellV | NameRef | Quoted | Decided | Refuted | Key | Lazy;
 
 interface Binding {
   readonly value: V;
@@ -238,7 +259,7 @@ export const createKernel: CreateKernel2 = () => {
   const isV = (x: unknown): x is V =>
     x instanceof Bits || x instanceof Sym || x instanceof Param || x instanceof Struct || x instanceof Expr || x instanceof Fn ||
     x instanceof Prim || x instanceof KernelPrim || x instanceof CellV || x instanceof NameRef || x instanceof Quoted ||
-    x instanceof Decided || x instanceof Refuted || x instanceof Key;
+    x instanceof Decided || x instanceof Refuted || x instanceof Key || x instanceof Lazy;
   const into = (x: Value | null | undefined, what: string): V => {
     if (!isV(x)) throw new InterfaceError(`${what} is not a value of this kernel`);
     return x;
@@ -248,11 +269,19 @@ export const createKernel: CreateKernel2 = () => {
     return x;
   };
 
-  /** The value a handle stands for when it is read: through a filled cell, a quotation and an outcome. */
-  const seen = (v: V): V => {
+  /** Through a filled cell and an argument, to what is there now. */
+  const through = (v: V): V => {
     for (;;) {
       if (v instanceof CellV && v.filled) v = v.value as V;
-      else if (v instanceof Quoted || v instanceof Decided) v = v.inner;
+      else if (v instanceof Lazy) v = v.value;
+      else return v;
+    }
+  };
+  /** The value a handle stands for when it is read: through a filled cell, an argument, a quotation and an outcome. */
+  const seen = (v: V): V => {
+    for (;;) {
+      v = through(v);
+      if (v instanceof Quoted || v instanceof Decided) v = v.inner;
       else return v;
     }
   };
@@ -274,6 +303,7 @@ export const createKernel: CreateKernel2 = () => {
   const known = (v: V): boolean => {
     if (v instanceof Bits || v instanceof Prim || v instanceof KernelPrim || v instanceof Quoted || v instanceof Refuted || v instanceof Fn || v instanceof Key) return true;
     if (v instanceof Decided) return known(v.inner);
+    if (v instanceof Lazy) return v.done && known(v.value);
     if (v instanceof CellV) return v.filled && known(v.value as V);
     if (v instanceof Struct) {
       if (settled.has(v)) return true;
@@ -408,6 +438,21 @@ export const createKernel: CreateKernel2 = () => {
       return v.value as V;
     }
     if (v instanceof Fn) return close(v, scope);
+    if (v instanceof Lazy) {
+      if (v.done) {
+        v.rests.forEach(rest);
+        return v.value;
+      }
+      const { value: r, rests } = collecting(() => evaluate(v.value, v.scope));
+      rests.forEach(rest);
+      v.rests = [...v.rests, ...rests];
+      v.value = r;
+      if (r instanceof Refuted || known(r)) {
+        v.done = true;
+        return r;
+      }
+      return v; // It still waits. It stays one thing, so whatever is left in it is done once.
+    }
     if (v instanceof Struct) {
       if (settled.has(v)) return v;
       const entries: (readonly [V | null, V])[] = [];
@@ -443,6 +488,39 @@ export const createKernel: CreateKernel2 = () => {
         if (known(claimed)) return new Refuted("a claim that is not true", claimed);
         return new Expr(fn, [claimed]);
       }
+      if (fn.name === "if") {
+        // The condition is needed; a branch is needed only if it is the one taken.
+        const condition = evaluate(v.args[0], scope);
+        if (condition instanceof Refuted) return condition;
+        const truth = truthOf(condition);
+        if (truth === true) return evaluate(v.args[1], scope);
+        if (truth === false) return evaluate(v.args[2], scope);
+        if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
+        return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
+      }
+      if (fn.name === "attempt") {
+        // The budget is needed; what is attempted is evaluated inside the attempt.
+        const steps = evaluate(v.args[1], scope);
+        if (steps instanceof Refuted) return steps;
+        const budgetBits = seen(steps);
+        if (!known(steps)) return new Expr(fn, [later(v.args[0], scope), steps]);
+        if (!(budgetBits instanceof Bits)) return new Refuted("an attempt's budget is a number of steps, as bits", steps);
+        const outer = budget;
+        budget = Math.min(outer, spent + numberOf(budgetBits));
+        let r: V;
+        try {
+          r = evaluate(v.args[0], scope);
+        } catch (e) {
+          if (e instanceof LimitReached && spent < outer) return data("limit");
+          throw e;
+        } finally {
+          budget = outer;
+        }
+        if (r instanceof Refuted) return data("refuted", text(r.reason));
+        if (known(r)) return data("value", r);
+        // It waits on something. What is left is attempted again, so nothing done so far is done twice.
+        return new Expr(fn, [r, steps]);
+      }
       const args: V[] = [];
       for (const a of v.args) {
         const r = evaluate(a, scope);
@@ -450,13 +528,6 @@ export const createKernel: CreateKernel2 = () => {
         args.push(r);
       }
       const waits = (): V => new Expr(fn, args);
-      if (fn.name === "if") {
-        const truth = truthOf(args[0]);
-        if (truth === undefined) return known(args[0]) ? new Refuted("a condition that is neither true nor false", args[0]) : waits();
-        const branch = args[truth ? 1 : 2];
-        if (branch instanceof Fn && branch.params.length === 0) return evaluate(branch.body, scope);
-        return known(branch) ? new Refuted("a branch of a conditional is not a function of no parameters", branch) : waits();
-      }
       if (fn.name === "describe") {
         const [right, f] = [seen(args[0]), args[1]];
         if (!known(right) || !known(f)) return waits();
@@ -472,45 +543,29 @@ export const createKernel: CreateKernel2 = () => {
         const built = build(args[0], []);
         return built instanceof Fn ? close(built, scope) : built instanceof Refuted ? built : new Refuted("only the description of a function can be built", args[0]);
       }
-      if (fn.name === "attempt") {
-        const [f, steps] = [args[0], seen(args[1])];
-        if (!known(f) || !known(steps)) return waits();
-        if (!(f instanceof Fn) || f.params.length !== 0) return new Refuted("an attempt takes a function of no parameters", f);
-        if (!(steps instanceof Bits)) return new Refuted("an attempt's budget is a number of steps, as bits", steps);
-        const outer = budget;
-        budget = Math.min(outer, spent + numberOf(steps));
-        let r: V;
-        try {
-          r = evaluate(f.body, scope);
-        } catch (e) {
-          if (e instanceof LimitReached && spent < outer) return data("limit");
-          throw e;
-        } finally {
-          budget = outer;
-        }
-        if (r instanceof Refuted) return data("refuted", text(r.reason));
-        if (known(r)) return data("value", r);
-        // It waits on something. What is left is attempted again, so nothing done so far is done twice.
-        const rest = new Fn([], r);
-        settled.add(rest);
-        return new Expr(fn, [rest, args[1]]);
-      }
       throw new KernelFault(`the kernel primitive "${fn.name}" has no evaluation`);
     }
 
+    if (fn instanceof Fn) {
+      // A composed function's arguments are not evaluated here. Each goes into the body as
+      // it was written, and is evaluated when something in the body needs it.
+      if (fn.params.length !== v.args.length)
+        return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
+      const env = new Map(fn.params.map((p, i) => [p, later(v.args[i], scope)] as const));
+      return evaluate(substitute(fn.body, env, new Map()), scope);
+    }
+    if (!(fn instanceof Prim)) {
+      if (known(fn)) return new Refuted("a call on something that is not a function", fn);
+      return new Expr(fn, v.args.map((a) => later(a, scope)));
+    }
+    // A primitive function needs every argument.
     const args: V[] = [];
     for (const a of v.args) {
       const r = evaluate(a, scope);
       if (r instanceof Refuted) return r;
       args.push(r);
     }
-    if (fn instanceof Fn) {
-      if (fn.params.length !== args.length)
-        return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${args.length} argument(s)`, undefined);
-      const env = new Map(fn.params.map((p, i) => [p, args[i]] as const));
-      return evaluate(substitute(fn.body, env, new Map()), scope);
-    }
-    if (fn instanceof Prim) {
+    {
       if (fn.declaration.arity !== args.length)
         return new Refuted(`a primitive of ${fn.declaration.arity} parameter(s) was given ${args.length} argument(s)`, undefined);
       if (!args.every(known)) return new Expr(fn, args);
@@ -527,8 +582,17 @@ export const createKernel: CreateKernel2 = () => {
       }
       return r instanceof CellV ? r : asData(r, "what a primitive returned");
     }
-    if (known(fn)) return new Refuted("a call on something that is not a function", fn);
-    return new Expr(fn, args);
+  };
+
+  /**
+   * An argument as it is handed on without being evaluated: tied to the
+   * scope it was written in, and shared, so it is evaluated at most once
+   * and means there what it meant here. What needs no evaluation is
+   * handed on as it is.
+   */
+  const later = (a: V, scope: ScopeV): V => {
+    const tied = tie(a, scope, new Map());
+    return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied)) ? new Lazy(tied, scope) : tied;
   };
 
   const truthOf = (v: V): boolean | undefined => {
@@ -564,6 +628,7 @@ export const createKernel: CreateKernel2 = () => {
     } else if (v instanceof Struct) {
       if (!settled.has(v)) v.entries.forEach(([, e]) => waitsOn(e, found, visited));
     } else if (v instanceof Decided) waitsOn(v.inner, found, visited);
+    else if (v instanceof Lazy) waitsOn(v.value, found, visited);
   };
 
   // ---- Reading ------------------------------------------------------------
@@ -631,6 +696,7 @@ export const createKernel: CreateKernel2 = () => {
     else if (v instanceof Key) text = `key ${v.module} ${v.slot}`;
     else if (v instanceof Quoted) text = `quote ${part(v.inner)}`;
     else if (v instanceof Decided) return contentOf(v.inner, binders, memo);
+    else if (v instanceof Lazy) return contentOf(v.value, binders, memo);
     else if (v instanceof Expr) text = `apply ${part(v.fn)} ${v.args.map((a) => part(a)).join(" ")}`;
     else if (v instanceof Struct) text = `structure ${v.entries.map(([k, e]) => `${k === null ? "-" : part(k)}:${part(e)}`).join(" ")}`;
     else if (v instanceof Fn) text = `function ${v.params.length} ${part(v.body, [...binders, v])}`;
@@ -708,6 +774,7 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof Sym) return data("name", new Quoted(v));
     if (v instanceof NameRef) return data("name", new Quoted(v.sym));
     if (v instanceof Decided) return describe(v.inner, binders, own);
+    if (v instanceof Lazy) return describe(v.value, binders, own);
     if (v instanceof CellV) return v.filled ? describe(v.value as V, binders, own) : data("unknown");
     if (v instanceof KernelPrim) return data("kernel", text(v.name));
     if (v instanceof Key) return data("key", text(v.module), number(v.slot));
@@ -908,8 +975,8 @@ export const createKernel: CreateKernel2 = () => {
       const v = into(value, "the value");
       const root = rootOf.get(v);
       if (root !== undefined) return out(root.value);
-      if (v instanceof CellV && v.filled) return out(v.value as V);
-      return value;
+      const now = through(v);
+      return now === v ? value : out(now);
     },
 
     kind: (v) => kindOf(into(v, "the value")),
@@ -949,7 +1016,8 @@ export const createKernel: CreateKernel2 = () => {
       for (;;) {
         if (s instanceof Refuted) return "refuted";
         if (s instanceof Decided) return "decided";
-        if (s instanceof CellV && s.filled) s = s.value as V;
+        const t = through(s);
+        if (t !== s) s = t;
         else if (s instanceof Quoted) s = s.inner;
         else break;
       }
@@ -1005,12 +1073,11 @@ export const createKernel: CreateKernel2 = () => {
       return { module: s.module, slot: s.slot };
     },
     restsOn: (value) => {
-      let v = into(value, "the value");
-      while (v instanceof CellV && v.filled) v = v.value as V;
+      const v = through(into(value, "the value"));
       return v instanceof Decided ? v.rests : [];
     },
     reasonOf: (value) => {
-      const v = into(value, "the value");
+      const v = through(into(value, "the value"));
       return v instanceof Refuted ? v.reason : undefined;
     },
     claimKey: (claim, within, restsOn) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn),
