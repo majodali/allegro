@@ -648,7 +648,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): concepts.md Part 0 (SC-1) / kinds chapter (planned II.3)
 - Notes: Significance calibrated from 5.
 - Notes (2026-11-11, DR2): ruled; each kind passes the kernel's criterion. Absorbs "Kind is a host discriminant, not a type". Carried forward to the open privacy question: a symbol is identified by name, and a name can be guessed.
-- Notes (2026-11-15, the rulings on strength and on identity): a key is an eighth kind ("A key is made with the module that holds it"). The title is kept until the acceptance stream, whose corpus cites it, can take a retitle. The alternative weighed: a key as a function made by the kernel, which Part II's wording allows; rejected because a key that is called like a function invites confusion.
+- Notes (2026-11-15, the ruling on identity): the kinds stay seven. A key is a structure that the kernel marks ("A key is made with the module that holds it"), not a kind of its own.
 - Chapter: Values
 
 #### The kernel's plain data is a sequence of bits, and it computes nothing on them
@@ -1002,6 +1002,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR2): the kernel registers `error`, `knowledge`, `warnings` and `exported` (`src/capability.ts:181`–`195`); the registration primitive is named `channel_register`.
 - Notes (2026-11-11, DR2, leftovers): absorbs "Writes gated by a capability, reads free" and "One-shot field registration with a pass epoch".
 - Held finding (2026-11-11, DR2): a second registration with the same rule in the same evaluation pass returns the held writer, a workaround for re-evaluation in the REPL.
+- Notes (2026-11-15, the ruling on identity): the kernel now has a third field of its own, the mark of a key. The title is kept until the fields are built and the entry is next reviewed.
 - Chapter: Metadata
 
 #### A field's rule is a pure, bounded function
@@ -1674,14 +1675,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Modules and programs
 
 #### A key is made with the module that holds it
-- Decides: when a module is made, the kernel derives the module's identity from its content, and makes the module's keys from that identity. The same module has the same keys in every kernel and every phase, and after it is saved and loaded. No other content has them. A holder of a key can derive further keys from data.
+- Decides: when a module is made, the kernel derives the module's identity from its content, and makes the module's keys from that identity. A key is a structure that says which module and which slot, carrying a mark that only the kernel writes and that is never carried onto another value. Anyone can build a structure with the same entries; it is not a key. Whether a value is a key, and whether two are the same key, are questions for the kernel, never answered by comparing content. The same module has the same keys in every kernel and every phase, and after it is saved and loaded. No other content has them. A holder of a key can derive further keys from data.
 - Status: partly built (the reference kernel makes modules and keys; deriving a key from data is not built); ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; Authority is an unforgeable value; The same program and the same information give the same result; Reading an expression never yields authority
+- Depends on: A module is an extension that arrives as a file; Authority is an unforgeable value; The same program and the same information give the same result; Reading an expression never yields authority; Trust in a value needs no seal
 - Significance: 4 — where every unforgeable value of a program comes from
 - Label: foundational — private members, the writers of metadata fields, and anything else held by a key
-- Options recorded: making a key as an effect, performed once (rejected: it breaks determinism and the rule that only the module being run performs effects, and a saved program's keys would be restored on trust); a key identified by the place in the text where it is made (rejected: another party can read that expression and evaluate it again); a key as a function made by the kernel (allowed by Part II's wording; rejected for an eighth kind of value)
+- Options recorded: making a key as an effect, performed once (rejected: it breaks determinism and the rule that only the module being run performs effects, and a saved program's keys would be restored on trust); a key identified by the place in the text where it is made (rejected: another party can read that expression and evaluate it again); a key as bits or a structure with no mark (it could be forged: its content is derived from a hash of public code); a key as an eighth kind of value (the first build; safe with nothing to get right, but a special case where the design already has the mechanism: "Trust in a value needs no seal"); a key as marked bits (would work; a structure's parts are readable, and a derived key has a natural shape); a key as a function made by the kernel
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Use case: a library defines a type with a private member; a program saved on a build server and loaded on a laptop reaches the member with the same key, and no other library can make that key.
 - Notes: new, by ruling; answers issues 11 and 12 of the adversarial review. To forge a module's key one must present the module's exact content, which only yields the module, whose code does not hand its keys out; change the content to export a key, and the identity and the keys change. A module's content names its parameters by their place, so renaming them changes nothing. The cost: the kernel hashes content, where it computed nothing on bits. The hash is SHA-256.

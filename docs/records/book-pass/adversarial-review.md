@@ -419,10 +419,20 @@ with the module that holds it." The kernel derives a module's
 identity from its content, and its keys from that identity. A saved
 program records key slots, never keys. Rejected: making a key as an
 effect; a key identified by the place in the text where it is made.
-A key is an eighth kind of value. Not ruled, and noted as a reading
-on the module decision: issue 13, a module instantiated once for each
+Not ruled, and noted as a reading on the module decision: issue 13, a module instantiated once for each
 set of arguments, every instance sharing the module's identity and
 keys.
+
+**What a key is, ruled 2026-11-15.** The first build made a key an
+eighth kind of value. The maintainer asked for an alternative: "I was
+assuming a key would be a Bits value or a structure." Bits or a
+structure alone can be forged, since a key's content is derived from
+a hash of public code. With a mark that only the kernel writes it
+cannot, which is the mechanism of "Trust in a value needs no seal".
+Ruled: a key is a structure that the kernel marks. The kinds stay
+seven. The mark is never carried onto another value, and whether a
+value is a key, or two are the same key, is asked of the kernel and
+never answered by comparing content.
 
 ## Terms introduced
 

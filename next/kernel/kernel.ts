@@ -106,7 +106,13 @@ class CellV {
   value: V | undefined;
   constructor(readonly source: Rest | undefined) {}
 }
-/** A key: made with its module, from the module's identity. */
+/**
+ * A key: made with its module, from the module's identity. It reads as
+ * a structure of two entries, the module's identity and the slot. The
+ * kernel's mark is that it is of this class: until metadata fields are
+ * built, that is how the reference kernel tells a key from a structure
+ * with the same entries.
+ */
 class Key {
   constructor(readonly module: string, readonly slot: number) {}
 }
@@ -486,6 +492,7 @@ export const createKernel: CreateKernel2 = () => {
 
   // ---- Reading ------------------------------------------------------------
 
+  const utf8 = new TextEncoder();
   const intern = (fqn: string): Sym => {
     let s = symbols.get(fqn);
     if (s === undefined) symbols.set(fqn, (s = new Sym(fqn)));
@@ -496,10 +503,9 @@ export const createKernel: CreateKernel2 = () => {
     if (s instanceof Bits) return "bits";
     if (s instanceof Sym || s instanceof NameRef) return "symbol";
     if (s instanceof Param) return "param";
-    if (s instanceof Struct || s instanceof Refuted) return "structure";
+    if (s instanceof Struct || s instanceof Refuted || s instanceof Key) return "structure";
     if (s instanceof Fn) return "composed-function";
     if (s instanceof Prim || s instanceof KernelPrim) return "primitive-function";
-    if (s instanceof Key) return "key";
     return "expression"; // an expression, and an unfilled cell
   };
   const wrong = (call: string, v: V): never => {
@@ -516,6 +522,10 @@ export const createKernel: CreateKernel2 = () => {
   const entriesOf = (v: V): readonly Entry[] => {
     const s = seen(v);
     if (s instanceof Refuted) return [];
+    if (s instanceof Key) {
+      const slot = Uint8Array.of(s.slot >>> 24, (s.slot >>> 16) & 255, (s.slot >>> 8) & 255, s.slot & 255);
+      return [[null, out(new Bits(utf8.encode(s.module), s.module.length * 8))], [null, out(new Bits(slot, 32))]];
+    }
     return s instanceof Struct ? s.entries.map(([k, e]) => [k === null ? null : out(k), out(e)] as const) : wrong("entriesOf", v);
   };
 
@@ -734,9 +744,11 @@ export const createKernel: CreateKernel2 = () => {
       const v = into(value, "the value");
       return v instanceof Fn ? moduleIds.get(v) : undefined;
     },
+    isKey: (value) => seen(into(value, "the value")) instanceof Key,
     keyOf: (value): KeyDescription => {
       const s = seen(into(value, "the value"));
-      return s instanceof Key ? { module: s.module, slot: s.slot } : wrong("keyOf", s);
+      if (!(s instanceof Key)) throw new InterfaceError("keyOf: the value is not a key");
+      return { module: s.module, slot: s.slot };
     },
     restsOn: (value) => {
       let v = into(value, "the value");

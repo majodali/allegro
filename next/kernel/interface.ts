@@ -70,7 +70,7 @@ export interface Cell extends Value {
   readonly [cellBrand]: true;
 }
 
-/** The representation kinds: the seven of the first version, and the key. A kind says how a value is represented; it is not a type. */
+/** The seven representation kinds. A kind says how a value is represented; it is not a type. */
 export type Kind =
   | "bits"
   | "symbol"
@@ -78,9 +78,7 @@ export type Kind =
   | "expression"
   | "composed-function"
   | "primitive-function"
-  | "structure"
-  /** A key: an unforgeable value made with its module. Read only by `Kernel2.keyOf`. */
-  | "key";
+  | "structure";
 
 /** One entry of a structure. An array is a structure whose entries all have a null key. */
 export type Entry = readonly [key: Value | null, value: Value];
@@ -338,7 +336,12 @@ export interface Kernel2 extends Kernel {
    * capabilities, inputs, other modules.
    *
    * The kernel derives the module's identity from the function's content
-   * and makes one key for each slot from that identity. It returns the
+   * and makes one key for each slot from that identity. A key is a
+   * structure that the kernel marks: its entries say which module and
+   * which slot, and anyone can build a structure with the same entries,
+   * but only the kernel can mark one, and the mark is never carried onto
+   * another value. So a key is told from a lookalike by `isKey`, never
+   * by its content. It returns the
    * module function: a composed function of the remaining parameters,
    * with the keys in place. The same content gives the same identity and
    * the same keys in every kernel; no other content gives them.
@@ -350,7 +353,9 @@ export interface Kernel2 extends Kernel {
   module(fn: Value, keys: number): Value;
   /** The identity of the module a module function was made as, or undefined for any other value. */
   moduleOf(value: Value): string | undefined;
-  /** Reads a key. An InterfaceError for a value of any other kind. */
+  /** True for a key: a structure carrying the kernel's mark. False for a structure with the same entries and no mark. */
+  isKey(value: Value): boolean;
+  /** Reads a key. An InterfaceError for a value that is not one. */
   keyOf(value: Value): KeyDescription;
 
   // ---- What a result rests on -------------------------------------------

@@ -380,7 +380,12 @@ test("a module's keys are made from its identity, one for each slot", () => {
   const [k0, k1] = [k.param("k0"), k.param("k1")];
   const m = k.module(k.composedFunction([k0, k1], k.structure([[null, k0], [null, k1]])), 2);
   const made = k.entriesOf(k.evaluate(call(m), k.scope()).value).map(([, v]) => v);
-  assert.deepEqual(made.map((v) => k.kind(v)), ["key", "key"]);
+  assert.deepEqual(made.map((v) => k.kind(v)), ["structure", "structure"], "a key is a structure the kernel marks, not a kind of its own");
+  assert.deepEqual(made.map((v) => k.isKey(v)), [true, true]);
+  const lookalike = k.structure(k.entriesOf(made[0]).map(([key, v]) => [key, v] as const));
+  assert.equal(k.isKey(lookalike), false, "the same entries, and no mark");
+  assert.throws(() => k.keyOf(lookalike), /not a key/);
+  assert.equal(new TextDecoder().decode(k.bitsOf(k.entriesOf(made[0])[0][1]).bytes), k.moduleOf(m), "its entries say which module");
   assert.deepEqual(made.map((v) => k.keyOf(v).slot), [0, 1]);
   assert.equal(k.keyOf(made[0]).module, k.moduleOf(m));
   assert.notEqual(made[0], made[1]);
