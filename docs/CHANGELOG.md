@@ -574,6 +574,34 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Decision titles made accurate.** Seven entries are
+  retitled, and two are new: the general rule that an expression is
+  evaluated when its value is needed, and "Describing a function
+  requires authority", split from the entry it had been written
+  into. Whether a structure needs its entries is open. The decision
+  map keeps each former title. The table is in
+  `docs/records/book-pass/adversarial-review.md`, "Titles made
+  accurate". The inventory holds 239 decisions.
+- **2026-11-15 — Solving ruled.** A solver's problem is a function of
+  its unknowns. A new kernel primitive specializes a function: it
+  evaluates the body with the parameters unknown and returns a
+  function whose body is the residual. The solver describes that
+  function to read the residual and calls it to try a candidate. Each
+  part of a residual keeps the module whose function it came from, so
+  specializing a wrapper reads nobody's body. Recorded, not built:
+  the build is the next chunk's. The inventory holds 237 decisions.
+- **2026-11-15 — Values and descriptions (K4).** Five rulings on what
+  Allegro code may do with an expression, two reversing earlier ones.
+  A function is opaque: describing one takes a key of the module that
+  made it, or the inspection right, and a description is plain data
+  that names an unforgeable value without holding it. A function is
+  built from a description only when it holds none. No argument can
+  be inspected. Arguments are evaluated when they are needed, at most
+  once, in the scope where they were written, so a conditional needs
+  only the branch taken and an effect happens when its value is
+  needed. One primitive returns how an evaluation ended, as data. In
+  `next/kernel/kernel.ts`: lazy arguments, `describe`, `build`,
+  `attempt`; quotation removed. The inventory holds 236 decisions.
 - **2026-11-15 — Identity and strength ruled; the contracts' second
   versions (K3).** A key is made with the module that holds it: the
   kernel hashes a module's content and makes its keys from that

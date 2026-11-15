@@ -1496,6 +1496,35 @@ its approval.
   are left as they were, so the acceptance stream's code compiles
   unchanged. The inventory gains "A key is made with the module that
   holds it".
+- **2026-11-15 — values and descriptions** (the review session;
+  chunk K4 (what Allegro code may do with an expression)). The
+  maintainer merged PR #215 and ruled five decisions for the
+  adversarial review's cluster 1 with issues 14 and 23, two of them
+  reversing earlier rulings: a function is opaque and describing one
+  is an authority; a live expression is built only from live values;
+  there are no unevaluated arguments; an evaluation can be returned as
+  data; an origin is a description. The reference kernel implements
+  the first four: arguments are evaluated when needed and none can be
+  inspected, and `describe`, `build` and `attempt` are kernel
+  primitives; quotation is gone. On PR #216 the maintainer corrected
+  the session's confusion of lazy evaluation with unevaluated
+  arguments, and ruled that an effect happens when its value is
+  needed. The kernel's primitive list is fixed at eight
+  things, of which fields and the questions about keys are not built.
+  The maintainer: this design is judged by another adversarial review
+  round.
+- **2026-11-15 — solving ruled** (the review session). A solver's
+  problem is a function of its unknowns; a kernel primitive
+  specializes a function with its parameters unknown; the solver
+  describes the residual and calls it with candidates; each part of a
+  residual keeps the module it came from. Built in the next chunk,
+  with recursion and the policy for opening calls. The inventory
+  holds 237 decisions.
+- **2026-11-15 — decision titles made accurate** (the review
+  session), at the maintainer's request: seven retitled, two entries
+  added, 239 decisions. Open: whether a structure needs its entries,
+  and how the order of effects is determined. The table is in the
+  record of the adversarial review, "Titles made accurate".
 
 ## 8. Sessions
 
