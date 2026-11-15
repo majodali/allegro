@@ -532,7 +532,7 @@ among its claims.
 | 5 | Launcher | Kernel | Evaluate the loader's call for the main module | request | 3, 4 | "Startup, step by step" (5) |
 | 6 | Kernel | Launcher | Read a file: its path; returned: a cell | service call; asynchronous | 4, 5 | "The loader reaches files through a capability" |
 | 7 | Launcher | Host platform | Read the file; returned: its bytes, or a failure | service call | 6 | *choice* |
-| 8 | Launcher | Kernel | Fill the cell with the bytes, or with an exception on failure | service call | 7 | "A late answer or its failure fills a cell as plain data" |
+| 8 | Launcher | Kernel | Fill the cell with the bytes, or with the failure, as plain data | service call | 7 | "A late answer or its failure fills a cell as plain data" |
 | 9 | Kernel | Launcher | The result: a refutation on the main value, with its explanation | response | 8; a choice by the Kernel among refuted, decided and undecided | "Only the kernel records the outcome of a claim"; "A predicate can explain its refusal" |
 | 10 | Launcher | Tool | The result | service call | 9 | "A tool reads a phase's result and adds no analysis of its own" |
 | 11 | Tool | Author | The summary word, and the refuted claim with its explanation | UI use | 10 | "A module's summary is the weakest strength among its claims" |

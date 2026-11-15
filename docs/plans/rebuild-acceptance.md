@@ -729,7 +729,7 @@ policy is the gate ruled there.
     extensions, and configuration sources, each with the record of which
     source supplied a value. The terminal entry does not yet set
     `restoreAs`.
-- **2026-11-15 — The corpus follows the kernel stream's K4.** PR #216
+- **2026-11-15 — The corpus follows the kernel stream's K4 (values and descriptions).** PR #216
   (values and descriptions, solving ruled, titles made accurate)
   retitled seven decisions and added three rows to the decision map.
   - **The titles followed.** `npx tsx next/tools/corpus.ts
@@ -769,3 +769,13 @@ policy is the gate ruled there.
     evaluation can be returned as data") for the trial evaluation.
     The check prints:
     `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1585, changes 261, detail 146) · unclassed 0 — consistent`.
+  - **Added in review.** Six cases about origins are restated under "A
+    value's origin is a description": an origin is read under the
+    inspection right, and a run keeps none unless its configuration
+    says so. None changes class. Three passages of the planning
+    specification that the rulings made false are corrected: the
+    completion search (§4) specializes and describes where it took the
+    claim unevaluated; question 13 and §13 say the origin issue is
+    ruled. Left as written, for the maintainer: §2's "a choice is an
+    unknown, one of a stated set of options", since unknowns that carry
+    facts wait for metadata fields.

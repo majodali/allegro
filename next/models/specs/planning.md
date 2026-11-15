@@ -198,14 +198,15 @@ treats them.
 **Two open kernel designs.** The model needs two things of the kernel
 and designs neither.
 
-- "A solver reads the residual of its problem". The completion search takes
-  the open plan's claim unevaluated, evaluates it with the remainder
-  unknown, and reads which parts are resolved. A gap is a part left
-  unresolved: an input whose producer depends on the remainder. The
-  model needs the functions that return the resolved and unresolved
-  parts of a residual, which that decision says Vivace supplies, and a
-  way to evaluate the claim with a candidate in place of the unknown
-  without filling the cell, which its note names a kernel primitive.
+- "A solver reads the residual of its problem". The open plan's claim
+  is a function of the remainder. The completion search specializes it
+  with the remainder unknown and describes the residual to read which
+  parts are resolved. A gap is a part left unresolved: an input whose
+  producer depends on the remainder. A candidate is tried by calling
+  the specialized function with it, which fills no cell. The model
+  needs the right to describe the residual, which the caller grants,
+  and "A function can be specialized with its parameters unknown",
+  which is not built yet.
 - "A missing value is a cell that is filled once". The remainder is
   such a cell. A refused candidate never fills it. An accepted one
   fills it once, with the entry and a new remainder. The model needs a
@@ -614,8 +615,9 @@ Ordered so that a question comes after the ones it depends on.
     duplicated string and lets a notation name things implicitly. It
     costs the model its independence from how a value was written: a
     plan built by a program that read a file (use case 5) has no
-    binding to take a name from, and the adversarial review asks who
-    may read an origin and when a phase may erase one (§13).
+    binding to take a name from, and "A value's origin is a description"
+    as ruled on 2026-11-15 lets an origin be read only under the
+    inspection right and lets a run keep none (§13).
     **Recommended: (a)**: a name that a finding must show is data of
     the model; an origin locates the text and is not relied on for
     meaning.
@@ -665,8 +667,9 @@ alone.
 
 The review session ran an adversarial review of phase 1's decisions on
 2026-11-13 (`docs/records/book-pass/adversarial-review.md`): 31
-issues, none ruled. This specification was drafted without it and checked against
-it afterwards. Six issues bear on it. Each is the kernel's or the
+issues, none ruled at that date. This specification was drafted without it and checked against
+it afterwards. Rulings were taken on 2026-11-14 and 2026-11-15; a row
+below says so where one settles it. Six issues bear on it. Each is the kernel's or the
 inventory's to settle; the specification states what it needs and
 changes when the issue is ruled.
 
@@ -675,7 +678,7 @@ changes when the issue is ruled.
 | A refutation cannot be tested for, yet search, proposal loops and budgeted evaluation must | §4, the refusal; §5, a solver that calls the residual with a candidate | A trial evaluation whose outcome is data to the caller, a refutation included. Without it neither the loop nor design B of §5 can be written as an ordinary function. The kernel primitive `attempt` now exists for it ("An evaluation can be returned as data") |
 | An undeclared name is a refutation, and an unknown is an unbound symbol | §4 and §5: the unknowns here are declared, a cell for the catalog remainder and a stated set of options for a choice | Nothing new: no unknown of the planning model is an undeclared name. The specification does not depend on how the issue is ruled |
 | A proposal that is accepted runs later with the capabilities of the place it filled | §4, a proposal: a catalog entry can hold predicates | A value that fills an unknown holds no capability unless a claim says otherwise, which is the review's own candidate ruling |
-| Origins disclose data, cost memory, and a phase may need to erase them | §2, §8 and question 13: names and renderings | Names that findings show are fields of the model (question 13 (a)); an origin is used to locate text only |
+| Origins disclose data, cost memory, and a phase may need to erase them | §2, §8 and question 13: names and renderings | Names that findings show are fields of the model (question 13 (a)); an origin is used to locate text only. Ruled 2026-11-15 ("A value's origin is a description"): an origin is read under the inspection right, and a run keeps none unless its configuration says so |
 | A circular definition is decided; ordinary recursion never repeats a state | §3, the walks' termination; §7, the last row | The walks over a plan are ordinary recursion over a finite tree. The model needs that recursion decided by a decrease on a child list, and until then the termination claim stays assumed and named |
 | An effect waits for undecided claims that a run can never decide | §3, promises; question 9 | A promise is a claim about the value a step produces, never about the plan value. Printing or saving a checked plan consumes the plan, so an undecided promise does not hold it back. A phase that runs a plan would meet the issue in full, which is one reason question 8 leaves running out |
 
