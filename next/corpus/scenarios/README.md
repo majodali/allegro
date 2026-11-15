@@ -16,9 +16,9 @@ others refer to it.
 
 | Scenario | Rung | Milestone | Steps | Changes by ruling | Open questions |
 |---|---|---|---|---|---|
-| [rung1-01-discharge.md](rung1-01-discharge.md) | 1 | 5 | 6 | 6 | 3 |
-| [rung1-02-counterexamples.md](rung1-02-counterexamples.md) | 1 | 5 | 5 and break it | 5 | 3 |
-| [rung1-03-effects.md](rung1-03-effects.md) | 1 | 5 | 5 and break it | 4 | 3 |
+| [rung1-01-discharge.md](rung1-01-discharge.md) | 1 | 5 | 6 | 6 | 2 |
+| [rung1-02-counterexamples.md](rung1-02-counterexamples.md) | 1 | 5 | 5 and break it | 5 | 0 |
+| [rung1-03-effects.md](rung1-03-effects.md) | 1 | 5 | 5 and break it | 4 | 0 |
 | [rung1-04-laws.md](rung1-04-laws.md) | 1 | 5 | 7 and break it | 6 | 2 |
 | [rung1-05-prover-loop.md](rung1-05-prover-loop.md) | 1 | 5 | 6 and break it | 4 | 6 |
 | [rung2-01-dimensions.md](rung2-01-dimensions.md) | 2 | 6 | 7 and break it | 5 | 1 |
@@ -41,7 +41,7 @@ or a break-it case.
 - **"A module's summary is the weakest strength among its claims".** The
   grade `proven-safe` and the heading "Verdict (verified)" become one
   word, the weakest strength. It is decided for rung 1, scene 3. For
-  rung 1, scene 1, it is decided or assumed (that scene's question 3).
+  rung 1, scene 1, it is decided or assumed (that scene's question 2).
   This follows from ruling 5: it is assumed for rung 1, scene 4, where
   no law is left undecided. For every program that draws the units
   library it is the weakest strength among the file's claims and the
@@ -68,7 +68,9 @@ or a break-it case.
   1, scene 2, lines 9, 10 and 15; rung 2, scene 1, lines 22 and 27; rung
   2, scene 2, line 20; rung 3, scene 1, lines 175 and 179; rung 3, scene
   2, lines 162 and 194. For the refinements of rung 1, scene 2, "Constructing
-  a refined value claims its predicate" makes each a refutation. Ruling 3
+  a refined value claims its predicate" would make each a refutation, so
+  the program calls the predicate and prints its explanation (ruling B
+  of round 2). Ruling 3
   makes the mismatches of rung 2 (lines 22, 27 and 20) refutations
   carrying the same messages, moved to break-it cases. Ruling 4 makes
   `validate` (rung 3, scene 1, lines 175 and 179) answer its explanation
@@ -150,6 +152,27 @@ stream's reading of a ruling, not the maintainer's word.
    checked again every build, never trusted. Changes: rung 1, scenes 1
    and 4; rung 2, scene 3.
 
+**Per-scene rulings, round 2.** The maintainer then took six
+recommendations on the scenes' own questions: "I agree with all six
+recommendations, A through F".
+
+- **A.** `requires`, `ensures` and the `effects` clause are part of the
+  standard language with no `use`. They stay separate extensions inside
+  it, so a configuration can drop one. Rung 1, scenes 1 and 3.
+- **B.** Rung 1, scene 2 shows its three counterexamples by calling the
+  predicate, which answers its explanation, and printing it. One
+  break-it case keeps a real failed construction that halts.
+- **C.** A refused clause is rendered as written, with the value: "`_ >
+  0` does not hold of -5". No bound is derived. Rung 1, scene 2.
+- **D.** A build reports every refutation that does not rest on an
+  earlier one, and performs no effect after the first. Rung 1, scene 2.
+- **E.** An `effects` clause names capabilities by their own names, so
+  `effects output`; `pure` stays the word for holding none. The output
+  capability is `output`, its one part `write`. Rung 1, scene 3.
+- **F.** The result holds the capabilities every function uses, as a
+  reported fact, not a claim; a tool shows it when configured. Rung 1,
+  scene 3.
+
 Two needs go to the kernel stream. A guard must treat an explanation as
 not true (rulings 3 and 4). The standard deriver is an extension the
 build runs; it asks nothing of the kernel beyond the trial evaluation
@@ -158,21 +181,21 @@ the kernel already owes.
 ## The scenes' open questions
 
 The 37 questions of the first draft, by scene and number in that
-draft. Nine are settled; 28 stay open, each with the option the stream
-recommends. Five questions are new with the rulings and follow the
-table. A scene's file gives each open question in full under its
+draft. Nine are settled by the five rulings and seven by the round 2
+rulings; 21 stay open, each with the option the stream recommends.
+Five questions are new with the rulings and follow the table. A scene's file gives each open question in full under its
 current number.
 
 | Scene | Question | Settled or open |
 |---|---|---|
 | rung1-01, 1 | Strength of the twelve equality laws and two coercion claims | Settled by ruling 5 for the laws. The coercion part stays open as the scene's question 1 |
-| rung1-01, 2 | Whether `use contracts` survives as a module | Open. Recommended: the clauses are part of the standard language ("A body clause is a notation"), and `use contracts` goes |
-| rung1-02, 1 | How the three counterexamples are shown | Open. Recommended: three break-it cases, each a refutation, as rung 2, scene 1 moves its mismatches |
-| rung1-02, 2 | How the clause `_ > 0` is rendered | Open. Recommended: the clause as written, with the bound derived from it |
-| rung1-02, 3 | Whether milestone 5 reports all four refutations of one file | Open. Recommended: yes; a phase may go on evaluating to report every refutation |
-| rung1-03, 1 | The name of the output capability in an `effects` clause | Open. Recommended: `output`, the name of the launcher's capability |
-| rung1-03, 2 | Whether the bound needs `use effects` | Open. Recommended: no; the clause is part of the standard language |
-| rung1-03, 3 | Whether `inspect` shows the capabilities a function holds when it claims nothing | Open. Recommended: yes, as a report |
+| rung1-01, 2 | Whether `use contracts` survives as a module | Settled, ruled 2026-11-15, round 2 (A) |
+| rung1-02, 1 | How the three counterexamples are shown | Settled, ruled 2026-11-15, round 2 (B) |
+| rung1-02, 2 | How the clause `_ > 0` is rendered | Settled, ruled 2026-11-15, round 2 (C) |
+| rung1-02, 3 | Whether milestone 5 reports all four refutations of one file | Settled, ruled 2026-11-15, round 2 (D) |
+| rung1-03, 1 | The name of the output capability in an `effects` clause | Settled, ruled 2026-11-15, round 2 (E) |
+| rung1-03, 2 | Whether the bound needs `use effects` | Settled, ruled 2026-11-15, round 2 (A) |
+| rung1-03, 3 | Whether `inspect` shows the capabilities a function holds when it claims nothing | Settled, ruled 2026-11-15, round 2 (F) |
 | rung1-04, 1 | A refused `by` term on a claim that holds by evaluation | Settled by ruling 2 |
 | rung1-04, 2 | Whether binding a proof value is a claim | Open. Recommended: no; the value carries the record of what it rests on |
 | rung1-04, 3 | Whether Cell's refl and sym are decided | Settled by ruling 5: derived, assumed while Int's are |
@@ -208,7 +231,7 @@ New with the rulings, all open:
 | Scene | Question | Recommended |
 |---|---|---|
 | rung1-01, 1 | Whether the two Int-to-Float coercion claims are assumed or decided | Assumed and named with the platform, as Int's laws |
-| rung1-01, 3 | Whether a theorem decided by evaluation, with a term that uses an assumed law, is decided or assumed | Decided, with the proof's record naming the assumed law |
+| rung1-01, 2 | Whether a theorem decided by evaluation, with a term that uses an assumed law, is decided or assumed | Decided, with the proof's record naming the assumed law |
 | rung1-04, 2 | Whether the standard deriver attempts a law the file has assumed | No, since an assumed claim is not undecided |
 | rung1-05, 5 | Which claim the prover-loop walkthrough uses, now that `double_four` is decided by evaluation | A claim over every value of a type that evaluation leaves undecided |
 | rung1-05, 6 | Whether a tool offers a refused proposal on a decided claim for repair | No; the result holds the refusal, and a tool shows it where configured |

@@ -24,7 +24,9 @@ the run to carry nothing of the checks.
    exit. With `x` unknown and known to be at least 1, `requires` holds
    from that knowledge. The sum is known to be at least 2, so `ensures`
    and the return type hold. Each is decided with the value unknown, so
-   none stays in the residual. The run prints 14.
+   none stays in the residual. `requires` and `ensures` are part of the
+   standard language, with no `use contracts` (ruling A of 2026-11-15,
+   round 2). The run prints 14.
 3. **Does.** States `theorem four: 2 + 2 == 4` and
    `theorem half_of_eight: 4 == 8 / 2`. **Must find.** Each holds,
    decided by evaluation. No proposal is involved.
@@ -46,7 +48,7 @@ the run to carry nothing of the checks.
    not rest on the laws: `2 + 2 == 4` uses the primitive and not the
    law. The module's summary is the weakest strength among its claims;
    whether the theorems of step 4 count as decided or assumed is open
-   question 3.
+   question 2.
 6. **Does.** Runs the program. **Must find.** It prints 5, 14 and 4. The
    theorems and the contract leave nothing to evaluate in the run.
 
@@ -60,7 +62,7 @@ scene 2's (`rung1-02-counterexamples.md`).
 - "A module's summary is the weakest strength among its claims": the
   grade `proven-safe` becomes one word, the weakest strength among the
   module's claims: decided, or assumed if the theorems of step 4 take
-  the strength of the Int laws their terms used (open question 3).
+  the strength of the Int laws their terms used (open question 2).
 - "Four strengths, one vocabulary": `inspect`'s "rests on: proven
   backing only" and `verify`'s "discharged" counts give way to the four
   strengths.
@@ -86,7 +88,10 @@ scene 2's (`rung1-02-counterexamples.md`).
 
 Settled: the strength of the twelve equality laws (ruling 5 of
 2026-11-15). Its part on the coercion claims is not settled, and stays
-as question 1.
+as question 1. Settled, ruled 2026-11-15, round 2: question 2 of the
+draft, whether `use contracts` survives (ruling A: `requires` and
+`ensures` are part of the standard language with no `use`, a separate
+extension inside it that a configuration can drop).
 
 1. The verdict lists the two Int-to-Float coercion claims as discharged,
    at the tier the code calls `kernel`. Ruling 5 names the equality
@@ -94,11 +99,7 @@ as question 1.
    with the platform, as Int's laws are, or decided? Recommended:
    assumed and named, as Int's laws, until proved against the
    primitives' reference definitions.
-2. Does `use contracts` survive as a module, or are `requires` and
-   `ensures` part of the standard language without it ("A body clause is
-   a notation")? Recommended: part of the standard language, and `use
-   contracts` goes.
-3. `four_flipped` and `chained` hold by evaluation, and their terms use
+2. `four_flipped` and `chained` hold by evaluation, and their terms use
    Int's symmetry and transitivity laws, which are assumed (ruling 5).
    Is each theorem decided, from evaluation, with its proof recording
    the assumed law? Or assumed, from its term? Recommended: decided,

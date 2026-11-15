@@ -602,3 +602,13 @@ policy is the gate ruled there.
     not true (rulings 3 and 4). The standard deriver is an extension
     the build runs; it asks nothing of the kernel but the trial
     evaluation the kernel already owes.
+  - **Round 2, the same day.** The maintainer took six recommendations
+    on per-scene questions, A to F, in the stream's session: the
+    contract and `effects` clauses need no `use`; rung 1, scene 2
+    calls its predicates and prints their explanations, rendered as
+    the clause written with the value; a build reports every
+    refutation that rests on no earlier one; `effects output` names
+    the capability; a function's capabilities are a reported fact.
+    Seven more of the 37 questions are settled, 21 stay open. Three
+    pins of rung 1, scene 2 restate their new result, and one note
+    follows a renumbered question.
