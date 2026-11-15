@@ -751,4 +751,10 @@ policy is the gate ruled there.
   the bits, the reading the bare operators take (signed recommended),
   where unsigned integers enter (the standard language, as a type) and
   a literal's range; and the emitter refuses a whole-number literal of
-  2^53 or more, which the present parser rounds through a double.
+  2^53 or more, which the present parser rounds through a double. A
+  second question from the maintainer, how an operator's integer or
+  float version is chosen without types, became question 11: 16 cases
+  apply an operator where the emitter sees no operand's sort; the
+  recommendation is one meaning for each operator, the signed integer
+  one, with the float and text primitives bound by the standard
+  language's types. The proposal now asks eleven questions.

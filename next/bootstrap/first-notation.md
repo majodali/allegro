@@ -5,7 +5,7 @@
 > (`docs/plans/rebuild.md`, "How the two sessions meet", rule 2). This
 > document is chunk Q5 (the first notation and the bootstrap), part 1,
 > of B-196 (the rebuild's acceptance side). It proposes the forms and
-> asks ten questions. The emitter `next/bootstrap/emit.ts` builds the
+> asks eleven questions. The emitter `next/bootstrap/emit.ts` builds the
 > forms marked *expressible today* under the recommended options; the
 > census `next/bootstrap/census.ts` measures what the rest wait on.
 >
@@ -76,7 +76,7 @@ builds (`src/grammar2/tree-builder.ts`), which is what the emitter reads.
 | A conditional `if c then a else b` | `eval_if(c, thunk, thunk)` | `expression(kernel if, [c, a, b])`; the thunks are dropped | expressible today | the same; no branch needs wrapping |
 | `&&`, `\|\|`, `!`, `and`, `or` | `typed_and(a, thunk)`, `typed_or`, `typed_not` | `if(a, b, false)`, `if(a, true, b)`, `if(a, false, true)` | expressible today | the same |
 | `==`, `!=` on texts or truth values | `bits_eq`, `bits_neq` | the kernel's primitive for telling bits apart | needs a kernel primitive, not in #216 | the same |
-| Arithmetic, comparison on numbers | `bits_add` and the rest, `bits_lt` and the rest | shipped pure primitives, by content hash (section 4) | needs a shipped pure primitive | the same |
+| Arithmetic, comparison on numbers | `bits_add` and the rest, `bits_lt` and the rest | shipped pure primitives, by content hash (section 4); which family an operator takes is question 11 | needs a shipped pure primitive | the same |
 | `+` on texts, interpolation | `bits_add` of texts | a shipped text primitive | needs a shipped pure primitive | the same |
 | A claim `claim(e)`, as a statement | an application of the name `claim` | `expression(kernel claim, [e])` (question 1) | expressible today | the same |
 | A claim inside an expression | the same | refused (question 1) | question 1 | an unneeded argument is never evaluated, so its claim would never be decided |
@@ -455,6 +455,37 @@ a block that prints and then answers waits (0 cases of the census today;
 the tests' blocks wait on block bindings first). Cost of (c): it breaks
 silently when #216 merges. **Recommended: (a)**; (b) is the kernel
 stream's if it prefers one.
+
+**11. Which primitive an operator stands for.** The first notation has
+no types, and the kernel's bits carry none. The present tree chooses at
+run time, by the type each value carries: `add(a, b) => a + b` prints
+`4` for `add(1.5, 2.5)` and `3` for `add(1, 2)`. A saved program has
+nothing to choose by at run time, so the emitter must choose when it
+writes the record. Today it chooses by [sort](#def-sort): a text
+operand makes `+` the joining of texts, a float operand makes the
+operator the float one, and anything else is the signed integer one.
+It sees a literal's sort and not a parameter's. Of the 216 cases, 59
+apply an operator where it sees the sort of some operand only, and 16
+where it sees none, and there it would guess. No wrong record is
+written today, because every such text is refused until the shipped
+primitives exist. (a) Each operator has one meaning: `+ - * / %` and
+the orderings are the signed integer primitives; an operand the emitter
+can see is a float or a text is a finding; the float and text
+primitives are bound to operators by the standard language's types
+("The core types are built over bits": an operator is a method of its
+operand's type). (b) By sort where the emitter sees one, and a finding
+where it sees none. (c) The emitter infers each parameter's sort from
+its uses and its callers, and refuses a function used at two sorts.
+Cost of (a): the 13 float cases and the 19 cases of joining texts wait
+for milestone 4, 12 pins of `tests/types.alg` among them; a float
+passed where a function adds integers is added as an integer, which the
+comparison harness shows as a failing pin. Cost of (b): a float passed
+through a parameter to an operator with an integer literal is computed
+wrongly with no finding, and 16 cases wait. Cost of (c): a small type
+checker in the bootstrap, thrown away at milestone 4. **Recommended:
+(a).** One operator, one primitive, as "Every notation stands for an
+expression" has it; the choice by type belongs to the language that has
+types.
 
 ## 6. Evidence and limits
 
