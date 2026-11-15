@@ -1133,6 +1133,19 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The launcher on the reference kernel (B-196, chunk Q7 (the minimal launcher), part 2)
+
+B-196 (the rebuild's acceptance side). `next/launch/launcher.ts` now
+uses the second version of the kernel's interface and of the data
+form: it checks a record with `check2`, loads one of either version,
+and passes `restoreAs` to `load` only when the configuration names the
+builder it accepts. A refuted run carries the reason the kernel gives
+for each refutation it reported. A run left waiting counts the cells no
+capability will answer and names the names nothing binds. The tests run
+on the reference kernel, and the stand-in kernel is deleted.
+`npm run launch -- next/launch/fixtures/hello.json` prints
+`hello, world` and exits 0, and a test holds that in a child process.
+
 ### 2026-11 — One corpus case restated after the cell decision's rewording (B-196)
 
 B-196 (the rebuild's acceptance side). The kernel stream reworded the
@@ -1155,6 +1168,41 @@ until the kernel stream provides `next/kernel/create.ts` it says that
 no kernel is built yet and exits 2. The 17 tests run on a stand-in
 kernel kept with them.
 
+
+### 2026-11 — The demo scenes restated as scenarios (B-196, chunk Q3 (the scenarios))
+
+B-196 (the rebuild's acceptance side). Each of the eleven scenes of
+rungs 1 to 4 is restated under `next/corpus/scenarios/` as who acts,
+what they do and what the platform must find, in the words of the ruled
+decisions and with no dependence on exact output. Each names what
+changes by ruling: the strength words in four pinned lines, ten pinned
+lines that read an error value, four break-it cases that print before
+they halt, the verdict's `auto-PE` in place of a proposer. The
+scenarios are the acceptance statement for milestones 5, 6 and 7 of
+the rebuild. No code changed.
+
+The maintainer then ruled five shared questions on 2026-11-15,
+recorded in `next/corpus/scenarios/README.md`, "Rulings of
+2026-11-15". A strength prevents no effect unless a policy requires
+it; a refutation still does. A refused proposal never refutes its
+claim. A predicate on a parameter is a claim with one meaning at every
+phase, so a dimension mismatch is a refutation found when the program
+is checked. `validate` is the plan's own predicate, answering true or
+its explanation. Bool's equality laws are decided and those of Int,
+Float and String assumed, and a standard deriver attempts undecided
+laws within step budgets. The scenes state the ruled behaviour, nine
+of their 37 questions are settled, and 37 corpus cases are restated,
+14 of them changing class. Six per-scene rulings of the same day
+settle seven more, among them `effects output` as the clause's name
+and the explanation `_ > 0` does not hold of -5 in rung 1, scene 2.
+Nine rulings of a third round and the planning specification settle
+13 more: of the 37, 29 are settled and eight stay open, and the prover
+loop's scene now answers a claim evaluation cannot decide. A third
+overlay restates 28 corpus cases, 18 of them changing class. A fourth
+round settles the rest: all 42 questions of the scenes are settled,
+none open, and a fourth overlay restates 82 cases and rewrites every
+note that cited an open question. The corpus moves from survives 1618,
+changes 229, detail 145 to survives 1586, changes 260, detail 146.
 
 ### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
 
