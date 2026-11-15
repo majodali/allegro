@@ -1165,6 +1165,18 @@ gains the new tree's runner and `npm run harness:next`. The launcher's
 `limit` end says so when a kernel stops at its own limit with no step
 budget set.
 
+### 2026-11 — The corpus and the specifications follow the kernel stream's K4 (B-196)
+
+B-196 (the rebuild's acceptance side). The corpus follows the seven
+decisions that PR #216 (values and descriptions, solving ruled, titles
+made accurate) retitled: 84 cases moved. Of the 54 that cited "A
+function may take an argument unevaluated", 53 now cite "An expression
+is evaluated when its value is needed" and keep their class, and one
+changes by "No argument can be inspected". A sweep adds a citation to
+3 cases. The planning specification's design B is the ruled one, and
+both model specifications cite the kernel primitive `attempt`. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The launcher on the reference kernel (B-196, chunk Q7 (the minimal launcher), part 2)
 
 B-196 (the rebuild's acceptance side). `next/launch/launcher.ts` now

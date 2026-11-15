@@ -249,8 +249,9 @@ policy is the gate ruled there.
     error value becomes a refutation. Six by "The standard language's
     handled failure is an exception": the printed form of an error
     value. Five by "Four strengths, one vocabulary". One each by "Every
-    value keeps its origin" and "An extension registers its own fields;
-    the kernel has two".
+    value keeps its origin" (now "A value's origin is a description")
+    and "An extension registers its own fields; the kernel has two"
+    (now "An extension registers its own fields").
   - **The 2 that are detail** print through `observe`, which phase 1
     removed.
   - **151 surviving pins carry a note**, since the default class is
@@ -528,7 +529,8 @@ policy is the gate ruled there.
     application of that function. The output part is not bound in the
     program's scope (interaction 5): it is an argument of the module
     function, as "A module is a function of the capabilities it
-    declares" and the data form have it, and the scope is empty. There
+    declares" (now "A module is a function of its capabilities, inputs
+    and imports") and the data form have it, and the scope is empty. There
     is no configuration reader: the configuration arrives as a value,
     and the terminal entry sets it (the ceiling `output`, a budget from
     `--steps`) without recording which source supplied each value.
@@ -633,8 +635,8 @@ policy is the gate ruled there.
     requires `solve` to read a residual over its unknowns, and that the
     enumeration is not ported. Milestone 7 waits on the kernel stream
     for a way to implement general solvers, since that stream has
-    reversed "A function may take an argument unevaluated". This
-    stream follows when the reversal lands in the inventory: the
+    reversed "A function may take an argument unevaluated" (now "No
+    argument can be inspected"). This stream follows when the reversal lands in the inventory: the
     planning specification's §5 cites that decision as a need.
   - **Round 4, the last.** Nine more recommendations, P to X, ruled:
     the dimension predicates name the value, its dimension and the one
@@ -711,11 +713,13 @@ policy is the gate ruled there.
     launcher realises "Only the launcher sets the ceiling" in whole for
     a run of one saved program. It realises in part: "Startup, step by
     step" (one saved program, no phase, no first extensions); "A module
-    is a function of the capabilities it declares" (capabilities only);
-    "A value that arrives later fills a cell, and a failure fills it
-    with an exception" (the launcher's filling with plain data; a call
-    on a capability the phase lacks is refused before the run, not left
-    residual); "A stored outcome is restored with its builder's name"
+    is a function of the capabilities it declares" (now "A module is a
+    function of its capabilities, inputs and imports") (capabilities
+    only); "A value that arrives later fills a cell, and a failure
+    fills it with an exception" (now "A late answer or its failure
+    fills a cell as plain data") (the launcher's filling with plain
+    data; a call on a capability the phase lacks is refused before the
+    run, not left residual); "A stored outcome is restored with its builder's name"
     (the configuration names one builder or withholds restore); "A
     capability is a named set of effectful primitives" (one part
     only); and "The terminal and the browser ship output, timers and
@@ -725,6 +729,56 @@ policy is the gate ruled there.
     extensions, and configuration sources, each with the record of which
     source supplied a value. The terminal entry does not yet set
     `restoreAs`.
+- **2026-11-15 — The corpus follows the kernel stream's K4 (values and descriptions).** PR #216
+  (values and descriptions, solving ruled, titles made accurate)
+  retitled seven decisions and added three rows to the decision map.
+  - **The titles followed.** `npx tsx next/tools/corpus.ts
+    --follow-renames` moved 84 cases, 87 citations: 54 of "No argument
+    can be inspected", 16 of "An extension registers its own fields",
+    7 of "A value's origin is a description", 6 of "A late answer or
+    its failure fills a cell as plain data", 4 of "A composed function
+    is parameters and a body". No case cited the former titles of "A
+    solver reads the residual of its problem" or "A module is a
+    function of its capabilities, inputs and imports".
+  - **The 54 of the replaced decision, read one by one.** 53 rest only
+    on an operand being evaluated when needed: `&&`, `||` and `!` in
+    `tests/logical.alg`, `tests/logical-error-demo.alg` and the tests
+    that run them. They cite "An expression is evaluated when its value
+    is needed" in its place and keep their class: 47 survive, and 6
+    change by "The standard language's handled failure is an
+    exception". One changes by "No argument can be inspected": the
+    D47 (the source channel) test of a primitive that receives each
+    argument's expression becomes a read of the value's origin as a
+    description, by code that holds the inspection right. None rests on the order in which
+    a structure's entries are evaluated.
+  - **The sweep.** 172 cases match laziness, short-circuit,
+    unevaluated, quote, source-of, solve, attempt, describe or inspect.
+    3 gain a citation and none is reclassed: "Describing a function
+    requires authority" for the test of `summarizeValue` reading a
+    function's parameters and the reflection test of private members;
+    "An evaluation can be returned as data" for the test of a diverging
+    proposal ended by its budget. No case cites "A function can be
+    specialized with its parameters unknown" or "A solver reads the
+    residual of its problem": the present search enumerates.
+  - **The documents.** The titles now stand in the launcher's header,
+    both model specifications and two scenarios. The planning
+    specification's design B is the ruled one: each choice a parameter
+    of the problem function, `specialize` gives the residual, the
+    solver describes it and calls it with candidates, not built yet.
+    Both specifications cite the kernel primitive `attempt` ("An
+    evaluation can be returned as data") for the trial evaluation.
+    The check prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1585, changes 261, detail 146) · unclassed 0 — consistent`.
+  - **Added in review.** Six cases about origins are restated under "A
+    value's origin is a description": an origin is read under the
+    inspection right, and a run keeps none unless its configuration
+    says so. None changes class. Three passages of the planning
+    specification that the rulings made false are corrected: the
+    completion search (§4) specializes and describes where it took the
+    claim unevaluated; question 13 and §13 say the origin issue is
+    ruled. Left as written, for the maintainer: §2's "a choice is an
+    unknown, one of a stated set of options", since unknowns that carry
+    facts wait for metadata fields.
 - **2026-11-15 — Q5, part 1 drafted: the first notation proposed.**
   `next/bootstrap/first-notation.md`, for the maintainer's ruling: the
   forms of the first notation, each with the kernel expression it stands

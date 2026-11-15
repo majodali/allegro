@@ -5,9 +5,9 @@
 //   "Startup, step by step", as far as milestone 2 needs it
 //   "The launcher does only what cannot be done in Allegro"
 //   "Only the launcher sets the ceiling"
-//   "A module is a function of the capabilities it declares"
-//   "A value that arrives later fills a cell, and a failure fills it with
-//    an exception", as reworded: the launcher fills a cell with plain data
+//   "A module is a function of its capabilities, inputs and imports"
+//   "A late answer or its failure fills a cell as plain data": the
+//    launcher fills a cell with plain data
 //
 // It is a library and host-neutral: no process, no fs, no Buffer. It is
 // built against the second version of the kernel's interface (`Kernel2`
