@@ -656,3 +656,72 @@ policy is the gate ruled there.
     `classed 1992 (survives 1618, changes 229, detail 145)`; now it
     prints:
     `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1586, changes 260, detail 146) · unclassed 0 — consistent`.
+- **2026-11-15 — Q7, part 2 landed: the launcher on the reference kernel.**
+  `next/launch/launcher.ts` now takes a factory of `Kernel2`, the
+  second version of the kernel's interface, and refuses a kernel that
+  lacks the calls of it the launcher uses. It checks a record with
+  `check2`, so a record of the first or the second version loads. Key
+  slots are the kernel's: `load` makes the module and its keys, and
+  `declares` lists the parameters after them. The configuration has a
+  new field, `restoreAs`: the builder whose stored outcomes it accepts
+  for the saved program. The launcher passes it to `load`, and without
+  it the stored outcomes are not looked at. A kernel that refuses to
+  load the record, as on a stored key that does not match, ends the run
+  as refused before anything is evaluated. The `refuted` end carries
+  `reasons`, the reason `reasonOf` gives for each refuted value the run
+  reported, and `reason` joins them. The `waiting` end carries
+  `unanswered`, the count of cells no capability will answer, and
+  `unbound`, the names nothing binds, read with `symbolName`. The
+  launcher's 22 tests run on `createKernel` of `next/kernel/create.ts`,
+  and `next/launch/stand-in-kernel.for-tests.ts` is deleted: no test
+  needs it. New tests cover a false claim, a claim refuted once its
+  answer arrives, a name nothing binds, a run that waits on a cell and
+  a name, a record of the second version with and without a builder
+  named and with a wrong stored key, and the committed fixture run
+  through the terminal entry in a child process.
+  - **Milestone 2's command.** `npm run launch -- next/launch/fixtures/hello.json`
+    prints `hello, world` and exits 0.
+  - **The five gaps of part 1.** The explanation of a refutation is
+    closed: the kernel gives `reasonOf`, and the launcher reports it.
+    The other four stay open. The data form still has no sequencing
+    form; the reference kernel evaluates a structure's entries in order,
+    a choice that awaits the maintainer's ruling, and the two-line test
+    rests on it. The interface still does not say that `waiting`
+    returns the same handle for a cell each time; the reference kernel
+    does, and the test of an answer that arrives later holds it. The
+    launcher's keying by handle rests on that, and the contract does not
+    state it.
+    The interface still does not say what a throw from a primitive
+    function's `run` becomes; the reference kernel lets it out of
+    `evaluate` or `advance`, and the launcher reports a fault. A
+    capability of several parts still needs a way to select a part, and
+    the kernel's primitives are `claim`, `if` and `quote`; the launcher
+    still hands only a capability of one part.
+  - **What the outcome can carry for the rulings of 2026-11-15.** Ruling
+    D of `next/corpus/scenarios/README.md` (a build reports every
+    refutation that does not rest on an earlier one, and performs no
+    effect after the first) needs a list of refutations, and `reasons`
+    is one. The launcher stops at the first `evaluate` or `advance`
+    that reports one. On the reference kernel a refuted structure
+    entry stops the structure, so the effect after it is not performed,
+    and a test holds that. Ruling 1 (a strength never prevents an
+    effect unless a policy requires it) needs nothing of the launcher:
+    it builds no policy.
+  - **The decision map.** No row moved. Of this stream's decisions the
+    launcher realises "Only the launcher sets the ceiling" in whole for
+    a run of one saved program. It realises in part: "Startup, step by
+    step" (one saved program, no phase, no first extensions); "A module
+    is a function of the capabilities it declares" (capabilities only);
+    "A value that arrives later fills a cell, and a failure fills it
+    with an exception" (the launcher's filling with plain data; a call
+    on a capability the phase lacks is refused before the run, not left
+    residual); "A stored outcome is restored with its builder's name"
+    (the configuration names one builder or withholds restore); "A
+    capability is a named set of effectful primitives" (one part
+    only); and "The terminal and the browser ship output, timers and
+    HTTP" (output, on the terminal). The orchestrating session decides
+    whether any row moves.
+  - **Left for later parts.** Inputs, imported modules, the first
+    extensions, and configuration sources, each with the record of which
+    source supplied a value. The terminal entry does not yet set
+    `restoreAs`.
