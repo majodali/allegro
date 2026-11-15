@@ -81,13 +81,16 @@ halts before output here.
   The search raises an exception carrying the counterexample (planning
   specification §7), which the program handles.
 - The maintainer's ruling of 2026-11-15 on reading a residual: milestone 7
-  requires `solve` to read a residual over its unknowns ("A solver sees
-  its problem unevaluated"), and the enumeration is not ported.
+  requires `solve` to read a residual over its unknowns ("A solver reads
+  the residual of its problem"), and the enumeration is not ported.
   Milestone 7 waits on the kernel stream for a way to implement general
   solvers, since that stream has reversed "A function may take an
-  argument unevaluated". The maintainer takes it to the kernel stream.
+  argument unevaluated" (now "No argument can be inspected"). The
+  maintainer takes it to the kernel stream.
   This stream follows when the reversal lands in the inventory: the
-  planning specification's §5 cites that decision as a need.
+  planning specification's §5 cites that decision as a need. The
+  reversal landed with PR #216 (values and descriptions, solving ruled,
+  titles made accurate), and §5 now gives the ruled design.
 - "Feasible is decided; best says how strongly it holds": today a
   solution carries no strength for being best. The solution states that
   it is feasible, decided, and how strongly it is best.

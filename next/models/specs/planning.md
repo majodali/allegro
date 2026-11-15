@@ -68,7 +68,7 @@ question of §11).
 | Retry | A maximum number of attempts and an optional backoff | `retry: max N attempts[, X backoff]`; `retry`, `retry_backoff` | *pilot*. The backoff enters no claim; the chapter's richer `iterate:` form was never built |
 | Failure type | The name of a failure a node can raise | `fails: Name, …` | *open*, question 1: a name today; a type value under the same reasoning as a port |
 | Handler | A failure type, an optional retry, and an alternate graph that must produce its scope's declared outcomes | `on F:` inside a composite or a plan; `handler`, `handler_retry` | *pilot* |
-| Choice | A node whose options are nodes with the choice's ports; a plan holding one is a template | `options:` inside a node block; `choice` | *changed* by "A solver sees its problem unevaluated": a choice is an unknown, one of a stated set of options (§5, question 6). The pilot stores the first option's ports on the choice |
+| Choice | A node whose options are nodes with the choice's ports; a plan holding one is a template | `options:` inside a node block; `choice` | *changed* by "A solver reads the residual of its problem": a choice is an unknown, one of a stated set of options (§5, question 6). The pilot stores the first option's ports on the choice |
 | Resolution | One option picked at every choice | the solver; `resolve(p, decisions)` | *pilot* |
 | Objective | The order in which candidates are compared | built in: the bound's effort, then its duration (`better`) | *open*, question 7 |
 | Catalog and catalog entry | A list of nodes and plans a plan may draw on; an entry is a node, a plan in it is borrowed | `catalog NAME:`; a list expression | *pilot* for the list. Open at its end: question 2 |
@@ -198,14 +198,15 @@ treats them.
 **Two open kernel designs.** The model needs two things of the kernel
 and designs neither.
 
-- "A solver sees its problem unevaluated". The completion search takes
-  the open plan's claim unevaluated, evaluates it with the remainder
-  unknown, and reads which parts are resolved. A gap is a part left
-  unresolved: an input whose producer depends on the remainder. The
-  model needs the functions that return the resolved and unresolved
-  parts of a residual, which that decision says Vivace supplies, and a
-  way to evaluate the claim with a candidate in place of the unknown
-  without filling the cell, which its note names a kernel primitive.
+- "A solver reads the residual of its problem". The open plan's claim
+  is a function of the remainder. The completion search specializes it
+  with the remainder unknown and describes the residual to read which
+  parts are resolved. A gap is a part left unresolved: an input whose
+  producer depends on the remainder. A candidate is tried by calling
+  the specialized function with it, which fills no cell. The model
+  needs the right to describe the residual, which the caller grants,
+  and "A function can be specialized with its parameters unknown",
+  which is not built yet.
 - "A missing value is a cell that is filled once". The remainder is
   such a cell. A refused candidate never fills it. An accepted one
   fills it once, with the entry and a new remainder. The model needs a
@@ -213,13 +214,17 @@ and designs neither.
   decision says a structure is always complete in shape and a value in
   one of its places may be missing, so the need is within it.
 
-A third need has no decision that owns it yet. Judging a candidate
+A third need had no decision that owned it when this specification was
+ruled. Judging a candidate
 means evaluating a claim that may come out refuted, and reading that
 outcome as data: the refusal's explanation goes back to the proposer,
 and the search moves to the next candidate. "A refutation marks
 everything computed from it" says a refutation cannot be tested for.
 The loop and the search both need a trial evaluation whose outcome,
 a refutation included, is a value to the code that asked for it (§13).
+The kernel primitive `attempt` now exists for it: "An evaluation can be
+returned as data", added by PR #216 (values and descriptions, solving
+ruled, titles made accurate).
 
 ## 5. Search
 
@@ -264,15 +269,16 @@ it. Two designs, for question 6:
 
 | | A: the search in the library | B: the residual of the plan with its choices unknown |
 |---|---|---|
-| What it is | The pilot's. Enumerate resolutions as concrete plans, compute each bound by walking the plan, compare. Structural checks are run once over the template and per candidate only where a pick can change them, coded by hand (`template_findings`, `check_resolved`, `option_table`) | Each choice is an unknown, one of its options. The bound and the budget claim are evaluated with the choices unknown, and the residual is a smaller expression over them. The solver reads it, rebinds each unknown to an option, and evaluates again; equal sub-evaluations are shared |
-| What it costs | About 350 lines of search code specific to plans, which duplicate what partial evaluation would give; a second search for a second model; the thesis is not shown on the model it was built to test | Depends on designs not yet shown: a residual's size grows with the choices unless sharing holds; reading a residual back needs the functions Vivace supplies; a bound refutes a template without enumerating only with a sound domain over quantities |
-| What it needs from the kernel | Nothing beyond evaluation | "A solver sees its problem unevaluated" (residual reading, rebinding a name); "A function may take an argument unevaluated"; "Expressions memoize per evaluation context" in place of the hand-coded once-per-template checks; for refuting a template without enumeration, "Abstract domains as sound approximations" over quantities |
-| What it gives | A selection, with the decisions | A selection by rebinding, the same decisions; a bound over every resolution from one evaluation; the same mechanism for any model |
+| What it is | The pilot's. Enumerate resolutions as concrete plans, compute each bound by walking the plan, compare. Structural checks are run once over the template and per candidate only where a pick can change them, coded by hand (`template_findings`, `check_resolved`, `option_table`) | Each choice is a parameter of the problem function, whose body is the bound and the budget claim. `specialize` gives the residual: a function of the same parameters, its body evaluated with the choices unknown, a smaller expression over them. The solver describes it and calls it with candidates; equal sub-evaluations are shared. The primitive is not built yet |
+| What it costs | About 350 lines of search code specific to plans, which duplicate what partial evaluation would give; a second search for a second model; the thesis is not shown on the model it was built to test | Depends on designs not yet shown: a residual's size grows with the choices unless sharing holds; reading a residual back needs the right to describe it, which the caller grants; a bound refutes a template without enumerating only with a sound domain over quantities |
+| What it needs from the kernel | Nothing beyond evaluation | "A solver reads the residual of its problem" (specializing, describing, calling with candidates); "A function can be specialized with its parameters unknown", not built yet; "Describing a function requires authority"; "An evaluation can be returned as data" (the kernel primitive `attempt`) to judge a candidate; "Expressions memoize per evaluation context" in place of the hand-coded once-per-template checks; for refuting a template without enumeration, "Abstract domains as sound approximations" over quantities |
+| What it gives | A selection, with the decisions | A selection by calling the residual with candidates, the same decisions; a bound over every resolution from one evaluation; the same mechanism for any model |
 
 The pilot recorded at its stage that the residual design yields a
 bound, not a selection. That holds for reading an interval off a
-residual. Rebinding the unknown, which "A solver sees its problem
-unevaluated" provides, gives the selection.
+residual. Calling the specialized function with a candidate, which
+"A solver reads the residual of its problem" provides, gives the
+selection.
 
 **Evidence that would decide.** Both designs on the rebuilt kernel,
 over the worked example's template and the fulfilment catalog: the same
@@ -280,7 +286,7 @@ solutions and the same strengths; the cost per candidate with sharing
 and without it; the lines of plan-specific search code; and whether an
 infeasible template is refuted with fewer evaluations than its
 resolutions. Recommended: B, with A built on the new kernel only if
-the kernel's milestone for "A solver sees its problem unevaluated"
+the kernel's milestone for "A solver reads the residual of its problem"
 fails, and then named as the weaker design.
 
 ## 6. The notation
@@ -507,7 +513,7 @@ plan's choice or a workaround.
 | "Explicit `raise` and failure context in handlers" | Whether a handler may propagate explicitly and read what failed | *Fold* into "Failure handlers over outcomes", as its open part | It is that entry's unresolved surface |
 | "Choices, templates and solution finding by enumeration" | Choices, templates, `solve` by enumeration and a fixed objective | *Restate*: "a node with options is a choice; a plan holding one is a template whose choices are unknowns; a resolution is proposed for them and judged by the plan's claims; the objective is a value the caller supplies". The strategy and its strength *fold* into "Feasible is decided; best says how strongly it holds" | Enumeration is one strategy, and the decision of Part V governs what any strategy may claim (questions 6, 7) |
 | "Completion from a catalog" | A gap is what the checks report, a catalog a list of nodes, completion fills gaps backward to a depth | *Restate*: "an open plan is a plan with a catalog whose remainder is unknown; its feasibility claim waits for the remainder; a proposal is one entry; completion is the search that places entries" | Its loop half is the first instance of "Solving is proposing a value for an unknown, and the kernel checks it" (questions 2, 3) |
-| "Library search over kernel residuals" | The bound is computed by library search, not read from a residual | *Remove* as a workaround | The entry calls itself an expedient; its target is "A solver sees its problem unevaluated" (§5, question 6) |
+| "Library search over kernel residuals" | The bound is computed by library search, not read from a residual | *Remove* as a workaround | The entry calls itself an expedient; its target is "A solver reads the residual of its problem" (§5, question 6) |
 | "Search beyond enumeration" | Whether to add branch and bound | *Fold* into "Feasible is decided; best says how strongly it holds" | A strategy is a library's choice; what it may claim is the ruled decision's |
 
 ## 11. Questions for the maintainer
@@ -559,9 +565,10 @@ Ordered so that a question comes after the ones it depends on.
    and 4.
 6. **Where the search's bound comes from.** (a) The library's
    enumeration, as built. (b) The residual of the plan with its choices
-   unknown, read and rebound by the solver. Costs and needs are in §5.
+   unknown: specialized, described and called with candidates by the
+   solver. Costs and needs are in §5.
    **Recommended: (b)**, with (a) built on the new kernel only if the
-   kernel's milestone for "A solver sees its problem unevaluated"
+   kernel's milestone for "A solver reads the residual of its problem"
    fails, and then named as the weaker design. Depends on question 2.
 7. **The objective.** (a) Fixed in the model: the bound's effort, then
    its duration. (b) A value the caller supplies, an ordering over
@@ -604,12 +611,13 @@ Ordered so that a question comes after the ones it depends on.
     fixture and a catalog each have a name that findings and
     explanations use. (a) The name is a field of the value, as the
     pilot has it. (b) The name is read from the value's origin, under
-    "Every value keeps its origin", and the field goes. (b) removes a
+    "A value's origin is a description", and the field goes. (b) removes a
     duplicated string and lets a notation name things implicitly. It
     costs the model its independence from how a value was written: a
     plan built by a program that read a file (use case 5) has no
-    binding to take a name from, and the adversarial review asks who
-    may read an origin and when a phase may erase one (§13).
+    binding to take a name from, and "A value's origin is a description"
+    as ruled on 2026-11-15 lets an origin be read only under the
+    inspection right and lets a run keep none (§13).
     **Recommended: (a)**: a name that a finding must show is data of
     the model; an origin locates the text and is not relied on for
     meaning.
@@ -641,7 +649,7 @@ alike.
 
 **Not checked.** Nothing here ran on a rebuilt kernel; none exists.
 Every statement about the residual design of §5, cells in a list, the
-rebinding primitive and step budgets rests on the ruled decisions
+specializing primitive and step budgets rests on the ruled decisions
 alone. The loop with a language model was not run; its transcript was
 read. The size of the residual for the worked example's template is
 not measured. The software system model's mapping is stated from
@@ -659,17 +667,18 @@ alone.
 
 The review session ran an adversarial review of phase 1's decisions on
 2026-11-13 (`docs/records/book-pass/adversarial-review.md`): 31
-issues, none ruled. This specification was drafted without it and checked against
-it afterwards. Six issues bear on it. Each is the kernel's or the
+issues, none ruled at that date. This specification was drafted without it and checked against
+it afterwards. Rulings were taken on 2026-11-14 and 2026-11-15; a row
+below says so where one settles it. Six issues bear on it. Each is the kernel's or the
 inventory's to settle; the specification states what it needs and
 changes when the issue is ruled.
 
 | Issue of the review | Where this specification meets it | What the model needs |
 |---|---|---|
-| A refutation cannot be tested for, yet search, proposal loops and budgeted evaluation must | §4, the refusal; §5, a solver that rebinds a candidate and evaluates again | A trial evaluation whose outcome is data to the caller, a refutation included. Without it neither the loop nor design B of §5 can be written as an ordinary function |
+| A refutation cannot be tested for, yet search, proposal loops and budgeted evaluation must | §4, the refusal; §5, a solver that calls the residual with a candidate | A trial evaluation whose outcome is data to the caller, a refutation included. Without it neither the loop nor design B of §5 can be written as an ordinary function. The kernel primitive `attempt` now exists for it ("An evaluation can be returned as data") |
 | An undeclared name is a refutation, and an unknown is an unbound symbol | §4 and §5: the unknowns here are declared, a cell for the catalog remainder and a stated set of options for a choice | Nothing new: no unknown of the planning model is an undeclared name. The specification does not depend on how the issue is ruled |
 | A proposal that is accepted runs later with the capabilities of the place it filled | §4, a proposal: a catalog entry can hold predicates | A value that fills an unknown holds no capability unless a claim says otherwise, which is the review's own candidate ruling |
-| Origins disclose data, cost memory, and a phase may need to erase them | §2, §8 and question 13: names and renderings | Names that findings show are fields of the model (question 13 (a)); an origin is used to locate text only |
+| Origins disclose data, cost memory, and a phase may need to erase them | §2, §8 and question 13: names and renderings | Names that findings show are fields of the model (question 13 (a)); an origin is used to locate text only. Ruled 2026-11-15 ("A value's origin is a description"): an origin is read under the inspection right, and a run keeps none unless its configuration says so |
 | A circular definition is decided; ordinary recursion never repeats a state | §3, the walks' termination; §7, the last row | The walks over a plan are ordinary recursion over a finite tree. The model needs that recursion decided by a decrease on a child list, and until then the termination claim stays assumed and named |
 | An effect waits for undecided claims that a run can never decide | §3, promises; question 9 | A promise is a claim about the value a step produces, never about the plan value. Printing or saving a checked plan consumes the plan, so an undecided promise does not hold it back. A phase that runs a plan would meet the issue in full, which is one reason question 8 leaves running out |
 

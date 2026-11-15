@@ -197,12 +197,17 @@ planning specification (`next/models/specs/planning.md`, ruled at PR
 words that `solve` must read a residual: milestone 7 requires the
 residual design, and the enumeration is not ported. Milestone 7 waits
 on the kernel stream for a way to implement general solvers, since that
-stream has reversed "A function may take an argument unevaluated".
+stream has reversed "A function may take an argument unevaluated" (now
+"No argument can be inspected"). The kernel stream ruled that way on
+2026-11-15: "A solver reads the residual of its problem", through "A
+function can be specialized with its parameters unknown", which is not
+built yet.
 
 Two needs go to the kernel stream. A guard must treat an explanation as
 not true (rulings 3 and 4). The standard deriver is an extension the
 build runs; it asks nothing of the kernel beyond the trial evaluation
-the kernel already owes.
+the kernel already owes, the kernel primitive `attempt` ("An evaluation
+can be returned as data").
 
 ## The scenes' questions, as settled
 
