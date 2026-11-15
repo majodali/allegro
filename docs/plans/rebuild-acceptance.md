@@ -92,7 +92,7 @@ On `origin/main` at `e399222`, 2026-11-13.
 | Pinned output lines in them and in `basics.alg` | 653 |
 | Of those, the programs the suite runs against their pins, and their pinned lines | 71, of 613 |
 | Tests of the suite, `src/test/` and `src/boundary-tests.ts` | 1,379 |
-| Demo scenes, rungs 1 to 4 | 10 |
+| Demo scenes, rungs 1 to 4 | 11: ten programs and rung 1's prover-loop walkthrough |
 | Libraries, `lib/*.alg` | 17, of 2,765 lines |
 
 **Corrected at Q2, part 1.** The suite registers 1,379 tests, not
@@ -163,7 +163,7 @@ saved-program data form.
 |---|---|---|---|
 | Q1 | **The decision map.** `next/decisions.json`, generated once from the inventory: one row per decision with its part, chapter, type, status against the present code, owning stream, state (none), unit and cases. Its check, `next/tools/decision-map.ts`, run as `npm run lint:decisions`: every decision of the inventory has exactly one row and every row a decision; an owner is R, Q or none; a state other than none names a path that exists. A CI step for the new tree's commands | the check passes on 231 rows; a probe with a row removed fails it | merge on green |
 | Q2 | **The corpus, inventoried and classed.** `next/corpus/cases.json`: every [case](#def-case) with its source, its text and its [class](#def-class); a *changes* case names its ruled decision and states the new result; each case that survives or changes lists the decisions it tests, and the decision map's rows gain them. Its check: every pin and every test of the present tree has exactly one case | the check passes; the counts of §2 are met | merge on green; classes reviewed at their milestone (program plan, P5) |
-| Q3 | **The scenarios.** Each of the ten scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
+| Q3 | **The scenarios.** Each of the eleven scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
 | Q5 | **The first notation and the bootstrap.** The notation's forms, each standing for one kernel expression; an emitter under `next/bootstrap/` that has the present tree's parser read a text in it and writes a saved program in the data form | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
 | Q6 | **The comparison harness.** Under `next/corpus/`: runs a program on the present tree and on the new one and compares by class; reports the cases passing per milestone | its tests on a stub kernel, then on the kernel | merge on green |
@@ -549,6 +549,182 @@ policy is the gate ruled there.
     moves a row when the unit realises the decision's whole statement
     and a case passes on the kernel, as the kernel stream left its
     rows at none for an interface that is declared and not built.
+- **2026-11-13 — Q3 drafted: the scenarios.** Eleven files under
+  `next/corpus/scenarios/` and an index, for the maintainer's ruling:
+  one [scenario](#def-scenario) per scene, each with who acts and why,
+  its steps as what the actor does and what the platform must find,
+  its break-it case, what changes by ruling with the decision's title,
+  its open questions, and its program's pinned lines against the steps.
+  The ten programs hold 65 pinned lines and every one is covered by a
+  step. The index states eight changes that touch several scenes, and
+  one question the rulings leave open: whether an effect waits on a
+  claim that a run can never decide. The scenes are eleven, not the ten
+  this plan first said: rung 1's prover loop is a walkthrough with no
+  program. 37 open questions are put, four of them shared by several
+  scenes and asked first.
+  - **Ruled 2026-11-15.** The maintainer ruled the index's shared
+    question and four questions the scenes share. Nine of the 37 are
+    settled by them; the next entry records the rulings.
+  - **The index's shared question is gone.** Its section is replaced
+    by "Rulings of 2026-11-15" and a table of the scenes' questions,
+    in `next/corpus/scenarios/README.md`.
+- **2026-11-15 — Q3: five shared questions ruled, and the corpus follows.**
+  The maintainer ruled five questions in a design discussion of this
+  stream's session. They are stated in
+  `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15", and the
+  scenes state the ruled behaviour as fact.
+  - **The rulings.** (1) A strength (assumed, sampled, undecided) never
+    prevents an effect unless a policy or configuration requires it; a
+    refuted claim still does. (2) A refused proposal never refutes its
+    claim; the claim's outcome is what evaluation gives, and a policy
+    "no proposal in the source is refused" exists, off by default.
+    (3) A predicate on a parameter stays a claim with one meaning at
+    every phase, `d + t` is refuted when checked, a failed check is not
+    catchable, and the policy "every parameter claim is decided before
+    the run begins" is on by default. (4) `validate` on a plan is the
+    plan's own predicate called as an ordinary function, answering true
+    or its explanation as a value. (5) Bool's equality laws are decided
+    by enumeration, those of Int, Float and String assumed and named
+    until proved, and the standard deriver, the shipped proposer the
+    build runs, evaluates, samples and derives within configurable step
+    budgets.
+  - **The corpus.** 37 cases restated by an overlay
+    (`next/tools/corpus.ts --apply`): 13 by ruling 3, 13 changing class
+    from survives to changes; 7 by ruling 4, the text kept; 3 by ruling
+    2, one changing class; 12 by ruling 5; 1 by ruling 1; 1 for a
+    question renumbered in its scene. 14 cases change class in all.
+    The check prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1604, changes 243, detail 145) · unclassed 0 — consistent`.
+  - **The questions.** Of the scenes' 37, nine are settled and 28 stay
+    open, each with a recommended option. Five are new with the
+    rulings, all open.
+  - **For the kernel stream.** A guard must treat an explanation as
+    not true (rulings 3 and 4). The standard deriver is an extension
+    the build runs; it asks nothing of the kernel but the trial
+    evaluation the kernel already owes.
+  - **Round 2, the same day.** The maintainer took six recommendations
+    on per-scene questions, A to F, in the stream's session: the
+    contract and `effects` clauses need no `use`; rung 1, scene 2
+    calls its predicates and prints their explanations, rendered as
+    the clause written with the value; a build reports every
+    refutation that rests on no earlier one; `effects output` names
+    the capability; a function's capabilities are a reported fact.
+    Seven more of the 37 questions are settled, 21 stay open. Three
+    pins of rung 1, scene 2 restate their new result, and one note
+    follows a renumbered question.
+  - **Round 3 and the planning scenes, the same day.** Nine more
+    recommendations, G to O, ruled: a bound proof value is no claim;
+    an obligation is named by its module and claim name, and the hash
+    over the proposition's text goes; a hint is the refusing rule's or
+    the deriver's explanation; a scripted proposer passes milestone 5;
+    the benchmark is a separate case; rung 1, scene 5 answers a claim
+    evaluation cannot decide, first with the derivation budget at zero
+    and last by the deriver; the coercion claims are assumed and named;
+    a true claim whose term uses an assumed law is decided when
+    evaluation decides it; the deriver does not attempt an assumed
+    law. Seven questions of the planning scenes are settled by
+    `next/models/specs/planning.md`, as ruled at PR #202, each cited
+    by section. Of the 37, 29 are settled and eight stay open; of the
+    five new questions, four are settled and one is open. 28 corpus
+    cases are restated by a third overlay, 18 of them changing class.
+    The check prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1586, changes 260, detail 146) · unclassed 0 — consistent`.
+  - **Followed, not yet landed.** The maintainer ruled that milestone 7
+    requires `solve` to read a residual over its unknowns, and that the
+    enumeration is not ported. Milestone 7 waits on the kernel stream
+    for a way to implement general solvers, since that stream has
+    reversed "A function may take an argument unevaluated". This
+    stream follows when the reversal lands in the inventory: the
+    planning specification's §5 cites that decision as a need.
+  - **Round 4, the last.** Nine more recommendations, P to X, ruled:
+    the dimension predicates name the value, its dimension and the one
+    expected; `import` brings bindings and `use` bindings and notation;
+    nobody has to claim a grammar unambiguous; milestone 6 has a
+    notation break-it; a proposal for a library's law goes into the
+    project's proof store, and the default obligation list shows the
+    project's own claims; the tools still list obligations that rest
+    on no refuted value; one recorded model run passes milestone 7;
+    milestone 7 passes on the one-model scene; a refused proposal on a
+    decided claim is offered for nothing. With them every question of
+    the eleven scenes is settled: the draft's 37 and five raised by the
+    write-up, 42 in all, none open. The index's table becomes "The
+    scenes' questions, as settled".
+  - **The corpus at the close of the day.** Overlays restated 37 cases
+    for the five rulings, 4 for round 2, 28 for round 3 and 82 for
+    round 4, which also rewrote 67 notes that cited a scenario's open
+    question; no note now does. Before the rulings the check printed
+    `classed 1992 (survives 1618, changes 229, detail 145)`; now it
+    prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1586, changes 260, detail 146) · unclassed 0 — consistent`.
+- **2026-11-15 — Q7, part 2 landed: the launcher on the reference kernel.**
+  `next/launch/launcher.ts` now takes a factory of `Kernel2`, the
+  second version of the kernel's interface, and refuses a kernel that
+  lacks the calls of it the launcher uses. It checks a record with
+  `check2`, so a record of the first or the second version loads. Key
+  slots are the kernel's: `load` makes the module and its keys, and
+  `declares` lists the parameters after them. The configuration has a
+  new field, `restoreAs`: the builder whose stored outcomes it accepts
+  for the saved program. The launcher passes it to `load`, and without
+  it the stored outcomes are not looked at. A kernel that refuses to
+  load the record, as on a stored key that does not match, ends the run
+  as refused before anything is evaluated. The `refuted` end carries
+  `reasons`, the reason `reasonOf` gives for each refuted value the run
+  reported, and `reason` joins them. The `waiting` end carries
+  `unanswered`, the count of cells no capability will answer, and
+  `unbound`, the names nothing binds, read with `symbolName`. The
+  launcher's 22 tests run on `createKernel` of `next/kernel/create.ts`,
+  and `next/launch/stand-in-kernel.for-tests.ts` is deleted: no test
+  needs it. New tests cover a false claim, a claim refuted once its
+  answer arrives, a name nothing binds, a run that waits on a cell and
+  a name, a record of the second version with and without a builder
+  named and with a wrong stored key, and the committed fixture run
+  through the terminal entry in a child process.
+  - **Milestone 2's command.** `npm run launch -- next/launch/fixtures/hello.json`
+    prints `hello, world` and exits 0.
+  - **The five gaps of part 1.** The explanation of a refutation is
+    closed: the kernel gives `reasonOf`, and the launcher reports it.
+    The other four stay open. The data form still has no sequencing
+    form; the reference kernel evaluates a structure's entries in order,
+    a choice that awaits the maintainer's ruling, and the two-line test
+    rests on it. The interface still does not say that `waiting`
+    returns the same handle for a cell each time; the reference kernel
+    does, and the test of an answer that arrives later holds it. The
+    launcher's keying by handle rests on that, and the contract does not
+    state it.
+    The interface still does not say what a throw from a primitive
+    function's `run` becomes; the reference kernel lets it out of
+    `evaluate` or `advance`, and the launcher reports a fault. A
+    capability of several parts still needs a way to select a part, and
+    the kernel's primitives are `claim`, `if` and `quote`; the launcher
+    still hands only a capability of one part.
+  - **What the outcome can carry for the rulings of 2026-11-15.** Ruling
+    D of `next/corpus/scenarios/README.md` (a build reports every
+    refutation that does not rest on an earlier one, and performs no
+    effect after the first) needs a list of refutations, and `reasons`
+    is one. The launcher stops at the first `evaluate` or `advance`
+    that reports one. On the reference kernel a refuted structure
+    entry stops the structure, so the effect after it is not performed,
+    and a test holds that. Ruling 1 (a strength never prevents an
+    effect unless a policy requires it) needs nothing of the launcher:
+    it builds no policy.
+  - **The decision map.** No row moved. Of this stream's decisions the
+    launcher realises "Only the launcher sets the ceiling" in whole for
+    a run of one saved program. It realises in part: "Startup, step by
+    step" (one saved program, no phase, no first extensions); "A module
+    is a function of the capabilities it declares" (capabilities only);
+    "A value that arrives later fills a cell, and a failure fills it
+    with an exception" (the launcher's filling with plain data; a call
+    on a capability the phase lacks is refused before the run, not left
+    residual); "A stored outcome is restored with its builder's name"
+    (the configuration names one builder or withholds restore); "A
+    capability is a named set of effectful primitives" (one part
+    only); and "The terminal and the browser ship output, timers and
+    HTTP" (output, on the terminal). The orchestrating session decides
+    whether any row moves.
+  - **Left for later parts.** Inputs, imported modules, the first
+    extensions, and configuration sources, each with the record of which
+    source supplied a value. The terminal entry does not yet set
+    `restoreAs`.
 - **2026-11-15 — Q5, part 1 drafted: the first notation proposed.**
   `next/bootstrap/first-notation.md`, for the maintainer's ruling: the
   forms of the first notation, each with the kernel expression it stands
