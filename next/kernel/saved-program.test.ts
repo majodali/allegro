@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Kernel, Value } from "./interface.js";
-import { check, check2, encode, load, type SavedProgram } from "./saved-program.js";
+import { check, check2, encode, load, outcomeKeys, type SavedProgram } from "./saved-program.js";
 import { createKernel } from "./kernel.js";
 
 const ADD = "sha256:" + "ab".repeat(32);
@@ -122,7 +122,7 @@ test("load refuses a document that is not a saved program", () => {
 
 // module(key, n) => claim(n == 0)   — one key slot, one input, one stored outcome.
 const EQ0 = "sha256:" + "ee".repeat(32);
-const second: SavedProgram = {
+const draft: SavedProgram = {
   format: "allegro-saved-program",
   version: 2,
   needs: [{ hash: EQ0, name: "isZero" }],
@@ -139,8 +139,15 @@ const second: SavedProgram = {
   module: 7,
   declares: [{ param: 1, role: "input", name: "n" }],
   keys: 1,
-  outcomes: [{ claim: 5, restsOn: [{ kind: "primitive", hash: EQ0, name: "isZero" }] }],
+  outcomes: [{ claim: 5, restsOn: [{ kind: "primitive", hash: EQ0, name: "isZero" }], key: "sha256:" + "00".repeat(32) }],
 };
+/** The record as a builder writes it: the kernel computes each outcome's key. */
+const second: SavedProgram = (() => {
+  const k = createKernel();
+  const isZero = k.primitiveFunction({ purity: "pure", hash: EQ0, name: "isZero", arity: 1, run: (_a, c) => c.bits(Uint8Array.of(1), 1) });
+  const [key] = outcomeKeys(k, draft, new Map([[EQ0, isZero]]));
+  return { ...draft, outcomes: [{ ...draft.outcomes![0], key }] };
+})();
 const edit2 = (f: (doc: any) => void): unknown => {
   const doc = JSON.parse(JSON.stringify(second));
   f(doc);
@@ -166,6 +173,19 @@ test("a stored outcome names a claim, and never rests on a capability", () => {
   assert.match(check2(edit2((d) => (d.outcomes[0].claim = 4))).join(), /does not refer to an application of the kernel primitive "claim"/);
   assert.match(check2(edit2((d) => d.outcomes[0].restsOn.push({ kind: "capability", capability: "http", part: "get" }))).join(), /never stored/);
   assert.match(check2(edit2((d) => d.outcomes[0].restsOn.push({ kind: "rumour" }))).join(), /not something a result rests on/);
+  assert.match(check2(edit2((d) => delete d.outcomes[0].key)).join(), /key is not sha256/);
+});
+
+test("a stored outcome whose key the loading kernel does not compute is refused", () => {
+  const k = createKernel();
+  const isZero = k.primitiveFunction({ purity: "pure", hash: EQ0, name: "isZero", arity: 1, run: (_a, c) => c.bits(Uint8Array.of(1), 1) });
+  const prims = new Map([[EQ0, isZero]]);
+  assert.throws(() => load(k, draft, prims, { restoreAs: "b" }), /does not match/, "a made-up key");
+  const moved = edit2((d) => (d.nodes[4] = { k: "expression", fn: 2, args: [0] })) as SavedProgram;
+  assert.throws(() => load(k, moved, prims, { restoreAs: "b" }), /does not match/, "the claim was changed under its key");
+  const regrounded = edit2((d) => (d.outcomes[0].restsOn = [])) as SavedProgram;
+  assert.throws(() => load(k, regrounded, prims, { restoreAs: "b" }), /does not match/, "the grounds were changed under its key");
+  assert.doesNotThrow(() => load(k, draft, prims), "with no builder named, the outcomes are not looked at");
 });
 
 function loaded(restoreAs?: string) {

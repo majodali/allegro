@@ -3424,7 +3424,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a team's build server saves a library with its laws decided; a developer's kernel restores them stamped with the server's name, and an auditor decides them again.
 - Notes: new, by ruling. The maintainer: fully rechecking on load "will likely be opt-in"; restore is allowed inside the kernel and is configurable, which "means mostly we need to always analyze for vulnerabilities".
-- Notes (2026-11-15, the rulings on strength and on identity): determinism justifies restoring only where it holds, so an outcome that rested on a capability's answer is never stored (issue 10). A restored claim keeps the word its builder's kernel recorded. In the first build, `Kernel2.restore` records the outcome on the claim as loaded, and the record's content is what ties it to that claim.
+- Notes (2026-11-15, the rulings on strength and on identity): determinism justifies restoring only where it holds, so an outcome that rested on a capability's answer is never stored (issue 10). A restored claim keeps the word its builder's kernel recorded. The kernel computes each outcome's key itself, from the claim's content, the content of the function it sits in and what it rests on (`Kernel2.claimKey`), and `restore` refuses a stored key that differs. The first build left this out; the maintainer asked for it on PR #215.
 - Chapter: Saved programs and export
 
 #### A target platform is a model, and export is a transformation into it

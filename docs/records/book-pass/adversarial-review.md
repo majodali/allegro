@@ -434,6 +434,17 @@ seven. The mark is never carried onto another value, and whether a
 value is a key, or two are the same key, is asked of the kernel and
 never answered by comparing content.
 
+**On PR #215, 2026-11-15.** The maintainer: "Go ahead with the
+temporary second version, the other stream is going to be a while."
+The second versions of both contracts sit beside the first until the
+acceptance stream moves over. And: "Let's implement the kernel
+building a key for each restore claim." The first build had tied a
+stored outcome to its claim only by the record's content. Now the
+kernel computes a key from the claim's content, the content of the
+function it sits in, and what the outcome rests on; a builder stores
+it; the loading kernel computes it again and refuses the record where
+the two differ.
+
 ## Terms introduced
 
 - **Rests on**: what a result's evaluation used that the kernel did

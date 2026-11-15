@@ -371,20 +371,34 @@ export interface Kernel2 extends Kernel {
   // ---- Restore ------------------------------------------------------------
 
   /**
+   * The key of a claim's outcome: a hash the kernel computes from the
+   * claim's content, the content of the function it sits in, and what
+   * the outcome rests on. `within` is that function, as built and before
+   * `module` is applied to it; `claim` is an application of the kernel's
+   * claim primitive somewhere inside it. A builder stores the key beside
+   * the outcome. The same claim in the same function, resting on the
+   * same things, has the same key in every kernel; any change to one of
+   * the three changes it. An InterfaceError where `claim` is not inside
+   * `within`.
+   */
+  claimKey(claim: Value, within: Value, restsOn: readonly Rest[]): string;
+  /**
    * Records that a claim was decided by the kernel of whoever built the
-   * saved program it came from. `claim` is the application of the
-   * kernel's claim primitive, as loaded and before anything was
-   * evaluated. When evaluation reaches it, it is not evaluated again:
-   * its outcome is "decided", resting on the builder named here and on
-   * what `restsOn` lists.
+   * saved program it came from. The kernel computes the claim's key
+   * itself, as `claimKey` does, and refuses with an InterfaceError
+   * unless it equals `key`: a stored outcome cannot be attached to
+   * another claim, to the claim in another function, or to other
+   * grounds. When evaluation reaches the claim it is not evaluated
+   * again: its outcome is "decided", resting on the builder named here
+   * and on what `restsOn` lists.
    *
    * The only call that records an outcome the kernel did not itself
    * reach, and it cannot record one without a builder's name. An
-   * InterfaceError where `claim` is not such an application, or where
-   * `restsOn` names a capability: an outcome that rests on a
+   * InterfaceError also where `claim` is not such an application, or
+   * where `restsOn` names a capability: an outcome that rests on a
    * capability's answer is never stored.
    */
-  restore(claim: Value, builder: string, restsOn: readonly Rest[]): void;
+  restore(claim: Value, within: Value, builder: string, restsOn: readonly Rest[], key: string): void;
 
   // ---- Cells --------------------------------------------------------------
 

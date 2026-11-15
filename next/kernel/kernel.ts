@@ -578,6 +578,31 @@ export const createKernel: CreateKernel2 = () => {
     return { digest, free: Math.max(0, free) };
   };
 
+  /** The functions that enclose a value inside another, outermost first, or undefined where it is not inside. */
+  const enclosing = (target: V, v: V, binders: readonly Fn[], visited: Set<V>): readonly Fn[] | undefined => {
+    if (v === target) return binders;
+    if (visited.has(v)) return undefined;
+    visited.add(v);
+    const parts: V[] = v instanceof Expr ? [v.fn, ...v.args] : v instanceof Struct ? v.entries.map(([, e]) => e) : v instanceof Quoted ? [v.inner] : [];
+    for (const p of parts) {
+      const found = enclosing(target, p, binders, visited);
+      if (found !== undefined) return found;
+    }
+    return v instanceof Fn ? enclosing(target, v.body, [...binders, v], visited) : undefined;
+  };
+
+  /** The key of a claim's outcome: its content, the content of the function it sits in, and what it rests on. */
+  const claimKey = (claim: V, within: V, restsOn: readonly Rest[]): string => {
+    if (!(claim instanceof Expr) || claim.fn !== kernelPrims.get("claim") || claim.args.length !== 1)
+      throw new InterfaceError("not an application of the kernel's claim primitive");
+    if (!(within instanceof Fn)) throw new InterfaceError("the claim's function is not a composed function");
+    const binders = enclosing(claim, within, [], new Set());
+    if (binders === undefined) throw new InterfaceError("the claim is not inside that function");
+    const grounds = restsOn.filter((r) => r.kind !== "builder").map(restKey).sort();
+    const memo = new Map<V, string>();
+    return `sha256:${sha256Text(`outcome ${contentOf(within, [], memo).digest} ${contentOf(claim, binders, memo).digest} ${grounds.join("|")}`)}`;
+  };
+
   const kernel: Kernel2 = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -759,16 +784,17 @@ export const createKernel: CreateKernel2 = () => {
       const v = into(value, "the value");
       return v instanceof Refuted ? v.reason : undefined;
     },
-    restore: (claim, builder, restsOn) => {
+    claimKey: (claim, within, restsOn) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn),
+    restore: (claim, within, builder, restsOn, key) => {
       const c = into(claim, "the claim");
-      if (!(c instanceof Expr) || c.fn !== kernelPrims.get("claim") || c.args.length !== 1)
-        throw new InterfaceError("restore: not an application of the kernel's claim primitive");
       if (builder === "") throw new InterfaceError("restore: an outcome is restored under a builder's name");
       if (restsOn.some((r) => r.kind === "capability"))
         throw new InterfaceError("restore: an outcome that rests on a capability's answer is never stored");
+      if (claimKey(c, into(within, "the function"), restsOn) !== key)
+        throw new InterfaceError("restore: the key does not match this claim, in this function, resting on these things");
       const all = new Map<string, Rest>();
       for (const r of [{ kind: "builder", builder } as const, ...restsOn]) all.set(restKey(r), r);
-      restored.set(c, [...all.values()]);
+      restored.set(c as Expr, [...all.values()]);
     },
     isCell: (value) => {
       const v = into(value, "the value");

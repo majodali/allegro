@@ -97,6 +97,13 @@ export interface StoredOutcome {
   readonly claim: Ref;
   /** What it rested on. Never a capability. */
   readonly restsOn: readonly Rest[];
+  /**
+   * The outcome's key, as the builder's kernel computed it from the
+   * claim, the module function and `restsOn` (`Kernel2.claimKey`). The
+   * loading kernel computes it again and refuses the record where the
+   * two differ.
+   */
+  readonly key: string;
 }
 
 export interface SavedProgram {
@@ -290,10 +297,11 @@ export function check2(doc: unknown): string[] {
     else
       doc.outcomes.forEach((o, i) => {
         if (!isObject(o) || !Array.isArray(o.restsOn)) {
-          out.push(`outcomes[${i}] is not {claim, restsOn}`);
+          out.push(`outcomes[${i}] is not {claim, restsOn, key}`);
           return;
         }
-        for (const key of extraKeys(o, ["claim", "restsOn"])) out.push(`outcomes[${i}] has unknown key "${key}"`);
+        for (const key of extraKeys(o, ["claim", "restsOn", "key"])) out.push(`outcomes[${i}] has unknown key "${key}"`);
+        if (typeof o.key !== "string" || !HASH.test(o.key)) out.push(`outcomes[${i}].key is not sha256: and 64 hex digits`);
         const c = typeof o.claim === "number" && Number.isInteger(o.claim) ? (nodes[o.claim] as Record<string, unknown> | undefined) : undefined;
         const fn = c !== undefined && c.k === "expression" && typeof c.fn === "number" ? (nodes[c.fn] as Record<string, unknown> | undefined) : undefined;
         if (fn === undefined || fn.k !== "kernel" || fn.name !== "claim") out.push(`outcomes[${i}].claim does not refer to an application of the kernel primitive "claim"`);
@@ -325,27 +333,8 @@ function fromHex(hex: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Rebuilds a saved program in a kernel and returns its module function.
- * It makes constructing calls only, one for each node: nothing is
- * evaluated, bound or filled. Instantiating the module is the caller's
- * act, by building a call of the returned function and evaluating it.
- *
- * `primitives` holds the pure primitive functions the caller has made in
- * this kernel, by content hash. A need it does not hold is an error: a
- * saved program never runs against something else.
- *
- * A record with key slots or with outcomes to restore needs a kernel of
- * the second version: the kernel makes the module and its keys from the
- * function's content, and records each restored outcome under the
- * builder's name. On a kernel of the first version such a record is an
- * error; a record without them loads on either.
- */
-export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>, options: LoadOptions = {}): Value {
-  const findings = check2(doc);
-  if (findings.length > 0) throw new Error(`not a saved program: ${findings.join("; ")}`);
-  for (const need of doc.needs)
-    if (!primitives.has(need.hash)) throw new Error(`the kernel lacks the primitive ${need.name} (${need.hash})`);
+/** Makes one value for each node, by constructing calls only. */
+function build(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): Value[] {
   const values: Value[] = [];
   for (const node of doc.nodes) {
     switch (node.k) {
@@ -375,13 +364,49 @@ export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: Re
         break;
     }
   }
+  return values;
+}
+
+/**
+ * The key of each stored outcome of a record, as this kernel computes
+ * it, in the order of `outcomes`. For whoever writes a record: build it
+ * with any `key`, ask for the keys, and write them in. It reads the
+ * record's nodes and `restsOn` only, and evaluates nothing.
+ */
+export function outcomeKeys(kernel: Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): string[] {
+  const values = build(kernel, doc, primitives);
+  return (doc.outcomes ?? []).map((o) => kernel.claimKey(values[o.claim], values[doc.module], o.restsOn));
+}
+
+/**
+ * Rebuilds a saved program in a kernel and returns its module function.
+ * It makes constructing calls only, one for each node: nothing is
+ * evaluated, bound or filled. Instantiating the module is the caller's
+ * act, by building a call of the returned function and evaluating it.
+ *
+ * `primitives` holds the pure primitive functions the caller has made in
+ * this kernel, by content hash. A need it does not hold is an error: a
+ * saved program never runs against something else.
+ *
+ * A record with key slots or with outcomes to restore needs a kernel of
+ * the second version: the kernel makes the module and its keys from the
+ * function's content, and records each restored outcome under the
+ * builder's name. On a kernel of the first version such a record is an
+ * error; a record without them loads on either.
+ */
+export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>, options: LoadOptions = {}): Value {
+  const findings = check2(doc);
+  if (findings.length > 0) throw new Error(`not a saved program: ${findings.join("; ")}`);
+  for (const need of doc.needs)
+    if (!primitives.has(need.hash)) throw new Error(`the kernel lacks the primitive ${need.name} (${need.hash})`);
+  const values = build(kernel, doc, primitives);
   const restoring = options.restoreAs !== undefined && (doc.outcomes?.length ?? 0) > 0;
   if (!("module" in kernel)) {
     if ((doc.keys ?? 0) > 0) throw new Error("the saved program has key slots, and this kernel is of the first version");
     if (restoring) throw new Error("the saved program has outcomes to restore, and this kernel is of the first version");
     return values[doc.module];
   }
-  if (restoring) for (const o of doc.outcomes ?? []) kernel.restore(values[o.claim], options.restoreAs as string, o.restsOn);
+  if (restoring) for (const o of doc.outcomes ?? []) kernel.restore(values[o.claim], values[doc.module], options.restoreAs as string, o.restsOn, o.key);
   if (doc.version === 1) return values[doc.module];
   return kernel.module(values[doc.module], doc.keys ?? 0);
 }

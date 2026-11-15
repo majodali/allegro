@@ -583,7 +583,10 @@ name.
   `next/kernel/`: the interface's second version (`Kernel2`) with
   modules, keys, `restsOn` and restore; key slots and stored outcomes
   in the saved-program form; the reference kernel implementing both;
-  a SHA-256 checked against the standard's vectors.
+  a SHA-256 checked against the standard's vectors. A key is a
+  structure the kernel marks, so the kinds stay seven. The kernel
+  computes a key for each stored outcome and refuses one that does
+  not match its claim.
 - **2026-11-15 — The reference kernel, first part (K2).**
   `next/kernel/kernel.ts` implements the kernel's interface: values of
   the seven kinds, scopes and names, cells, and the evaluation of

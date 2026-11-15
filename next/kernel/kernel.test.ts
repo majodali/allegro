@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Kernel, PrimitiveDeclaration, Value } from "./interface.js";
+import type { Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { createKernel, InterfaceError } from "./kernel.js";
 import { load, type SavedProgram } from "./saved-program.js";
 import { launch } from "../launch/launcher.js";
@@ -440,20 +440,40 @@ test("what a binding's value rested on is kept with it", () => {
   assert.ok(k.restsOn(r.value).some((x) => x.kind === "primitive" && x.name === "isZero"), "though the binding was not evaluated again");
 });
 
-test("restore records an outcome under a builder's name, and in no other way", () => {
-  const { k, isZero, call, kp } = setup();
-  const claim = call(kp("claim"), call(isZero, byte(k, 5)));
-  assert.equal(k.evaluate(claim, k.scope()).refuted, true);
-  const stored = call(kp("claim"), call(isZero, byte(k, 5)));
-  k.restore(stored, "team-build", []);
-  const r = k.evaluate(stored, k.scope());
+test("restore records an outcome under a builder's name, only where the kernel's own key matches", () => {
+  const build = () => {
+    const s = setup();
+    const n = s.k.param("n");
+    const claim = s.call(s.kp("claim"), s.call(s.isZero, n));
+    const fn = s.k.composedFunction([n], claim);
+    return { ...s, n, claim, fn };
+  };
+  const { k, isZero, call, kp, n, claim, fn } = build();
+  const grounds: Rest[] = [{ kind: "primitive", hash: hash(4), name: "isZero" }];
+  const key = k.claimKey(claim, fn, grounds);
+  assert.match(key, /^sha256:[0-9a-f]{64}$/);
+  const elsewhere = build();
+  assert.equal(elsewhere.k.claimKey(elsewhere.claim, elsewhere.fn, grounds), key, "the same key in every kernel");
+
+  assert.equal(k.evaluate(call(fn, byte(k, 5)), k.scope()).refuted, true, "not restored: 5 is not zero");
+  k.restore(claim, fn, "team-build", grounds, key);
+  const r = k.evaluate(call(fn, byte(k, 5)), k.scope());
   assert.equal(k.outcomeOf(r.value), "decided");
-  assert.deepEqual(k.restsOn(r.value), [{ kind: "builder", builder: "team-build" }]);
-  const outer = k.evaluate(call(kp("claim"), stored), k.scope());
+  assert.deepEqual(k.restsOn(r.value), [{ kind: "builder", builder: "team-build" }, ...grounds]);
+  const outer = k.evaluate(call(kp("claim"), call(fn, byte(k, 5))), k.scope());
   assert.ok(k.restsOn(outer.value).some((x) => x.kind === "builder"), "what rests on a restored outcome names the builder too");
-  assert.throws(() => k.restore(stored, "", []), /under a builder's name/);
-  assert.throws(() => k.restore(call(isZero, byte(k, 0)), "b", []), /claim primitive/);
-  assert.throws(() => k.restore(stored, "b", [{ kind: "capability", capability: "http", part: "get" }]), /never stored/);
+
+  // The key ties the outcome to this claim, in this function, on these grounds.
+  const other = call(kp("claim"), call(isZero, n));
+  const fn2 = k.composedFunction([n], k.structure([[null, other]]));
+  assert.notEqual(k.claimKey(other, fn2, grounds), key, "the same claim in another function");
+  assert.notEqual(k.claimKey(claim, fn, []), key, "the same claim on other grounds");
+  assert.throws(() => k.restore(other, fn2, "team-build", grounds, key), /does not match/);
+  assert.throws(() => k.restore(claim, fn, "team-build", [], key), /does not match/);
+  assert.throws(() => k.restore(claim, fn, "", grounds, key), /under a builder's name/);
+  assert.throws(() => k.restore(claim, fn, "b", [{ kind: "capability", capability: "http", part: "get" }], key), /never stored/);
+  assert.throws(() => k.claimKey(call(isZero, byte(k, 0)), fn, []), /claim primitive/);
+  assert.throws(() => k.claimKey(other, fn, []), /not inside that function/);
 });
 
 test("isCell tells a cell and a waiting name from other values", () => {
