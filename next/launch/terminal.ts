@@ -1,5 +1,5 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
-// acceptance side), chunk Q7 (the minimal launcher), part 1). The only
+// acceptance side), chunk Q7 (the minimal launcher), parts 1 and 2). The only
 // file of next/launch/ that touches process and fs.
 //
 //   npm run launch -- <saved-program.json> [--steps <n>]
@@ -15,7 +15,7 @@
 // step budget, and without it there is none.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
-// exporting `createKernel` of type `CreateKernel`
+// exporting `createKernel` of type `CreateKernel2`
 // (next/kernel/interface.ts). Until that file exists the entry prints
 // one line saying so and exits 2. It never loads the stand-in kernel of
 // the launcher's tests.
@@ -23,7 +23,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import type { CreateKernel } from "../kernel/interface.js";
+import type { CreateKernel2 } from "../kernel/interface.js";
 import { describe, launch } from "./launcher.js";
 import { output } from "./output.js";
 
@@ -38,12 +38,12 @@ function fail(message: string, code = 1): never {
   process.exit(code);
 }
 
-async function kernelFactory(): Promise<CreateKernel> {
+async function kernelFactory(): Promise<CreateKernel2> {
   const file = path.join(root, KERNEL_MODULE);
   if (!fs.existsSync(file)) fail(`no kernel is built yet: ${KERNEL_MODULE} does not exist`, 2);
   const mod = (await import(pathToFileURL(file).href)) as { createKernel?: unknown };
   if (typeof mod.createKernel !== "function") fail(`${KERNEL_MODULE} does not export a function createKernel`);
-  return mod.createKernel as CreateKernel;
+  return mod.createKernel as CreateKernel2;
 }
 
 async function main(argv: readonly string[]): Promise<void> {

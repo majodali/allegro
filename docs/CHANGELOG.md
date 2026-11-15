@@ -1134,6 +1134,19 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The launcher on the reference kernel (B-196, chunk Q7 (the minimal launcher), part 2)
+
+B-196 (the rebuild's acceptance side). `next/launch/launcher.ts` now
+uses the second version of the kernel's interface and of the data
+form: it checks a record with `check2`, loads one of either version,
+and passes `restoreAs` to `load` only when the configuration names the
+builder it accepts. A refuted run carries the reason the kernel gives
+for each refutation it reported. A run left waiting counts the cells no
+capability will answer and names the names nothing binds. The tests run
+on the reference kernel, and the stand-in kernel is deleted.
+`npm run launch -- next/launch/fixtures/hello.json` prints
+`hello, world` and exits 0, and a test holds that in a child process.
+
 ### 2026-11 — One corpus case restated after the cell decision's rewording (B-196)
 
 B-196 (the rebuild's acceptance side). The kernel stream reworded the

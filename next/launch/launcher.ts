@@ -1,5 +1,5 @@
 // The minimal launcher (B-196 (the rebuild's acceptance side), chunk Q7
-// (the minimal launcher), part 1, docs/plans/rebuild-acceptance.md §5).
+// (the minimal launcher), parts 1 and 2, docs/plans/rebuild-acceptance.md §5).
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -10,15 +10,19 @@
 //    an exception", as reworded: the launcher fills a cell with plain data
 //
 // It is a library and host-neutral: no process, no fs, no Buffer. It is
-// built against the kernel's interface (next/kernel/interface.ts) and the
-// data form of a saved program (next/kernel/saved-program.ts), and runs on
-// whatever kernel factory it is given. The terminal's entry is
-// next/launch/terminal.ts.
+// built against the second version of the kernel's interface (`Kernel2`
+// of next/kernel/interface.ts) and of the data form of a saved program
+// (`check2` of next/kernel/saved-program.ts), and runs on whatever kernel
+// factory it is given. The terminal's entry is next/launch/terminal.ts.
 //
 // The steps it performs, numbered as the decision numbers them:
 //   2  creates a kernel, once;
-//   3  checks the saved program and loads it, refusing with the findings
-//      when it does not check or a pure primitive it needs is missing;
+//   3  checks the saved program, of the first or second version, and
+//      loads it, refusing with the findings when it does not check, a
+//      pure primitive it needs is missing, or the kernel refuses to load
+//      it; the stored outcomes of a record of the second version are
+//      restored only when the configuration names the builder it accepts
+//      them from (`restoreAs`), and are not looked at otherwise;
 //   4  creates the capabilities of the ceiling as effectful primitive
 //      functions, and hands the module function exactly those its
 //      `declares` names with role `capability`, in the function's order;
@@ -30,23 +34,29 @@
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`;
 //   7  returns how the run ended, and the lines the output capability
-//      wrote.
+//      wrote. A refuted run carries the reason the kernel gives for each
+//      refutation it reported (`reasonOf`). A run left waiting names the
+//      names nothing binds, apart from the cells no capability will answer.
 // Step 1 is the caller's: it passes the configuration. Step 3 loads one
 // saved program; the first extensions are a later part.
 //
-// Left out of this part, each refused with a plain reason:
+// Left out, each refused with a plain reason:
 //   - a module parameter with role `input` or `module`;
 //   - a declared capability with more than one part: handing one needs a
 //     way to select a part inside the module, which is a kernel
-//     primitive's job.
+//     primitive's job, and the kernel has none yet.
 // A capability with one part is handed as that part's primitive function.
 //
-// Tested by next/launch/launcher.test.ts, on the stand-in kernel in
-// next/launch/stand-in-kernel.for-tests.ts.
+// A key slot of a record of the second version is not the launcher's:
+// `load` has the kernel make the keys, and `declares` lists only the
+// parameters after them.
+//
+// Tested by next/launch/launcher.test.ts, on the reference kernel of
+// next/kernel/create.ts.
 
-import type { Cell, CreateKernel, Kernel, PrimitiveDeclaration, Value } from "../kernel/interface.js";
-import { INTERFACE_VERSION } from "../kernel/interface.js";
-import { check, load, type SavedProgram } from "../kernel/saved-program.js";
+import type { Cell, CreateKernel2, Kernel2, PrimitiveDeclaration, Value } from "../kernel/interface.js";
+import { INTERFACE_VERSION, KernelFault } from "../kernel/interface.js";
+import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
 
 /** A capability's definition: its name and the names of its parts. */
 export interface CapabilityDefinition {
@@ -96,10 +106,16 @@ export interface Configuration {
   readonly ceiling: readonly string[];
   /** The step budget for the whole run: the evaluation and every advance after it. None: no budget. */
   readonly steps?: number;
+  /**
+   * The builder whose stored outcomes this configuration accepts for the
+   * saved program. Passed to `load` as `restoreAs`. None: the stored
+   * outcomes are not looked at, and every claim is decided again.
+   */
+  readonly restoreAs?: string;
 }
 
 export interface Launch {
-  readonly createKernel: CreateKernel;
+  readonly createKernel: CreateKernel2;
   /** A saved program, as parsed JSON. It is checked before it is used. */
   readonly program: unknown;
   readonly configuration: Configuration;
@@ -112,12 +128,20 @@ export interface Launch {
 export type LaunchEnd =
   /** Evaluation went as far as the information allows, and nothing waited for is outstanding. */
   | { readonly kind: "completed"; readonly steps: number }
-  /** The kernel recorded a refutation. */
-  | { readonly kind: "refuted"; readonly steps: number; readonly reason: string }
+  /**
+   * The kernel recorded a refutation. `reasons` holds the reason the
+   * kernel gives for each refuted value the run reported, in the order
+   * reported; `reason` joins them.
+   */
+  | { readonly kind: "refuted"; readonly steps: number; readonly reason: string; readonly reasons: readonly string[] }
   /** The step budget ran out; what was unfinished is undecided. */
   | { readonly kind: "limit"; readonly steps: number; readonly reason: string }
-  /** The kernel waits on a cell that no capability will answer. */
-  | { readonly kind: "waiting"; readonly steps: number; readonly reason: string }
+  /**
+   * The kernel waits on what nothing will supply: `unanswered` counts the
+   * cells no capability will answer, and `unbound` names the names that
+   * nothing binds.
+   */
+  | { readonly kind: "waiting"; readonly steps: number; readonly reason: string; readonly unanswered: number; readonly unbound: readonly string[] }
   /** Refused before anything was evaluated. */
   | { readonly kind: "refused"; readonly reason: string; readonly findings: readonly string[] }
   /** The kernel or a capability threw. */
@@ -129,11 +153,14 @@ export interface LaunchOutcome {
   readonly end: LaunchEnd;
 }
 
+/** The calls of the second version the launcher uses. */
+const SECOND_VERSION_CALLS = ["module", "restore", "reasonOf"] as const;
+
 function refused(lines: string[], reason: string, findings: readonly string[] = []): LaunchOutcome {
   return { lines, end: { kind: "refused", reason, findings } };
 }
 
-function plainValue(kernel: Kernel, plain: Plain): Value {
+function plainValue(kernel: Kernel2, plain: Plain): Value {
   if ("bits" in plain) return kernel.bits(plain.bits, plain.bitLength);
   if ("symbol" in plain) return kernel.symbol(plain.symbol);
   return kernel.structure(plain.entries.map(([k, v]) => [k === null ? null : plainValue(kernel, k), plainValue(kernel, v)] as const));
@@ -163,9 +190,12 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   const kernel = request.createKernel();
   if (kernel.interfaceVersion !== INTERFACE_VERSION)
     return refused(lines, `the kernel implements interface version ${kernel.interfaceVersion}; this launcher needs ${INTERFACE_VERSION}`);
+  const lacking = SECOND_VERSION_CALLS.filter((name) => typeof (kernel as unknown as Record<string, unknown>)[name] !== "function");
+  if (lacking.length > 0)
+    return refused(lines, "the kernel is not of the second version of the interface", lacking.map((name) => `the kernel lacks ${name}`));
 
   // Step 3, the record alone: nothing reaches the kernel until it checks.
-  const findings = check(request.program);
+  const findings = check2(request.program);
   if (findings.length > 0) return refused(lines, "the saved program does not check", findings);
   const program = request.program as SavedProgram;
   const pure = new Map<string, PrimitiveDeclaration>();
@@ -192,7 +222,14 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // Step 3, loading: the pure primitives it needs, then the record.
     const primitives = new Map<string, Value>();
     for (const need of program.needs) primitives.set(need.hash, kernel.primitiveFunction(pure.get(need.hash)!));
-    const moduleFn = load(kernel, program, primitives);
+    let moduleFn: Value;
+    try {
+      moduleFn = load(kernel, program, primitives, configuration.restoreAs === undefined ? {} : { restoreAs: configuration.restoreAs });
+    } catch (e) {
+      if (e instanceof KernelFault) throw e;
+      const message = e instanceof Error ? e.message : String(e);
+      return refused(lines, "the kernel refused to load the saved program", [message]);
+    }
 
     // Step 4: the capabilities of the ceiling, as effectful primitive functions.
     const granted = new Map<string, Value[]>();
@@ -211,11 +248,11 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     const result = kernel.evaluate(kernel.expression(moduleFn, args), kernel.scope(), left(0));
     let steps = result.steps;
     const atLimit = (): LaunchOutcome => ({ lines, end: { kind: "limit", steps, reason: `the step budget of ${budget} ran out` } });
-    const refutedEnd = (): LaunchOutcome => ({
-      lines,
-      end: { kind: "refuted", steps, reason: "a refutation is recorded on the program's value; this version of the interface gives no explanation of it" },
-    });
-    if (result.refuted) return refutedEnd();
+    const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
+      const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
+      return { lines, end: { kind: "refuted", steps, reason: reasons.join("; "), reasons } };
+    };
+    if (result.refuted) return refutedEnd([result.value]);
     if (result.ended === "limit") return atLimit();
 
     // Step 6: deliver the values that arrive later.
@@ -235,13 +272,21 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       if (filled > 0) {
         const advanced = kernel.advance(left(steps));
         steps += advanced.steps;
-        if (advanced.refuted.length > 0) return refutedEnd();
+        if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
         if (advanced.ended === "limit") return atLimit();
         continue;
       }
       const due = waiting.filter((c) => answers.has(c)).map((c) => answers.get(c)!);
-      if (due.length === 0)
-        return { lines, end: { kind: "waiting", steps, reason: `the program waits on ${waiting.length} cell(s) that no capability will answer` } };
+      if (due.length === 0) {
+        // A name nothing binds is listed as a cell handle of kind symbol.
+        const unbound = waiting.filter((c) => kernel.kind(c) === "symbol").map((c) => kernel.symbolName(c));
+        const unanswered = waiting.length - unbound.length;
+        const parts = [
+          ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
+          ...(unbound.length > 0 ? [`the name(s) ${unbound.join(", ")}, which nothing binds`] : []),
+        ];
+        return { lines, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, unbound } };
+      }
       await Promise.race(due);
     }
 
