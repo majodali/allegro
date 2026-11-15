@@ -27,7 +27,9 @@ names it with "(held)".
    `WellFormedPlan`. The claim holds. The wiring is derived ("A plan is
    an outcome graph with derived wiring", held). The claim rests on the
    fixtures it uses and on the library's termination assumptions, so
-   its strength is at most assumed.
+   its strength is at most assumed. The run goes on: a strength
+   prevents no effect unless a policy or configuration requires it
+   (ruling 1 of 2026-11-15).
 3. **Does.** Declares `plan SoftwareRelease:`, which borrows
    `BuildPipeline` with `uses`, nests composites and sets a budget of
    200 person-hours. **Must find.** The same claim holds, at the same
@@ -41,14 +43,18 @@ names it with "(held)".
 5. **Does.** Asks `escalations`. **Must find.** Each declared failure,
    the node that raises it and the composite whose handler takes it.
 6. **Does.** Builds `unwired` with library functions and asks
-   `validate`. **Must find.** No claim is made, so nothing is refuted
-   ("Nothing is a claim until someone makes it"). The predicate's
-   explanation names every finding: input PackagedArtifacts of Sign is
-   produced by nothing, and outcome CompiledBinaries of Compile is
-   consumed by nothing.
+   `validate`. **Must find.** `validate` is the plan's own predicate,
+   `WellFormedPlan`'s, called as an ordinary function (ruling 4 of
+   2026-11-15). No claim is made, so nothing is refuted ("Nothing is a
+   claim until someone makes it"). The predicate answers its
+   explanation as a value ("A predicate can explain its refusal"), and
+   the program prints it. The explanation names every finding: input
+   PackagedArtifacts of Sign is produced by nothing, and outcome
+   CompiledBinaries of Compile is consumed by nothing.
 7. **Does.** Lowers the budget to 20 person-hours and asks `validate`.
-   **Must find.** The explanation names the budget: the bound's 24
-   person-hours exceed 20.
+   **Must find.** The predicate answers its explanation, which names the
+   budget: the bound's 24 person-hours exceed 20. For a plan that is
+   well formed it answers true.
 8. **Does.** Adds a handler on DiskFull, which nothing beneath it
    raises, and asks `plan_errors`. **Must find.** The finding names the
    handler and that no node raises DiskFull ("Failure handlers over
@@ -65,9 +71,16 @@ The present tree already halts before output here.
 
 ## What changes by ruling
 
-- "The standard language's handled failure is an exception": pins 175
-  and 179 read an error value from `validate` with `error of`. The error
-  value is gone; what replaces it is question 1.
+- Ruling 4 of 2026-11-15 and "A predicate can explain its refusal":
+  pins 175 and 179 read an error value from `validate` with `error of`.
+  `validate` is no second way of enforcing. It is the plan's predicate
+  called as an ordinary function, and it answers true or its
+  explanation as a value. The pinned lines keep their text, and `error
+  of` leaves the source ("The standard language's handled failure is an
+  exception").
+- Ruling 1 of 2026-11-15: every plan claim rests on fixtures and
+  termination assumptions, so its strength is at most assumed. The run
+  prints all the same.
 - "A refutation marks everything computed from it": "Type error:
   refinement predicate failed for WellFormedPlan" becomes the refutation
   of the plan's claim, carrying the predicate's explanation.
@@ -81,23 +94,26 @@ The present tree already halts before output here.
   and "admitted" becomes assumed.
 - "A module's summary is the weakest strength among its claims": the
   heading reads "verified" while five Quantity laws wait. The summary
-  is undecided.
+  is one word, the weakest strength among the file's claims and the
+  laws it draws, at most assumed.
 
 ## Open questions
 
-1. The held "Two enforcement shapes for a well-formed plan" makes the
-   library path yield an error value. Under the ruled decisions, is
-   `validate` a call of the predicate that answers its explanation as a
-   value, or a function that raises an exception? Pins 175 and 179
-   follow the answer.
-2. Are the fixtures `a => true` assumed promises, as today's ledger has
+Settled: question 1 of the draft, whether `validate` answers its
+explanation as a value or raises an exception (ruling 4: it is the
+plan's predicate called as an ordinary function, and answers true or
+its explanation).
+
+1. Are the fixtures `a => true` assumed promises, as today's ledger has
    them, so that every plan claim is at most assumed? This rests on the
    held "Bracket constraints as refinements, named as predicate
-   fixtures".
-3. A plan's predicate must terminate ("Equality, coercion and invariant
+   fixtures". Recommended: yes, each on the record with the file as its
+   author.
+2. A plan's predicate must terminate ("Equality, coercion and invariant
    predicates hold no capability and terminate"). Must milestone 7 keep
    the library's walks at the strength assumed, as the library has them,
    or decide their termination ("Termination by bounded decrease")?
+   Recommended: keep them assumed, each on the record, for milestone 7.
 
 ## Present pins
 

@@ -31,14 +31,22 @@ the run to carry nothing of the checks.
 4. **Does.** States `four_flipped` by `proof_sym(four)` and `chained` by
    `proof_trans(four, half_of_eight)`. **Must find.** Each `by` term is a
    proposal. The kernel checks that it establishes exactly the stated
-   equation. Each holds, decided. Each result names the standard
-   extension, whose symmetry and transitivity rules it used, and the
-   strength of Int equality's transitivity law. The proposer of both
-   terms is the file.
-5. **Does.** Runs `inspect` and `verify`. **Must find.** The module's
-   summary is one word: decided. Each claim of steps 1 to 4 is listed
-   with its strength and what it rests on. The standard types' equality
-   laws and the Int-to-Float coercion claims are listed with theirs.
+   equation. Each holds. Each result names the standard extension,
+   whose symmetry and transitivity rules it used, and the strength of
+   the Int equality law the rule used: assumed (ruling 5). The proposer
+   of both terms is the file.
+5. **Does.** Runs `inspect` and `verify`. **Must find.** Each claim of
+   steps 1 to 4 is listed with its strength and what it rests on. The
+   twelve equality laws of the standard types are listed with theirs:
+   Bool's three are decided by enumeration; the nine of Int, Float and
+   String are assumed, each named with the platform as the author of
+   the assumption, until proved against the primitives' reference
+   definitions (ruling 5 of 2026-11-15). The Int-to-Float coercion
+   claims are listed with theirs. The claims decided by evaluation do
+   not rest on the laws: `2 + 2 == 4` uses the primitive and not the
+   law. The module's summary is the weakest strength among its claims;
+   whether the theorems of step 4 count as decided or assumed is open
+   question 3.
 6. **Does.** Runs the program. **Must find.** It prints 5, 14 and 4. The
    theorems and the contract leave nothing to evaluate in the run.
 
@@ -50,13 +58,21 @@ scene 2's (`rung1-02-counterexamples.md`).
 ## What changes by ruling
 
 - "A module's summary is the weakest strength among its claims": the
-  grade `proven-safe` becomes the word decided.
+  grade `proven-safe` becomes one word, the weakest strength among the
+  module's claims: decided, or assumed if the theorems of step 4 take
+  the strength of the Int laws their terms used (open question 3).
 - "Four strengths, one vocabulary": `inspect`'s "rests on: proven
-  backing only" and `verify`'s "discharged" counts become decided.
+  backing only" and `verify`'s "discharged" counts give way to the four
+  strengths.
 - "Every result says how strongly it holds": the verdict's heading
   "verified" and the ledger's "all proofs rest on proven backing" give
-  the strength decided. The results of `four_flipped` and `chained` name
-  the standard extension ("A proof term is a proposal").
+  the strengths the claims earned. The results of `four_flipped` and
+  `chained` name the standard extension ("A proof term is a proposal")
+  and the Int law each rule used, assumed.
+- Ruling 5 of 2026-11-15: the verdict lists the twelve equality laws as
+  discharged at the tier `kernel`. Bool's three are decided by
+  enumeration; the nine of Int, Float and String are assumed, with the
+  platform named.
 - "Anyone may propose, and the record shows who": the verdict credits
   all four theorems to `auto-PE`. Two of them carry terms the file
   proposed; the result names the file for those. The other two are
@@ -68,14 +84,27 @@ scene 2's (`rung1-02-counterexamples.md`).
 
 ## Open questions
 
-1. The verdict lists twelve equality laws of Int, Float, String and Bool
-   and two coercion claims as discharged, at the law strength the code
-   calls `kernel`. Are they decided by evaluation in the new tree, or
-   assumed as laws the supplier of a primitive declares ("A law licenses
-   a rewrite, and the rewritten program carries the law's strength")?
+Settled: the strength of the twelve equality laws (ruling 5 of
+2026-11-15). Its part on the coercion claims is not settled, and stays
+as question 1.
+
+1. The verdict lists the two Int-to-Float coercion claims as discharged,
+   at the tier the code calls `kernel`. Ruling 5 names the equality
+   laws and not the coercions. Are the coercion claims assumed and named
+   with the platform, as Int's laws are, or decided? Recommended:
+   assumed and named, as Int's laws, until proved against the
+   primitives' reference definitions.
 2. Does `use contracts` survive as a module, or are `requires` and
    `ensures` part of the standard language without it ("A body clause is
-   a notation")?
+   a notation")? Recommended: part of the standard language, and `use
+   contracts` goes.
+3. `four_flipped` and `chained` hold by evaluation, and their terms use
+   Int's symmetry and transitivity laws, which are assumed (ruling 5).
+   Is each theorem decided, from evaluation, with its proof recording
+   the assumed law? Or assumed, from its term? Recommended: decided,
+   with the proof's record naming the assumed law. Ruling 5 says a
+   program is not dragged down: only a proof step or rewrite that uses a
+   law rests on it, and evaluation alone decides these claims.
 
 ## Present pins
 

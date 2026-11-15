@@ -562,3 +562,43 @@ policy is the gate ruled there.
   this plan first said: rung 1's prover loop is a walkthrough with no
   program. 37 open questions are put, four of them shared by several
   scenes and asked first.
+  - **Ruled 2026-11-15.** The maintainer ruled the index's shared
+    question and four questions the scenes share. Nine of the 37 are
+    settled by them; the next entry records the rulings.
+  - **The index's shared question is gone.** Its section is replaced
+    by "Rulings of 2026-11-15" and a table of the scenes' questions,
+    in `next/corpus/scenarios/README.md`.
+- **2026-11-15 — Q3: five shared questions ruled, and the corpus follows.**
+  The maintainer ruled five questions in a design discussion of this
+  stream's session. They are stated in
+  `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15", and the
+  scenes state the ruled behaviour as fact.
+  - **The rulings.** (1) A strength (assumed, sampled, undecided) never
+    prevents an effect unless a policy or configuration requires it; a
+    refuted claim still does. (2) A refused proposal never refutes its
+    claim; the claim's outcome is what evaluation gives, and a policy
+    "no proposal in the source is refused" exists, off by default.
+    (3) A predicate on a parameter stays a claim with one meaning at
+    every phase, `d + t` is refuted when checked, a failed check is not
+    catchable, and the policy "every parameter claim is decided before
+    the run begins" is on by default. (4) `validate` on a plan is the
+    plan's own predicate called as an ordinary function, answering true
+    or its explanation as a value. (5) Bool's equality laws are decided
+    by enumeration, those of Int, Float and String assumed and named
+    until proved, and the standard deriver, the shipped proposer the
+    build runs, evaluates, samples and derives within configurable step
+    budgets.
+  - **The corpus.** 37 cases restated by an overlay
+    (`next/tools/corpus.ts --apply`): 13 by ruling 3, 13 changing class
+    from survives to changes; 7 by ruling 4, the text kept; 3 by ruling
+    2, one changing class; 12 by ruling 5; 1 by ruling 1; 1 for a
+    question renumbered in its scene. 14 cases change class in all.
+    The check prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1604, changes 243, detail 145) · unclassed 0 — consistent`.
+  - **The questions.** Of the scenes' 37, nine are settled and 28 stay
+    open, each with a recommended option. Five are new with the
+    rulings, all open.
+  - **For the kernel stream.** A guard must treat an explanation as
+    not true (rulings 3 and 4). The standard deriver is an extension
+    the build runs; it asks nothing of the kernel but the trial
+    evaluation the kernel already owes.

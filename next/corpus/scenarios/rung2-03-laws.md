@@ -27,54 +27,79 @@ strength each has earned, including those still undecided.
    with the file as its author.
 5. **Does.** Binds `q = 5 m`, states `theorem q_chain: q == q by
    proof_trans(proof_refl(q), proof_refl(q))` and binds the term to `p`.
-   **Must find.** The transitivity rule accepts the term. The claim holds
-   at the strength assumed and names the assumption. The run prints
-   assumed.
-6. **Does.** Runs `verify`. **Must find.** Quantity's laws at their
-   strengths ("Quantity laws at honest tiers"): trans assumed; refl,
-   sym, `mul_comm` and `conv_roundtrip` undecided. `q_chain` assumed,
-   resting on trans. The theorems of steps 1 to 3 decided. The module's
-   summary is undecided.
+   **Must find.** The transitivity rule accepts the term. The proof
+   takes the strength of Quantity's transitivity law and names the
+   assumption. The run prints that strength: assumed, on the reading
+   that the standard deriver does not attempt a law the file has
+   assumed (rung 1, scene 4, question 2).
+6. **Does.** Runs `verify`. **Must find.** Quantity's five laws, refl,
+   sym, trans, `mul_comm` and `conv_roundtrip` ("Quantity laws at honest
+   tiers"), each under the standard deriver (ruling 5 of 2026-11-15).
+   Each law still undecided after evaluation is attempted within the
+   build's budgets, in the order evaluation, sampling, derivation, and
+   ends at the strongest strength reached: decided, sampled or
+   undecided. Where it ends short of decided, the record says a
+   derivation was tried and where it stopped. A law the deriver cannot
+   sample within its allowance is recorded as not sampled. The scene
+   requires the attempt and the record, not a particular strength.
+   `q_chain` at the strength of what it rests on. The theorems of steps
+   1 to 3 decided. The module's summary is the weakest strength among
+   its claims.
 7. **Does.** Prints `"physics with receipts"`. **Must find.** The run
-   prints it.
+   prints it. A strength short of decided prevents no effect (ruling 1).
 
 ## Break it
 
 **Does.** Removes `Law.assume`, uncomments `qx = 5 m` and `theorem bad:
 qx == qx by proof_trans(proof_refl(qx), proof_refl(qx))`. **Must find.**
-The transitivity rule refuses the term: Quantity's transitivity is
-neither decided nor assumed. The refusal names `Quantity`, the law trans
-and both ways forward, `Law.witness` and `Law.assume`. It is found while
-the program is checked, before any effect. Today the program prints a
-line and then halts.
+Where the standard deriver has not decided Quantity's transitivity, the
+transitivity rule refuses the term: the law is neither decided nor
+assumed. A refused proposal does not refute its claim (ruling 2 of
+2026-11-15). The claim's outcome is what evaluation gives: `qx == qx`
+is decided by evaluation. The refusal is recorded with the rule's
+explanation, which names `Quantity`, the law trans and both ways
+forward, `Law.witness` and `Law.assume`. Nothing halts, and the run
+prints as in steps 1 to 7. Today the program prints a line and then
+halts.
 
 ## What changes by ruling
 
 - "Four strengths, one vocabulary": pin 32 reads `admitted` and becomes
   assumed. `verify`'s "discharged", "ADMITTED" and "pending", and the
   refusal's "neither proven nor admitted", use the four strengths.
+- Ruling 5 of 2026-11-15: today Quantity's refl, sym, `mul_comm` and
+  `conv_roundtrip` are pending because a law over a record type has no
+  sample construction. The standard deriver attempts each within its
+  budgets and records where it stopped.
+- Ruling 2 of 2026-11-15 and "A proof term is a proposal": the break-it
+  term is refused and recorded, and nothing halts. The anonymous claim
+  of step 2 is missing from today's verdict. The result lists it.
+- Ruling 1 of 2026-11-15: the prints proceed whatever strength the laws
+  reach.
 - "Every result says how strongly it holds": `verify` marks `q_chain` and
   `p` discharged with a note. Their strength is assumed. The heading
   reads "verified" while four laws wait.
 - "A module's summary is the weakest strength among its claims": the
-  summary is undecided.
-- "A proof term is a proposal": the anonymous claim of step 2 is missing
-  from today's verdict. The result lists it.
+  summary is one word, the weakest strength among the file's claims and
+  the laws it draws.
 - "Anyone may propose, and the record shows who": the verdict credits
   each theorem to `auto-PE`. The result names the file as proposer of
-  the `by` term and author of the assumption.
-- "An effect consumes only values whose claims are decided": the
-  break-it halt follows a printed line. The run prints nothing.
+  the `by` term and author of the assumption, and the deriver as
+  proposer of each law it decides.
 
 ## Open questions
 
-1. Quantity's refl and sym are undecided because a law over a record
-   type has no sample construction. Must milestone 6 keep them
-   undecided, as the scene shows, or reach sampled?
-2. A refused `by` term on a claim that holds by evaluation: refuted or
-   undecided? This is rung 1, scene 4, question 1.
-3. Is the proof value `p`, bound without `theorem`, a claim? This is
-   rung 1, scene 4, question 2.
+Settled: question 1 of the draft, whether Quantity's refl and sym stay
+undecided or reach sampled (ruling 5: each is attempted under the
+standard deriver, and the scene requires the attempt and its record).
+Question 2, a refused `by` term on a claim that holds by evaluation
+(ruling 2).
+
+1. Is the proof value `p`, bound without `theorem`, a claim? This is
+   rung 1, scene 4, question 1.
+2. Does the standard deriver attempt Quantity's transitivity, which the
+   file has assumed? This is rung 1, scene 4, question 2; pin 32 follows
+   the answer.
 
 ## Present pins
 

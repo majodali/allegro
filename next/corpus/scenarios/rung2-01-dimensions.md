@@ -21,21 +21,44 @@ in units and dimensions.
    `Quantity` ("Dimensions as data, named dimensions as refinements over
    one Quantity"). Its predicate, evaluated over `v`'s dimension vector,
    answers true for Velocity and false for Force.
-3. **Does.** Adds `d + qty(150, cm)`. **Must find.** Addition within one
-   dimension converts units. The run prints 4.5 m.
-4. **Does.** Adds `d + t`. **Must find.** A failure that names both units
-   and both dimensions: m and s, length and time. Whether it is a
-   refutation or an exception is open (question 1).
-5. **Does.** Converts `qty(5, km).to(m)` and `d.to(s)`. **Must find.**
-   The first gives 5000 m. The second fails, naming m and s, length and
-   time, of the same kind as step 4.
-6. **Does.** Declares `speed(a: Acceleration, t: Duration): Velocity =>
+3. **Does.** Adds `d + qty(150, cm)`. **Must find.** `+` claims that its
+   operands have compatible dimensions (ruling 3 of 2026-11-15). The
+   claim holds, decided. Addition within one dimension converts units.
+   The run prints 4.5 m.
+4. **Does.** Converts `qty(5, km).to(m)`. **Must find.** `to` makes the
+   same claim, and it holds. The run prints 5000 m.
+5. **Does.** Declares `speed(a: Acceleration, t: Duration): Velocity =>
    a.mul(t)` and calls it on 9.8 m/s² and 2 s. **Must find.** The
    parameter claims on entry and the return claim on exit hold, decided
    ("A typed function claims its parameter types on entry and its return
    type on exit"). The run prints 19.6 m/s.
+6. **Does.** Reads a quantity `x` from the program's input, guards it
+   with the units library's test that `x` has the dimension of `d`, and
+   adds `d + x` only where the test answers true. **Must find.** The
+   guard calls the same predicate that `+` claims (ruling 3). Where it
+   answers true, the claim of `+` is decided from that knowledge before
+   the run begins. Where it answers its explanation, the program prints
+   that explanation as a value. This follows from rulings 3 and 4: a
+   guard treats an explanation as not true. No exception is raised, and
+   no check is caught.
+7. **Does.** Removes the guard of step 6. **Must find.** The claim of
+   `+` on `d + x` cannot be decided before `x` arrives. The policy
+   "every parameter claim is decided before the run begins" is on by
+   default, so the run does not begin, and the result names the
+   undecided claim. A user may configure the policy not to apply to a
+   script or similar execution. Then the claim is evaluated when `x`
+   arrives, with the same meaning, and a failure is a refutation.
 
 ## Break it
+
+**Does.** Writes `d + t`. **Must find.** The claim of `+` that its
+operands have compatible dimensions is refuted when the program is
+checked (ruling 3). The refutation carries the predicate's explanation:
+cannot add m and s, length vs time. It is found before any effect, so
+the run prints nothing.
+
+**Does.** Writes `d.to(s)`. **Must find.** The claim of `to` is refuted
+in the same way, carrying: cannot convert m to s, length vs time.
 
 **Does.** Uncomments `wrong = speed(qty(3, m), qty(2, s))`. **Must
 find.** The entry claim that `a` is an Acceleration is refuted. The
@@ -45,10 +68,14 @@ program prints eight lines and then halts.
 
 ## What changes by ruling
 
-- "The standard language's handled failure is an exception" and
-  "Constructing a refined value claims its predicate": pins 22 and 27
-  read an error value with `error of`. The error value is gone; what
-  replaces it here is question 1.
+- Ruling 3 of 2026-11-15, "A typed function claims its parameter types
+  on entry and its return type on exit" and "The standard language's
+  handled failure is an exception": pins 22 and 27 read an error value
+  with `error of`. A predicate on a parameter stays a claim, with the
+  same meaning at every phase. `d + t` and `d.to(s)` are refuted when
+  the program is checked, each carrying the message of today's error
+  value as the predicate's explanation. The two lines move to the
+  break-it block. The error value and `error of` leave the source.
 - "A refutation marks everything computed from it" and "A typed
   function claims its parameter types on entry and its return type on
   exit": "Type error: argument 0 failed refinement predicate for
@@ -56,21 +83,27 @@ program prints eight lines and then halts.
   "Every failure carries a legible counterexample" it names the
   parameter `a`, where today it gives a position.
 - "An effect consumes only values whose claims are decided": the
-  break-it halt follows eight printed lines. The run prints nothing.
+  break-it halt follows eight printed lines. A refutation is found
+  before any effect, and the run prints nothing.
+- Ruling 1 of 2026-11-15: the run prints although the units library's
+  five Quantity laws may stay short of decided. A strength prevents no
+  effect unless a policy or configuration requires it.
 - "A module's summary is the weakest strength among its claims": the
-  file draws the units library, whose five Quantity laws are undecided,
-  so its summary is undecided.
+  file draws the units library, whose five Quantity laws the standard
+  deriver attempts (rung 2, scene 3). The summary is the weakest
+  strength among them and the file's claims.
 
 ## Open questions
 
-1. Is adding quantities of different dimensions a wrong program, a
-   refutation like `Positive(-1)`? Or is it a handled failure, an
-   exception the program may read? The same question holds for `to`
-   across dimensions, and for rung 2, scene 2, pin 20.
-2. Do the named-dimension predicates explain their refusal ("A predicate
+Settled: question 1 of the draft, whether adding quantities of
+different dimensions is a refutation or a handled failure (ruling 3: a
+refutation, carrying the message as the predicate's explanation; the
+same for `to`, and for rung 2, scene 2, pin 20).
+
+1. Do the named-dimension predicates explain their refusal ("A predicate
    can explain its refusal"), so that the break-it refutation names the
    value 3 m and its dimension, length, against length over time
-   squared?
+   squared? Recommended: yes, in the manner of `+`'s explanation.
 
 ## Present pins
 
@@ -82,7 +115,7 @@ Eight pins. All are covered.
 | 14 | `true` | 2 |
 | 15 | `false` | 2 |
 | 18 | `4.5 m` | 3 |
-| 22 | `cannot add m and s: length vs time` | 4 |
-| 25 | `5000 m` | 5 |
-| 27 | `cannot convert m to s: length vs time` | 5 |
-| 41 | `19.6 m/s` | 6 |
+| 22 | `cannot add m and s: length vs time` | Break it |
+| 25 | `5000 m` | 4 |
+| 27 | `cannot convert m to s: length vs time` | Break it |
+| 41 | `19.6 m/s` | 5 |

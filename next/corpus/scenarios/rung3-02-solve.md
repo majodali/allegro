@@ -29,7 +29,8 @@ names it with "(held)".
    duration, is Quick and Direct: 20.75 person-hours, 1460 min. That it
    is best is decided, since all four resolutions were evaluated
    ("Feasible is decided; best says how strongly it holds"). The
-   solution's plan is a `WellFormedPlan`.
+   solution's plan is a `WellFormedPlan`: its predicate, called as an
+   ordinary function, answers true (ruling 4 of 2026-11-15).
 3. **Does.** Sets a deadline of 23 h. **Must find.** The answer moves to
    Quick and BlueGreen: 22.5 person-hours, 1205 min. The chosen option
    brings its own handler: `escalations` names HealthCheckFailed, taken
@@ -75,19 +76,34 @@ halts before output here.
   "Every result says how strongly it holds": as in scene 1, the plan
   claims rest on fixtures and on the library's termination assumptions,
   and take the strength assumed.
+- Ruling 1 of 2026-11-15: every plan claim of the scene is at most
+  assumed, and the run prints all the same.
+- Ruling 4 of 2026-11-15: a program that tests a plan calls its
+  predicate, which answers true or its explanation as a value. Here the
+  test of the solution's plan answers true (pin 147).
 
 ## Open questions
 
+No question of this scene is settled by the rulings of 2026-11-15.
+
 1. When no resolution or completion fits (pins 162 and 194), does the
    search raise an exception, or answer a value that names the failure?
+   Recommended: an exception the caller may handle, carrying the
+   counterexample, as the planning specification has it
+   (`next/models/specs/planning.md` §7, ruled at PR #202). A search
+   failure is not a failed check, so ruling 3's "not catchable" does not
+   reach it.
 2. `solve_from` chains catalog nodes backward to a fixed depth. Is its
    best completion decided, because the depth exhausts the catalog, or
-   sampled?
+   sampled? Recommended: decided where the depth exhausts the catalog,
+   and the result says so; otherwise sampled.
 3. "Best" is ordered by effort, then duration. Is that order the
-   library's, or must a plan state what it optimises?
+   library's, or must a plan state what it optimises? Recommended: the
+   library's default, which a plan may override.
 4. "A solver sees its problem unevaluated" is a design to prove. Must
    milestone 7's `solve` read a residual over unknowns, or may it keep
-   enumerating a template value as today?
+   enumerating a template value as today? Recommended: enumeration is
+   enough for milestone 7; the residual is a later milestone's.
 
 ## Present pins
 

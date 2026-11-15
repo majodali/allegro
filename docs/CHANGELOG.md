@@ -1123,6 +1123,19 @@ they halt, the verdict's `auto-PE` in place of a proposer. The
 scenarios are the acceptance statement for milestones 5, 6 and 7 of
 the rebuild. No code changed.
 
+The maintainer then ruled five shared questions on 2026-11-15,
+recorded in `next/corpus/scenarios/README.md`, "Rulings of
+2026-11-15". A strength prevents no effect unless a policy requires
+it; a refutation still does. A refused proposal never refutes its
+claim. A predicate on a parameter is a claim with one meaning at every
+phase, so a dimension mismatch is a refutation found when the program
+is checked. `validate` is the plan's own predicate, answering true or
+its explanation. Bool's equality laws are decided and those of Int,
+Float and String assumed, and a standard deriver attempts undecided
+laws within step budgets. The scenes state the ruled behaviour, nine
+of their 37 questions are settled, and 37 corpus cases are restated,
+14 of them changing class.
+
 ### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
 
 B-196 (the rebuild's acceptance side).

@@ -27,17 +27,22 @@ checks and searches, and scene 1's findings on them hold here.
    The plan's surface (inputs, outcomes, budget) is what a proposal must
    leave as written.
 2. **Does.** Adds the proposal Courier, which ships a labelled order.
-   **Must find.** Refused. The answer names the next dead end: nothing
-   produces Labelled, which Courier needs. The obligation stays open.
-3. **Does.** Adds the proposal Freight. **Must find.** Refused. Every
-   gap is filled, and the completion breaks the budget. The answer names
-   the cheapest completion and the measure it misses: 200 min against
-   160 min.
+   **Must find.** Refused. A refused proposal does not refute the claim
+   it was offered for (ruling 2 of 2026-11-15). The open plan's claim
+   stays undecided, and the refusal is the claim's explanation with that
+   candidate (`next/models/specs/planning.md` §4): nothing produces
+   Labelled, which Courier needs. The obligation stays open.
+3. **Does.** Adds the proposal Freight. **Must find.** Refused, in the
+   same way. Every gap is filled, and the completion breaks the budget.
+   The explanation names the cheapest completion and the measure it
+   misses: 200 min against 160 min.
 4. **Does.** Adds the proposal Express. **Must find.** Accepted. The
    plan is solved: Van, Depot, Express; 1.5 person-hours, 155 min. The
    binding `solved: WellFormedPlan` claims the solved plan is
    well-formed. The claim holds and rests on the promise `sealed`, so its
-   strength is assumed.
+   strength is assumed. The run goes on: a strength prevents no effect
+   unless a policy or configuration requires it (ruling 1 of
+   2026-11-15).
 5. **Does.** Compares each proposal's surface with the plan's. **Must
    find.** No proposal changed the plan as written ("A proposer answers
    with only the missing value").
@@ -46,8 +51,9 @@ checks and searches, and scene 1's findings on them hold here.
    catalog entry with who proposed it ("Anyone may propose, and the
    record shows who"), and the promise it rests on, with its strength.
 7. **Does.** Runs `obligations --pending`. **Must find.** Every claim
-   that waits for a value: the five Quantity laws and the plan's gap
-   ("Open obligations are listed for any proposer"). The gap's identity
+   that waits for a value: the Quantity laws the standard deriver left
+   undecided (rung 2, scene 3) and the plan's gap ("Open obligations
+   are listed for any proposer"). The gap's identity
    covers the plan's surface and the gap, so a proposal that edits the
    plan no longer matches it.
 8. **Does.** Runs `propose`. **Must find.** The form for people: the
@@ -94,23 +100,43 @@ before output here.
 - "A refutation marks everything computed from it": the break-it's
   "Type error: refinement predicate failed for WellFormedPlan" becomes
   the refutation of the plan's claim.
+- Ruling 1 of 2026-11-15: the plan's claims rest on the promise `sealed`
+  and the library's termination assumptions, and the run prints all the
+  same.
+- Ruling 2 of 2026-11-15: a refused catalog entry was already, under the
+  planning specification (§4), the claim's explanation with that
+  candidate, the claim staying undecided. The ruling agrees: a refused
+  proposal never refutes its claim, the claim's outcome is what
+  evaluation gives, and the refusal is recorded with the explanation.
 
 ## Open questions
 
+No question of this scene is settled by the rulings of 2026-11-15.
+
 1. Do the open plan's states open, unsolved and solved (pins 48, 83, 88
    and 95) map onto the four strengths, or stay planning words beside
-   them?
+   them? Recommended: planning words beside them. Open and unsolved
+   are the feasibility claim undecided, each with its explanation, as
+   the planning specification's §7 has them. Solved is the claim
+   holding, at the strength it earns.
 2. The obligation list holds five Quantity laws that no proposer can
    answer in this file, and `prove` skips them. Where is a proposal for
-   a library's law placed?
+   a library's law placed? Recommended: in the library's own source.
+   The standard deriver attempts the laws in the build, and a proof it
+   finds is kept in the configured store and checked again every build
+   (ruling 5).
 3. After the strict form's refutation, may the tools for proposing still
    list the result's other open obligations? Today every command stops.
+   Recommended: yes. A phase that has refuted a claim performs no
+   further effect but may go on evaluating to report every refutation
+   ("An effect consumes only values whose claims are decided").
 4. The language-model run is recorded once, on the maintainer's
    subscription, and a test puts each recorded reply through the kernel
-   again. Is that enough for milestone 7?
+   again. Is that enough for milestone 7? Recommended: yes.
 5. The rung's story is two coupled models; this scene has one. Does
    milestone 7 need a scene with a second model, or does it pass on
-   this one?
+   this one? Recommended: it passes on this one; the second model is a
+   later milestone's.
 
 ## Present pins
 
