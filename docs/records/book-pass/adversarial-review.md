@@ -445,10 +445,162 @@ function it sits in, and what the outcome rests on; a builder stores
 it; the loading kernel computes it again and refuses the record where
 the two differ.
 
+**Values and descriptions: cluster 1 with issues 14 and 23, ruled
+2026-11-15.** The maintainer merged PR #215 ("Reviewed - all good")
+and took the design for what Allegro code may do with an expression.
+The core idea: a value is live and a description is plain data, and
+every problem of cluster 1 came from letting code treat a live
+expression as data and then make it live again. Five decisions, all
+agreed, two of them reversing earlier rulings:
+
+1. A function is opaque, and describing one is an authority, held
+   through the key of the module that made it or through an inspection
+   right a configuration grants. This reverses "any code can read an
+   expression's structure". A description never yields authority.
+2. A live expression is built only from live values.
+3. No argument can be inspected. This replaces "A function may take
+   an argument unevaluated". (First written as "a delayed expression
+   is a function, and the notation wraps it"; corrected below.)
+4. One kernel primitive evaluates a function under a budget and
+   returns how it ended as data.
+5. An origin is a description, read under the same authority; a phase
+   may drop origins nobody with the right will ask for.
+
+No primitive inside the language makes or reads a scope. The kernel's
+primitives are now eight things, listed in "The kernel's primitives
+are pure and few".
+
+The maintainer: "this is the scope of change we need. Unevaluated
+arguments and carrying the originating expressions raised far too
+many legitimate concerns." They had been suggested for four use
+cases: conditionals passing knowledge in and out of the partial
+evaluation of branches; language features not obviously supported,
+such as solving for unknowns and grammars; analysis, optimisation
+beyond partial evaluation and transforms; and reporting findings in
+the terms of the original code. "One solution for all this was
+tempting and ambitious. But I think we have separate solutions for
+each." And: "We'll judge all this with another adversarial review
+round."
+
+**Lazy evaluation and unevaluated arguments are two things, ruled
+2026-11-15, on PR #216.** The review session had built the reference
+kernel to evaluate arguments before a call, and so wrote decision 3
+as "a delayed expression is a function, and the notation wraps it",
+with the conditional taking its branches as functions. The maintainer
+asked when a delayed expression is needed at all, and then named the
+confusion: "what you're describing appears to be lazy evaluation. All
+composed functions have their arguments evaluated lazily, i.e. the
+arguments are passed into the function body to the functions/
+operations inside as expressions, which are only evaluated when they
+are applied to eager primitive functions. 'Unevaluated arguments'
+means the argument is of type `expression` and may be inspected
+directly within the function body." Confirmed and built:
+
+- A composed function's arguments are evaluated when needed, at most
+  once, in the scope where they were written. An argument nothing
+  needs is never evaluated.
+- No argument can be inspected. That is what decision 3 removes.
+- The conditional needs its condition and then only the branch taken;
+  a conditional a user defines needs no wrapper.
+- An effect happens when its value is needed, and the statements of a
+  body are needed in written order.
+- A consequence to test, not a rule: a typed function claims its
+  parameter types on entry, which needs the arguments, so typed code
+  is strict in practice.
+
+### Solving (2026-11-15)
+
+The maintainer told the acceptance stream that unevaluated arguments
+were gone, "because there are so many references to the decision, and
+because the work there includes plan solving, which requires
+inspecting a plan expression after PE has run, so it can find
+solutions more efficiently", and asked how Allegro supports solving
+an expression for one or more unknowns. Ruled ("This solution looks
+good to me"):
+
+- A problem is a function of its unknowns.
+- A kernel primitive specializes a function: it evaluates the body
+  with the parameters unknown, under a budget, and returns a function
+  whose body is the residual. It evaluates both branches of a
+  conditional whose condition is unknown, performs no effect, and
+  keeps a refutation inside its branch.
+- The solver reads the residual by describing the specialized
+  function, tries a candidate by calling it, and fixes some unknowns
+  by specializing again.
+- The caller grants the right to describe as a function that closes
+  over its key.
+- Each part of a residual stays marked with the module whose function
+  it came from, and is described only under a right that covers that
+  module.
+
+The maintainer asked whether inverting all or part of a function
+needs `build`. Recorded: an inverse computed as a candidate needs
+none; an inverse returned as a function is a function that interprets
+the inverted description, specialized; a partial inversion that keeps
+a part described as opaque needs a function built with live values
+taken from the function described. That form of `build` is a grant
+separate from the right to describe, and is built when the planning
+model needs it.
+
+The maintainer ratified the term "specialization", and allowed the
+review session a mechanical rename of decision titles in the
+acceptance stream's corpus, so that every title can be made accurate.
+
+### Titles made accurate (2026-11-15)
+
+The maintainer asked that every decision title be correct and
+accurate. The review session read all the titles against what each
+decides and proposed eight changes; the maintainer questioned four,
+and the result is seven retitled entries and two new ones. The
+decision map keeps each former title, so the acceptance stream's
+corpus passes its check and follows with one command of its own tool.
+
+| Former title | Title now |
+|---|---|
+| A function may take an argument unevaluated | No argument can be inspected |
+| A solver sees its problem unevaluated | A solver reads the residual of its problem |
+| A value that arrives later fills a cell, and a failure fills it with an exception | A late answer or its failure fills a cell as plain data |
+| An extension registers its own fields; the kernel has two | An extension registers its own fields |
+| Every value keeps its origin | A value's origin is a description |
+| A module is a function of the capabilities it declares | A module is a function of its capabilities, inputs and imports |
+| Functions are data: params plus body | A composed function is parameters and a body |
+
+- **"An expression is evaluated when its value is needed"** is new. The maintainer asked whether the rule for
+  arguments is a corollary of a broader rule, and there was none. The
+  entry says what needs a value, and that the kernel evaluates more
+  only where no one can tell. Open by the maintainer's word: whether
+  a structure needs its entries. The maintainer prefers that entries
+  are evaluated when needed too, and holds that the order of effects
+  needs another answer: "a way to determine effect ordering, and
+  optionally declare ordering for specific effects, but that's a
+  different topic."
+- **"Reading an expression never yields authority"** keeps its title, and **"Describing a function requires authority"** is a new entry. The
+  session had put both rules in one entry and retitled it; the
+  maintainer: that "seems like creating a completely new distinct
+  rule". The second title is the maintainer's wording.
+- The cell's title names the failure: a failure fills the cell as an
+  answer does, as plain data.
+- The module's title names its parameters. The session's first
+  wording, "a function of what it declares", read as if every
+  declaration were a parameter.
+
+Three entries also had a sentence corrected: a composed function is
+reached from outside the kernel only by describing it; authority is a
+value, since a key is a structure; the kernel registers three fields.
+Titles that are accurate and only awkward in form are left for the
+style pass.
+
 ## Terms introduced
 
+- **Description**: plain data that says what an expression looks
+  like, holding public identities where the expression holds
+  unforgeable values.
+- **Inspection right**: the authority to describe a function one did
+  not make.
 - **Rests on**: what a result's evaluation used that the kernel did
   not itself evaluate.
 - **Key slot**: a place in a module where one of its keys goes.
+- **Specialization**: a function whose body is the residual of
+  another function's body, evaluated with its parameters unknown.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
