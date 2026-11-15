@@ -91,15 +91,18 @@ halts.
   the `by` term and author of the assumption, and the deriver as
   proposer of each law it decides.
 
-## Open questions
+## Questions, as settled
 
-None. Settled: question 1 of the draft, whether Quantity's refl and sym
-stay undecided or reach sampled (ruling 5: each is attempted under the
-standard deriver, and the scene requires the attempt and its record).
-Question 2, a refused `by` term on a claim that holds by evaluation
-(ruling 2). Ruled 2026-11-15, round 3: question 3, whether `p` is a
-claim (ruling G: no). Whether the deriver attempts Quantity's assumed
-transitivity (ruling O: no, so pin 32 prints assumed).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- Whether Quantity's refl and sym stay undecided or reach sampled:
+  ruling 5 (attempted by the standard deriver).
+- A refused `by` term on a claim that holds by evaluation: ruling 2.
+- Whether the proof value `p` is a claim: ruling G (no).
+- Whether the deriver attempts Quantity's assumed transitivity: ruling O
+  (no, so pin 32 prints assumed).
 
 ## Present pins
 

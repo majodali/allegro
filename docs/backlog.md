@@ -3740,6 +3740,18 @@ table and the stream plans.
   7. A goal not yet a decision; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. Every law of a shipped module is
      to have reference definitions and proofs; until then a law of a
      primitive is assumed. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  8. "Open obligations are listed for any proposer"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session
+     (rulings H and T). An obligation is named by its module and claim
+     name, with no hash over the proposition's text, and the default
+     list shows the project's own claims; the libraries' open claims
+     are listed when asked for, and a proposal for a library's law goes
+     into the project's proof store. Recorded in
+     `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  9. "A grammar change reaches to the end of its block"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session (ruling
+     Q). Two acts have two words: `import` brings a module's bindings
+     only, and `use` brings the bindings and the notation, to the end of
+     the block it is written in, since the text asks for it. Recorded
+     in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under

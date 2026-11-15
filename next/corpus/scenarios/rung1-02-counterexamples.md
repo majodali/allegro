@@ -78,15 +78,19 @@ after the first (ruling D).
   "refinement check failed" with no constraint and no value. The
   explanation names the invariant and the two field values.
 
-## Open questions
+## Questions, as settled
 
-Settled, ruled 2026-11-15, round 2: question 1, how the three
-counterexamples are shown (ruling B: the program calls the predicate
-and prints its explanation; one break-it keeps a failed construction).
-Question 2, how the clause is rendered (ruling C: as written, with the
-value). Question 3, whether a check reports every refutation (ruling
-D: every refutation that does not rest on an earlier one, and no effect
-after the first).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- How the three counterexamples are shown: ruling B (the program calls
+  the predicate and prints its explanation; one break-it keeps a failed
+  construction).
+- How a refused clause is rendered: ruling C (as written, with the
+  value).
+- Whether a check reports every refutation: ruling D (every one that
+  rests on no earlier one, and no effect after the first).
 
 ## Present pins
 

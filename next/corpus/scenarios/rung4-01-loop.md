@@ -14,6 +14,9 @@ alone accepts one.
 
 The planning decisions are held, not ruled. This scene uses rung 3's
 checks and searches, and scene 1's findings on them hold here.
+Milestone 7 passes on this one-model scene. The rung's two-model scene
+is a step of its own, after milestone 7, once the software system
+model's library exists (ruling W of 2026-11-15, round 4).
 
 ## Steps
 
@@ -52,21 +55,25 @@ checks and searches, and scene 1's findings on them hold here.
    record names the plan as well-formed, its bound, its decisions, each
    catalog entry with who proposed it ("Anyone may propose, and the
    record shows who"), and the promise it rests on, with its strength.
-7. **Does.** Runs `obligations --pending`. **Must find.** Every claim
-   that waits for a value: the Quantity laws the standard deriver left
-   undecided (rung 2, scene 3) and the plan's gap ("Open obligations
-   are listed for any proposer"). The gap's identity
-   covers the plan's surface and the gap, so a proposal that edits the
-   plan no longer matches it.
+7. **Does.** Runs `obligations --pending`. **Must find.** The default
+   list shows the project's own claims that wait for a value: the plan's
+   gap ("Open obligations are listed for any proposer"). The units
+   library's open claims, the Quantity laws the standard deriver left
+   undecided, are listed when asked for (ruling T of 2026-11-15, round
+   4). The gap is named by its module and claim name (ruling H), and a
+   proposal is checked against the claim as it now stands.
 8. **Does.** Runs `propose`. **Must find.** The form for people: the
    gap, the search so far, the catalog to extend, and the instruction to
    add one node block and leave the plan as written.
 9. **Does.** Runs `prove` with the scripted proposer. **Must find.** Two
    attempts. Messenger is refused, naming Labelled. Dispatch is accepted
    and the plan solved. The result names the scripted proposer and two
-   attempts. The laws are skipped, since the file holds no place for
-   their answer.
-10. **Does.** Runs `prove` with a language model, recorded once.
+   attempts. The library's laws are not in the default list, so the
+   loop does not ask for them. A proposal for a library's law, where
+   one is asked for, goes into the project's proof store, never into
+   the library's source (ruling T), and is checked again every build.
+10. **Does.** Runs `prove` with a language model, recorded once; one
+    recorded run is enough for milestone 7 (ruling V).
     **Must find.** ShipOrder is refused: Pack's outcome Packed is left
     unconsumed. Ship is accepted. The result names the model's proposer
     and two attempts.
@@ -83,7 +90,8 @@ find.** The claim that `Fulfil` is a `WellFormedPlan` is refuted. The
 refutation carries the predicate's explanation: outcome Delivered is
 declared and no node produces it; outcome Packed of Pack is consumed by
 nothing. It is found before any effect. The present tree already halts
-before output here.
+before output here. The tools for proposing still list the other open
+obligations, those that do not rest on the refuted value (ruling U).
 
 ## What changes by ruling
 
@@ -111,32 +119,22 @@ before output here.
   proposal never refutes its claim, the claim's outcome is what
   evaluation gives, and the refusal is recorded with the explanation.
 
-## Open questions
+## Questions, as settled
 
-Settled by the planning specification (`next/models/specs/planning.md`,
-ruled at PR #202), as confirmed in the session of 2026-11-15: question
-1 of the draft, the states open, unsolved and solved (pins 48, 83, 88
-and 95). They are states of one feasibility claim, undecided until a
-completion solves it (§7 and §11, question 3).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
 
-1. The obligation list holds five Quantity laws that no proposer can
-   answer in this file, and `prove` skips them. Where is a proposal for
-   a library's law placed? Recommended: in the library's own source.
-   The standard deriver attempts the laws in the build, and a proof it
-   finds is kept in the configured store and checked again every build
-   (ruling 5).
-2. After the strict form's refutation, may the tools for proposing still
-   list the result's other open obligations? Today every command stops.
-   Recommended: yes. A phase that has refuted a claim performs no
-   further effect but may go on evaluating to report every refutation
-   ("An effect consumes only values whose claims are decided").
-3. The language-model run is recorded once, on the maintainer's
-   subscription, and a test puts each recorded reply through the kernel
-   again. Is that enough for milestone 7? Recommended: yes.
-4. The rung's story is two coupled models; this scene has one. Does
-   milestone 7 need a scene with a second model, or does it pass on
-   this one? Recommended: it passes on this one; the second model is a
-   later milestone's.
+- The states open, unsolved and solved: the planning specification, §7
+  and §11, question 3 (states of one feasibility claim).
+- Where a proposal for a library's law is placed: ruling T (the
+  project's proof store, never the library's source).
+- Whether the tools list other obligations after a refutation: ruling U
+  (yes, those that do not rest on the refuted value).
+- Whether one recorded language-model run passes milestone 7: ruling V
+  (yes).
+- Whether milestone 7 needs a second model: ruling W (no; the two-model
+  scene is a later step).
 
 ## Present pins
 

@@ -78,7 +78,9 @@ H). The obligation keeps its name, the module and `double_times_two`.
 - Ruling 2 of 2026-11-15 and "A proof term is a proposal": today a
   refused term makes `run` halt with exit 1 while `obligations` lists
   the theorem as pending. A refused proposal does not refute its claim,
-  and the refusal is on the record. Nothing halts.
+  and the refusal is on the record. Nothing halts. A tool does not offer
+  a refused proposal on an already decided claim for repair: the claim
+  needs nothing (ruling X of 2026-11-15, round 4).
 - Rulings H and I of 2026-11-15, round 3: today an obligation is
   identified by a hash over its proposition's text, and `propose` and
   `verify` print hints the tool composes, such as "match the
@@ -96,22 +98,25 @@ H). The obligation keeps its name, the module and `double_times_two`.
   `--pending` lists decided claims as obligations. The form for people
   lacks what is in scope.
 
-## Open questions
+## Questions, as settled
 
-Settled, ruled 2026-11-15: question 1 of the draft, whether
-`double_four` with a refused term is refuted or undecided (ruling 2:
-neither; it is decided by evaluation). In round 3: question 2, how an
-obligation is identified (ruling H: by its module and claim name; the
-exact form waits on the kernel stream's ruling on identity). Question
-3, hints (ruling I). Question 4, a scripted proposer (ruling J).
-Question 5, the benchmark (ruling K: a separate corpus case at
-milestone 5, not part of this scenario). The question new with ruling
-2, which claim the walkthrough uses (ruling L).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
 
-1. New with ruling 2: does any tool offer a refused proposal on a
-   decided claim for repair, though no obligation is open? Recommended:
-   no. The result holds the refusal with its explanation, and a tool
-   shows it where it is configured to.
+- Whether `double_four` with a refused term is refuted or undecided:
+  ruling 2 (neither; decided by evaluation).
+- How an obligation is identified: ruling H (by its module and claim
+  name).
+- Whether hints are part of the result: ruling I (a hint is the refusing
+  rule's or the deriver's explanation).
+- Whether a scripted proposer passes milestone 5: ruling J (yes).
+- Whether the benchmark belongs to the scenario: ruling K (a separate
+  corpus case).
+- Which claim the walkthrough uses: ruling L (a claim evaluation cannot
+  decide, the deriver last).
+- Whether a tool offers a refused proposal on a decided claim for
+  repair: ruling X (no).
 
 ## Present pins
 

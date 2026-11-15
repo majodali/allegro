@@ -636,3 +636,23 @@ policy is the gate ruled there.
     reversed "A function may take an argument unevaluated". This
     stream follows when the reversal lands in the inventory: the
     planning specification's §5 cites that decision as a need.
+  - **Round 4, the last.** Nine more recommendations, P to X, ruled:
+    the dimension predicates name the value, its dimension and the one
+    expected; `import` brings bindings and `use` bindings and notation;
+    nobody has to claim a grammar unambiguous; milestone 6 has a
+    notation break-it; a proposal for a library's law goes into the
+    project's proof store, and the default obligation list shows the
+    project's own claims; the tools still list obligations that rest
+    on no refuted value; one recorded model run passes milestone 7;
+    milestone 7 passes on the one-model scene; a refused proposal on a
+    decided claim is offered for nothing. With them every question of
+    the eleven scenes is settled: the draft's 37 and five raised by the
+    write-up, 42 in all, none open. The index's table becomes "The
+    scenes' questions, as settled".
+  - **The corpus at the close of the day.** Overlays restated 37 cases
+    for the five rulings, 4 for round 2, 28 for round 3 and 82 for
+    round 4, which also rewrote 67 notes that cited a scenario's open
+    question; no note now does. Before the rulings the check printed
+    `classed 1992 (survives 1618, changes 229, detail 145)`; now it
+    prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1586, changes 260, detail 146) · unclassed 0 — consistent`.

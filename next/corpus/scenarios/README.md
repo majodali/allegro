@@ -14,19 +14,21 @@ walkthrough belongs to its scene's scenario. A question shared by
 several scenes is asked in the first scene that raises it, and the
 others refer to it.
 
-| Scenario | Rung | Milestone | Steps | Changes by ruling | Open questions |
+| Scenario | Rung | Milestone | Steps | Changes by ruling | Questions settled |
 |---|---|---|---|---|---|
-| [rung1-01-discharge.md](rung1-01-discharge.md) | 1 | 5 | 6 | 6 | 0 |
-| [rung1-02-counterexamples.md](rung1-02-counterexamples.md) | 1 | 5 | 5 and break it | 5 | 0 |
-| [rung1-03-effects.md](rung1-03-effects.md) | 1 | 5 | 5 and break it | 4 | 0 |
-| [rung1-04-laws.md](rung1-04-laws.md) | 1 | 5 | 7 and break it | 6 | 0 |
-| [rung1-05-prover-loop.md](rung1-05-prover-loop.md) | 1 | 5 | 7 and break it | 5 | 1 |
-| [rung2-01-dimensions.md](rung2-01-dimensions.md) | 2 | 6 | 7 and break it | 5 | 1 |
-| [rung2-02-literals.md](rung2-02-literals.md) | 2 | 6 | 4 and break it | 4 | 3 |
-| [rung2-03-laws.md](rung2-03-laws.md) | 2 | 6 | 7 and break it | 7 | 0 |
-| [rung3-01-model.md](rung3-01-model.md) | 3 | 7 | 8 and break it | 6 | 0 |
-| [rung3-02-solve.md](rung3-02-solve.md) | 3 | 7 | 8 and break it | 7 | 0 |
-| [rung4-01-loop.md](rung4-01-loop.md) | 4 | 7 | 11 and break it | 7 | 4 |
+| [rung1-01-discharge.md](rung1-01-discharge.md) | 1 | 5 | 6 | 6 | 4 |
+| [rung1-02-counterexamples.md](rung1-02-counterexamples.md) | 1 | 5 | 5 and break it | 5 | 3 |
+| [rung1-03-effects.md](rung1-03-effects.md) | 1 | 5 | 5 and break it | 4 | 3 |
+| [rung1-04-laws.md](rung1-04-laws.md) | 1 | 5 | 7 and break it | 6 | 5 |
+| [rung1-05-prover-loop.md](rung1-05-prover-loop.md) | 1 | 5 | 7 and break it | 5 | 7 |
+| [rung2-01-dimensions.md](rung2-01-dimensions.md) | 2 | 6 | 7 and break it | 5 | 2 |
+| [rung2-02-literals.md](rung2-02-literals.md) | 2 | 6 | 4 and break it | 5 | 3 |
+| [rung2-03-laws.md](rung2-03-laws.md) | 2 | 6 | 7 and break it | 7 | 4 |
+| [rung3-01-model.md](rung3-01-model.md) | 3 | 7 | 8 and break it | 6 | 3 |
+| [rung3-02-solve.md](rung3-02-solve.md) | 3 | 7 | 8 and break it | 7 | 4 |
+| [rung4-01-loop.md](rung4-01-loop.md) | 4 | 7 | 11 and break it | 7 | 5 |
+
+No question of the scenes is open.
 
 The ten programs hold 65 pinned lines. Every pin is covered by a step
 or a break-it case.
@@ -134,7 +136,8 @@ stream's reading of a ruling, not the maintainer's word.
    called as an ordinary function, not a second way of enforcing. It
    answers true or its explanation as a value, and the program prints
    the explanation. The pinned lines keep their text, and `error of`
-   leaves the source. Changes: rung 3, scenes 1 and 2.
+   leaves the source. The maintainer: "I agree on Q4." Changes: rung 3,
+   scenes 1 and 2.
 5. **Laws.** Bool's three equality laws are decided by enumeration. The
    nine of Int, Float and String are assumed, named with the platform,
    until proved against the primitives' reference definitions. That is
@@ -153,61 +156,42 @@ stream's reading of a ruling, not the maintainer's word.
    checked again every build, never trusted. Changes: rung 1, scenes 1
    and 4; rung 2, scene 3.
 
-**Per-scene rulings, round 2.** The maintainer then took six
-recommendations on the scenes' own questions: "I agree with all six
-recommendations, A through F".
+**The scenes' own questions, rounds 2 to 4.** The maintainer took the
+stream's recommendations in three rounds: "I agree with all six
+recommendations, A through F"; "I agree with all recommendations, G
+through O"; "I agree with all recommendations, P through X".
 
-- **A.** `requires`, `ensures` and the `effects` clause are part of the
-  standard language with no `use`. They stay separate extensions inside
-  it, so a configuration can drop one. Rung 1, scenes 1 and 3.
-- **B.** Rung 1, scene 2 shows its three counterexamples by calling the
-  predicate, which answers its explanation, and printing it. One
-  break-it case keeps a real failed construction that halts.
-- **C.** A refused clause is rendered as written, with the value: "`_ >
-  0` does not hold of -5". No bound is derived. Rung 1, scene 2.
-- **D.** A build reports every refutation that does not rest on an
-  earlier one, and performs no effect after the first. Rung 1, scene 2.
-- **E.** An `effects` clause names capabilities by their own names, so
-  `effects output`; `pure` stays the word for holding none. The output
-  capability is `output`, its one part `write`. Rung 1, scene 3.
-- **F.** The result holds the capabilities every function uses, as a
-  reported fact, not a claim; a tool shows it when configured. Rung 1,
-  scene 3.
-
-**Per-scene rulings, round 3.** The maintainer then took nine more:
-"I agree with all recommendations, G through O".
-
-- **G.** Binding a proof value is no claim: a proposal attached to
-  nothing, listed nowhere, checked by nothing until someone uses it as
-  the `by` of a claim. Rung 1, scene 4; rung 2, scene 3.
-- **H.** An obligation is named by where its claim is made: the module
-  and the claim's name. The hash over the proposition's text goes; a
-  content hash is only the proof store's cache key. Rung 1, scene 5.
-- **I.** A hint is the explanation the refusing rule or the deriver
-  gave, so it is in the result; a tool adds none of its own. Rung 1,
-  scene 5.
-- **J.** A scripted proposer is enough for milestone 5; a language
-  model's run is recorded once and replayed through the kernel. Rung 1,
-  scene 5.
-- **K.** The benchmark is a separate corpus case at milestone 5. Rung
-  1, scene 5.
-- **L.** Rung 1, scene 5's example is a claim over every value that
-  evaluation cannot decide, run with the derivation budget at zero; a
-  last step turns the deriver on and it answers the same obligation.
-- **M.** The coercion claims are as the laws: assumed and named, a
-  proof against the reference definitions the goal. Rung 1, scene 1.
-- **N.** A true claim whose `by` term uses an assumed law is decided
-  when evaluation decides it; it reads assumed only when the term is
-  what establishes it. Rung 1, scenes 1 and 4; rung 2, scene 3.
+- **A.** `requires`, `ensures` and the `effects` clause are part of the standard language with no `use`, each a separate extension inside it that a configuration can drop.
+- **B.** Rung 1, scene 2 calls each predicate and prints the explanation it answers; one break-it keeps a real failed construction.
+- **C.** A refused clause is rendered as written, with the value: "`_ > 0` does not hold of -5".
+- **D.** A build reports every refutation that does not rest on an earlier one, and performs no effect after the first.
+- **E.** An `effects` clause names capabilities by their own names, `effects output`; `pure` holds none; the output capability is `output`, its one part `write`.
+- **F.** The result holds the capabilities every function uses, as a reported fact; a tool shows it when configured.
+- **G.** Binding a proof value is no claim: a proposal attached to nothing, listed nowhere, checked by nothing.
+- **H.** An obligation is named by its module and claim name; the hash over the proposition's text goes; a content hash is only the proof store's cache key.
+- **I.** A hint is the explanation the refusing rule or the deriver gave, in the result; a tool adds none of its own.
+- **J.** A scripted proposer is enough for milestone 5; a language model's run is recorded once and replayed through the kernel.
+- **K.** The benchmark is a separate corpus case at milestone 5.
+- **L.** Rung 1, scene 5 answers a claim evaluation cannot decide, with the derivation budget at zero; a last step has the deriver answer it.
+- **M.** The coercion claims are as the laws: assumed and named, a proof against the reference definitions the goal.
+- **N.** A true claim whose `by` term uses an assumed law is decided when evaluation decides it.
 - **O.** The deriver does not attempt a law the author has assumed.
-  Rung 1, scene 4; rung 2, scene 3.
+- **P.** The dimension predicates explain their refusal: the value, its dimension and the one expected.
+- **Q.** `import units` brings the bindings only; `use units` brings the bindings and the notation, to the end of its block.
+- **R.** Nobody has to claim the combined grammar unambiguous; a text with two parses is always refuted; a library may claim it, and the deriver samples the claim.
+- **S.** Milestone 6 has a break-it for the notation: a text read two ways, refuted with both readings named.
+- **T.** A proposal for a library's law goes into the project's proof store, never the library's source; the default obligation list shows the project's own claims, and the libraries' when asked.
+- **U.** After a refutation the tools still list the open obligations that do not rest on the refuted value.
+- **V.** One recorded language-model run is enough for milestone 7.
+- **W.** Milestone 7 passes on the one-model scene; the two-model scene is a later step of its own.
+- **X.** A tool does not offer a refused proposal on an already decided claim for repair.
 
 **The planning scenes.** Seven of their questions are settled by the
 planning specification (`next/models/specs/planning.md`, ruled at PR
-#202), as confirmed in the session. The maintainer ruled rung 3, scene
-2's question 4 in words: milestone 7 requires `solve` to read a
-residual, and the enumeration is not ported. Milestone 7 waits on the
-kernel stream for a way to implement general solvers, since that
+#202), each by the section the table cites. The maintainer ruled in
+words that `solve` must read a residual: milestone 7 requires the
+residual design, and the enumeration is not ported. Milestone 7 waits
+on the kernel stream for a way to implement general solvers, since that
 stream has reversed "A function may take an argument unevaluated".
 
 Two needs go to the kernel stream. A guard must treat an explanation as
@@ -215,61 +199,56 @@ not true (rulings 3 and 4). The standard deriver is an extension the
 build runs; it asks nothing of the kernel beyond the trial evaluation
 the kernel already owes.
 
-## The scenes' open questions
+## The scenes' questions, as settled
 
 The 37 questions of the first draft, by scene and number in that
-draft. Nine are settled by the five rulings, seven by round 2, six by
-round 3 and seven by the planning specification; eight stay open, each
-with the option the stream recommends. Five questions are new with the
-rulings and follow the table; four of them are settled by round 3. A scene's file gives each open question in full under its
-current number.
+draft, and the five raised while the rulings were written. Every one
+is settled. Of the draft's 37, nine are settled by the five rulings, 21
+by the letters A to X and seven by the planning specification; the
+five new ones by the letters L, M, N, O and X. Each scene's file records them under
+"Questions, as settled".
 
-| Scene | Question | Settled or open |
+| Scene | Question | Settled by |
 |---|---|---|
-| rung1-01, 1 | Strength of the twelve equality laws and two coercion claims | Settled by ruling 5 for the laws, and by ruling M of round 3 for the coercion claims |
-| rung1-01, 2 | Whether `use contracts` survives as a module | Settled, ruled 2026-11-15, round 2 (A) |
-| rung1-02, 1 | How the three counterexamples are shown | Settled, ruled 2026-11-15, round 2 (B) |
-| rung1-02, 2 | How the clause `_ > 0` is rendered | Settled, ruled 2026-11-15, round 2 (C) |
-| rung1-02, 3 | Whether milestone 5 reports all four refutations of one file | Settled, ruled 2026-11-15, round 2 (D) |
-| rung1-03, 1 | The name of the output capability in an `effects` clause | Settled, ruled 2026-11-15, round 2 (E) |
-| rung1-03, 2 | Whether the bound needs `use effects` | Settled, ruled 2026-11-15, round 2 (A) |
-| rung1-03, 3 | Whether `inspect` shows the capabilities a function holds when it claims nothing | Settled, ruled 2026-11-15, round 2 (F) |
-| rung1-04, 1 | A refused `by` term on a claim that holds by evaluation | Settled by ruling 2 |
-| rung1-04, 2 | Whether binding a proof value is a claim | Settled, ruled 2026-11-15, round 3 (G) |
-| rung1-04, 3 | Whether Cell's refl and sym are decided | Settled by ruling 5: derived, assumed while Int's are |
-| rung1-04, 4 | The strength of Int equality's transitivity in pin 10 | Settled by ruling 5: assumed |
-| rung1-05, 1 | Whether `double_four` with a refused term is refuted or undecided | Settled by ruling 2: decided by evaluation |
-| rung1-05, 2 | How an obligation is identified | Settled, ruled 2026-11-15, round 3 (H): by the module and the claim's name |
-| rung1-05, 3 | Whether hints are part of the result | Settled, ruled 2026-11-15, round 3 (I): a hint is the refusing rule's or the deriver's explanation, in the result |
-| rung1-05, 4 | Whether a scripted proposer passes milestone 5 | Settled, ruled 2026-11-15, round 3 (J) |
-| rung1-05, 5 | Whether the benchmark belongs to the scenario | Settled, ruled 2026-11-15, round 3 (K): a separate corpus case |
-| rung2-01, 1 | Whether a dimension mismatch is a refutation or a handled failure | Settled by ruling 3 |
-| rung2-01, 2 | Whether the named-dimension predicates explain their refusal | Open. Recommended: yes |
-| rung2-02, 1 | Whether `use units` is one form or two | Open. Recommended: two forms, with `use` a notation for both |
-| rung2-02, 2 | Who claims the combined grammar unambiguous | Open. Recommended: no one wholesale; each text with two parses is refuted |
-| rung2-02, 3 | Whether milestone 6 needs a break-it case for the notation | Open. Recommended: yes, a text with two parses |
-| rung2-03, 1 | Whether Quantity's refl and sym stay undecided or reach sampled | Settled by ruling 5: attempted by the standard deriver, with the record of where it stopped |
-| rung2-03, 2 | A refused `by` term (rung 1, scene 4's question 1) | Settled by ruling 2 |
-| rung2-03, 3 | Whether `p` is a claim (rung 1, scene 4's question 2) | Settled, ruled 2026-11-15, round 3 (G) |
-| rung3-01, 1 | Whether `validate` answers its explanation or raises an exception | Settled by ruling 4 |
-| rung3-01, 2 | Whether the fixtures are assumed promises | Settled by the planning specification, §11, question 9 |
-| rung3-01, 3 | Whether the library's tree walks stay assumed or have their termination decided | Settled by the planning specification, §3 |
-| rung3-02, 1 | Whether a failed search raises an exception or answers a value | Settled by the planning specification, §7 |
-| rung3-02, 2 | Whether `solve_from`'s best completion is decided or sampled | Settled by the planning specification, §5 |
-| rung3-02, 3 | Whose order "best" follows | Settled by the planning specification, §11, question 7 |
-| rung3-02, 4 | Whether `solve` must read a residual over unknowns | Settled, ruled 2026-11-15 in words: the residual design is required, enumeration is not ported |
-| rung4-01, 1 | Whether open, unsolved and solved map onto the strengths | Settled by the planning specification, §7 and §11, question 3 |
-| rung4-01, 2 | Where a proposal for a library's law is placed | Open. Recommended: in the library's source; the standard deriver attempts the laws in the build |
-| rung4-01, 3 | Whether the tools list other obligations after a refutation | Open. Recommended: yes |
-| rung4-01, 4 | Whether one recorded language-model run passes milestone 7 | Open. Recommended: yes |
-| rung4-01, 5 | Whether milestone 7 needs a second model | Open. Recommended: it passes on this one |
-
-New with the rulings:
-
-| Scene | Question | Settled or open |
-|---|---|---|
-| rung1-01, 1 | Whether the two Int-to-Float coercion claims are assumed or decided | Settled, ruled 2026-11-15, round 3 (M): assumed and named |
-| rung1-01, 2 | Whether a theorem decided by evaluation, with a term that uses an assumed law, is decided or assumed | Settled, ruled 2026-11-15, round 3 (N): decided |
-| rung1-04, 2 | Whether the standard deriver attempts a law the file has assumed | Settled, ruled 2026-11-15, round 3 (O): no |
-| rung1-05, 5 | Which claim the prover-loop walkthrough uses, now that `double_four` is decided by evaluation | Settled, ruled 2026-11-15, round 3 (L) |
-| rung1-05, 6 (now 1) | Whether a tool offers a refused proposal on a decided claim for repair | Open. Recommended: no; the result holds the refusal, and a tool shows it where configured |
+| rung1-01, 1 | Strength of the twelve equality laws and two coercion claims | Ruling 5; ruling M for the coercion claims |
+| rung1-01, 2 | Whether `use contracts` survives as a module | Ruling A |
+| rung1-02, 1 | How the three counterexamples are shown | Ruling B |
+| rung1-02, 2 | How the clause `_ > 0` is rendered | Ruling C |
+| rung1-02, 3 | Whether milestone 5 reports all four refutations of one file | Ruling D |
+| rung1-03, 1 | The name of the output capability in an `effects` clause | Ruling E |
+| rung1-03, 2 | Whether the bound needs `use effects` | Ruling A |
+| rung1-03, 3 | Whether `inspect` shows the capabilities of a function that claims nothing | Ruling F |
+| rung1-04, 1 | A refused `by` term on a claim that holds by evaluation | Ruling 2 |
+| rung1-04, 2 | Whether binding a proof value is a claim | Ruling G |
+| rung1-04, 3 | Whether Cell's refl and sym are decided | Ruling 5 |
+| rung1-04, 4 | The strength of Int equality's transitivity in pin 10 | Ruling 5 |
+| rung1-05, 1 | Whether `double_four` with a refused term is refuted or undecided | Ruling 2 |
+| rung1-05, 2 | How an obligation is identified | Ruling H |
+| rung1-05, 3 | Whether hints are part of the result | Ruling I |
+| rung1-05, 4 | Whether a scripted proposer passes milestone 5 | Ruling J |
+| rung1-05, 5 | Whether the benchmark belongs to the scenario | Ruling K |
+| rung2-01, 1 | Whether a dimension mismatch is a refutation or a handled failure | Ruling 3 |
+| rung2-01, 2 | Whether the named-dimension predicates explain their refusal | Ruling P |
+| rung2-02, 1 | Whether `use units` is one form or two | Ruling Q |
+| rung2-02, 2 | Who claims the combined grammar unambiguous | Ruling R |
+| rung2-02, 3 | Whether milestone 6 needs a break-it case for the notation | Ruling S |
+| rung2-03, 1 | Whether Quantity's refl and sym stay undecided or reach sampled | Ruling 5 |
+| rung2-03, 2 | A refused `by` term, as rung1-04, 1 | Ruling 2 |
+| rung2-03, 3 | Whether `p` is a claim, as rung1-04, 2 | Ruling G |
+| rung3-01, 1 | Whether `validate` answers its explanation or raises an exception | Ruling 4 |
+| rung3-01, 2 | Whether the fixtures are assumed promises | The planning specification, §11, question 9 |
+| rung3-01, 3 | Whether the walks' termination stays assumed | The planning specification, §3 |
+| rung3-02, 1 | Whether a failed search raises an exception or answers a value | The planning specification, §7 |
+| rung3-02, 2 | Whether `solve_from`'s best is decided or sampled | The planning specification, §5 |
+| rung3-02, 3 | Whose order "best" follows | The planning specification, §11, question 7 |
+| rung3-02, 4 | Whether `solve` must read a residual over unknowns | The planning specification, as the maintainer ruled in words |
+| rung4-01, 1 | Whether open, unsolved and solved map onto the strengths | The planning specification, §7 and §11, question 3 |
+| rung4-01, 2 | Where a proposal for a library's law is placed | Ruling T |
+| rung4-01, 3 | Whether the tools list other obligations after a refutation | Ruling U |
+| rung4-01, 4 | Whether one recorded language-model run passes milestone 7 | Ruling V |
+| rung4-01, 5 | Whether milestone 7 needs a second model | Ruling W |
+| rung1-01, new | Whether the coercion claims are assumed or decided | Ruling M |
+| rung1-01, new | Whether a true claim whose term uses an assumed law is decided | Ruling N |
+| rung1-04, new | Whether the deriver attempts a law the author has assumed | Ruling O |
+| rung1-05, new | Which claim the prover-loop walkthrough uses | Ruling L |
+| rung1-05, new | Whether a tool offers a refused proposal on a decided claim for repair | Ruling X |

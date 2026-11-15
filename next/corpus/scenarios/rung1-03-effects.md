@@ -63,16 +63,18 @@ present tree already halts before output here.
 - "Four strengths, one vocabulary": `inspect`'s "effects: io (declared,
   verified)" gives the strength decided.
 
-## Open questions
+## Questions, as settled
 
-Settled, ruled 2026-11-15, round 2: question 1, the name of the output
-capability in an `effects` clause (ruling E: `effects output`; `pure`
-for none). Question 2, whether the bound needs `use effects` (ruling A:
-no; the clause is part of the standard language, a separate extension
-inside it that a configuration can drop). Question 3, whether `inspect`
-shows the capabilities of a function that claims nothing (ruling F: the
-result holds them as a reported fact, and a tool shows them when
-configured).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- The name of the output capability in an `effects` clause: ruling E
+  (`effects output`; `pure` for none).
+- Whether the bound needs `use effects`: ruling A (no).
+- Whether `inspect` shows the capabilities of a function that claims
+  nothing: ruling F (a reported fact in the result, shown when
+  configured).
 
 ## Present pins
 

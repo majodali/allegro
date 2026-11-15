@@ -97,17 +97,18 @@ The present tree already halts before output here.
   is one word, the weakest strength among the file's claims and the
   laws it draws, at most assumed.
 
-## Open questions
+## Questions, as settled
 
-None. Settled: question 1 of the draft, whether `validate` answers its
-explanation as a value or raises an exception (ruling 4: it is the
-plan's predicate called as an ordinary function, and answers true or
-its explanation). Settled by the planning specification
-(`next/models/specs/planning.md`, ruled at PR #202), as confirmed in
-the session of 2026-11-15: question 2, the fixtures (§11, question 9:
-assumed and named until running a plan is specified; a trivial one is
-decided), and question 3, the walks' termination (§3: assumed and named
-for now).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- Whether `validate` answers its explanation or raises an exception:
+  ruling 4 (it answers true or its explanation).
+- Whether the fixtures are assumed promises: the planning specification,
+  §11, question 9 (assumed and named; a trivial one decided).
+- Whether the walks' termination stays assumed: the planning
+  specification, §3 (assumed and named for now).
 
 ## Present pins
 

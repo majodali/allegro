@@ -85,17 +85,20 @@ scene 2's (`rung1-02-counterexamples.md`).
   included. The list holds only claims that wait for a value; here it is
   empty.
 
-## Open questions
+## Questions, as settled
 
-None. Settled: the strength of the twelve equality laws (ruling 5 of
-2026-11-15). Question 2 of the draft, whether `use contracts` survives
-(ruling A of round 2: `requires` and `ensures` are part of the standard
-language with no `use`, a separate extension inside it that a
-configuration can drop). The two questions new with the rulings, ruled
-2026-11-15, round 3: the coercion claims' strength (ruling M: assumed
-and named with the platform, a proof against the reference definitions
-the goal), and the strength of a true claim whose term uses an assumed
-law (ruling N: decided when evaluation decides it).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- The strength of the twelve equality laws: ruling 5 (Bool's decided,
+  the nine others assumed and named).
+- Whether `use contracts` survives as a module: ruling A (the clauses
+  are part of the standard language with no `use`).
+- The strength of the two coercion claims: ruling M (assumed and named,
+  as the laws).
+- The strength of a true claim whose term uses an assumed law: ruling N
+  (decided when evaluation decides it).
 
 ## Present pins
 

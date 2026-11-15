@@ -27,7 +27,7 @@ names it with "(held)".
    value for an unknown, and the kernel checks it"). That a resolution
    is feasible is decided. `solve` reads the residual of the template
    with its choices unknown, and the enumeration of today's library is
-   not ported (the maintainer's ruling of 2026-11-15 on question 4). The
+   not ported (the maintainer's ruling of 2026-11-15 on reading a residual). The
    best by the objective, which the caller may supply and whose default
    is the library's, the bound's effort then its duration (planning
    specification §11, question 7), is Quick and Direct: 20.75
@@ -80,7 +80,7 @@ halts before output here.
   and 194 read an error value with `error of`. The error value is gone.
   The search raises an exception carrying the counterexample (planning
   specification §7), which the program handles.
-- The maintainer's ruling of 2026-11-15 on question 4: milestone 7
+- The maintainer's ruling of 2026-11-15 on reading a residual: milestone 7
   requires `solve` to read a residual over its unknowns ("A solver sees
   its problem unevaluated"), and the enumeration is not ported.
   Milestone 7 waits on the kernel stream for a way to implement general
@@ -104,19 +104,21 @@ halts before output here.
   predicate, which answers true or its explanation as a value. Here the
   test of the solution's plan answers true (pin 147).
 
-## Open questions
+## Questions, as settled
 
-None. Settled by the planning specification
-(`next/models/specs/planning.md`, ruled at PR #202), as confirmed in
-the session of 2026-11-15: question 1, a search that finds nothing
-(§7: an exception the caller may handle, carrying the counterexample);
-question 2, the strength of `solve_from`'s best (§5: decided when the
-space is exhausted, otherwise sampled or assumed, and named); question
-3, whose order "best" follows (§11, question 7: a value the caller
-supplies, the library's as the default). Question 4, whether `solve`
-must read a residual, the maintainer ruled in words on 2026-11-15:
-"Let's go with option 1 and assume we'll get a solution shortly." The
-residual design is required, and enumeration is not ported.
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- A search that finds nothing: the planning specification, §7 (an
+  exception the caller may handle, carrying the counterexample).
+- The strength of `solve_from`'s best: the planning specification, §5
+  (decided when the space is exhausted, otherwise sampled or assumed,
+  and named).
+- Whose order "best" follows: the planning specification, §11, question
+  7 (the caller's, the library's by default).
+- Whether `solve` must read a residual: the maintainer's ruling in words
+  (the residual design is required; enumeration is not ported).
 
 ## Present pins
 

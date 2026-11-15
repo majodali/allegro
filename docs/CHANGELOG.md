@@ -1140,7 +1140,11 @@ and the explanation `_ > 0` does not hold of -5 in rung 1, scene 2.
 Nine rulings of a third round and the planning specification settle
 13 more: of the 37, 29 are settled and eight stay open, and the prover
 loop's scene now answers a claim evaluation cannot decide. A third
-overlay restates 28 corpus cases, 18 of them changing class.
+overlay restates 28 corpus cases, 18 of them changing class. A fourth
+round settles the rest: all 42 questions of the scenes are settled,
+none open, and a fourth overlay restates 82 cases and rewrites every
+note that cited an open question. The corpus moves from survives 1618,
+changes 229, detail 145 to survives 1586, changes 260, detail 146.
 
 ### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
 

@@ -63,7 +63,9 @@ in the same way, carrying: cannot convert m to s, length vs time.
 **Does.** Uncomments `wrong = speed(qty(3, m), qty(2, s))`. **Must
 find.** The entry claim that `a` is an Acceleration is refuted. The
 refutation names `speed`, the parameter `a` and the type Acceleration.
-It is found while the program is checked, before any effect. Today the
+The predicate's explanation names the value, 3 m, its dimension,
+length, and the one expected, length over time squared (ruling P of
+2026-11-15, round 4). It is found while the program is checked, before any effect. Today the
 program prints eight lines and then halts.
 
 ## What changes by ruling
@@ -93,17 +95,16 @@ program prints eight lines and then halts.
   deriver attempts (rung 2, scene 3). The summary is the weakest
   strength among them and the file's claims.
 
-## Open questions
+## Questions, as settled
 
-Settled: question 1 of the draft, whether adding quantities of
-different dimensions is a refutation or a handled failure (ruling 3: a
-refutation, carrying the message as the predicate's explanation; the
-same for `to`, and for rung 2, scene 2, pin 20).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
 
-1. Do the named-dimension predicates explain their refusal ("A predicate
-   can explain its refusal"), so that the break-it refutation names the
-   value 3 m and its dimension, length, against length over time
-   squared? Recommended: yes, in the manner of `+`'s explanation.
+- Whether a dimension mismatch is a refutation or a handled failure:
+  ruling 3 (a refutation, the message as the predicate's explanation).
+- Whether the named-dimension predicates explain their refusal: ruling P
+  (yes: the value, its dimension and the one expected).
 
 ## Present pins
 

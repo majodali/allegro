@@ -101,19 +101,20 @@ before any effect, so the run prints nothing.
   of each `by` term and the author of the assumption, and the deriver as
   the proposer of each derived law.
 
-## Open questions
+## Questions, as settled
 
-None. Settled: question 1 of the draft, a refused `by` term on a claim
-that holds by evaluation (ruling 2). Question 3, whether Cell's refl
-and sym are decided (ruling 5: the standard deriver derives them,
-assumed while Int's laws are). Question 4, the strength of Int
-equality's transitivity in pin 10 (ruling 5: assumed). Ruled
-2026-11-15, round 3: question 2, whether binding a proof value is a
-claim (ruling G: no; it is a proposal attached to nothing until someone
-uses it as the `by` of a claim). The question new with ruling 5,
-whether the deriver attempts a law the author has assumed (ruling O:
-no; a tool may offer, when asked, an audit of assumptions the deriver
-could replace).
+Every question this scene raised is settled. Rulings 1 to 5 and the
+letters A to X are stated in the index (`README.md`, "Rulings of
+2026-11-15").
+
+- A refused `by` term on a claim that holds by evaluation: ruling 2.
+- Whether binding a proof value is a claim: ruling G (no).
+- Whether Cell's refl and sym are decided: ruling 5 (derived, assumed
+  while Int's laws are).
+- The strength of Int equality's transitivity in pin 10: ruling 5
+  (assumed).
+- Whether the deriver attempts a law the author has assumed: ruling O
+  (no).
 
 ## Present pins
 
