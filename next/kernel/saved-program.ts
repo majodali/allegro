@@ -7,7 +7,7 @@
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "A saved program is a recorded sequence of interface calls"
 //   "A saved program names what it needs by content hash"
-//   "A module is a function of the capabilities it declares"
+//   "A module is a function of what it declares"
 //   "Only the module being run performs effects when instantiated"
 //
 // A saved program rebuilds a program in a kernel without parsing. Its

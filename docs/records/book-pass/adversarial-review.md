@@ -546,6 +546,31 @@ The maintainer ratified the term "specialization", and allowed the
 review session a mechanical rename of decision titles in the
 acceptance stream's corpus, so that every title can be made accurate.
 
+### Titles made accurate (2026-11-15)
+
+The maintainer asked that every decision title be correct and
+accurate. Eight titles misstated their decision after the rulings
+since phase 1 closed, and are changed. The decision map keeps each
+former title, so the acceptance stream's corpus passes its check and
+follows with one command of its own tool.
+
+| Former title | Title now |
+|---|---|
+| A function may take an argument unevaluated | An argument is evaluated when it is needed |
+| Reading an expression never yields authority | Describing a function is an authority |
+| A solver sees its problem unevaluated | A solver reads the residual of its problem |
+| A value that arrives later fills a cell, and a failure fills it with an exception | A value that arrives later fills a cell |
+| An extension registers its own fields; the kernel has two | An extension registers its own fields |
+| Every value keeps its origin | A value's origin is a description |
+| A module is a function of the capabilities it declares | A module is a function of what it declares |
+| Functions are data: params plus body | A composed function is parameters and a body |
+
+Three entries also had a sentence corrected: a composed function is
+reached from outside the kernel only by describing it; authority is a
+value, since a key is a structure; the kernel registers three fields.
+Titles that are accurate and only awkward in form are left for the
+style pass.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

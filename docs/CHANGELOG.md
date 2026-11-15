@@ -574,6 +574,11 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Eight decision titles made accurate.** The titles
+  that the rulings since phase 1 had left wrong are changed in the
+  inventory and the decision map, which keeps each former title. The
+  table is in `docs/records/book-pass/adversarial-review.md`,
+  "Titles made accurate".
 - **2026-11-15 — Solving ruled.** A solver's problem is a function of
   its unknowns. A new kernel primitive specializes a function: it
   evaluates the body with the parameters unknown and returns a

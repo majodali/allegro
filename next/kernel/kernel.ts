@@ -11,7 +11,7 @@
 //   "The kernel is passive", "What the kernel's interface offers",
 //   "No interface call writes a bare claim outcome", "Limits are step budgets",
 //   "Seven representation kinds", "Expressions are values, forming a DAG",
-//   "Functions are data: params plus body",
+//   "A composed function is parameters and a body",
 //   "A call is evaluated by evaluating the function's body",
 //   "Evaluation is total over unresolved information",
 //   "A missing value is a cell that is filled once",
