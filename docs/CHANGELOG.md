@@ -574,6 +574,18 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — The reference kernel, first part (K2).**
+  `next/kernel/kernel.ts` implements the kernel's interface: values of
+  the seven kinds, scopes and names, cells, and the evaluation of
+  names, structures and calls of composed and primitive functions,
+  under a step budget. A name not yet bound is a residual, and what
+  waited on a name or a cell is evaluated again by `advance`. Three
+  kernel primitives for now: a conditional, a claim and a quotation.
+  Tested through the interface only (23 tests), and by the acceptance
+  stream's launcher, which runs a saved program on it:
+  `npm run launch -- next/launch/fixtures/hello.json` prints
+  `hello, world`. Not yet: metadata fields, origins, recursion on
+  unknown arguments.
 - **2026-11-14 — How a name comes to be checked, ruled.** The kernel
   never refutes an unbound name; evaluating one gives a residual. A
   language checks the names it cares about, from the expression it

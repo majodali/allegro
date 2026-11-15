@@ -1473,6 +1473,18 @@ its approval.
   evaluating an unbound name returns) is under discussion: the
   maintainer leans to an unbound name giving a residual, so that a
   name may be used before it is defined.
+- **2026-11-15 — the reference kernel, first part** (the review
+  session; chunk K2 (the reference kernel)). `next/kernel/kernel.ts`
+  implements the interface for values, scopes and names, cells, and
+  the evaluation of names, structures and calls, with three kernel
+  primitives: a conditional, a claim, and a quotation. Milestone 1 of
+  `rebuild.md`: its tests evaluate expressions built through the
+  interface. The kernel's half of milestone 2: the acceptance stream's
+  launcher runs its saved program on this kernel and prints through
+  the output capability (`npm run launch -- next/launch/fixtures/hello.json`).
+  Issue 15 of the adversarial review was ruled on 2026-11-14 and is
+  built in: an unbound name is a residual. Six rows of the decision
+  map move to written.
 
 ## 8. Sessions
 
