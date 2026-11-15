@@ -445,8 +445,50 @@ function it sits in, and what the outcome rests on; a builder stores
 it; the loading kernel computes it again and refuses the record where
 the two differ.
 
+**Values and descriptions: cluster 1 with issues 14 and 23, ruled
+2026-11-15.** The maintainer merged PR #215 ("Reviewed - all good")
+and took the design for what Allegro code may do with an expression.
+The core idea: a value is live and a description is plain data, and
+every problem of cluster 1 came from letting code treat a live
+expression as data and then make it live again. Five decisions, all
+agreed, two of them reversing earlier rulings:
+
+1. A function is opaque, and describing one is an authority, held
+   through the key of the module that made it or through an inspection
+   right a configuration grants. This reverses "any code can read an
+   expression's structure". A description never yields authority.
+2. A live expression is built only from live values.
+3. There are no unevaluated arguments: a delayed expression is a
+   function, and the notation wraps it. This replaces "A function may
+   take an argument unevaluated".
+4. One kernel primitive evaluates a function under a budget and
+   returns how it ended as data.
+5. An origin is a description, read under the same authority; a phase
+   may drop origins nobody with the right will ask for.
+
+No primitive inside the language makes or reads a scope. The kernel's
+primitives are now eight things, listed in "The kernel's primitives
+are pure and few".
+
+The maintainer: "this is the scope of change we need. Unevaluated
+arguments and carrying the originating expressions raised far too
+many legitimate concerns." They had been suggested for four use
+cases: conditionals passing knowledge in and out of the partial
+evaluation of branches; language features not obviously supported,
+such as solving for unknowns and grammars; analysis, optimisation
+beyond partial evaluation and transforms; and reporting findings in
+the terms of the original code. "One solution for all this was
+tempting and ambitious. But I think we have separate solutions for
+each." And: "We'll judge all this with another adversarial review
+round."
+
 ## Terms introduced
 
+- **Description**: plain data that says what an expression looks
+  like, holding public identities where the expression holds
+  unforgeable values.
+- **Inspection right**: the authority to describe a function one did
+  not make.
 - **Rests on**: what a result's evaluation used that the kernel did
   not itself evaluate.
 - **Key slot**: a place in a module where one of its keys goes.
