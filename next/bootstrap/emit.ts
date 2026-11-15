@@ -13,7 +13,7 @@
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "A saved program is a recorded sequence of interface calls" (the
 //     record constructs values and binds nothing; names are resolved here)
-//   "A module is a function of the capabilities it declares" (the text is
+//   "A module is a function of its capabilities, inputs and imports" (the text is
 //     one module function, its declared capabilities its parameters)
 //   "Only the module being run performs effects when instantiated" (the
 //     top-level effects sit in the body, in written order)

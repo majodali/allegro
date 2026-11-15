@@ -14,14 +14,17 @@
 > the kernel's interface `next/kernel/interface.ts` and the data form
 > `next/kernel/saved-program.ts`.
 >
-> **Two kernels.** The emitter is built and tested against `origin/main`
-> at `a479e5e`. The kernel stream's open pull request #216 (values and
+> **Two kernels.** The emitter was built and tested against the kernel
+> of `a479e5e`. The kernel stream's pull request #216 (values and
 > descriptions, kernel chunk K4 (what Allegro code may do with an
-> expression)), branch `claude/kernel-k4` at `6829b3d`, changes how
-> arguments are evaluated. Every statement below about #216 was checked
-> by running the emitter's records on that branch's kernel, exported to
-> a scratch directory and not merged. The forms' table gives both
-> states where they differ.
+> expression)) changes how arguments are evaluated. It merged on
+> 2026-11-15, after this proposal was written; `origin/main` is now at
+> `4b6b395`. In this document "on `origin/main`" means the kernel before
+> #216, at `a479e5e`, and "once #216 merges" means the kernel now on
+> main. Every statement about #216 was first checked on its branch at
+> `6829b3d`; the emitter's tests, the fixtures and the census were run
+> again on the merged kernel, with the same results. The forms' table
+> gives both states where they differ.
 >
 > **Term introduced.** <a id="def-sort"></a>**Sort**: what the emitter
 > can see of a value from the form that made it, without types: a text,
@@ -121,8 +124,8 @@ standard language by rulings A and E of the scenarios, and every other
 
 ## 3. The module
 
-A text becomes one module function, as "A module is a function of the
-capabilities it declares" has it.
+A text becomes one module function, as "A module is a function of its
+capabilities, inputs and imports" has it.
 
 **Its parameters.** The capabilities it uses, then the modules it
 imports (question 6). Today the only one is `output`, declared when the
@@ -407,7 +410,7 @@ expression at all, so (d) needs the reader of (c) anyway.
 no input is declared at milestone 3. (b) An explicit header line names
 each capability. Cost of (a): a capability is not written in the text,
 though it is listed in the record's `declares`, which is what "A module
-is a function of the capabilities it declares" makes visible where the
+is a function of its capabilities, inputs and imports" makes visible where the
 module is loaded. Cost of (b): every corpus program changes.
 **Recommended: (a).** By ruling Q of the scenarios, `import` brings
 bindings only; the launcher supplies no module yet, so an import is a
