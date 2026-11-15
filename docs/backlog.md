@@ -3706,7 +3706,53 @@ table and the stream plans.
   the maintainer, records the ruling in
   `docs/plans/book-pass-inventory.md`, and checks the line off; no
   other session does. Filed 2026-11-13 by the rebuild program's plan
-  (`docs/plans/rebuild.md` §8). No lines yet.
+  (`docs/plans/rebuild.md` §8). The lines below are rulings to record
+  in the inventory, not evidence to bring.
+  1. "An effect consumes only values whose claims are decided"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session.
+     A strength (assumed, sampled, undecided) prevents no effect unless
+     a policy or configuration requires it, a refuted claim never
+     reaches an effect, and the result holds every undecided claim,
+     shown by a tool as configured. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  2. "A proof term is a proposal"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. A refused proposal never
+     refutes its claim: the claim's outcome is what evaluation gives,
+     the refusal is recorded with the rule's explanation, and a policy
+     "no proposal in the source is refused" exists, off by default.
+     Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  3. "A typed function claims its parameter types on entry and its
+     return type on exit"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. A parameter claim has the same meaning
+     at every phase, a failed check is not catchable, and the policy
+     "every parameter claim is decided before the run begins" is on by
+     default, which a user may turn off for a script or similar
+     execution. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  4. "Default equality belongs to the standard extension"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. Bool's
+     equality laws are decided by enumeration, those of Int, Float and
+     String are assumed and named with the platform, and a law derived
+     from fields' laws carries their strength, where the decision says
+     the laws are decided once for all types. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  5. "Discharge mechanisms without search"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. A standard deriver,
+     the shipped proposer the build runs, takes each claim undecided
+     after evaluation and samples, then derives, within configurable
+     step budgets; the kernel checks each proposal and does no search,
+     and found proofs are stored and checked again every build. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  6. "Bounded sampling for universal claims"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. Sampling has a
+     configurable allowance, a count with a step cap each, over a fixed
+     sequence of small values first, where the decision fixes four
+     sampled inputs. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  7. A goal not yet a decision; the maintainer's ruling of 2026-11-15 in the acceptance stream's session. Every law of a shipped module is
+     to have reference definitions and proofs; until then a law of a
+     primitive is assumed. Recorded in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  8. "Open obligations are listed for any proposer"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session
+     (rulings H and T). An obligation is named by its module and claim
+     name, with no hash over the proposition's text, and the default
+     list shows the project's own claims; the libraries' open claims
+     are listed when asked for, and a proposal for a library's law goes
+     into the project's proof store. Recorded in
+     `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  9. "A grammar change reaches to the end of its block"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session (ruling
+     Q). Two acts have two words: `import` brings a module's bindings
+     only, and `use` brings the bindings and the notation, to the end of
+     the block it is written in, since the text asks for it. Recorded
+     in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under
