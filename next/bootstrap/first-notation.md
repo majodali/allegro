@@ -154,6 +154,20 @@ record `(_ => out("b"))(out("a"))` prints `a`, `b` on `origin/main` and
 `b` alone on #216. The structure form prints the same on both, and so
 does every fixture of `next/bootstrap/fixtures/`.
 
+**What this rests on, and it is open.** "An expression is evaluated when
+its value is needed" (ruled 2026-11-15, with #216) says a body needs its
+statements in written order. The data form has no node for a body of
+statements, so the emitter has one way to write them: a structure's
+entries. The same decision leaves open whether a structure needs its
+entries, and records that the maintainer prefers entries evaluated when
+needed, with the order of effects settled another way. If that is
+ruled, every record of more than one statement stops performing its
+statements, as the unused argument did. The first notation then needs a
+kernel form for a body's statements (question 10, option (b)). The
+kernel stream asked that no case rest on the order of a structure's
+entries; the emitter does, because nothing else exists, and says so
+here.
+
 **A value binding** is needed at its written place on both kernels. On
 `origin/main` the argument `e` is evaluated before the body. On #216 it
 is evaluated by the entry `x: x`, which is the first entry of the
@@ -449,15 +463,20 @@ it; (d) a refutation. Cost of (b): printing any number waits on the
 standard language. **Recommended: (a) and (c)**, for the kernel stream
 to confirm, since the primitives are its own.
 
-**10. A block whose value is its last statement's.** (a) Refused until
+**10. A body's statements, and a block whose value is its last
+statement's.** Section 3 writes statements as a structure's entries,
+which rests on an open point of "An expression is evaluated when its
+value is needed". (a) Refused until
 the kernel can read a structure's entry; the block is then the structure
 of its statements and its value is the last entry. (b) A kernel form
 that evaluates a sequence and answers the last value. (c) A function of
 one unused parameter, which works on `origin/main` only. Cost of (a):
 a block that prints and then answers waits (0 cases of the census today;
 the tests' blocks wait on block bindings first). Cost of (c): it breaks
-silently when #216 merges. **Recommended: (a)**; (b) is the kernel
-stream's if it prefers one.
+silently when #216 merges. **Recommended: (a)** while a structure's
+entries are evaluated in order. If entries become evaluated when needed,
+(b) is required, for every body of more than one statement and not only
+for a block's value; it is the kernel stream's to build.
 
 **11. Which primitive an operator stands for.** The first notation has
 no types, and the kernel's bits carry none. The present tree chooses at
