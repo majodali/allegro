@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 236 decisions in 6 parts and 38 chapters (231 when the phase closed; five added by rulings since) after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 237 decisions in 6 parts and 38 chapters (231 when the phase closed; six added by rulings since) after the preface and the tour. Part I: 23; Part II: 52; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -38,7 +38,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; the kernel has two; A field's rule is a pure, bounded function; Every value keeps its origin; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; A function may take an argument unevaluated; A call is evaluated by evaluating the function's body; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; A function may take an argument unevaluated; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -892,7 +892,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Authority
 
 #### Reading an expression never yields authority
-- Decides: a value and its description are two things. A function is opaque: ordinary code can call it and do nothing else with it. Describing one is an authority, held through the key of the module that made the function or through an inspection right that a configuration grants. A description is plain data that says what an expression looks like; where the expression holds an unforgeable value, the description holds only its public identity. So a description never yields authority, and a function that wraps a capability in a narrower one cannot be taken apart.
+- Decides: a value and its description are two things. A function is opaque: ordinary code can call it and do nothing else with it. Describing one is an authority, held through the key of the module that made the function or through an inspection right that a configuration grants. A description is plain data that says what an expression looks like; where the expression holds an unforgeable value, the description holds only its public identity. So a description never yields authority, and a function that wraps a capability in a narrower one cannot be taken apart. Opening a call copies the callee's body into the residual; each part of a residual stays marked with the module whose function it came from, and a description shows a part only under a right that covers that module.
 - Status: open; ruled 2026-11-11 (DR4), reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -903,6 +903,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling, placed in Part II with the maintainer's agreement. It answers the question "Authority is an unforgeable value" left open: what an expression shows of a key to code that does not hold it. The same holds when an expression is reached through a value's origin.
 - Notes (2026-11-15, values and descriptions): reworded by ruling, reversing "any code can read an expression's structure". The adversarial review's cluster 1 showed what that sentence allowed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it (issue 1); a result computed from a private value carried that value in its origin (issue 4); and if any code can tell `a + 0` from `a`, no optimisation is invisible (issue 3). What survives is that a description never yields authority.
+- Notes (2026-11-15, solving): the sentence on residuals is added by ruling. Without it, wrapping any function, specializing the wrapper and describing the result would read that function's body. A part the right does not cover is described as opaque.
 - Chapter: Authority
 
 #### A live expression is built only from live values
@@ -1156,6 +1157,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, arguments are evaluated when needed): the arguments go into the body as written and are evaluated when needed, at most once, in the scope where they were written ("A function may take an argument unevaluated", as replaced).
 - Chapter: Evaluation
 
+#### A function can be specialized with its parameters unknown
+- Decides: a kernel primitive evaluates a function's body with its parameters unknown, under a budget, and returns a function of the same parameters whose body is the residual. The evaluation is speculative: it evaluates both branches of a conditional whose condition is unknown. It performs no effect; an effect stays in the residual. A refutation inside a branch stays in that branch, and a body refuted whatever its parameters is a refutation of the whole. The result is a function of the module that made the original.
+- Status: open, a design to prove on the planning model; ruled 2026-11-15
+- Type: capability
+- Rationale kind: technical
+- Depends on: A call is evaluated by evaluating the function's body; Evaluation is total over unresolved information; Reading an expression never yields authority
+- Significance: 4 — what lets Allegro code ask for the residual of a problem
+- Label: foundational — solving, claims about every value, and optimization by specialization
+- Options recorded: an argument a function can inspect, restored for solvers (rejected: the reasons it was removed stand); a primitive that asks whether a value is resolved (removed in the Part IV review)
+- Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. It is the operation "A claim about every value is decided by evaluating it with the value unknown" needs, offered to Allegro code. Fixing some parameters is a second specialization, of a function that calls the first with those values. The policy for which calls are opened is the next decision's, proved by building.
+- Chapter: Evaluation
+
 #### A recursive call is evaluated once for each state of knowledge
 - Decides: while evaluating a function's body, the evaluator may meet a call to the same function with the same information known about its arguments. It does not open that call again. The call stays in the residual, as a call to the function being evaluated. Claims stated about the function's result are assumed at that inner call and decided on the body.
 - Status: open (a design to prove on real cases); ruled 2026-11-11 (DR2)
@@ -1283,7 +1297,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover eight things: telling bits apart; making and reading structures; one conditional; describing a function and building one from a description; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover nine things: telling bits apart; making and reading structures; one conditional; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1298,6 +1312,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-12, DR4): truth. The kernel recognises two bit values as true and false; a conditional or a claim on anything else is a refutation. The standard language's Bool is those two values with a type, so the kernel's notion of true depends on no extension.
 - Notes (2026-11-13, DR6): terms. A kernel primitive is one of these; a primitive function is any function whose body is host code. The primitive for evaluating an expression with names rebound can supply the complete set of names, so that Allegro code, the module loader first, can evaluate a module in a scope that holds only what it is given.
 - Notes (2026-11-15, values and descriptions): the list is fixed by the rulings on values and descriptions. "Evaluating an expression with names rebound" goes: a loader builds a function from a description and calls it, so no primitive inside the language makes or reads a scope (issue 23 of the adversarial review). Quotation goes: a quoted symbol is a description. The title says six in its history and eight now.
+- Notes (2026-11-15, solving): nine, with specializing a function ("A function can be specialized with its parameters unknown").
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -2798,11 +2813,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Search and optimization
 
 #### A solver sees its problem unevaluated
-- Decides: a solver's problem is a function of its unknowns. Search calls it with candidates. A solver that works on the problem's form is handed a description of it by the caller, who owns it, and can build and evaluate variants that hold no unforgeable value. How a notation writes an unknown is the notation's choice.
-- Status: open, a design to prove; ruled 2026-11-12 (DR5), reworded 2026-11-15
+- Decides: a solver's problem is a function of its unknowns. The solver specializes it and reads the residual by describing it: which unknowns each remaining constraint mentions gives the order of search and the sub-problems that are independent. A candidate is tried by calling the specialized function. Fixing some unknowns is a second specialization. The caller grants the right to describe as an ordinary function that closes over its key, so the key never leaves its module. A candidate the solver works out from the residual's form, by inverting part of it, is proposed as plain data and checked by the call. How a notation writes an unknown is the notation's choice.
+- Status: open, a design to prove on the planning model; ruled 2026-11-12 (DR5), replaced 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function may take an argument unevaluated; Evaluation is total over unresolved information; Reading an expression never yields authority
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function can be specialized with its parameters unknown; A function may take an argument unevaluated; Evaluation is total over unresolved information; Reading an expression never yields authority
 - Significance: 4 — how a search is written as an ordinary function
 - Label: foundational — search and optimization written in Allegro, open to partial evaluation
 - Options recorded: a primitive that asks of any value whether it is resolved (`is_resolved`, removed in the Part IV review: it makes any function's behaviour depend on the phase; here only a function that declares an unevaluated argument sees a residual, and it sees it by reading an expression)
@@ -2810,6 +2825,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: unknowns may be represented by unbound symbols, and normal evaluation turns those, and hence a solver function, into a residual; solver functions can take unevaluated arguments, "but this may be a use case for something akin to `is_resolved`"; "Vivace should provide functions that parse expressions and return resolved and unresolved parts." The maintainer confirmed on PR #193: reading the residual of an expression the solver evaluated itself is correct, and `is_resolved` is not; different grammars may handle unknowns differently, so an unbound symbol is one representation. A second use case for unevaluated arguments, after `if` with knowledge in its branches. A candidate is tried by evaluating the problem with the unknown's name rebound, a kernel primitive.
 - Notes (2026-11-14, issue 15 of the adversarial review): consistent with the ruling: a name nothing has bound gives a residual in ordinary evaluation, for a solver's unknown as for any name.
 - Notes (2026-11-15, values and descriptions): reworded by ruling: the solver no longer takes its problem unevaluated or reads a residual. The title is the old decision's, kept until the entry is next reviewed.
+- Notes (2026-11-15, solving): replaced by ruling. The maintainer told the acceptance stream of the change to unevaluated arguments because plan solving "requires inspecting a plan expression after PE has run, so it can find solutions more efficiently". The design: specialize, describe, call. Left out until the planning model needs them: a function built from a description with live values taken from the function described, which a partial inversion needs when the inverse keeps a part the description shows as opaque, and which is a grant separate from the right to describe, since whoever rebuilds a function can use a capability inside it without the guard written around it; and unknowns that carry facts, such as a choice limited to a set of options, which need metadata fields. An inverse returned as a function needs neither: the solver returns a function that interprets the inverted description, and specializing it removes the interpreter.
 - Chapter: Search and optimization
 
 #### Feasible is decided; best says how strongly it holds

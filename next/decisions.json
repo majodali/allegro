@@ -60,6 +60,7 @@
     {"title":"The environment is not a value","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A function may take an argument unevaluated","part":"II","chapter":"Evaluation","type":"capability","present":"open","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
     {"title":"A call is evaluated by evaluating the function's body","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
+    {"title":"A function can be specialized with its parameters unknown","part":"II","chapter":"Evaluation","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A recursive call is evaluated once for each state of knowledge","part":"II","chapter":"Evaluation","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A branch that may not be taken is evaluated without capabilities","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A missing value is a cell that is filled once","part":"II","chapter":"Evaluation","type":"capability","present":"settled","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},

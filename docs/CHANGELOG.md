@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Solving ruled.** A solver's problem is a function of
+  its unknowns. A new kernel primitive specializes a function: it
+  evaluates the body with the parameters unknown and returns a
+  function whose body is the residual. The solver describes that
+  function to read the residual and calls it to try a candidate. Each
+  part of a residual keeps the module whose function it came from, so
+  specializing a wrapper reads nobody's body. Recorded, not built:
+  the build is the next chunk's. The inventory holds 237 decisions.
 - **2026-11-15 — Values and descriptions (K4).** Five rulings on what
   Allegro code may do with an expression, two reversing earlier ones.
   A function is opaque: describing one takes a key of the module that

@@ -1513,6 +1513,13 @@ its approval.
   things, of which fields and the questions about keys are not built.
   The maintainer: this design is judged by another adversarial review
   round.
+- **2026-11-15 — solving ruled** (the review session). A solver's
+  problem is a function of its unknowns; a kernel primitive
+  specializes a function with its parameters unknown; the solver
+  describes the residual and calls it with candidates; each part of a
+  residual keeps the module it came from. Built in the next chunk,
+  with recursion and the policy for opening calls. The inventory
+  holds 237 decisions.
 
 ## 8. Sessions
 

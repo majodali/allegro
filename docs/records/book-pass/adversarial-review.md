@@ -508,6 +508,44 @@ directly within the function body." Confirmed and built:
   parameter types on entry, which needs the arguments, so typed code
   is strict in practice.
 
+### Solving (2026-11-15)
+
+The maintainer told the acceptance stream that unevaluated arguments
+were gone, "because there are so many references to the decision, and
+because the work there includes plan solving, which requires
+inspecting a plan expression after PE has run, so it can find
+solutions more efficiently", and asked how Allegro supports solving
+an expression for one or more unknowns. Ruled ("This solution looks
+good to me"):
+
+- A problem is a function of its unknowns.
+- A kernel primitive specializes a function: it evaluates the body
+  with the parameters unknown, under a budget, and returns a function
+  whose body is the residual. It evaluates both branches of a
+  conditional whose condition is unknown, performs no effect, and
+  keeps a refutation inside its branch.
+- The solver reads the residual by describing the specialized
+  function, tries a candidate by calling it, and fixes some unknowns
+  by specializing again.
+- The caller grants the right to describe as a function that closes
+  over its key.
+- Each part of a residual stays marked with the module whose function
+  it came from, and is described only under a right that covers that
+  module.
+
+The maintainer asked whether inverting all or part of a function
+needs `build`. Recorded: an inverse computed as a candidate needs
+none; an inverse returned as a function is a function that interprets
+the inverted description, specialized; a partial inversion that keeps
+a part described as opaque needs a function built with live values
+taken from the function described. That form of `build` is a grant
+separate from the right to describe, and is built when the planning
+model needs it.
+
+The maintainer ratified the term "specialization", and allowed the
+review session a mechanical rename of decision titles in the
+acceptance stream's corpus, so that every title can be made accurate.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
@@ -518,5 +556,7 @@ directly within the function body." Confirmed and built:
 - **Rests on**: what a result's evaluation used that the kernel did
   not itself evaluate.
 - **Key slot**: a place in a module where one of its keys goes.
+- **Specialization**: a function whose body is the residual of
+  another function's body, evaluated with its parameters unknown.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
