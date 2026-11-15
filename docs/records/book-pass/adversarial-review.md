@@ -549,21 +549,40 @@ acceptance stream's corpus, so that every title can be made accurate.
 ### Titles made accurate (2026-11-15)
 
 The maintainer asked that every decision title be correct and
-accurate. Eight titles misstated their decision after the rulings
-since phase 1 closed, and are changed. The decision map keeps each
-former title, so the acceptance stream's corpus passes its check and
-follows with one command of its own tool.
+accurate. The review session read all the titles against what each
+decides and proposed eight changes; the maintainer questioned four,
+and the result is seven retitled entries and two new ones. The
+decision map keeps each former title, so the acceptance stream's
+corpus passes its check and follows with one command of its own tool.
 
 | Former title | Title now |
 |---|---|
-| A function may take an argument unevaluated | An argument is evaluated when it is needed |
-| Reading an expression never yields authority | Describing a function is an authority |
+| A function may take an argument unevaluated | No argument can be inspected |
 | A solver sees its problem unevaluated | A solver reads the residual of its problem |
-| A value that arrives later fills a cell, and a failure fills it with an exception | A value that arrives later fills a cell |
+| A value that arrives later fills a cell, and a failure fills it with an exception | A late answer or its failure fills a cell as plain data |
 | An extension registers its own fields; the kernel has two | An extension registers its own fields |
 | Every value keeps its origin | A value's origin is a description |
-| A module is a function of the capabilities it declares | A module is a function of what it declares |
+| A module is a function of the capabilities it declares | A module is a function of its capabilities, inputs and imports |
 | Functions are data: params plus body | A composed function is parameters and a body |
+
+- **"An expression is evaluated when its value is needed"** is new. The maintainer asked whether the rule for
+  arguments is a corollary of a broader rule, and there was none. The
+  entry says what needs a value, and that the kernel evaluates more
+  only where no one can tell. Open by the maintainer's word: whether
+  a structure needs its entries. The maintainer prefers that entries
+  are evaluated when needed too, and holds that the order of effects
+  needs another answer: "a way to determine effect ordering, and
+  optionally declare ordering for specific effects, but that's a
+  different topic."
+- **"Reading an expression never yields authority"** keeps its title, and **"Describing a function requires authority"** is a new entry. The
+  session had put both rules in one entry and retitled it; the
+  maintainer: that "seems like creating a completely new distinct
+  rule". The second title is the maintainer's wording.
+- The cell's title names the failure: a failure fills the cell as an
+  answer does, as plain data.
+- The module's title names its parameters. The session's first
+  wording, "a function of what it declares", read as if every
+  declaration were a parameter.
 
 Three entries also had a sentence corrected: a composed function is
 reached from outside the kernel only by describing it; authority is a

@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 237 decisions in 6 parts and 38 chapters (231 when the phase closed; six added by rulings since) after the preface and the tour. Part I: 23; Part II: 52; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 239 decisions in 6 parts and 38 chapters (231 when the phase closed; eight added by rulings since) after the preface and the tour. Part I: 23; Part II: 54; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -34,11 +34,11 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
 5. **Authority** (7 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
-   - Decisions: Authority is an unforgeable value; Describing a function is an authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
+   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; Describing a function requires authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An argument is evaluated when it is needed; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -110,7 +110,7 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
 32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
    - Decisions: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; Startup, step by step; One kernel serves many invocations.
 33. **Capabilities and primitive functions** (5 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
-   - Decisions: A capability is a named set of effectful primitives; A module is a function of what it declares; Only the module being run performs effects when instantiated; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
+   - Decisions: A capability is a named set of effectful primitives; A module is a function of its capabilities, inputs and imports; Only the module being run performs effects when instantiated; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
 34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
    - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
 35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
@@ -120,7 +120,7 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
 37. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
    - Decisions: A tool reads a phase's result and adds no analysis of its own; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
 38. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
-   - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell; The browser launcher is one bundle; The core runs in a browser.
+   - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A late answer or its failure fills a cell as plain data; The browser launcher is one bundle; The core runs in a browser.
 
 ## Findings held for their decisions
 
@@ -164,7 +164,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Facts are kept on the scope and narrowed in place | What is known about a value travels with the value | Contracts | DR4, rulings of 2026-11-12 |
 | The verdict is assembled outside evaluation; undecided contracts do not reach it | Every result says how strongly it holds | Keep it simple | DR4, rulings of 2026-11-12 |
 | There is no stated kernel interface; each host calls the evaluator's internals | What the kernel's interface offers | The kernel's interface | DR6, rulings of 2026-11-13 |
-| Hosts are swapped by capturing output and substituting extensions; a failed request fills a cell with an error value; a missing runtime throws | The terminal and the browser ship output, timers and HTTP; A value that arrives later fills a cell | The launchers we ship | DR6, rulings of 2026-11-13 |
+| Hosts are swapped by capturing output and substituting extensions; a failed request fills a cell with an error value; a missing runtime throws | The terminal and the browser ship output, timers and HTTP; A late answer or its failure fills a cell as plain data | The launchers we ship | DR6, rulings of 2026-11-13 |
 | The module summary has a vocabulary of its own | A module's summary is the weakest strength among its claims | Tools | DR6, rulings of 2026-11-13 |
 | The browser bundle holds no module loader and fails on an unguarded Node global | The browser launcher is one bundle; The core runs in a browser | The launchers we ship | DR6, rulings of 2026-11-13 |
 
@@ -844,7 +844,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md T0 §7; docs/book/units.md §4.1 row 7; docs/book/process.md §6 (not read; cited by CLAUDE.md)
 - Book home (fragments' proposal): kinds chapter (planned)
 - Notes: analysis properties (`partial`, `inferredEffects`, …) ride as JS expandos listed in `PRESERVED_FN_META_KEYS`, invisible in the interface; the host-plane declaration entry owns that.
-- Notes (2026-11-15, values and descriptions): to the kernel, and to whoever holds the right to describe a function. To other code a function is opaque ("Describing a function is an authority").
+- Notes (2026-11-15, values and descriptions): to the kernel, and to whoever holds the right to describe a function. To other code a function is opaque ("Reading an expression never yields authority").
 - Notes (2026-11-15, titles made accurate): retitled from "Functions are data: params plus body", and the sentence that building and inspecting a function "needs no reflection API" replaced: by the rulings on values and descriptions a function is opaque to code outside the kernel.
 - Chapter: Programs as values
 
@@ -893,8 +893,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, titles made accurate): "a function value" became "a value": a key is a structure the kernel marks.
 - Chapter: Authority
 
-#### Describing a function is an authority
-- Decides: a value and its description are two things. A function is opaque: ordinary code can call it and do nothing else with it. Describing one is an authority, held through the key of the module that made the function or through an inspection right that a configuration grants. A description is plain data that says what an expression looks like; where the expression holds an unforgeable value, the description holds only its public identity. So a description never yields authority, and a function that wraps a capability in a narrower one cannot be taken apart. Opening a call copies the callee's body into the residual; each part of a residual stays marked with the module whose function it came from, and a description shows a part only under a right that covers that module.
+#### Reading an expression never yields authority
+- Decides: a value and its description are two things. A description is plain data that says what an expression looks like; where the expression holds an unforgeable value, the description holds only its public identity. So reading never yields authority, and a function that wraps a capability in a narrower one cannot be taken apart.
 - Status: open; ruled 2026-11-11 (DR4), reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -905,8 +905,21 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling, placed in Part II with the maintainer's agreement. It answers the question "Authority is an unforgeable value" left open: what an expression shows of a key to code that does not hold it. The same holds when an expression is reached through a value's origin.
 - Notes (2026-11-15, values and descriptions): reworded by ruling, reversing "any code can read an expression's structure". The adversarial review's cluster 1 showed what that sentence allowed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it (issue 1); a result computed from a private value carried that value in its origin (issue 4); and if any code can tell `a + 0` from `a`, no optimisation is invisible (issue 3). What survives is that a description never yields authority.
+- Notes (2026-11-15, titles made accurate): this entry and "Describing a function requires authority" were one entry after the rulings on values and descriptions. The maintainer: the change of title "seems like creating a completely new distinct rule". They are two rules, and this one keeps its title.
+- Chapter: Authority
+
+#### Describing a function requires authority
+- Decides: a function is opaque: ordinary code can call it and do nothing else with it. Describing one requires authority, held through the key of the module that made the function or through an inspection right that a configuration grants. Opening a call copies the callee's body into the residual; each part of a residual stays marked with the module whose function it came from, and a description shows a part only under a right that covers that module.
+- Status: open; ruled 2026-11-15
+- Type: capability
+- Rationale kind: technical
+- Depends on: Reading an expression never yields authority; Authority is an unforgeable value; A composed function is parameters and a body
+- Significance: 5 — what keeps a module's code and what it holds from every other module
+- Label: foundational — privacy, narrowed capabilities, solvers and every tool that inspects code
+- Options recorded: any code can read an expression's structure (the ruling of 2026-11-11, reversed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it)
+- Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new as an entry of its own; ruled with values and descriptions and first written into "Reading an expression never yields authority". The maintainer's wording of the title.
 - Notes (2026-11-15, solving): the sentence on residuals is added by ruling. Without it, wrapping any function, specializing the wrapper and describing the result would read that function's body. A part the right does not cover is described as opaque.
-- Notes (2026-11-15, titles made accurate): retitled from "Reading an expression never yields authority".
 - Chapter: Authority
 
 #### A live expression is built only from live values
@@ -914,12 +927,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Describing a function is an authority; Authority is an unforgeable value; Expressions are values, forming a DAG
+- Depends on: Reading an expression never yields authority; Authority is an unforgeable value; Expressions are values, forming a DAG
 - Significance: 4 — the one way from data to something that can act
 - Label: foundational — loaders, solvers that work on a description, and every transformation of code
 - Options recorded: rebuilding a changed expression against the original under rules the kernel checks (rejected: a rebuilt part can leave out the guard that the original put around a capability)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
-- Notes: new, by ruling. With "Describing a function is an authority" it closes the path the adversarial review found: treating a live expression as data and then making part of it live again.
+- Notes: new, by ruling. With "Reading an expression never yields authority" it closes the path the adversarial review found: treating a live expression as data and then making part of it live again.
 - Chapter: Authority
 
 #### A capability is granted, never acquired
@@ -1131,22 +1144,35 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Scope is the evaluation environment, not data" and "Scope leaves the value universe". Tabled by the maintainer, with no solid use case yet and an unknown effect on unforgeability: introspection of an environment, and a tool that translates one environment into another, without adding or forging capabilities, for a program that requires a specific one.
 - Held finding (2026-11-11, DR2): a scope is a `StructureValue` with `isScope` (`src/scope.ts:36`), with five sites that exist to undo its valuehood.
-- Notes (2026-11-15, values and descriptions): no primitive inside the language makes or reads a scope. A module is a function of what it declares, a session at a prompt is a chain of functions each taking the bindings before it, and scopes exist in the kernel and at the host's interface only.
+- Notes (2026-11-15, values and descriptions): no primitive inside the language makes or reads a scope. A module is a function of its capabilities, inputs and imports, a session at a prompt is a chain of functions each taking the bindings before it, and scopes exist in the kernel and at the host's interface only.
 - Chapter: Evaluation
 
-#### An argument is evaluated when it is needed
-- Decides: no argument can be inspected. An argument is evaluated when it is needed: a composed function's arguments go into its body as written, and each is evaluated when something in the body needs its value, which in the end is a primitive function. An argument is evaluated at most once, however often the body uses it, and in the scope where it was written. An argument nothing needs is never evaluated. A function never holds a value of an expression's kind that it can look into; the one way to look inside a function is to describe it, under a right. A form that must give a branch more knowledge makes the branch a function of the names its condition tested, and applies it to values that carry the extra fact. A solver's problem is a function of its unknowns.
+#### An expression is evaluated when its value is needed
+- Decides: an expression is evaluated when something needs its value. A primitive function needs its arguments, a conditional its condition, a claim its expression, a body its statements in written order, and a caller the result it asked for. The kernel may evaluate more than is needed only where no one can tell: it performs no effect there, and a refutation stays where it arose.
+- Status: partly built (the reference kernel; it evaluates a structure's entries when the structure is built); ruled 2026-11-15
+- Type: capability
+- Rationale kind: technical
+- Depends on: One operation: partial evaluation; Evaluation is total over unresolved information
+- Significance: 5 — when anything happens
+- Label: foundational — arguments, conditionals, effects and specialization all follow from it
+- Options recorded: evaluating whatever the available information determines, needed or not (what "One operation: partial evaluation" could be read to say: it would perform effects nobody asked for)
+- Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. The maintainer asked whether "an argument is evaluated when it is needed" is a corollary of a broader rule, and the inventory had none. Open: whether a structure needs its entries. The maintainer prefers that entries are evaluated when needed too, and holds that the order of effects is to be settled another way: a way to determine the order of effects, and optionally to declare an order for particular effects, which is a topic of its own. Until then the reference kernel evaluates a structure's entries in order.
+- Chapter: Evaluation
+
+#### No argument can be inspected
+- Decides: no argument can be inspected. A composed function's arguments go into its body as written, and each is evaluated when something in the body needs its value. An argument is evaluated at most once, however often the body uses it, and in the scope where it was written. A function never holds a value of an expression's kind that it can look into; the one way to look inside a function is to describe it, under a right. A form that must give a branch more knowledge makes the branch a function of the names its condition tested, and applies it to values that carry the extra fact.
 - Status: open, a design to prove on the conditional first; ruled 2026-11-15, replacing the ruling of 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
+- Depends on: An expression is evaluated when its value is needed; Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
 - Significance: 4 — what lets control forms be built by extensions
 - Label: foundational — `if` with branch knowledge, pattern matching and every analysis of an expression rest on it
 - Options recorded: laziness as a privilege of kernel primitives (what the code does today); passing a partly evaluated form (not needed: the function asks the kernel to evaluate what it wants evaluated)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling; it replaces the `lazy` and `sourceAware` declarations of primitives. The declaration is a property of the parameter, since the kernel has no syntax. The maintainer: the function cannot know which other extensions are loaded, so that information is carried in the expression; here each part of an expression holds the function it applies, and the context stays with the expression. Use cases to work through: `if` with branch knowledge (first), pattern matching, `&&` and `||`, reading a function's body for termination, diagnostics that show an expression, rewriting by laws.
 - Notes (2026-11-15, values and descriptions): replaced by ruling. The review session first wrote it as "a delayed expression is a function, and the notation wraps it", which is needed only in a kernel that evaluates arguments before a call; the maintainer pointed out that this confused two things. Evaluating an argument when it is needed is lazy evaluation, which was always the design and raises none of the review's objections. An unevaluated argument, in the sense that was removed, is an argument of an expression's kind that the function may inspect. The old decision let a callee hand a transformed expression back to be evaluated in its caller's context, which made the context a thing to probe by name (issue 2 of the adversarial review) and stopped any rewriting of an argument passed to an unknown function (issue 3). The maintainer had suggested it for four use cases, and now sees "separate solutions for each": conditionals passing knowledge into branches (this entry); language features such as solving and grammars (functions of unknowns, and descriptions); analysis, optimisation and transforms (descriptions, under the right to describe); reporting in the terms of the original code (origins as descriptions).
-- Notes (2026-11-15, titles made accurate): retitled from "A function may take an argument unevaluated". The entry also decides that no argument can be inspected.
+- Notes (2026-11-15, titles made accurate): retitled from "A function may take an argument unevaluated". That an argument is evaluated when it is needed follows from "An expression is evaluated when its value is needed"; this entry keeps what is particular to arguments.
 - Chapter: Evaluation
 
 #### A call is evaluated by evaluating the function's body
@@ -1160,7 +1186,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: leaving a call as a residual behind its signature (rejected: it hides everything inside the callee); the two exceptions of the former rule, a recursion cycle during a typed compilation and a call inside a speculated `when` arm (replaced by the next decision and by sharing)
 - Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "PE Rule 1: residualise, but unfold composed calls", without its exceptions.
-- Notes (2026-11-15, arguments are evaluated when needed): the arguments go into the body as written and are evaluated when needed, at most once, in the scope where they were written ("An argument is evaluated when it is needed", as replaced).
+- Notes (2026-11-15, arguments are evaluated when needed): the arguments go into the body as written and are evaluated when needed, at most once, in the scope where they were written ("No argument can be inspected", as replaced).
 - Chapter: Evaluation
 
 #### A function can be specialized with its parameters unknown
@@ -1168,7 +1194,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open, a design to prove on the planning model; ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: A call is evaluated by evaluating the function's body; Evaluation is total over unresolved information; Describing a function is an authority
+- Depends on: A call is evaluated by evaluating the function's body; Evaluation is total over unresolved information; Describing a function requires authority
 - Significance: 4 — what lets Allegro code ask for the residual of a problem
 - Label: foundational — solving, claims about every value, and optimization by specialization
 - Options recorded: an argument a function can inspect, restored for solvers (rejected: the reasons it was removed stand); a primitive that asks whether a value is resolved (removed in the Part IV review)
@@ -1737,7 +1763,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (the reference kernel makes modules and keys; deriving a key from data is not built); ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; Authority is an unforgeable value; The same program and the same information give the same result; Describing a function is an authority; Trust in a value needs no seal
+- Depends on: A module is an extension that arrives as a file; Authority is an unforgeable value; The same program and the same information give the same result; Reading an expression never yields authority; Trust in a value needs no seal
 - Significance: 4 — where every unforgeable value of a program comes from
 - Label: foundational — private members, the writers of metadata fields, and anything else held by a key
 - Options recorded: making a key as an effect, performed once (rejected: it breaks determinism and the rule that only the module being run performs effects, and a saved program's keys would be restored on trust); a key identified by the place in the text where it is made (rejected: another party can read that expression and evaluate it again); a key as bits or a structure with no mark (it could be forged: its content is derived from a hash of public code); a key as an eighth kind of value (the first build; safe with nothing to get right, but a special case where the design already has the mechanism: "Trust in a value needs no seal"); a key as marked bits (would work; a structure's parts are readable, and a derived key has a natural shape); a key as a function made by the kernel
@@ -2109,7 +2135,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (the code mediates each access and asks whether the requesting scope holds a name); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Authority is an unforgeable value; Describing a function is an authority; Members are keyed by symbol and conformance is membership; A key is made with the module that holds it
+- Depends on: Authority is an unforgeable value; Reading an expression never yields authority; Members are keyed by symbol and conformance is membership; A key is made with the module that holds it
 - Significance: 4 — what a type can keep to itself
 - Label: foundational — secrecy, and the base of every access rule
 - Units: type-core
@@ -2125,7 +2151,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open, a design to prove; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A private member is one whose key not all code holds; A value's origin is a description; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; An argument is evaluated when it is needed
+- Depends on: A private member is one whose key not all code holds; A value's origin is a description; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; No argument can be inspected
 - Significance: 3 — interfaces and design discipline, checked
 - Label: swappable — the access rules a language offers
 - Options recorded: access decided by who is asking at the moment of access (rejected in Part II with authority by identity); a third mechanism for caller-based control (not needed: a key and a claim about origins combine)
@@ -2488,7 +2514,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (the code infers sets of effect labels and checks them in a pass of its own); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Describing a function is an authority; Host code reaches a program only as primitive functions
+- Depends on: A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; Reading an expression never yields authority; Host code reaches a program only as primitive functions
 - Significance: 4 — what a piece of code can touch is visible in what it holds
 - Label: foundational — safety claims about any program
 - Units: effects
@@ -2823,7 +2849,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open, a design to prove on the planning model; ruled 2026-11-12 (DR5), replaced 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function can be specialized with its parameters unknown; An argument is evaluated when it is needed; Evaluation is total over unresolved information; Describing a function is an authority
+- Depends on: Solving is proposing a value for an unknown, and the kernel checks it; A function can be specialized with its parameters unknown; No argument can be inspected; Evaluation is total over unresolved information; Reading an expression never yields authority; Describing a function requires authority
 - Significance: 4 — how a search is written as an ordinary function
 - Label: foundational — search and optimization written in Allegro, open to partial evaluation
 - Options recorded: a primitive that asks of any value whether it is resolved (`is_resolved`, removed in the Part IV review: it makes any function's behaviour depend on the phase; here only a function that declares an unevaluated argument sees a residual, and it sees it by reading an expression)
@@ -3339,7 +3365,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: capabilities "are defined abstractly (e.g. file I/O, network I/O)", mostly independent of platform, and mapped to implementations for a target.
 - Chapter: Capabilities and primitive functions
 
-#### A module is a function of what it declares
+#### A module is a function of its capabilities, inputs and imports
 - Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
@@ -3353,7 +3379,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. It needs the kernel primitive for evaluating with names rebound to supply the complete set of names (noted on "The kernel's primitives are pure and few").
 - Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open. The rule on top-level effects is the next entry.
 - Notes (2026-11-15, the rulings on strength and on identity): a reading, not yet ruled, for issue 13: a module is instantiated once for each set of arguments, and every instance shares the module's identity and keys, so the types they define are the same types.
-- Notes (2026-11-15, titles made accurate): retitled from "A module is a function of the capabilities it declares": its parameters are also its inputs and the modules it imports.
+- Notes (2026-11-15, titles made accurate): retitled from "A module is a function of the capabilities it declares": its parameters are also its inputs and the modules it imports. Its bindings are its body, not parameters: nothing a module uses from outside is ambient.
 - Chapter: Capabilities and primitive functions
 
 #### Only the module being run performs effects when instantiated
@@ -3361,7 +3387,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is a function of what it declares; Order of definition carries no meaning; The same program and the same information give the same result
+- Depends on: A module is a function of its capabilities, inputs and imports; Order of definition carries no meaning; The same program and the same information give the same result
 - Significance: 3 — importing a library never does anything
 - Label: foundational — the order in which modules are instantiated cannot be observed
 - Options recorded: any module may perform top-level effects, in dependency order, with the order among independent modules unspecified (rejected: that order would be observable); a saved program that evaluates at load (rejected: the loader loses control of when effects happen); top-level effects gathered into a function under a reserved name (the maintainer's suggestion; the module as one function is the same idea without the name)
@@ -3375,7 +3401,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is a function of what it declares; The loader reaches files through a capability; A capability has named parts and narrowed forms; Host code reaches a program only as primitive functions
+- Depends on: A module is a function of its capabilities, inputs and imports; The loader reaches files through a capability; A capability has named parts and narrowed forms; Host code reaches a program only as primitive functions
 - Significance: 4 — untrusted code has a way in that gives it nothing
 - Label: foundational — extensibility at run time, and its control
 - Options recorded: host code loaded by the launcher only (safer; it stops a program choosing its drivers); a list of allowed paths (weaker: a file can change between the check and the load)
@@ -3790,7 +3816,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): hosts are swapped by capturing output and substituting extensions; `fetch` sends a GET with no body.
 - Chapter: The launchers we ship
 
-#### A value that arrives later fills a cell
+#### A late answer or its failure fills a cell as plain data
 - Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. The standard language wraps each capability it ships so that a failure becomes an exception; another language may wrap it otherwise. A call on a capability the phase lacks stays residual; it does not fail.
 - Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
@@ -3805,7 +3831,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: was "Asynchronous host results arrive as future cells"; "Liveness of host sources declared per source" dissolves into "Completion is totality and liveness".
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
 - Notes (2026-11-13, after the adversarial review): the title is kept for now, though the launcher no longer makes the exception: a corpus file of the acceptance stream cites decisions by title, so a retitle is that stream's to coordinate. Answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
-- Notes (2026-11-15, titles made accurate): retitled from "A value that arrives later fills a cell, and a failure fills it with an exception": the launcher fills a cell with plain data, and the exception is the standard language's wrapper.
+- Notes (2026-11-15, titles made accurate): retitled from "A value that arrives later fills a cell, and a failure fills it with an exception": the launcher fills a cell with plain data, for an answer and for a failure alike, and the exception is the standard language's wrapper.
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle

@@ -11,7 +11,7 @@
 //   "Limits are step budgets"
 //   "Seven representation kinds", "A missing value is a cell that is filled once",
 //   "Host code reaches a program only as primitive functions",
-//   "A value that arrives later fills a cell"
+//   "A late answer or its failure fills a cell as plain data"
 //
 // Who calls it: host code only. A launcher, a test, an embedding
 // application, the loader of a saved program. Allegro code never sees

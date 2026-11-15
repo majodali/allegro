@@ -1520,9 +1520,11 @@ its approval.
   residual keeps the module it came from. Built in the next chunk,
   with recursion and the policy for opening calls. The inventory
   holds 237 decisions.
-- **2026-11-15 — eight decision titles made accurate** (the review
-  session), at the maintainer's request. The table is in the record
-  of the adversarial review, "Titles made accurate".
+- **2026-11-15 — decision titles made accurate** (the review
+  session), at the maintainer's request: seven retitled, two entries
+  added, 239 decisions. Open: whether a structure needs its entries,
+  and how the order of effects is determined. The table is in the
+  record of the adversarial review, "Titles made accurate".
 
 ## 8. Sessions
 
