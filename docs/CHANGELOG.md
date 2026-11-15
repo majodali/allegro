@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Identity and strength ruled; the contracts' second
+  versions (K3).** A key is made with the module that holds it: the
+  kernel hashes a module's content and makes its keys from that
+  identity, the same in every kernel. Strength says how a claim was
+  settled, and what a result rests on is recorded beside it: a claim
+  that used arithmetic is decided and names its primitives. In
+  `next/kernel/`: the interface's second version (`Kernel2`) with
+  modules, keys, `restsOn` and restore; key slots and stored outcomes
+  in the saved-program form; the reference kernel implementing both;
+  a SHA-256 checked against the standard's vectors.
 - **2026-11-15 — The reference kernel, first part (K2).**
   `next/kernel/kernel.ts` implements the kernel's interface: values of
   the seven kinds, scopes and names, cells, and the evaluation of

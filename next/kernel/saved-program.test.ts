@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Kernel, Value } from "./interface.js";
-import { check, encode, load, type SavedProgram } from "./saved-program.js";
+import { check, check2, encode, load, type SavedProgram } from "./saved-program.js";
+import { createKernel } from "./kernel.js";
 
 const ADD = "sha256:" + "ab".repeat(32);
 
@@ -113,6 +114,96 @@ test("load refuses a record whose needs the kernel lacks, before any call", () =
 
 test("load refuses a document that is not a saved program", () => {
   const { kernel, calls } = recorder();
-  assert.throws(() => load(kernel, edit((d) => (d.version = 2)) as SavedProgram, new Map()), /not a saved program/);
+  assert.throws(() => load(kernel, edit((d) => (d.version = 3)) as SavedProgram, new Map()), /not a saved program/);
   assert.deepEqual(calls, []);
+});
+
+// ---- The second version: key slots and stored outcomes -------------------
+
+// module(key, n) => claim(n == 0)   — one key slot, one input, one stored outcome.
+const EQ0 = "sha256:" + "ee".repeat(32);
+const second: SavedProgram = {
+  format: "allegro-saved-program",
+  version: 2,
+  needs: [{ hash: EQ0, name: "isZero" }],
+  nodes: [
+    { k: "param", name: "key" },
+    { k: "param", name: "n" },
+    { k: "primitive", hash: EQ0 },
+    { k: "kernel", name: "claim" },
+    { k: "expression", fn: 2, args: [1] },
+    { k: "expression", fn: 3, args: [4] },
+    { k: "structure", entries: [[null, 0], [null, 5]] },
+    { k: "function", params: [0, 1], body: 6 },
+  ],
+  module: 7,
+  declares: [{ param: 1, role: "input", name: "n" }],
+  keys: 1,
+  outcomes: [{ claim: 5, restsOn: [{ kind: "primitive", hash: EQ0, name: "isZero" }] }],
+};
+const edit2 = (f: (doc: any) => void): unknown => {
+  const doc = JSON.parse(JSON.stringify(second));
+  f(doc);
+  return doc;
+};
+
+test("the first version's check refuses a record of the second, and check2 accepts both", () => {
+  assert.deepEqual(check2(second), []);
+  assert.deepEqual(check2(good), []);
+  assert.deepEqual(check2(JSON.parse(encode(second))), []);
+  assert.match(check(second)[0], /version is not 1/);
+  assert.match(check2(edit2((d) => (d.version = 3))).join(), /version is not 1 or 2/);
+  assert.match(check2(edit((d) => (d.keys = 0))).join(), /unknown key "keys"/, "a first-version record has no key slots");
+});
+
+test("key slots are a count of the module function's first parameters, and are not declared", () => {
+  assert.match(check2(edit2((d) => (d.keys = 3))).join(), /keys is not a count/);
+  assert.match(check2(edit2((d) => (d.keys = 0))).join(), /one entry for each parameter/);
+  assert.match(check2(edit2((d) => d.nodes.splice(1, 0, { k: "key", module: "x", slot: 0 }))).join(), /not a node of a known kind/, "a record never holds a key");
+});
+
+test("a stored outcome names a claim, and never rests on a capability", () => {
+  assert.match(check2(edit2((d) => (d.outcomes[0].claim = 4))).join(), /does not refer to an application of the kernel primitive "claim"/);
+  assert.match(check2(edit2((d) => d.outcomes[0].restsOn.push({ kind: "capability", capability: "http", part: "get" }))).join(), /never stored/);
+  assert.match(check2(edit2((d) => d.outcomes[0].restsOn.push({ kind: "rumour" }))).join(), /not something a result rests on/);
+});
+
+function loaded(restoreAs?: string) {
+  const k = createKernel();
+  let ran = 0;
+  const isZero = k.primitiveFunction({ purity: "pure", hash: EQ0, name: "isZero", arity: 1, run: (a, c) => (ran++, c.bits(Uint8Array.of(c.bitsOf(a[0]).bytes[0] === 0 ? 1 : 0), 1)) });
+  const moduleFn = load(k, second, new Map([[EQ0, isZero]]), restoreAs === undefined ? {} : { restoreAs });
+  const result = k.evaluate(k.expression(moduleFn, [k.bits(Uint8Array.of(7))]), k.scope());
+  return { k, moduleFn, result, ran: () => ran };
+}
+
+test("loading makes the module's keys from its content: the same in every kernel", () => {
+  const a = loaded();
+  const b = loaded();
+  const keyA = a.k.keyOf(a.k.entriesOf(a.k.evaluate(a.k.expression(a.moduleFn, [a.k.bits(Uint8Array.of(0))]), a.k.scope()).value)[0][1]);
+  const keyB = b.k.keyOf(b.k.entriesOf(b.k.evaluate(b.k.expression(b.moduleFn, [b.k.bits(Uint8Array.of(0))]), b.k.scope()).value)[0][1]);
+  assert.deepEqual(keyA, keyB);
+  assert.equal(keyA.slot, 0);
+  assert.match(keyA.module, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(a.k.moduleOf(a.moduleFn), keyA.module);
+});
+
+test("without a builder named, a stored outcome is ignored and the claim is decided again", () => {
+  const { result, ran } = loaded();
+  assert.equal(result.refuted, true, "7 is not zero, whatever the record says");
+  assert.equal(ran(), 1);
+});
+
+test("with a builder named, a stored outcome is restored: not evaluated, and resting on that builder", () => {
+  const { k, result, ran } = loaded("build-server");
+  assert.equal(result.refuted, false);
+  assert.equal(ran(), 0, "the claim was not evaluated again");
+  const claim = k.entriesOf(result.value)[1][1];
+  assert.equal(k.outcomeOf(claim), "decided");
+  assert.deepEqual(k.restsOn(claim), [{ kind: "builder", builder: "build-server" }, { kind: "primitive", hash: EQ0, name: "isZero" }]);
+});
+
+test("a record with key slots does not load on a kernel of the first version", () => {
+  const { kernel } = recorder();
+  assert.throws(() => load(kernel, second, new Map([[EQ0, {} as Value]])), /key slots, and this kernel is of the first version/);
 });

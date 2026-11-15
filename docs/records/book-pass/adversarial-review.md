@@ -391,7 +391,43 @@ bound is a cell, in "A missing value is a cell that is filled once".
 has its own entry, the acceptance stream having loosened the test
 that pinned the decision map's row count.
 
+**On PR #214, 2026-11-15.** The maintainer merged the reference
+kernel's first part and signed milestone 1. Confirmed with it: the
+truth values are the bits of length one; the kernel primitives `if`,
+`claim` and `quote`; a structure's entries are evaluated in order.
+
+**Strength, issues 8 to 10, ruled 2026-11-15.** "Agreed on both
+rulings." Strength says how the claim itself was settled; what a
+result rests on is recorded beside it and never changes the word.
+
+- Decided means a kernel evaluated the claim, on the values in hand,
+  and it came out true. Assumed means someone stated it and no kernel
+  evaluated it.
+- The weakest-link rule applies among claims only. A claim that used
+  a pure primitive stays decided and names it (issue 9).
+- A claim evaluated on a capability's answer is decided, about that
+  answer, and names the capability; a claim a solver merely vouches
+  for is assumed (issue 8). Lowering every result that used a
+  capability to assumed was rejected: a program that reads a number
+  and checks it has truly checked that number.
+- A restored outcome keeps the word its builder's kernel recorded and
+  names the builder. An outcome that rests on a capability's answer
+  is never stored (issue 10).
+
+**Identity, issues 11 and 12, ruled 2026-11-15.** "A key is made
+with the module that holds it." The kernel derives a module's
+identity from its content, and its keys from that identity. A saved
+program records key slots, never keys. Rejected: making a key as an
+effect; a key identified by the place in the text where it is made.
+A key is an eighth kind of value. Not ruled, and noted as a reading
+on the module decision: issue 13, a module instantiated once for each
+set of arguments, every instance sharing the module's identity and
+keys.
+
 ## Terms introduced
 
+- **Rests on**: what a result's evaluation used that the kernel did
+  not itself evaluate.
+- **Key slot**: a place in a module where one of its keys goes.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.

@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Kernel, PrimitiveDeclaration, Value } from "./interface.js";
-import { createKernel, InterfaceError, refutationOf } from "./kernel.js";
+import { createKernel, InterfaceError } from "./kernel.js";
 import { load, type SavedProgram } from "./saved-program.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
@@ -202,7 +202,7 @@ test("\"if\" evaluates only the branch taken, and waits when the condition is un
   assert.equal(ran, 0);
   const r3 = k.evaluate(call(kp("if"), byte(k, 1), byte(k, 1), byte(k, 2)), scope);
   assert.equal(r3.refuted, true, "a byte is not a truth value");
-  assert.match(refutationOf(k, r3.value) ?? "", /neither true nor false/);
+  assert.match(k.reasonOf(r3.value) ?? "", /neither true nor false/);
 });
 
 test("a claim is decided, refuted or left waiting, and only the kernel records which", () => {
@@ -230,14 +230,14 @@ test("a refutation marks everything computed from it", () => {
   const f = k.composedFunction([x], call(add, x, byte(k, 1)));
   const r = k.evaluate(k.structure([[null, call(f, call(kp("claim"), call(isZero, byte(k, 1))))]]), k.scope());
   assert.equal(r.refuted, true);
-  assert.match(refutationOf(k, r.value) ?? "", /claim that is not true/);
+  assert.match(k.reasonOf(r.value) ?? "", /claim that is not true/);
 });
 
 test("a call on something that is not a function, or with the wrong number of arguments, is a refutation", () => {
   const { k, add, call } = setup();
   const r = k.evaluate(call(byte(k, 1), byte(k, 2)), k.scope());
   assert.equal(r.refuted, true);
-  assert.match(refutationOf(k, r.value) ?? "", /not a function/);
+  assert.match(k.reasonOf(r.value) ?? "", /not a function/);
   assert.equal(k.evaluate(call(add, byte(k, 1)), k.scope()).refuted, true);
   assert.equal(k.evaluate(call(k.composedFunction([], byte(k, 1)), byte(k, 2)), k.scope()).refuted, true);
 });
@@ -353,4 +353,109 @@ test("with an empty ceiling the launcher refuses the same program, and the kerne
   });
   assert.equal(outcome.end.kind, "refused");
   assert.deepEqual(outcome.lines, []);
+});
+
+// ---- The second version: modules, keys, what a result rests on, restore ----
+
+test("a module's identity is its content: the same in every kernel, whatever its parameters are called", () => {
+  const make = (names: [string, string]) => {
+    const { k, add, call } = setup();
+    const [key, n] = [k.param(names[0]), k.param(names[1])];
+    const m = k.module(k.composedFunction([key, n], k.structure([[null, key], [null, call(add, n, byte(k, 1))]])), 1);
+    return { k, m, id: k.moduleOf(m) as string };
+  };
+  const a = make(["key", "n"]);
+  const b = make(["k2", "input"]);
+  assert.match(a.id, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(a.id, b.id);
+  const other = setup();
+  const [key, n] = [other.k.param("key"), other.k.param("n")];
+  const changed = other.k.module(other.k.composedFunction([key, n], other.k.structure([[null, key], [null, other.call(other.add, n, byte(other.k, 2))]])), 1);
+  assert.notEqual(other.k.moduleOf(changed), a.id, "other content, other identity, other keys");
+  assert.equal(a.k.composedFunctionOf(a.m).params.length, 1, "the key slot is no longer a parameter");
+});
+
+test("a module's keys are made from its identity, one for each slot", () => {
+  const { k, call } = setup();
+  const [k0, k1] = [k.param("k0"), k.param("k1")];
+  const m = k.module(k.composedFunction([k0, k1], k.structure([[null, k0], [null, k1]])), 2);
+  const made = k.entriesOf(k.evaluate(call(m), k.scope()).value).map(([, v]) => v);
+  assert.deepEqual(made.map((v) => k.kind(v)), ["key", "key"]);
+  assert.deepEqual(made.map((v) => k.keyOf(v).slot), [0, 1]);
+  assert.equal(k.keyOf(made[0]).module, k.moduleOf(m));
+  assert.notEqual(made[0], made[1]);
+  const again = k.entriesOf(k.evaluate(call(k.module(k.composedFunction([k0, k1], k.structure([[null, k0], [null, k1]])), 2)), k.scope()).value);
+  assert.equal(again[0][1], made[0], "the same module gives the same key, not a new one");
+  assert.throws(() => k.keyOf(byte(k, 1)), InterfaceError);
+  assert.equal(k.moduleOf(k.composedFunction([], byte(k, 1))), undefined);
+});
+
+test("a module must be closed: no cell, no stray parameter, no effectful primitive", () => {
+  const { k, call } = setup();
+  const p = k.param("p");
+  const write = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (_a, c) => c.structure([]) });
+  assert.throws(() => k.module(k.composedFunction([p], k.cell()), 0), /not closed/);
+  assert.throws(() => k.module(k.composedFunction([], p), 0), /belongs to no function/);
+  assert.throws(() => k.module(k.composedFunction([p], call(write, p)), 0), /capability reaches a module as an argument/);
+  assert.throws(() => k.module(k.composedFunction([p], p), 2), /does not fit/);
+  assert.throws(() => k.module(byte(k, 1), 0), /not a composed function/);
+});
+
+test("a decided claim says what it rests on, and the word stays \"decided\"", () => {
+  const { k, add, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const r = k.evaluate(call(kp("claim"), call(isZero, call(add, byte(k, 0), byte(k, 0)))), scope);
+  assert.equal(k.outcomeOf(r.value), "decided");
+  assert.deepEqual(k.restsOn(r.value).map((x) => (x.kind === "primitive" ? x.name : x.kind)), ["kernel", "add", "isZero"], "in the order they ran");
+  const plain = k.evaluate(call(kp("claim"), truth(k, true)), scope);
+  assert.deepEqual(k.restsOn(plain.value), [{ kind: "kernel", variant: k.variant }]);
+  assert.deepEqual(k.restsOn(byte(k, 1)), []);
+});
+
+test("a claim on a capability's answer is decided about that answer, and names the capability", () => {
+  const { k, isZero, call, kp } = setup();
+  let pending: Value | undefined;
+  const ask = k.primitiveFunction({ purity: "effectful", capability: "http", part: "get", arity: 0, run: (_a, c) => (pending = c.cell()) });
+  const r = k.evaluate(call(kp("claim"), call(isZero, call(ask))), k.scope());
+  assert.equal(k.outcomeOf(r.value), "undecided");
+  k.fill(pending as ReturnType<Kernel["cell"]>, byte(k, 0));
+  k.advance();
+  const now = k.current(r.value);
+  assert.equal(k.outcomeOf(now), "decided");
+  assert.ok(k.restsOn(now).some((x) => x.kind === "capability" && x.capability === "http" && x.part === "get"));
+});
+
+test("what a binding's value rested on is kept with it", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const z = k.symbol("m.z");
+  k.bind(scope, z, call(isZero, byte(k, 0)));
+  k.evaluate(z, scope);
+  const r = k.evaluate(call(kp("claim"), z), scope);
+  assert.ok(k.restsOn(r.value).some((x) => x.kind === "primitive" && x.name === "isZero"), "though the binding was not evaluated again");
+});
+
+test("restore records an outcome under a builder's name, and in no other way", () => {
+  const { k, isZero, call, kp } = setup();
+  const claim = call(kp("claim"), call(isZero, byte(k, 5)));
+  assert.equal(k.evaluate(claim, k.scope()).refuted, true);
+  const stored = call(kp("claim"), call(isZero, byte(k, 5)));
+  k.restore(stored, "team-build", []);
+  const r = k.evaluate(stored, k.scope());
+  assert.equal(k.outcomeOf(r.value), "decided");
+  assert.deepEqual(k.restsOn(r.value), [{ kind: "builder", builder: "team-build" }]);
+  const outer = k.evaluate(call(kp("claim"), stored), k.scope());
+  assert.ok(k.restsOn(outer.value).some((x) => x.kind === "builder"), "what rests on a restored outcome names the builder too");
+  assert.throws(() => k.restore(stored, "", []), /under a builder's name/);
+  assert.throws(() => k.restore(call(isZero, byte(k, 0)), "b", []), /claim primitive/);
+  assert.throws(() => k.restore(stored, "b", [{ kind: "capability", capability: "http", part: "get" }]), /never stored/);
+});
+
+test("isCell tells a cell and a waiting name from other values", () => {
+  const { k, add, call } = setup();
+  const c = k.cell();
+  assert.equal(k.isCell(c), true);
+  assert.equal(k.isCell(byte(k, 1)), false);
+  k.evaluate(call(add, k.symbol("m.later"), byte(k, 1)), k.scope());
+  assert.equal(k.isCell(k.waiting()[0]), true);
 });

@@ -1,4 +1,4 @@
-// The data form of a saved program, first version.
+// The data form of a saved program, first and second versions.
 //
 // One of the three contracts between the two streams of the rebuild
 // (docs/plans/rebuild.md §8 rule 2): a change to this file is a pull
@@ -23,20 +23,33 @@
 // line so two records can be compared line by line; any JSON layout is
 // valid.
 //
-// Left out of the first version, each to return as an addition (the
-// rulings of 2026-11-13, docs/records/book-pass/adversarial-review.md):
-//   - claim outcomes: every claim of a loaded program is decided again;
-//   - keys: a program that makes an unforgeable value of its own cannot
-//     be saved in this form yet;
-//   - origins: a loaded value's origin starts at the saved program;
-//   - metadata fields: an extension's fields are rebuilt when the
-//     module's body is evaluated, by the extension's own constructors;
-//   - the host-code form.
+// The second version adds two things, after the rulings of 2026-11-15
+// on identity and on strength
+// (docs/records/book-pass/adversarial-review.md, issues 8 to 12):
+//   - `keys`: how many of the module function's first parameters are key
+//     slots. A record never holds a key. Loading has the kernel make the
+//     module's keys from the content of the function, so the same record
+//     gives the same keys in every kernel, and no other record gives
+//     them.
+//   - `outcomes`: claims the builder's kernel decided, each with what it
+//     rested on. They are restored only when whoever loads the record
+//     names its builder; otherwise they are ignored and every claim is
+//     decided again. An outcome that rests on a capability's answer is
+//     never stored.
+// A record of the first version is still a saved program: it has no key
+// slots and no outcomes.
+//
+// Still left out: origins (a loaded value's origin starts at the saved
+// program), metadata fields (an extension's fields are rebuilt when the
+// module's body is evaluated, by the extension's own constructors), and
+// the host-code form.
 
-import type { Kernel, Value } from "./interface.js";
+import type { Kernel, Kernel2, Rest, Value } from "./interface.js";
 
 export const SAVED_PROGRAM_FORMAT = "allegro-saved-program";
 export const SAVED_PROGRAM_VERSION = 1;
+/** The version of a record with key slots or outcomes. `check2` accepts this and the first. */
+export const SAVED_PROGRAM_VERSION_2 = 2;
 
 /** A reference to a node: its index in `nodes`. A node refers only to nodes before it. */
 export type Ref = number;
@@ -78,17 +91,32 @@ export interface Declared {
   readonly name: string;
 }
 
+/** A claim the builder's kernel decided. */
+export interface StoredOutcome {
+  /** The claim: an expression node that applies the kernel primitive "claim". */
+  readonly claim: Ref;
+  /** What it rested on. Never a capability. */
+  readonly restsOn: readonly Rest[];
+}
+
 export interface SavedProgram {
   readonly format: typeof SAVED_PROGRAM_FORMAT;
-  readonly version: typeof SAVED_PROGRAM_VERSION;
+  readonly version: 1 | 2;
   /** The pure primitive functions this record needs, each once. */
   readonly needs: readonly Need[];
   /** The values, each referring only to earlier ones. */
   readonly nodes: readonly Node[];
   /** The module function: a function node. */
   readonly module: Ref;
-  /** One entry for each parameter of the module function, in the function's order. */
+  /**
+   * One entry for each parameter of the module function after its key
+   * slots, in the function's order.
+   */
   readonly declares: readonly Declared[];
+  /** Second version: how many of the module function's first parameters are key slots. Absent means none. */
+  readonly keys?: number;
+  /** Second version: the claims the builder's kernel decided. Absent means none. */
+  readonly outcomes?: readonly StoredOutcome[];
 }
 
 const HASH = /^sha256:[0-9a-f]{64}$/;
@@ -103,7 +131,8 @@ const NODE_KEYS: Record<Node["k"], readonly string[]> = {
   kernel: ["k", "name"],
   primitive: ["k", "hash"],
 };
-const TOP_KEYS = ["format", "version", "needs", "nodes", "module", "declares"];
+const TOP_KEYS_1 = ["format", "version", "needs", "nodes", "module", "declares"];
+const TOP_KEYS_2 = [...TOP_KEYS_1, "keys", "outcomes"];
 
 function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null && !Array.isArray(x);
@@ -114,17 +143,30 @@ function extraKeys(o: Record<string, unknown>, allowed: readonly string[]): stri
 }
 
 /**
- * Checks a parsed JSON document against the data form. Returns the
- * findings, one sentence each; an empty list means the document is a
- * saved program of this version. It checks the record alone: whether a
- * kernel has the primitives it needs is `load`'s to find.
+ * Checks a parsed JSON document against the first version of the data
+ * form. Returns the findings, one sentence each; an empty list means the
+ * document is a saved program of the first version. A record of the
+ * second version is refused here, by its version: a caller that can load
+ * one uses `check2`.
  */
 export function check(doc: unknown): string[] {
+  const findings = check2(doc).map((f) => (f === "version is not 1 or 2" ? "version is not 1" : f));
+  if (isObject(doc) && doc.version === 2) findings.unshift("version is not 1");
+  return findings;
+}
+
+/**
+ * Checks a parsed JSON document against the data form, first or second
+ * version. Returns the findings, one sentence each; an empty list means
+ * the document is a saved program. It checks the record alone: whether a
+ * kernel has the primitives it needs is `load`'s to find.
+ */
+export function check2(doc: unknown): string[] {
   const out: string[] = [];
   if (!isObject(doc)) return ["the document is not an object"];
   if (doc.format !== SAVED_PROGRAM_FORMAT) out.push(`format is not "${SAVED_PROGRAM_FORMAT}"`);
-  if (doc.version !== SAVED_PROGRAM_VERSION) out.push(`version is not ${SAVED_PROGRAM_VERSION}`);
-  for (const key of extraKeys(doc, TOP_KEYS)) out.push(`unknown key "${key}"`);
+  if (doc.version !== 1 && doc.version !== 2) out.push("version is not 1 or 2");
+  for (const key of extraKeys(doc, doc.version === 2 ? TOP_KEYS_2 : TOP_KEYS_1)) out.push(`unknown key "${key}"`);
 
   const needed = new Set<string>();
   if (!Array.isArray(doc.needs)) out.push("needs is not a list");
@@ -223,7 +265,14 @@ export function check(doc: unknown): string[] {
     out.push("module does not refer to a function node");
     return out;
   }
-  const params = (nodes[m] as { params?: unknown }).params;
+  const all = (nodes[m] as { params?: unknown }).params;
+  let keyCount = 0;
+  if (doc.keys !== undefined) {
+    if (typeof doc.keys !== "number" || !Number.isInteger(doc.keys) || doc.keys < 0 || !Array.isArray(all) || doc.keys > all.length)
+      out.push("keys is not a count of the module function's first parameters");
+    else keyCount = doc.keys;
+  }
+  const params = Array.isArray(all) ? all.slice(keyCount) : all;
   if (!Array.isArray(doc.declares)) out.push("declares is not a list");
   else if (Array.isArray(params)) {
     if (doc.declares.length !== params.length) out.push("declares does not have one entry for each parameter of the module function");
@@ -236,7 +285,38 @@ export function check(doc: unknown): string[] {
       for (const key of extraKeys(d, ["param", "role", "name"])) out.push(`declares[${i}] has unknown key "${key}"`);
     });
   }
+  if (doc.outcomes !== undefined) {
+    if (!Array.isArray(doc.outcomes)) out.push("outcomes is not a list");
+    else
+      doc.outcomes.forEach((o, i) => {
+        if (!isObject(o) || !Array.isArray(o.restsOn)) {
+          out.push(`outcomes[${i}] is not {claim, restsOn}`);
+          return;
+        }
+        for (const key of extraKeys(o, ["claim", "restsOn"])) out.push(`outcomes[${i}] has unknown key "${key}"`);
+        const c = typeof o.claim === "number" && Number.isInteger(o.claim) ? (nodes[o.claim] as Record<string, unknown> | undefined) : undefined;
+        const fn = c !== undefined && c.k === "expression" && typeof c.fn === "number" ? (nodes[c.fn] as Record<string, unknown> | undefined) : undefined;
+        if (fn === undefined || fn.k !== "kernel" || fn.name !== "claim") out.push(`outcomes[${i}].claim does not refer to an application of the kernel primitive "claim"`);
+        o.restsOn.forEach((r, j) => {
+          const where = `outcomes[${i}].restsOn[${j}]`;
+          if (!isObject(r)) out.push(`${where} is not something a result rests on`);
+          else if (r.kind === "capability") out.push(`${where} is a capability: an outcome that rests on a capability's answer is never stored`);
+          else if (r.kind === "kernel" ? typeof r.variant !== "string" : r.kind === "primitive" ? typeof r.hash !== "string" || typeof r.name !== "string" : r.kind === "builder" ? typeof r.builder !== "string" : true)
+            out.push(`${where} is not something a result rests on`);
+        });
+      });
+  }
   return out;
+}
+
+/** How a saved program is loaded. */
+export interface LoadOptions {
+  /**
+   * The builder whose word the stored outcomes are restored on. Named by
+   * whoever loads the record, never by the record. Absent: the outcomes
+   * are ignored and every claim is decided again.
+   */
+  readonly restoreAs?: string;
 }
 
 function fromHex(hex: string): Uint8Array {
@@ -254,9 +334,15 @@ function fromHex(hex: string): Uint8Array {
  * `primitives` holds the pure primitive functions the caller has made in
  * this kernel, by content hash. A need it does not hold is an error: a
  * saved program never runs against something else.
+ *
+ * A record with key slots or with outcomes to restore needs a kernel of
+ * the second version: the kernel makes the module and its keys from the
+ * function's content, and records each restored outcome under the
+ * builder's name. On a kernel of the first version such a record is an
+ * error; a record without them loads on either.
  */
-export function load(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): Value {
-  const findings = check(doc);
+export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>, options: LoadOptions = {}): Value {
+  const findings = check2(doc);
   if (findings.length > 0) throw new Error(`not a saved program: ${findings.join("; ")}`);
   for (const need of doc.needs)
     if (!primitives.has(need.hash)) throw new Error(`the kernel lacks the primitive ${need.name} (${need.hash})`);
@@ -289,7 +375,15 @@ export function load(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<
         break;
     }
   }
-  return values[doc.module];
+  const restoring = options.restoreAs !== undefined && (doc.outcomes?.length ?? 0) > 0;
+  if (!("module" in kernel)) {
+    if ((doc.keys ?? 0) > 0) throw new Error("the saved program has key slots, and this kernel is of the first version");
+    if (restoring) throw new Error("the saved program has outcomes to restore, and this kernel is of the first version");
+    return values[doc.module];
+  }
+  if (restoring) for (const o of doc.outcomes ?? []) kernel.restore(values[o.claim], options.restoreAs as string, o.restsOn);
+  if (doc.version === 1) return values[doc.module];
+  return kernel.module(values[doc.module], doc.keys ?? 0);
 }
 
 /** Writes a saved program as JSON, one node to a line. */
@@ -303,7 +397,8 @@ export function encode(doc: SavedProgram): string {
     doc.nodes.map((n) => JSON.stringify(n)).join(",\n"),
     "],",
     `"module": ${doc.module},`,
-    `"declares": ${JSON.stringify(doc.declares)}`,
+    `"declares": ${JSON.stringify(doc.declares)}` + (doc.version === 2 ? "," : ""),
+    ...(doc.version === 2 ? [`"keys": ${doc.keys ?? 0},`, `"outcomes": ${JSON.stringify(doc.outcomes ?? [])}`] : []),
     "}",
   ];
   return lines.join("\n") + "\n";
