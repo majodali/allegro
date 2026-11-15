@@ -25,10 +25,15 @@ names it with "(held)".
 2. **Does.** Calls `solve(SoftwareRelease)`. **Must find.** Each
    resolution is a proposal the kernel checks ("Solving is proposing a
    value for an unknown, and the kernel checks it"). That a resolution
-   is feasible is decided. The best by the bound's effort, then its
-   duration, is Quick and Direct: 20.75 person-hours, 1460 min. That it
-   is best is decided, since all four resolutions were evaluated
-   ("Feasible is decided; best says how strongly it holds"). The
+   is feasible is decided. `solve` reads the residual of the template
+   with its choices unknown, and the enumeration of today's library is
+   not ported (the maintainer's ruling of 2026-11-15 on question 4). The
+   best by the objective, which the caller may supply and whose default
+   is the library's, the bound's effort then its duration (planning
+   specification §11, question 7), is Quick and Direct: 20.75
+   person-hours, 1460 min. That it is best is decided, since the search
+   exhausts the space ("Feasible is decided; best says how strongly it
+   holds"; planning specification §5). The
    solution's plan is a `WellFormedPlan`: its predicate, called as an
    ordinary function, answers true (ruling 4 of 2026-11-15).
 3. **Does.** Sets a deadline of 23 h. **Must find.** The answer moves to
@@ -37,7 +42,12 @@ names it with "(held)".
    in Production.
 4. **Does.** Sets a deadline of 20 h. **Must find.** No resolution fits.
    The failure names the cheapest resolution, Quick and Direct, and the
-   measure it misses: 1460 min against 20 h. Its kind is question 1.
+   measure it misses: 1460 min against 20 h. The search raises an
+   exception the caller may handle, carrying that counterexample
+   (planning specification §7). A search that finds nothing is an
+   outcome the program reports, not a failed check, so it is
+   consistent with ruling 3. This follows: the program handles the
+   exception and prints its message.
 5. **Does.** Builds `fulfil`, whose declared outcome Delivered nothing
    produces, and asks `gaps_show`. **Must find.** The gap is the finding
    the checks already make: Delivered, which the plan declares
@@ -45,12 +55,15 @@ names it with "(held)".
 6. **Does.** Calls `solve_from(fulfil, parts)`. **Must find.** The
    catalog fills the gap by chaining backward: Delivered from LastMile,
    Shipped from Ship, Labelled from Label, Label via PrintLabel; 1.75
-   person-hours, 235 min. The strength of "best" here is question 2.
+   person-hours, 235 min. "Best" is decided when the search exhausts
+   the space; otherwise it is sampled or assumed, and named (planning
+   specification §5).
 7. **Does.** Sets a deadline of 220 min. **Must find.** The answer moves
    to Courier: 2 person-hours, 200 min.
 8. **Does.** Calls `solve_from` with a catalog that cannot ship.
    **Must find.** A failure that names where the search stopped: nothing
-   produces Shipped, which LastMile needs. Its kind is question 1.
+   produces Shipped, which LastMile needs. It is an exception carrying
+   that counterexample, as in step 4.
 
 ## Break it
 
@@ -64,8 +77,17 @@ halts before output here.
 ## What changes by ruling
 
 - "The standard language's handled failure is an exception": pins 162
-  and 194 read an error value with `error of`. The error value is gone;
-  what replaces it is question 1.
+  and 194 read an error value with `error of`. The error value is gone.
+  The search raises an exception carrying the counterexample (planning
+  specification §7), which the program handles.
+- The maintainer's ruling of 2026-11-15 on question 4: milestone 7
+  requires `solve` to read a residual over its unknowns ("A solver sees
+  its problem unevaluated"), and the enumeration is not ported.
+  Milestone 7 waits on the kernel stream for a way to implement general
+  solvers, since that stream has reversed "A function may take an
+  argument unevaluated". The maintainer takes it to the kernel stream.
+  This stream follows when the reversal lands in the inventory: the
+  planning specification's §5 cites that decision as a need.
 - "Feasible is decided; best says how strongly it holds": today a
   solution carries no strength for being best. The solution states that
   it is feasible, decided, and how strongly it is best.
@@ -84,26 +106,17 @@ halts before output here.
 
 ## Open questions
 
-No question of this scene is settled by the rulings of 2026-11-15.
-
-1. When no resolution or completion fits (pins 162 and 194), does the
-   search raise an exception, or answer a value that names the failure?
-   Recommended: an exception the caller may handle, carrying the
-   counterexample, as the planning specification has it
-   (`next/models/specs/planning.md` §7, ruled at PR #202). A search
-   failure is not a failed check, so ruling 3's "not catchable" does not
-   reach it.
-2. `solve_from` chains catalog nodes backward to a fixed depth. Is its
-   best completion decided, because the depth exhausts the catalog, or
-   sampled? Recommended: decided where the depth exhausts the catalog,
-   and the result says so; otherwise sampled.
-3. "Best" is ordered by effort, then duration. Is that order the
-   library's, or must a plan state what it optimises? Recommended: the
-   library's default, which a plan may override.
-4. "A solver sees its problem unevaluated" is a design to prove. Must
-   milestone 7's `solve` read a residual over unknowns, or may it keep
-   enumerating a template value as today? Recommended: enumeration is
-   enough for milestone 7; the residual is a later milestone's.
+None. Settled by the planning specification
+(`next/models/specs/planning.md`, ruled at PR #202), as confirmed in
+the session of 2026-11-15: question 1, a search that finds nothing
+(§7: an exception the caller may handle, carrying the counterexample);
+question 2, the strength of `solve_from`'s best (§5: decided when the
+space is exhausted, otherwise sampled or assumed, and named); question
+3, whose order "best" follows (§11, question 7: a value the caller
+supplies, the library's as the default). Question 4, whether `solve`
+must read a residual, the maintainer ruled in words on 2026-11-15:
+"Let's go with option 1 and assume we'll get a solution shortly." The
+residual design is required, and enumeration is not ported.
 
 ## Present pins
 

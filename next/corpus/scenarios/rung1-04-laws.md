@@ -15,10 +15,13 @@ also want a wrong equality caught with a counterexample.
 
 1. **Does.** States `theorem t_int: 1 == 1 by proof_trans(proof_refl(1),
    proof_refl(1))` and binds the same term to `p`. **Must find.** The
-   claim holds, decided by evaluation. The proof records Int equality
-   and the strength of its transitivity law: assumed, with the platform
-   named as the author of the assumption (ruling 5 of 2026-11-15). The
-   run prints that strength, assumed.
+   claim holds, decided by evaluation (ruling N of 2026-11-15, round
+   3). The proof records Int equality and the strength of its
+   transitivity law: assumed, with the platform named as the author of
+   the assumption (ruling 5). Binding `p` makes no claim: it is a
+   proposal attached to nothing, listed nowhere and checked by nothing
+   (ruling G). This follows: the run prints the strength the value `p`
+   records, assumed.
 2. **Does.** Declares `Cell`, drawing `Equatable` with its own `eq`,
    `self.x == other.x` over an Int field, and `v = Cell(1)`. **Must
    find.** Three law claims for `Cell`: refl, sym and trans ("Lawful
@@ -30,14 +33,16 @@ also want a wrong equality caught with a counterexample.
 3. **Does.** Calls `Law.assume(Cell, "trans")`. **Must find.** Cell's
    transitivity law has the strength assumed, on the record ("An
    assumption is always on the record") with the file as its author.
-   Whether the deriver also attempts it is question 2; the strength is
-   assumed either way.
+   The deriver does not attempt a law the author has assumed; it spends
+   its budget on undecided claims only (ruling O).
 4. **Does.** States `theorem t_cell: v == v by
    proof_trans(proof_refl(v), proof_refl(v))` and binds the term to `q`.
    **Must find.** The transitivity rule accepts the term because the law
-   is assumed. The proof takes the strength assumed, since a result
-   resting on a weaker result takes the weaker strength. It names the
-   assumptions it rests on. The run prints assumed.
+   is assumed. The claim `v == v` is decided, since evaluation decides
+   it (ruling N). The proof takes the strength assumed, since a result
+   resting on a weaker result takes the weaker strength, and names the
+   assumptions it rests on. `q`, like `p`, is no claim (ruling G). The
+   run prints the strength `q` records, assumed.
 5. **Does.** Declares `Cell2` over a Bool field and calls
    `Law.witness(Cell2, "refl", prove_for_all_bool(b => b == b))`.
    **Must find.** Cell2's refl law is decided, by enumerating Bool. This
@@ -46,8 +51,8 @@ also want a wrong equality caught with a counterexample.
    they are decided too.
 6. **Does.** Runs `verify`. **Must find.** Each law with its strength
    and what it rests on: Cell's three assumed, resting on Int's; Cell2's
-   three decided. `t_cell` and `q` assumed, resting on Cell's trans. The
-   standard types' laws as in scene 1. This follows: no claim is left
+   three decided. `t_int` and `t_cell` decided. `p` and `q` are not
+   listed (ruling G). The standard types' laws as in scene 1. This follows: no claim is left
    undecided, so the module's summary, the weakest strength among its
    claims, is assumed.
 7. **Does.** Prints `"laws carry their strength"`. **Must find.** The
@@ -86,8 +91,9 @@ before any effect, so the run prints nothing.
   equality.
 - "Every result says how strongly it holds": `verify` marks `t_cell`
   and `q` discharged with a note that they rest on an admitted law.
-  Their strength is assumed. The heading reads "verified" while four
-  laws wait.
+  `t_cell` is decided by evaluation (ruling N), and its proof records
+  the assumed law. `q` is not listed (ruling G). The heading reads
+  "verified" while four laws wait.
 - "A module's summary is the weakest strength among its claims": the
   grade `proven-safe` becomes assumed (this follows, step 6).
 - "Anyone may propose, and the record shows who": the verdict credits
@@ -97,22 +103,17 @@ before any effect, so the run prints nothing.
 
 ## Open questions
 
-Settled: question 1 of the draft, a refused `by` term on a claim that
-holds by evaluation (ruling 2). Question 3, whether Cell's refl and
-sym are decided (ruling 5: the standard deriver derives them, assumed
-while Int's laws are). Question 4, the strength of Int equality's
-transitivity in pin 10 (ruling 5: assumed).
-
-1. `p` and `q` are proof values bound without `theorem`. The verdict
-   lists them as theorems. Is binding a proof value a claim ("Nothing is
-   a claim until someone makes it")? Recommended: no. A proof value is a
-   value that carries the record of what it rests on, and the result
-   lists it as a value, not as a claim.
-2. New with ruling 5: the standard deriver runs for each claim still
-   undecided after evaluation. Does it attempt a law the file has
-   assumed, such as Cell's transitivity after `Law.assume`? Recommended:
-   no, since an assumed claim is not undecided. Here the strength is
-   assumed either way. In rung 2, scene 3, pin 32 follows the answer.
+None. Settled: question 1 of the draft, a refused `by` term on a claim
+that holds by evaluation (ruling 2). Question 3, whether Cell's refl
+and sym are decided (ruling 5: the standard deriver derives them,
+assumed while Int's laws are). Question 4, the strength of Int
+equality's transitivity in pin 10 (ruling 5: assumed). Ruled
+2026-11-15, round 3: question 2, whether binding a proof value is a
+claim (ruling G: no; it is a proposal attached to nothing until someone
+uses it as the `by` of a claim). The question new with ruling 5,
+whether the deriver attempts a law the author has assumed (ruling O:
+no; a tool may offer, when asked, an audit of assumptions the deriver
+could replace).
 
 ## Present pins
 

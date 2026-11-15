@@ -1137,6 +1137,10 @@ of their 37 questions are settled, and 37 corpus cases are restated,
 14 of them changing class. Six per-scene rulings of the same day
 settle seven more, among them `effects output` as the clause's name
 and the explanation `_ > 0` does not hold of -5 in rung 1, scene 2.
+Nine rulings of a third round and the planning specification settle
+13 more: of the 37, 29 are settled and eight stay open, and the prover
+loop's scene now answers a claim evaluation cannot decide. A third
+overlay restates 28 corpus cases, 18 of them changing class.
 
 ### 2026-11 — The software system model specified (B-196, chunk Q4 (the model specifications), part 2)
 

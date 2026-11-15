@@ -612,3 +612,27 @@ policy is the gate ruled there.
     Seven more of the 37 questions are settled, 21 stay open. Three
     pins of rung 1, scene 2 restate their new result, and one note
     follows a renumbered question.
+  - **Round 3 and the planning scenes, the same day.** Nine more
+    recommendations, G to O, ruled: a bound proof value is no claim;
+    an obligation is named by its module and claim name, and the hash
+    over the proposition's text goes; a hint is the refusing rule's or
+    the deriver's explanation; a scripted proposer passes milestone 5;
+    the benchmark is a separate case; rung 1, scene 5 answers a claim
+    evaluation cannot decide, first with the derivation budget at zero
+    and last by the deriver; the coercion claims are assumed and named;
+    a true claim whose term uses an assumed law is decided when
+    evaluation decides it; the deriver does not attempt an assumed
+    law. Seven questions of the planning scenes are settled by
+    `next/models/specs/planning.md`, as ruled at PR #202, each cited
+    by section. Of the 37, 29 are settled and eight stay open; of the
+    five new questions, four are settled and one is open. 28 corpus
+    cases are restated by a third overlay, 18 of them changing class.
+    The check prints:
+    `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1586, changes 260, detail 146) · unclassed 0 — consistent`.
+  - **Followed, not yet landed.** The maintainer ruled that milestone 7
+    requires `solve` to read a residual over its unknowns, and that the
+    enumeration is not ported. Milestone 7 waits on the kernel stream
+    for a way to implement general solvers, since that stream has
+    reversed "A function may take an argument unevaluated". This
+    stream follows when the reversal lands in the inventory: the
+    planning specification's §5 cites that decision as a need.

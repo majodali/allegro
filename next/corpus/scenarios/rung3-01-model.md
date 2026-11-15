@@ -99,21 +99,15 @@ The present tree already halts before output here.
 
 ## Open questions
 
-Settled: question 1 of the draft, whether `validate` answers its
+None. Settled: question 1 of the draft, whether `validate` answers its
 explanation as a value or raises an exception (ruling 4: it is the
 plan's predicate called as an ordinary function, and answers true or
-its explanation).
-
-1. Are the fixtures `a => true` assumed promises, as today's ledger has
-   them, so that every plan claim is at most assumed? This rests on the
-   held "Bracket constraints as refinements, named as predicate
-   fixtures". Recommended: yes, each on the record with the file as its
-   author.
-2. A plan's predicate must terminate ("Equality, coercion and invariant
-   predicates hold no capability and terminate"). Must milestone 7 keep
-   the library's walks at the strength assumed, as the library has them,
-   or decide their termination ("Termination by bounded decrease")?
-   Recommended: keep them assumed, each on the record, for milestone 7.
+its explanation). Settled by the planning specification
+(`next/models/specs/planning.md`, ruled at PR #202), as confirmed in
+the session of 2026-11-15: question 2, the fixtures (§11, question 9:
+assumed and named until running a plan is specified; a trivial one is
+decided), and question 3, the walks' termination (§3: assumed and named
+for now).
 
 ## Present pins
 

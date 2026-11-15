@@ -22,7 +22,9 @@ checks and searches, and scene 1's findings on them hold here.
    No `WellFormedPlan` claim is made on `Fulfil`. The hole is an
    obligation: a gap in a model waiting for a value ("Solving is
    proposing a value for an unknown, and the kernel checks it"). Its
-   state is open. The gap is Shipped, which Depot needs. The catalog's
+   state is open: open, unsolved and solved are states of one
+   feasibility claim, undecided until a completion solves it (planning
+   specification §7). The gap is Shipped, which Depot needs. The catalog's
    search went Delivered from Van, then Sorted from Depot, and stopped.
    The plan's surface (inputs, outcomes, budget) is what a proposal must
    leave as written.
@@ -111,29 +113,27 @@ before output here.
 
 ## Open questions
 
-No question of this scene is settled by the rulings of 2026-11-15.
+Settled by the planning specification (`next/models/specs/planning.md`,
+ruled at PR #202), as confirmed in the session of 2026-11-15: question
+1 of the draft, the states open, unsolved and solved (pins 48, 83, 88
+and 95). They are states of one feasibility claim, undecided until a
+completion solves it (§7 and §11, question 3).
 
-1. Do the open plan's states open, unsolved and solved (pins 48, 83, 88
-   and 95) map onto the four strengths, or stay planning words beside
-   them? Recommended: planning words beside them. Open and unsolved
-   are the feasibility claim undecided, each with its explanation, as
-   the planning specification's §7 has them. Solved is the claim
-   holding, at the strength it earns.
-2. The obligation list holds five Quantity laws that no proposer can
+1. The obligation list holds five Quantity laws that no proposer can
    answer in this file, and `prove` skips them. Where is a proposal for
    a library's law placed? Recommended: in the library's own source.
    The standard deriver attempts the laws in the build, and a proof it
    finds is kept in the configured store and checked again every build
    (ruling 5).
-3. After the strict form's refutation, may the tools for proposing still
+2. After the strict form's refutation, may the tools for proposing still
    list the result's other open obligations? Today every command stops.
    Recommended: yes. A phase that has refuted a claim performs no
    further effect but may go on evaluating to report every refutation
    ("An effect consumes only values whose claims are decided").
-4. The language-model run is recorded once, on the maintainer's
+3. The language-model run is recorded once, on the maintainer's
    subscription, and a test puts each recorded reply through the kernel
    again. Is that enough for milestone 7? Recommended: yes.
-5. The rung's story is two coupled models; this scene has one. Does
+4. The rung's story is two coupled models; this scene has one. Does
    milestone 7 need a scene with a second model, or does it pass on
    this one? Recommended: it passes on this one; the second model is a
    later milestone's.

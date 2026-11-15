@@ -27,11 +27,13 @@ strength each has earned, including those still undecided.
    with the file as its author.
 5. **Does.** Binds `q = 5 m`, states `theorem q_chain: q == q by
    proof_trans(proof_refl(q), proof_refl(q))` and binds the term to `p`.
-   **Must find.** The transitivity rule accepts the term. The proof
-   takes the strength of Quantity's transitivity law and names the
-   assumption. The run prints that strength: assumed, on the reading
-   that the standard deriver does not attempt a law the file has
-   assumed (rung 1, scene 4, question 2).
+   **Must find.** The transitivity rule accepts the term. The claim
+   `q == q` is decided, since evaluation decides it (ruling N of
+   2026-11-15, round 3). The proof takes the strength of Quantity's
+   transitivity law and names the assumption. The deriver does not
+   attempt a law the author has assumed (ruling O), so that strength is
+   assumed. `p` is no claim (ruling G). The run prints the strength `p`
+   records, assumed.
 6. **Does.** Runs `verify`. **Must find.** Quantity's five laws, refl,
    sym, trans, `mul_comm` and `conv_roundtrip` ("Quantity laws at honest
    tiers"), each under the standard deriver (ruling 5 of 2026-11-15).
@@ -42,8 +44,9 @@ strength each has earned, including those still undecided.
    derivation was tried and where it stopped. A law the deriver cannot
    sample within its allowance is recorded as not sampled. The scene
    requires the attempt and the record, not a particular strength.
-   `q_chain` at the strength of what it rests on. The theorems of steps
-   1 to 3 decided. The module's summary is the weakest strength among
+   `q_chain` and the theorems of steps 1 to 3 decided. `p` is not
+   listed. Quantity's transitivity is assumed and not attempted
+   (ruling O). The module's summary is the weakest strength among
    its claims.
 7. **Does.** Prints `"physics with receipts"`. **Must find.** The run
    prints it. A strength short of decided prevents no effect (ruling 1).
@@ -77,8 +80,9 @@ halts.
 - Ruling 1 of 2026-11-15: the prints proceed whatever strength the laws
   reach.
 - "Every result says how strongly it holds": `verify` marks `q_chain` and
-  `p` discharged with a note. Their strength is assumed. The heading
-  reads "verified" while four laws wait.
+  `p` discharged with a note. `q_chain` is decided by evaluation
+  (ruling N), its proof recording the assumed law; `p` is not listed
+  (ruling G). The heading reads "verified" while four laws wait.
 - "A module's summary is the weakest strength among its claims": the
   summary is one word, the weakest strength among the file's claims and
   the laws it draws.
@@ -89,17 +93,13 @@ halts.
 
 ## Open questions
 
-Settled: question 1 of the draft, whether Quantity's refl and sym stay
-undecided or reach sampled (ruling 5: each is attempted under the
+None. Settled: question 1 of the draft, whether Quantity's refl and sym
+stay undecided or reach sampled (ruling 5: each is attempted under the
 standard deriver, and the scene requires the attempt and its record).
 Question 2, a refused `by` term on a claim that holds by evaluation
-(ruling 2).
-
-1. Is the proof value `p`, bound without `theorem`, a claim? This is
-   rung 1, scene 4, question 1.
-2. Does the standard deriver attempt Quantity's transitivity, which the
-   file has assumed? This is rung 1, scene 4, question 2; pin 32 follows
-   the answer.
+(ruling 2). Ruled 2026-11-15, round 3: question 3, whether `p` is a
+claim (ruling G: no). Whether the deriver attempts Quantity's assumed
+transitivity (ruling O: no, so pin 32 prints assumed).
 
 ## Present pins
 
