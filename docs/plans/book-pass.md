@@ -1485,6 +1485,17 @@ its approval.
   Issue 15 of the adversarial review was ruled on 2026-11-14 and is
   built in: an unbound name is a residual. Six rows of the decision
   map move to written.
+- **2026-11-15 — identity and strength ruled; the second versions**
+  (the review session; chunk K3 (identity and strength)). The
+  maintainer signed milestone 1 at PR #214 and ruled issues 8 to 12
+  of the adversarial review. `next/kernel/interface.ts` gains a second
+  version beside the first: modules and their keys, what a result
+  rests on, the reason for a refutation, restore. The saved-program
+  form gains key slots and stored outcomes. The reference kernel
+  implements both, with a content hash of its own. The first versions
+  are left as they were, so the acceptance stream's code compiles
+  unchanged. The inventory gains "A key is made with the module that
+  holds it".
 
 ## 8. Sessions
 

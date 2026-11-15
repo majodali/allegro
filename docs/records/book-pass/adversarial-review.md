@@ -391,7 +391,64 @@ bound is a cell, in "A missing value is a cell that is filled once".
 has its own entry, the acceptance stream having loosened the test
 that pinned the decision map's row count.
 
+**On PR #214, 2026-11-15.** The maintainer merged the reference
+kernel's first part and signed milestone 1. Confirmed with it: the
+truth values are the bits of length one; the kernel primitives `if`,
+`claim` and `quote`; a structure's entries are evaluated in order.
+
+**Strength, issues 8 to 10, ruled 2026-11-15.** "Agreed on both
+rulings." Strength says how the claim itself was settled; what a
+result rests on is recorded beside it and never changes the word.
+
+- Decided means a kernel evaluated the claim, on the values in hand,
+  and it came out true. Assumed means someone stated it and no kernel
+  evaluated it.
+- The weakest-link rule applies among claims only. A claim that used
+  a pure primitive stays decided and names it (issue 9).
+- A claim evaluated on a capability's answer is decided, about that
+  answer, and names the capability; a claim a solver merely vouches
+  for is assumed (issue 8). Lowering every result that used a
+  capability to assumed was rejected: a program that reads a number
+  and checks it has truly checked that number.
+- A restored outcome keeps the word its builder's kernel recorded and
+  names the builder. An outcome that rests on a capability's answer
+  is never stored (issue 10).
+
+**Identity, issues 11 and 12, ruled 2026-11-15.** "A key is made
+with the module that holds it." The kernel derives a module's
+identity from its content, and its keys from that identity. A saved
+program records key slots, never keys. Rejected: making a key as an
+effect; a key identified by the place in the text where it is made.
+Not ruled, and noted as a reading on the module decision: issue 13, a module instantiated once for each
+set of arguments, every instance sharing the module's identity and
+keys.
+
+**What a key is, ruled 2026-11-15.** The first build made a key an
+eighth kind of value. The maintainer asked for an alternative: "I was
+assuming a key would be a Bits value or a structure." Bits or a
+structure alone can be forged, since a key's content is derived from
+a hash of public code. With a mark that only the kernel writes it
+cannot, which is the mechanism of "Trust in a value needs no seal".
+Ruled: a key is a structure that the kernel marks. The kinds stay
+seven. The mark is never carried onto another value, and whether a
+value is a key, or two are the same key, is asked of the kernel and
+never answered by comparing content.
+
+**On PR #215, 2026-11-15.** The maintainer: "Go ahead with the
+temporary second version, the other stream is going to be a while."
+The second versions of both contracts sit beside the first until the
+acceptance stream moves over. And: "Let's implement the kernel
+building a key for each restore claim." The first build had tied a
+stored outcome to its claim only by the record's content. Now the
+kernel computes a key from the claim's content, the content of the
+function it sits in, and what the outcome rests on; a builder stores
+it; the loading kernel computes it again and refuses the record where
+the two differ.
+
 ## Terms introduced
 
+- **Rests on**: what a result's evaluation used that the kernel did
+  not itself evaluate.
+- **Key slot**: a place in a module where one of its keys goes.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
