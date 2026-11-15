@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-14 — How a name comes to be checked, ruled.** The kernel
+  never refutes an unbound name; evaluating one gives a residual. A
+  language checks the names it cares about, from the expression it
+  built, and states the result as a claim; the standard language does
+  so at the end of a text, so a name may be used before it is defined.
+  `docs/plans/book-pass-inventory.md` gains the decision "A language
+  checks the names it cares about", and "Only the module being run
+  performs effects when instantiated" has its own entry: 233 decisions.
 - **2026-11-13 — The kernel's interface and the saved-program data
   form, first versions (K1).** The kernel stream of the rebuild
   program begins. `next/kernel/interface.ts` states what host code can
