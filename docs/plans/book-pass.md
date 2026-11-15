@@ -1496,6 +1496,20 @@ its approval.
   are left as they were, so the acceptance stream's code compiles
   unchanged. The inventory gains "A key is made with the module that
   holds it".
+- **2026-11-15 — values and descriptions** (the review session;
+  chunk K4 (what Allegro code may do with an expression)). The
+  maintainer merged PR #215 and ruled five decisions for the
+  adversarial review's cluster 1 with issues 14 and 23, two of them
+  reversing earlier rulings: a function is opaque and describing one
+  is an authority; a live expression is built only from live values;
+  there are no unevaluated arguments; an evaluation can be returned as
+  data; an origin is a description. The reference kernel implements
+  the first four: the conditional takes its branches as functions,
+  and `describe`, `build` and `attempt` are kernel primitives;
+  quotation is gone. The kernel's primitive list is fixed at eight
+  things, of which fields and the questions about keys are not built.
+  The maintainer: this design is judged by another adversarial review
+  round.
 
 ## 8. Sessions
 

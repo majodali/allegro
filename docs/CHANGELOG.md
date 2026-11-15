@@ -574,6 +574,18 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Values and descriptions (K4).** Five rulings on what
+  Allegro code may do with an expression, two reversing earlier ones.
+  A function is opaque: describing one takes a key of the module that
+  made it, or the inspection right, and a description is plain data
+  that names an unforgeable value without holding it. A function is
+  built from a description only when it holds none. There are no
+  unevaluated arguments: a delayed expression is a function, and a
+  branch that needs more knowledge is a function of the names its
+  condition tested. One primitive returns how an evaluation ended, as
+  data. In `next/kernel/kernel.ts`: the conditional with function
+  branches, `describe`, `build`, `attempt`; quotation removed. The
+  inventory holds 236 decisions.
 - **2026-11-15 — Identity and strength ruled; the contracts' second
   versions (K3).** A key is made with the module that holds it: the
   kernel hashes a module's content and makes its keys from that

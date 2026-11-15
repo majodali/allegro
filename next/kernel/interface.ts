@@ -353,6 +353,14 @@ export interface Kernel2 extends Kernel {
   module(fn: Value, keys: number): Value;
   /** The identity of the module a module function was made as, or undefined for any other value. */
   moduleOf(value: Value): string | undefined;
+  /**
+   * The inspection right: the authority to describe any function,
+   * whichever module made it. A key that no module's content gives. The
+   * host hands it to the code a configuration trusts to inspect, such as
+   * an analysis or an optimiser; code that is not handed it can describe
+   * only the functions of a module whose key it holds.
+   */
+  inspectionRight(): Value;
   /** True for a key: a structure carrying the kernel's mark. False for a structure with the same entries and no mark. */
   isKey(value: Value): boolean;
   /** Reads a key. An InterfaceError for a value that is not one. */

@@ -44,7 +44,9 @@ function setup() {
   const isZero = k.primitiveFunction(pure("isZero", 4, 1, (a) => a === 0));
   const call = (fn: Value, ...args: Value[]) => k.expression(fn, args);
   const kp = (name: string) => k.kernelPrimitive(name);
-  return { k, add, mul, dec, isZero, call, kp };
+  /** A delayed expression: a function of no parameters. */
+  const delay = (body: Value) => k.composedFunction([], body);
+  return { k, add, mul, dec, isZero, call, kp, delay };
 }
 
 test("the kernel is passive and states its interface", () => {
@@ -52,7 +54,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["claim", "if", "quote"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "build", "claim", "describe", "if"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -106,11 +108,11 @@ test("a structure's entries are evaluated, in order", () => {
 });
 
 test("recursion on known arguments runs to its end", () => {
-  const { k, mul, dec, isZero, call, kp } = setup();
+  const { k, mul, dec, isZero, call, kp, delay } = setup();
   const scope = k.scope();
   const n = k.param("n");
   const fact = k.symbol("m.fact");
-  k.bind(scope, fact, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n))))));
+  k.bind(scope, fact, k.composedFunction([n], call(kp("if"), call(isZero, n), delay(byte(k, 1)), delay(call(mul, n, call(fact, call(dec, n)))))));
   assert.equal(num(k, k.evaluate(call(fact, byte(k, 5)), scope).value), 120);
 });
 
@@ -185,24 +187,41 @@ test("a cell is filled once, and what waited on it is evaluated again by advance
   assert.throws(() => k.fill(k.cell(), k.param("p")), /not plain data/);
 });
 
-test("\"if\" evaluates only the branch taken, and waits when the condition is unknown", () => {
-  const { k, add, call, kp } = setup();
+test("the conditional calls only the branch taken, and waits when the condition is unknown", () => {
+  const { k, add, call, kp, delay } = setup();
   let ran = 0;
   const mark = k.primitiveFunction({ purity: "effectful", capability: "probe", part: "mark", arity: 0, run: (_a, c) => (ran++, c.structure([])) });
   const scope = k.scope();
-  const r1 = k.evaluate(call(kp("if"), truth(k, true), byte(k, 1), call(mark)), scope);
+  const r1 = k.evaluate(call(kp("if"), truth(k, true), delay(byte(k, 1)), delay(call(mark))), scope);
   assert.equal(num(k, r1.value), 1);
-  assert.equal(ran, 0, "the branch not taken is not evaluated");
+  assert.equal(ran, 0, "the branch not taken is not called");
   const c = k.cell();
-  const r2 = k.evaluate(call(kp("if"), c, call(mark), call(add, byte(k, 1), byte(k, 1))), scope);
-  assert.equal(ran, 0, "neither branch is evaluated while the condition is unknown");
+  const r2 = k.evaluate(call(kp("if"), c, delay(call(mark)), delay(call(add, byte(k, 1), byte(k, 1)))), scope);
+  assert.equal(ran, 0, "neither branch is called while the condition is unknown");
   k.fill(c, truth(k, false));
   k.advance();
   assert.equal(num(k, k.current(r2.value)), 2);
   assert.equal(ran, 0);
-  const r3 = k.evaluate(call(kp("if"), byte(k, 1), byte(k, 1), byte(k, 2)), scope);
+  const r3 = k.evaluate(call(kp("if"), byte(k, 1), delay(byte(k, 1)), delay(byte(k, 2))), scope);
   assert.equal(r3.refuted, true, "a byte is not a truth value");
   assert.match(k.reasonOf(r3.value) ?? "", /neither true nor false/);
+  const r4 = k.evaluate(call(kp("if"), truth(k, true), byte(k, 1), byte(k, 2)), scope);
+  assert.match(k.reasonOf(r4.value) ?? "", /not a function of no parameters/, "a branch is a function, never bare text");
+});
+
+test("a branch gets more knowledge as an argument: it is a function of the name its condition tested", () => {
+  // What a language's `if` form builds for:  if isZero(x) then use(x) else use(x)
+  // where `use` wants to know which branch it is in. Nothing is rebound: the
+  // branch is a function of x, and the form calls it with x and the fact.
+  const { k, isZero, call, kp, delay } = setup();
+  const tag = (fact: number) => k.primitiveFunction({ purity: "pure", hash: hash(20 + fact), name: `withFact${fact}`, arity: 1, run: (a, c) => c.structure([[null, a[0]], [null, c.bits(Uint8Array.of(fact))]]) });
+  const [knownZero, knownNonZero] = [tag(1), tag(2)];
+  const [x, v, thenFn, elseFn] = ["x", "v", "then", "else"].map((n) => k.param(n));
+  const refiningIf = k.composedFunction([x, thenFn, elseFn], call(kp("if"), call(isZero, x), delay(call(thenFn, call(knownZero, x))), delay(call(elseFn, call(knownNonZero, x)))));
+  const use = k.composedFunction([v], v);
+  const fact = (n: number) => num(k, k.entriesOf(k.evaluate(call(refiningIf, byte(k, n), use, use), k.scope()).value)[1][1]);
+  assert.equal(fact(0), 1, "the then-branch was handed x with the fact that it is zero");
+  assert.equal(fact(7), 2, "the else-branch was handed x with the fact that it is not");
 });
 
 test("a claim is decided, refuted or left waiting, and only the kernel records which", () => {
@@ -242,29 +261,24 @@ test("a call on something that is not a function, or with the wrong number of ar
   assert.equal(k.evaluate(call(k.composedFunction([], byte(k, 1)), byte(k, 2)), k.scope()).refuted, true);
 });
 
-test("\"quote\" hands a symbol on as data", () => {
-  const { k, call, kp } = setup();
-  const nameOf = k.primitiveFunction({
-    purity: "pure", hash: hash(9), name: "nameLength", arity: 1,
-    run: (args, c) => c.bits(Uint8Array.of(c.symbolName(args[0]).length)),
-  });
-  const s = k.symbol("m.unbound");
-  const scope = k.scope();
-  assert.equal(num(k, k.evaluate(call(nameOf, call(kp("quote"), s)), scope).value), 9);
+test("there is no quotation: a symbol that is data comes from a primitive or a cell, and a symbol in an expression is a name", () => {
+  const { k, call } = setup();
+  assert.throws(() => k.kernelPrimitive("quote"), InterfaceError);
+  const give = k.primitiveFunction({ purity: "pure", hash: hash(9), name: "aSymbol", arity: 0, run: (_a, c) => c.symbol("m.data") });
   const x = k.param("x");
   const id = k.composedFunction([x], x);
-  const r = k.evaluate(call(id, call(kp("quote"), s)), scope);
+  const r = k.evaluate(call(id, call(give)), k.scope());
   assert.equal(k.kind(r.value), "symbol");
-  assert.equal(k.symbolName(r.value), "m.unbound");
-  assert.deepEqual(k.waiting(), [], "a quoted symbol is data and waits on nothing");
+  assert.equal(k.symbolName(r.value), "m.data");
+  assert.deepEqual(k.waiting(), [], "a symbol that is data waits on nothing, however far it is handed on");
 });
 
 test("a step budget ends an evaluation the same way every time", () => {
-  const { k, dec, isZero, call, kp } = setup();
+  const { k, dec, isZero, call, kp, delay } = setup();
   const scope = k.scope();
   const n = k.param("n");
   const down = k.symbol("m.down");
-  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n)))));
+  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), delay(byte(k, 0)), delay(call(down, call(dec, n))))));
   const full = k.evaluate(call(down, byte(k, 50)), scope);
   assert.equal(full.ended, "complete");
   const cut1 = k.evaluate(call(down, byte(k, 50)), scope, { steps: 40 });
@@ -483,4 +497,134 @@ test("isCell tells a cell and a waiting name from other values", () => {
   assert.equal(k.isCell(byte(k, 1)), false);
   k.evaluate(call(add, k.symbol("m.later"), byte(k, 1)), k.scope());
   assert.equal(k.isCell(k.waiting()[0]), true);
+});
+
+// ---- Values and descriptions (chunk K4) -------------------------------------
+
+/** Reads a description: its form, and its parts. */
+function form(k: Kernel, d: Value): { form: string; parts: Value[] } {
+  const entries = k.entriesOf(d);
+  return { form: k.symbolName(entries[0][1]).replace("description.", ""), parts: entries.slice(1).map(([, v]) => v) };
+}
+const text = (k: Kernel, v: Value) => new TextDecoder().decode(k.bitsOf(v).bytes);
+const steps = (k: Kernel, n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+
+/** A module with one key and one function: (key) => [key, n => n + 1]. */
+function moduleWithFunction() {
+  const s = setup();
+  const { k, add, call } = s;
+  const [key, n] = [k.param("key"), k.param("n")];
+  const m = k.module(k.composedFunction([key], k.structure([[null, key], [null, k.composedFunction([n], call(add, n, byte(k, 1)))]])), 1);
+  const [ownKey, inc] = k.entriesOf(k.evaluate(call(m), k.scope()).value).map(([, v]) => v);
+  return { ...s, ownKey, inc };
+}
+
+test("a function is opaque: describing one takes a key of its module, or the inspection right", () => {
+  const { k, call, kp, ownKey, inc } = moduleWithFunction();
+  const scope = k.scope();
+  const d = form(k, k.evaluate(call(kp("describe"), ownKey, inc), scope).value);
+  assert.equal(d.form, "function");
+  const body = form(k, d.parts[1]);
+  assert.equal(body.form, "apply");
+  assert.equal(form(k, body.parts[0]).form, "primitive");
+  assert.equal(text(k, form(k, body.parts[0]).parts[0]), hash(1), "a pure primitive is named by its hash");
+  assert.deepEqual(k.entriesOf(body.parts[1]).map(([, a]) => form(k, a).form), ["param", "bits"]);
+
+  const k0 = k.param("k0");
+  const otherKey = k.entriesOf(k.evaluate(call(k.module(k.composedFunction([k0], k.structure([[null, k0]])), 1)), scope).value)[0][1];
+  const refused = k.evaluate(call(kp("describe"), otherKey, inc), scope);
+  assert.match(k.reasonOf(refused.value) ?? "", /a key of the module that made it/);
+  assert.match(k.reasonOf(k.evaluate(call(kp("describe"), byte(k, 1), inc), scope).value) ?? "", /a key or the inspection right/);
+  const lookalike = k.structure(k.entriesOf(ownKey).map(([key, v]) => [key, v] as const));
+  assert.match(k.reasonOf(k.evaluate(call(kp("describe"), lookalike, inc), scope).value) ?? "", /a key or the inspection right/, "a structure with a key's entries is not a key");
+  assert.equal(form(k, k.evaluate(call(kp("describe"), k.inspectionRight(), inc), scope).value).form, "function");
+  assert.equal(k.isKey(k.inspectionRight()), true);
+});
+
+test("a description never yields authority: a capability inside is described by name, and cannot be built", () => {
+  const { k, isZero, call, kp, delay } = setup();
+  let wrote = 0;
+  const write = k.primitiveFunction({ purity: "effectful", capability: "files", part: "write", arity: 1, run: (_a, c) => (wrote++, c.structure([])) });
+  const p = k.param("p");
+  // A narrowed capability: it writes only where its guard allows.
+  const guarded = k.composedFunction([p], call(kp("if"), call(isZero, p), delay(call(write, p)), delay(k.structure([]))));
+  const scope = k.scope();
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), guarded), scope).value;
+  const condition = form(k, form(k, d).parts[1]);
+  const thenBranch = form(k, k.entriesOf(condition.parts[1])[1][1]);
+  const use = form(k, thenBranch.parts[1]);
+  const named = form(k, use.parts[0]);
+  assert.equal(named.form, "capability");
+  assert.deepEqual(named.parts.map((v) => text(k, v)), ["files", "write"], "the description says which capability, and holds none");
+  const rebuilt = k.evaluate(call(kp("build"), d), scope);
+  assert.match(k.reasonOf(rebuilt.value) ?? "", /nothing makes authority from data/);
+  // The part that applies the capability, cut out of its guard, cannot be built either.
+  const cut = k.evaluate(call(kp("build"), k.entriesOf(condition.parts[1])[1][1]), scope);
+  assert.equal(cut.refuted, true);
+  assert.equal(wrote, 0);
+});
+
+test("a description of a function that holds no unforgeable value builds a function that does the same", () => {
+  const { k, call, kp, ownKey, inc } = moduleWithFunction();
+  const scope = k.scope();
+  const d = k.evaluate(call(kp("describe"), ownKey, inc), scope).value;
+  const built = k.evaluate(call(kp("build"), d), scope).value;
+  assert.equal(k.kind(built), "composed-function");
+  assert.notEqual(built, inc);
+  assert.equal(num(k, k.evaluate(call(built, byte(k, 41)), scope).value), 42);
+  assert.match(k.reasonOf(k.evaluate(call(kp("build"), byte(k, 1)), scope).value) ?? "", /not a description/);
+  assert.match(k.reasonOf(k.evaluate(call(kp("build"), form(k, d).parts[0]), scope).value) ?? "", /not a description/);
+});
+
+test("a function of another module is opaque inside a description, unless the inspection right describes it", () => {
+  const { k, call, kp, ownKey, inc } = moduleWithFunction();
+  const [key, f] = [k.param("key"), k.param("f")];
+  // A second module, handed the first one's function: (key, f) => [key, () => f]
+  const holder = k.module(k.composedFunction([key, f], k.structure([[null, key], [null, k.composedFunction([], f)]])), 1);
+  const [holderKey, wrapper] = k.entriesOf(k.evaluate(call(holder, inc), k.scope()).value).map(([, v]) => v);
+  const mine = form(k, k.evaluate(call(kp("describe"), holderKey, wrapper), k.scope()).value);
+  assert.equal(form(k, mine.parts[1]).form, "opaque", "its own key does not open another module's function");
+  const all = form(k, k.evaluate(call(kp("describe"), k.inspectionRight(), wrapper), k.scope()).value);
+  assert.equal(form(k, all.parts[1]).form, "function");
+  void ownKey;
+});
+
+test("an attempt returns how an evaluation ended, as data, and a refutation inside marks nothing outside", () => {
+  const { k, add, isZero, dec, call, kp, delay } = setup();
+  const scope = k.scope();
+  const tried = (body: Value, n = 1000) => form(k, k.evaluate(call(kp("attempt"), delay(body), steps(k, n)), scope).value);
+  const ok = tried(call(add, byte(k, 1), byte(k, 2)));
+  assert.equal(ok.form, "value");
+  assert.equal(num(k, ok.parts[0]), 3);
+  const bad = k.evaluate(call(kp("attempt"), delay(call(kp("claim"), call(isZero, byte(k, 5)))), steps(k, 1000)), scope);
+  assert.equal(bad.refuted, false, "the attempt itself is not wrong");
+  assert.equal(form(k, bad.value).form, "refuted");
+  assert.match(text(k, form(k, bad.value).parts[0]), /claim that is not true/);
+
+  const n = k.param("n");
+  const down = k.symbol("m.down");
+  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), delay(byte(k, 0)), delay(call(down, call(dec, n))))));
+  assert.equal(tried(call(down, byte(k, 200)), 30).form, "limit");
+  assert.equal(tried(call(down, byte(k, 200)), 30).form, "limit", "the same every time");
+  assert.equal(tried(call(down, byte(k, 3)), 30).form, "value");
+  // A search: try candidates until one satisfies a claim.
+  const candidate = k.param("candidate");
+  const fits = k.composedFunction([candidate], call(kp("attempt"), delay(call(kp("claim"), call(isZero, call(dec, candidate)))), steps(k, 100)));
+  assert.deepEqual([0, 1, 2].map((c) => form(k, k.evaluate(call(fits, byte(k, c)), scope).value).form), ["refuted", "value", "refuted"]);
+});
+
+test("an attempt that waits is taken up again from where it stopped, so an effect inside is performed once", () => {
+  const { k, add, call, kp, delay } = setup();
+  let wrote = 0;
+  const write = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 0, run: (_a, c) => (wrote++, c.bits(Uint8Array.of(1))) });
+  const c = k.cell();
+  const r = k.evaluate(call(kp("attempt"), delay(call(add, call(write), c)), steps(k, 100)), k.scope());
+  assert.equal(k.kind(r.value), "expression", "it waits on the cell");
+  assert.equal(wrote, 1);
+  k.fill(c, byte(k, 4));
+  k.advance();
+  const done = form(k, k.current(r.value));
+  assert.equal(done.form, "value");
+  assert.equal(num(k, done.parts[0]), 5);
+  assert.equal(wrote, 1, "the effect was not performed again");
 });
