@@ -549,3 +549,23 @@ policy is the gate ruled there.
     moves a row when the unit realises the decision's whole statement
     and a case passes on the kernel, as the kernel stream left its
     rows at none for an interface that is declared and not built.
+- **2026-11-15 — Q5, part 1 drafted: the first notation proposed.**
+  `next/bootstrap/first-notation.md`, for the maintainer's ruling: the
+  forms of the first notation, each with the kernel expression it stands
+  for and its state on `origin/main` and once the kernel stream's pull
+  request #216 merges; the module as one function; what milestone 3
+  needs; ten questions, each with a recommendation. The emitter
+  `next/bootstrap/emit.ts` (`npm run emit`) has the present tree's
+  parser read a text and writes a saved program of the first version,
+  or every finding; it reproduces `next/launch/fixtures/hello.json` from
+  the one line `print("hello, world")`. Its records print the same on
+  the kernel of `origin/main` and on the kernel of #216. The census
+  `next/bootstrap/census.ts` reads the 216 cases due at milestone 3:
+  no pin emits yet, and the texts of 38 tests do. The largest needs are
+  shipped integer arithmetic (91 cases waiting) and comparison (67),
+  telling bits apart (20, 19 of them pins), the standard language's
+  match (20) and text concatenation (19). With the integer primitives,
+  telling bits apart, text concatenation and the float primitives, all
+  31 pins and 124 tests emit. `npm run harness:next` runs every pinned
+  program through the emitter and the launcher; all 71 are reported as
+  cannot be emitted yet, and no pin fails.

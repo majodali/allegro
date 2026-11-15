@@ -12,7 +12,7 @@ import * as assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  compareProgram, buildReport, formatRows, formatSummary, failed, runAll, comparePrograms, presentTreeRunner, pinsByProgram, PRESENT_RUN_DIFFERS,
+  compareProgram, buildReport, formatRows, formatSummary, failed, failedNext, runAll, comparePrograms, presentTreeRunner, nextTreeRunner, pinsByProgram, PRESENT_RUN_DIFFERS,
   type Runner, type RunResult, type Program,
 } from "./harness.js";
 import { CASES_PATH, type Corpus, type PinCase, type TestCase } from "../tools/corpus.js";
@@ -164,4 +164,36 @@ test("the present-tree runner refuses a text that differs from the file on disk,
     run([], { kind: "stopped", reason: "the present-tree runner runs the file on disk, and the text given differs from tests/match-demo.alg" }));
   assert.deepEqual(await runner({ path: "tests/no-such.alg", text: "" }),
     run([], { kind: "stopped", reason: "tests/no-such.alg is no file under the repository root" }));
+});
+
+// ── The new tree's runner: text, saved program, launch (chunk Q5, part 1) ──
+
+test("the new tree's runner emits a text, launches it on the reference kernel and returns its lines", async () => {
+  const runner = nextTreeRunner();
+  assert.deepEqual(await runner({ path: "x.alg", text: 'print("a")\nprint("b")\n' }), run(["a", "b"]));
+  const refutedRun = await runner({ path: "x.alg", text: 'print("a")\nclaim(false)\n' });
+  assert.deepEqual(refutedRun.lines, ["a"]);
+  assert.equal(refutedRun.end.kind, "stopped");
+  const unemitted = await runner({ path: "x.alg", text: "print(1 + 2)\n" });
+  assert.deepEqual(unemitted.lines, []);
+  assert.equal(unemitted.end.kind, "not emitted");
+  assert.match((unemitted.end as { reason: string }).reason, /^\+ on numbers: .*shipped pure primitive\)$/);
+});
+
+test("a program that cannot be emitted yet is counted apart: no pin of it fails, and the summary and rows say how many", () => {
+  const notEmitted = compareProgram(P, PINS, run([], { kind: "not emitted", reason: "+ on numbers: no shipped arithmetic primitive exists yet" }));
+  assert.deepEqual(outcomes(notEmitted), ["not emitted", "not emitted", "not compared", "not emitted"]);
+  assert.deepEqual(notEmitted.findings, []);
+  const q = compareProgram(Q, CORPUS.cases.filter((c): c is PinCase => c.kind === "pin" && c.file === Q), run(["q1"]));
+  const report = buildReport(CORPUS, [notEmitted, q]);
+  assert.equal(report.programs.notEmitted, 1);
+  assert.equal(report.programs.run, 1);
+  assert.equal(report.pins.notEmitted, 3);
+  assert.equal(report.pins.failing, 0);
+  assert.ok(report.findings.includes("tests/p.alg: cannot be emitted yet: + on numbers: no shipped arithmetic primitive exists yet"));
+  assert.match(formatSummary(report, "new tree"), /^harness: new tree · programs 1 run, 0 stopped, 1 cannot be emitted yet · pins 5 \(passing 1, .*not run 0, cannot be emitted yet 3\)/);
+  assert.match(formatRows(report)[2], /not run 0, cannot be emitted yet 1 · /);
+  assert.equal(failedNext(report), false);
+  const failing = buildReport(CORPUS, [notEmitted, compareProgram(Q, CORPUS.cases.filter((c): c is PinCase => c.kind === "pin" && c.file === Q), run(["wrong"]))]);
+  assert.equal(failedNext(failing), true, "a survives pin of an emitted program that fails fails the command");
 });

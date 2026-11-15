@@ -1121,6 +1121,20 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The first notation proposed, and what milestone 3 needs (B-196, chunk Q5 (the first notation and the bootstrap), part 1)
+
+B-196 (the rebuild's acceptance side). `next/bootstrap/first-notation.md`
+proposes the first notation for the maintainer to rule, with ten
+questions. `next/bootstrap/emit.ts` (`npm run emit`) writes a saved
+program from a text the present tree's parser reads, for the forms the
+reference kernel evaluates today: texts, truth values and the logical
+forms, names, functions, applications, bindings, statements in written
+order, the conditional, claims, recursion by self-application,
+structures and printing through `output`. Any other form is a finding
+and no record. `next/bootstrap/census.ts` counts, for the 216 cases due
+at milestone 3, the cases waiting on each need. The comparison harness
+gains the new tree's runner and `npm run harness:next`.
+
 ### 2026-11 — One corpus case restated after the cell decision's rewording (B-196)
 
 B-196 (the rebuild's acceptance side). The kernel stream reworded the

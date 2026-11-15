@@ -33,6 +33,7 @@
     "test:next": "node --import tsx --test \"next/**/*.test.ts\"",
     "typecheck:next": "tsx next/tools/typecheck.ts",
     "harness:present": "tsx next/corpus/harness.ts --present",
+    "harness:next": "tsx next/corpus/harness.ts --next",
     "emit": "tsx next/bootstrap/emit.ts",
     "launch": "tsx next/launch/terminal.ts"
   },

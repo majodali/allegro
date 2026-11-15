@@ -13,10 +13,18 @@
 //                                                            and rows 1 to N
 //   npx tsx next/corpus/harness.ts --present --file <program>
 //                                                            one program
+//   npm run harness:next                                     every pinned program
+//                                                            on the new tree: emitted
+//                                                            by the bootstrap and run
+//                                                            by the launcher (chunk Q5,
+//                                                            part 1); the same flags
 //
 // The command prints the findings, one per line, then one row per
-// milestone, then a summary line. It exits 1 on a failing survives pin or
-// a finding on a program.
+// milestone, then a summary line. With --present it exits 1 on a failing
+// survives pin or a finding on a program. With --next a program the
+// emitter cannot emit yet is reported as such, with its first finding,
+// and counted apart from a failing pin; the command exits 1 only on a
+// failing survives pin of a program that was emitted.
 //
 // One program the calibration does not run. The suite runs
 // tests/proofs-proven-demo.alg with an extension the test passes; the file
@@ -29,7 +37,8 @@
 // its text) to the lines it printed, in order, and how the run ended. The
 // present-tree runner runs the file runner `src/index.ts` in a child
 // process, as a user would, and imports nothing from src/. The new tree's
-// runner arrives with the kernel and sits behind the same type.
+// runner (`nextTreeRunner`) sits behind the same type: text, saved
+// program, launch, lines.
 //
 // How a pin is compared. The i-th pin of a program is compared with the
 // i-th printed line, as src/test/alg-files.ts `runAlgFile` does.
@@ -62,8 +71,12 @@ import { CASES_PATH, type Case, type CaseClass, type Corpus, type PinCase } from
 /** A program as a runner receives it. */
 export interface Program { path: string; text: string }
 
-/** How a run ended: it completed, or it stopped, with the reason as text. */
-export type RunEnd = { kind: "completed" } | { kind: "stopped"; reason: string };
+/**
+ * How a run ended: it completed, or it stopped, with the reason as text.
+ * "not emitted" is the new tree's runner's: the bootstrap emitter cannot
+ * emit the program yet, and nothing ran. Its reason is the first finding.
+ */
+export type RunEnd = { kind: "completed" } | { kind: "stopped"; reason: string } | { kind: "not emitted"; reason: string };
 
 /** What a runner returns: the lines the program printed, in order, and how the run ended. */
 export interface RunResult { lines: string[]; end: RunEnd }
@@ -73,7 +86,7 @@ export type Runner = (program: Program) => Promise<RunResult>;
 
 // ── Comparison by class ───────────────────────────────────────────────
 
-export type Outcome = "passes" | "fails" | "to review" | "not compared";
+export type Outcome = "passes" | "fails" | "to review" | "not compared" | "not emitted";
 
 export interface PinVerdict {
   id: string;
@@ -95,6 +108,8 @@ export interface ProgramComparison {
   verdicts: PinVerdict[];
   /** Findings on the program as a whole. */
   findings: string[];
+  /** For a program the emitter cannot emit yet: why, as its first finding. Not a finding on the program. */
+  notEmitted?: string;
 }
 
 /** The ordinal of a pin case, from its id `pin:<file>#<ordinal>`. */
@@ -105,7 +120,7 @@ export function ordinalOf(c: PinCase): number {
 }
 
 export function describeEnd(end: RunEnd): string {
-  return end.kind === "completed" ? "completed" : `stopped: ${end.reason}`;
+  return end.kind === "completed" ? "completed" : end.kind === "stopped" ? `stopped: ${end.reason}` : `cannot be emitted yet: ${end.reason}`;
 }
 
 function noLine(result: RunResult): string {
@@ -115,6 +130,11 @@ function noLine(result: RunResult): string {
 /** Compare one program's pins, given a runner's result, by ordinal. */
 export function compareProgram(file: string, pins: PinCase[], result: RunResult): ProgramComparison {
   const sorted = [...pins].sort((a, b) => ordinalOf(a) - ordinalOf(b));
+  if (result.end.kind === "not emitted") {
+    // Nothing ran: no pin is compared, and none fails.
+    const verdicts: PinVerdict[] = sorted.map((c) => ({ id: c.id, class: c.class, milestone: c.milestone, outcome: c.class === "detail" ? "not compared" : "not emitted", produced: null, unchanged: false, finding: null }));
+    return { file, end: result.end, printed: 0, verdicts, findings: [], notEmitted: result.end.reason };
+  }
   const verdicts: PinVerdict[] = sorted.map((c) => {
     const i = ordinalOf(c) - 1;
     const produced = i < result.lines.length ? result.lines[i] : null;
@@ -153,15 +173,15 @@ export function compareProgram(file: string, pins: PinCase[], result: RunResult)
 
 export const MILESTONES = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 
-export interface PinCounts { due: number; passing: number; failing: number; review: number; notRun: number }
+export interface PinCounts { due: number; passing: number; failing: number; review: number; notRun: number; notEmitted?: number }
 export interface MilestoneRow { milestone: number; pins: PinCounts; tests: number }
 
 export interface Report {
   rows: MilestoneRow[];
   /** Pins of every milestone and none: by outcome, over the whole corpus. */
-  pins: { total: number; passing: number; failing: number; noLine: number; review: number; unchanged: number; notCompared: number; notRun: number };
+  pins: { total: number; passing: number; failing: number; noLine: number; review: number; unchanged: number; notCompared: number; notRun: number; notEmitted: number };
   tests: { total: number; due: number; notDue: number };
-  programs: { run: number; stopped: number; findings: number };
+  programs: { run: number; stopped: number; findings: number; notEmitted: number };
   findings: string[];
 }
 
@@ -177,7 +197,7 @@ export function buildReport(corpus: Corpus, compared: ProgramComparison[], upTo 
   const byId = new Map<string, PinVerdict>();
   for (const p of compared) for (const v of p.verdicts) byId.set(v.id, v);
   const rows = new Map<number, MilestoneRow>(MILESTONES.filter((m) => m <= upTo).map((m) => [m, { milestone: m, pins: zero(), tests: 0 }]));
-  const pins = { total: 0, passing: 0, failing: 0, noLine: 0, review: 0, unchanged: 0, notCompared: 0, notRun: 0 };
+  const pins = { total: 0, passing: 0, failing: 0, noLine: 0, review: 0, unchanged: 0, notCompared: 0, notRun: 0, notEmitted: 0 };
   const tests = { total: 0, due: 0, notDue: 0 };
   const due = (c: Case) => (c.class === "survives" || c.class === "changes") && c.milestone !== null;
   for (const c of corpus.cases) {
@@ -194,6 +214,7 @@ export function buildReport(corpus: Corpus, compared: ProgramComparison[], upTo 
     if (v.outcome === "passes") { pins.passing++; if (r) r.pins.passing++; }
     else if (v.outcome === "fails") { pins.failing++; if (v.produced === null) pins.noLine++; if (r) r.pins.failing++; }
     else if (v.outcome === "to review") { pins.review++; if (v.unchanged) pins.unchanged++; if (r) r.pins.review++; }
+    else if (v.outcome === "not emitted") { pins.notEmitted++; if (r) r.pins.notEmitted = (r.pins.notEmitted ?? 0) + 1; }
     else pins.notCompared++;
   }
   const findings: string[] = [];
@@ -201,10 +222,14 @@ export function buildReport(corpus: Corpus, compared: ProgramComparison[], upTo 
   for (const p of [...compared].sort((a, b) => Math.min(...a.verdicts.map((v) => order.get(v.id) ?? 0)) - Math.min(...b.verdicts.map((v) => order.get(v.id) ?? 0)))) {
     for (const v of p.verdicts) if (v.finding !== null) findings.push(v.finding);
     findings.push(...p.findings);
+    if (p.notEmitted !== undefined) findings.push(`${p.file}: cannot be emitted yet: ${p.notEmitted}`);
   }
   return {
     rows: [...rows.values()], pins, tests,
-    programs: { run: compared.length, stopped: compared.filter((p) => p.end.kind === "stopped").length, findings: compared.reduce((n, p) => n + p.findings.length, 0) },
+    programs: {
+      run: compared.filter((p) => p.end.kind !== "not emitted").length, stopped: compared.filter((p) => p.end.kind === "stopped").length,
+      findings: compared.reduce((n, p) => n + p.findings.length, 0), notEmitted: compared.filter((p) => p.end.kind === "not emitted").length,
+    },
     findings,
   };
 }
@@ -215,7 +240,8 @@ export function formatRows(report: Report): string[] {
   return report.rows.map((r) => {
     acc.due += r.pins.due; acc.passing += r.pins.passing; acc.failing += r.pins.failing; acc.review += r.pins.review; acc.notRun += r.pins.notRun; acc.tests += r.tests;
     const p = r.pins;
-    return `milestone ${r.milestone}: due ${p.due + r.tests} (pins ${p.due}, tests ${r.tests}) · pins passing ${p.passing}, failing ${p.failing}, to review ${p.review}, not run ${p.notRun} · tests not yet realised ${r.tests}` +
+    const unemitted = report.programs.notEmitted > 0 ? `, cannot be emitted yet ${p.notEmitted ?? 0}` : "";
+    return `milestone ${r.milestone}: due ${p.due + r.tests} (pins ${p.due}, tests ${r.tests}) · pins passing ${p.passing}, failing ${p.failing}, to review ${p.review}, not run ${p.notRun}${unemitted} · tests not yet realised ${r.tests}` +
       ` · up to ${r.milestone}: pins ${acc.passing} of ${acc.due} passing, ${acc.failing} failing, ${acc.review} to review, ${acc.notRun} not run; tests 0 of ${acc.tests} realised`;
   });
 }
@@ -225,14 +251,26 @@ export function formatSummary(report: Report, runnerName: string): string {
   const p = report.pins;
   const bad = p.failing + report.programs.findings;
   const verdict = bad === 0 ? "no failing pin" : `${p.failing} failing pin(s), ${report.programs.findings} program finding(s)`;
-  return `harness: ${runnerName} · programs ${report.programs.run} run, ${report.programs.stopped} stopped · ` +
-    `pins ${p.total} (passing ${p.passing}, failing ${p.failing} of which ${p.noLine} with no line, to review ${p.review} of which ${p.unchanged} unchanged, not compared ${p.notCompared}, not run ${p.notRun}) · ` +
+  const unemitted = report.programs.notEmitted > 0 ? `, ${report.programs.notEmitted} cannot be emitted yet` : "";
+  const unemittedPins = report.programs.notEmitted > 0 ? `, cannot be emitted yet ${p.notEmitted}` : "";
+  return `harness: ${runnerName} · programs ${report.programs.run} run, ${report.programs.stopped} stopped${unemitted} · ` +
+    `pins ${p.total} (passing ${p.passing}, failing ${p.failing} of which ${p.noLine} with no line, to review ${p.review} of which ${p.unchanged} unchanged, not compared ${p.notCompared}, not run ${p.notRun}${unemittedPins}) · ` +
     `tests ${report.tests.total} (due ${report.tests.due}, not yet realised ${report.tests.due}; detail ${report.tests.notDue}) — ${verdict}`;
 }
 
 /** Whether the command exits 1: a failing survives pin or a finding on a program. */
 export function failed(report: Report): boolean {
   return report.pins.failing > 0 || report.programs.findings > 0;
+}
+
+/**
+ * Whether `--next` exits 1: a survives pin of a program that was emitted
+ * fails. A program that cannot be emitted yet fails nothing, and neither
+ * does a finding on a program that was emitted: the new tree is expected
+ * to differ until its milestone.
+ */
+export function failedNext(report: Report): boolean {
+  return report.pins.failing > 0;
 }
 
 // ── Running programs ──────────────────────────────────────────────────
@@ -325,18 +363,48 @@ export const PRESENT_RUN_DIFFERS: Record<string, string> = {
     "the suite passes it lib/proven.alg as an extension (src/test/proofs.ts); the program has no `use proven` and the file runner has no flag for an extension, so its run stops on a parse error",
 };
 
+// ── The new tree's runner ─────────────────────────────────────────────
+
+/** The step budget of one program on the new tree: a recursion that never ends stops here. */
+export const NEXT_STEPS = 1_000_000;
+
+/**
+ * The new tree's runner: the text is emitted as a saved program by the
+ * bootstrap (next/bootstrap/emit.ts), and the record is run by the
+ * launcher (next/launch/launcher.ts) on the reference kernel, with the
+ * ceiling `output` and a budget of `NEXT_STEPS` steps. A text the emitter
+ * cannot emit yet is a run that did not happen: "not emitted", with the
+ * first finding. A run that did not complete is stopped, with the
+ * launcher's description of how it ended.
+ */
+export function nextTreeRunner(options: { steps?: number } = {}): Runner {
+  return async (program) => {
+    const [{ emit, describeFinding }, { launch, describe }, { output }, { createKernel }] = await Promise.all([
+      import("../bootstrap/emit.js"), import("../launch/launcher.js"), import("../launch/output.js"), import("../kernel/create.js"),
+    ]);
+    const emitted = emit(program.text);
+    if (!emitted.ok) return { lines: [], end: { kind: "not emitted", reason: describeFinding(emitted.findings[0]) } };
+    const outcome = await launch({
+      createKernel, program: JSON.parse(JSON.stringify(emitted.program)),
+      configuration: { ceiling: ["output"], steps: options.steps ?? NEXT_STEPS }, target: { capabilities: [output] },
+    });
+    return { lines: outcome.lines, end: outcome.end.kind === "completed" ? { kind: "completed" } : { kind: "stopped", reason: describe(outcome.end) } };
+  };
+}
+
 // ── main ──────────────────────────────────────────────────────────────
 
 function usage(msg: string): never {
   console.error(msg);
-  console.error("usage: npx tsx next/corpus/harness.ts --present [--milestone N] [--file <program>]");
+  console.error("usage: npx tsx next/corpus/harness.ts --present|--next [--milestone N] [--file <program>]");
   process.exit(2);
 }
 
 async function main(): Promise<void> {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
   const argv = process.argv.slice(2);
-  if (!argv.includes("--present")) usage("the harness needs a runner: --present is the one this part has");
+  const next = argv.includes("--next");
+  if (argv.includes("--present") === next) usage("the harness needs one runner: --present or --next");
   const value = (flag: string): string | undefined => {
     const i = argv.indexOf(flag);
     if (i < 0) return undefined;
@@ -355,18 +423,18 @@ async function main(): Promise<void> {
     files = [only];
   }
   if (msArg !== undefined) files = files.filter((f) => byProgram.get(f)!.some((c) => c.milestone !== null && c.milestone <= upTo));
-  const skipped = only !== undefined ? [] : files.filter((f) => f in PRESENT_RUN_DIFFERS);
+  const skipped = only !== undefined || next ? [] : files.filter((f) => f in PRESENT_RUN_DIFFERS);
   files = files.filter((f) => !skipped.includes(f));
 
   const bound = Math.max(1, Math.min(8, os.availableParallelism()));
   const started = Date.now();
-  const compared = await comparePrograms(root, corpus, presentTreeRunner(root), files, bound);
+  const compared = await comparePrograms(root, corpus, next ? nextTreeRunner() : presentTreeRunner(root), files, next ? 1 : bound);
   const report = buildReport(corpus, compared, upTo);
   for (const f of report.findings) console.log(f);
   for (const f of skipped) console.log(`not run: ${f}: ${PRESENT_RUN_DIFFERS[f]}`);
   for (const r of formatRows(report)) console.log(r);
-  console.log(`${formatSummary(report, "present tree")} · ${((Date.now() - started) / 1000).toFixed(1)} s, ${bound} at a time`);
-  if (failed(report)) process.exit(1);
+  console.log(`${formatSummary(report, next ? "new tree" : "present tree")} · ${((Date.now() - started) / 1000).toFixed(1)} s, ${next ? 1 : bound} at a time`);
+  if (next ? failedNext(report) : failed(report)) process.exit(1);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) void main();
