@@ -98,7 +98,7 @@ or a break-it case.
 The maintainer ruled five questions the scenes put, in a design
 discussion of the acceptance stream's session on 2026-11-15. They are
 settled. The rulings reword or extend ruled decisions of the inventory;
-B-197 (evidence against a ruled decision) lists each for the review
+the hand-off item of `docs/backlog.md` lists each for the review
 session to record. A point marked "this follows" in a scene is the
 stream's reading of a ruling, not the maintainer's word.
 
@@ -136,7 +136,7 @@ stream's reading of a ruling, not the maintainer's word.
    called as an ordinary function, not a second way of enforcing. It
    answers true or its explanation as a value, and the program prints
    the explanation. The pinned lines keep their text, and `error of`
-   leaves the source. The maintainer: "I agree on Q4." Changes: rung 3,
+   leaves the source. The maintainer agreed to this reading. Changes: rung 3,
    scenes 1 and 2.
 5. **Laws.** Bool's three equality laws are decided by enumeration. The
    nine of Int, Float and String are assumed, named with the platform,
@@ -152,8 +152,13 @@ stream's reading of a ruling, not the maintainer's word.
    derivation decides it. A derived law carries the strength of what it
    rests on, and when the budget runs out the record says where the
    derivation stopped. The kernel checks every proposal and does no
-   search. Found proofs are stored where the configuration says and
-   checked again every build, never trusted. Changes: rung 1, scenes 1
+   search. The budget is two settings for a claim, a count of samples
+   and a number of derivation steps, under a total for the build.
+   Samples are deterministic, small values first. Found proofs are
+   stored where the configuration says, the repository in favour, and
+   checked again every build, never trusted: only what the kernel can
+   check again is stored, a proof or a counterexample. The deriver
+   holds no capability; the tool that runs the build writes the store. Changes: rung 1, scenes 1
    and 4; rung 2, scene 3.
 
 **The scenes' own questions, rounds 2 to 4.** The maintainer took the
