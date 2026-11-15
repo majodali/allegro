@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 231 decisions in 6 parts and 38 chapters after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 234 decisions in 6 parts and 38 chapters (231 when the phase closed; three added by rulings since) after the preface and the tour. Part I: 23; Part II: 51; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -48,14 +48,14 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 
 As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed on PR #190.
 
-10. **Parsing** (13 decisions). A parser is a function, a grammar is a value, and a notation stands for an expression; how grammars read characters, layout and precedence, and what ambiguity is.
-   - Decisions: Parsing is evaluation; No parser is privileged; Grammars are values; Every notation stands for an expression; The `grammar { … }` block; A parser records where each expression came from in its text; Scannerless parsing; A terminal is a function, so a grammar can define its own; Offside rule through stateful indent terminals; Guards and reserved words separate keywords from identifiers; Named, partially ordered precedence levels; Ambiguity is a claim; Parse failure reporting and recovery.
+10. **Parsing** (14 decisions). A parser is a function, a grammar is a value, and a notation stands for an expression; how grammars read characters, layout and precedence, and what ambiguity is.
+   - Decisions: Parsing is evaluation; No parser is privileged; Grammars are values; Every notation stands for an expression; A language checks the names it cares about; The `grammar { … }` block; A parser records where each expression came from in its text; Scannerless parsing; A terminal is a function, so a grammar can define its own; Offside rule through stateful indent terminals; Guards and reserved words separate keywords from identifiers; Named, partially ordered precedence levels; Ambiguity is a claim; Parse failure reporting and recovery.
 11. **Changing the grammar** (4 decisions). How a text changes the language it is written in, how changes combine, and how far one reaches.
    - Decisions: A text can change the grammar it is read in; Every production can be extended; Grammars combine without regard to order; A grammar change reaches to the end of its block.
 12. **The parser engine** (2 decisions). What any parsing algorithm must do, and how the first engine arrives.
    - Decisions: Any parsing algorithm will do that meets five conditions; The platform's parser engine ships already built.
-13. **Modules and programs** (4 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
-   - Decisions: A module is an extension that arrives as a file; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
+13. **Modules and programs** (5 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
+   - Decisions: A module is an extension that arrives as a file; A key is made with the module that holds it; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
 
 **Part IV: Allegro Standard**
 
@@ -109,8 +109,8 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
    - Decisions: Configuration is all the information that determines an execution; Configuration sources have a priority, and a result says which supplied each value; A full configuration is a model, evaluated in a first phase.
 32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
    - Decisions: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; Startup, step by step; One kernel serves many invocations.
-33. **Capabilities and primitive functions** (4 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
-   - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
+33. **Capabilities and primitive functions** (5 decisions). Capabilities defined once and implemented per target, modules as functions of them, three strengths of loading, reference definitions.
+   - Decisions: A capability is a named set of effectful primitives; A module is a function of the capabilities it declares; Only the module being run performs effects when instantiated; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
 34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
    - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
 35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
@@ -494,7 +494,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### The kernel trusts only what it has evaluated
-- Decides: a result the kernel did not evaluate itself is never reported as decided. An answer from an outside solver, or a statement a program asks it to accept, is reported as assumed, and everything that rests on it says so. A claim decided with the help of a capability is decided, and names the capability.
+- Decides: a claim that no kernel evaluated is never reported as decided. A statement about a claim, such as an outside solver's verdict or an author's assertion, makes the claim assumed, and every claim that rests on it says so. A claim the kernel evaluated on an answer that came from a capability is decided, about that answer, and names the capability.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: technical
@@ -505,6 +505,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: three legs with an SMT solver as a trusted fallback (rejected: a solver is one more proposer, checked or assumed)
 - Sources: docs/book/vision.md §2; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: replaces "Three-leg proof strategy: PE-as-discharge, proof pairs, selective SMT" and merges "SMT as a selective fallback", which is no longer a decision.
+- Notes (2026-11-15, the rulings on strength and on identity): reworded. The two rules gave one mechanism two strengths (issue 8 of the adversarial review): what differs is whether the kernel evaluated the claim itself or was told its verdict. A program that reads a number through a capability and checks it has truly checked that number. A restored outcome was evaluated by its builder's kernel and names the builder.
 - Chapter: Keep it simple
 
 - Notes (amended 2026-11-11, DR2, with the maintainer's approval): the return of a capability is not a claim, so it is not "assumed"; a claim decided by calling a capability is decided and names it.
@@ -570,7 +571,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### Every result says how strongly it holds
-- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). A result that rests on a weaker result is itself reported at the weaker strength. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently. A result also names the extensions and capabilities it rests on.
+- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). The word says how the claim itself was settled. A claim that rests on a weaker claim is itself reported at the weaker strength; nothing else lowers it. What a result rests on is recorded beside the word and never changes it: the kernel variant, the primitive functions that ran, the capabilities whose answers were read, the extensions, the builders of restored outcomes. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
@@ -585,6 +586,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the keyword `proven` names a check made on four samples, and a `proven` clause is absent from the verdict, whose ledger then reads "all proofs rest on proven backing" (`lib/proven.alg:4`–`5`, `src/pcp.ts:1021`). Held on "Bounded sampling for universal claims".
 - Held finding (2026-11-11, DR1): the safety grade reads `proven-safe` whenever nothing complained (`src/introspect.ts:496`–`504`); a verdict resting on sampled backing is headed "Verdict (verified)" (`src/pcp.ts:646`, `959`). Held on "Safety grade as the default verification surface" and "The verdict as accumulated metadata".
 - Held finding (2026-11-12, DR4): the verdict is assembled by a walk of top-level bindings outside evaluation (`buildVerdict`), where the decision makes it the result's own metadata; and contracts that stay undecided reach `inspect` only, not the verdict or the record of assumptions. Formerly the entries "The verdict as accumulated metadata" and "Contracts in the verdict and the ledger".
+- Notes (2026-11-15, the rulings on strength and on identity): reworded: strength and what a result rests on are two things, where the decisions had treated them as one (issues 8 to 10). The weakest-link rule applies among claims only, so a claim that used arithmetic is decided and names its primitives.
 - Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
@@ -646,6 +648,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): concepts.md Part 0 (SC-1) / kinds chapter (planned II.3)
 - Notes: Significance calibrated from 5.
 - Notes (2026-11-11, DR2): ruled; each kind passes the kernel's criterion. Absorbs "Kind is a host discriminant, not a type". Carried forward to the open privacy question: a symbol is identified by name, and a name can be guessed.
+- Notes (2026-11-15, the ruling on identity): the kinds stay seven. A key is a structure that the kernel marks ("A key is made with the module that holds it"), not a kind of its own.
 - Chapter: Values
 
 #### The kernel's plain data is a sequence of bits, and it computes nothing on them
@@ -999,6 +1002,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR2): the kernel registers `error`, `knowledge`, `warnings` and `exported` (`src/capability.ts:181`–`195`); the registration primitive is named `channel_register`.
 - Notes (2026-11-11, DR2, leftovers): absorbs "Writes gated by a capability, reads free" and "One-shot field registration with a pass epoch".
 - Held finding (2026-11-11, DR2): a second registration with the same rule in the same evaluation pass returns the held writer, a workaround for re-evaluation in the REPL.
+- Notes (2026-11-15, the ruling on identity): the kernel now has a third field of its own, the mark of a key. The title is kept until the fields are built and the entry is next reviewed.
 - Chapter: Metadata
 
 #### A field's rule is a pure, bounded function
@@ -1160,7 +1164,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### A missing value is a cell that is filled once
-- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, and an input not yet supplied, are cells too.
+- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, an input not yet supplied, and a name that nothing has bound yet are cells too.
 - Status: settled; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1169,7 +1173,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Label: foundational — completion, later phases and asynchronous results rest on it
 - Options recorded: incompleteness as a state of a structure (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
-- Notes: replaces "Incompleteness lives in write-once future cells" and absorbs "One residualising resolution semantics for scopes": a declared name with no value yet is such a cell, and a name nothing declares is a refutation. The maintainer doubted that a name without a value arises apart from these cases; it does not, so it is not a decision of its own.
+- Notes: replaces "Incompleteness lives in write-once future cells" and absorbs "One residualising resolution semantics for scopes": a declared name with no value yet is such a cell. (Ruled otherwise on 2026-11-14: a name nothing has bound is such a cell as well, and is no refutation.) The maintainer doubted that a name without a value arises apart from these cases; it does not, so it is not a decision of its own.
 - Chapter: Evaluation
 
 #### When information arrives, what waited on it is evaluated again
@@ -1305,7 +1309,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Correctness
 
 #### A refutation marks everything computed from it
-- Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, a name that nothing declares, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
+- Decides: when a program is wrong, the kernel records a refutation on the value concerned. A program can be wrong through a false claim, a call on something that is not a function, or two definitions that conflict. Every value computed from a refuted value is refuted too. No code can remove the mark, test for it and carry on, or write it itself.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1316,6 +1320,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. With it an effect never consumes a refuted value, and a phase goes on evaluating what does not depend on one, then ends refuted. A test for the mark is itself computed from the refuted value, so it is refuted too.
 - Held finding (2026-11-11, DR2): the kernel throws on an ill-formed application and on some type errors instead of recording a refutation (the five abort classes of the former "Specified aborts").
+- Notes (2026-11-14, issue 15 of the adversarial review): "a name that nothing declares" leaves the list. The kernel never refutes an unbound name: evaluating one gives a residual. Whether a name left unbound is an error is for the language that read the text to claim ("A language checks the names it cares about").
 - Chapter: Correctness
 
 #### A refutation on a path that may be taken refutes the program
@@ -1415,6 +1420,21 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/grammar-formalism.md §6.4; docs/book/extension/grammar.md §4; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling: "Meaning comes before notation" made concrete. A form that changes the grammar is no exception: its expression's value is the new grammar ("A text can change the grammar it is read in"). Absorbs the hygiene clause of "The `grammar { … }` block".
 - Held finding (2026-11-12, DR3): the base grammar's trees are turned into expressions by host code (`src/grammar2/tree-builder.ts`), which can do what no form's expression can.
+- Notes (2026-11-14, issue 15 of the adversarial review): the mapping from what a form matched to its expression is a pure function, and it may compute on what it matched before it returns the expression; the templates of the `grammar { … }` block are one way of writing one. "A language checks the names it cares about" relies on this.
+- Chapter: Parsing
+
+#### A language checks the names it cares about
+- Decides: the kernel never refutes an unbound name; evaluating one gives a residual that waits on it. The extension that reads a text decides which names must be bound, and when. It computes, from the expression it built, the names the expression uses and the names it binds, and states the result as a claim on that constant: true, or the names left over. A utility for this is defined outside the kernel, for parsers and loaders to use. The standard language checks at the end of a text, so a name may be used before it is defined.
+- Status: open (the kernel refuses an undeclared name itself); ruled 2026-11-14
+- Type: capability
+- Rationale kind: technical
+- Depends on: Every notation stands for an expression; Claims are evaluated like everything else; A missing value is a cell that is filled once; The kernel holds no language
+- Significance: 3 — how a name comes to mean something is each language's rule
+- Label: foundational — hoisting, nonterminals in a grammar, logic variables and any other use of a name before its definition
+- Options recorded: a name bound to nothing is a refutation by the kernel (the review's first recommendation; rejected: a name may be used before it is defined, and the rule differs by language and even by symbol); a name left unbound when its scope is closed is a refutation (rejected: it adds a notion to the kernel and treats every name of a scope alike); a property on symbols that sets how each is declared and bound (adds a language's concept to the kernel); a kernel primitive in expressions that checks a symbol is bound (it would need to know that no binding can still come); the loader asking the kernel to check bindings (the loader would answer for what only the grammar knows); a claim that depends on the name's value (it waits for ever and is never refuted)
+- Sources: the maintainer's rulings of 2026-11-13 and 2026-11-14 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Use case: a module calls a function defined further down the file, and misspells another; the first is fine, and the check at the end of the text refutes the second by name.
+- Notes: new, by ruling; answers issue 15 of the adversarial review. The grammar has already said which identifiers matter, in the expression: one it wants checked is a symbol in a position that will be evaluated; a nonterminal or a logic variable is data or a cell, and the utility does not see it as a name. Because a module is a closed function, the check needs no view of any environment. A language that makes no such claim gets no refutation for a misspelt name; a tool can report names that nothing can bind when a phase ends, as a matter of completion. A name computed while a program runs cannot be checked ahead.
 - Chapter: Parsing
 
 #### The `grammar { … }` block
@@ -1652,6 +1672,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/extension/modules.md "Loading (L1)", Import syntax; docs/book/extension/README.md "Provides"; docs/book/grammar-formalism.md §6.2; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Extensions are the module substrate" and the import half of "`use` header for language extension, `import` for module values". The maintainer: a module is an extension, with the same interface; the kinds of artifact differ because the kernel's mechanism is kept as simple as possible and more sophisticated mechanisms are loaded as extensions. The entry "Module loading and typed module objects are separate layers" is dissolved: layers go, and typed module objects are a decision of the standard language.
 - Held finding (2026-11-12, DR3): the loader is host code (`src/modules.ts`), still mixed with the standard language's typed modules (scripts/analyze/units.json).
+- Chapter: Modules and programs
+
+#### A key is made with the module that holds it
+- Decides: when a module is made, the kernel derives the module's identity from its content, and makes the module's keys from that identity. A key is a structure that says which module and which slot, carrying a mark that only the kernel writes and that is never carried onto another value. Anyone can build a structure with the same entries; it is not a key. Whether a value is a key, and whether two are the same key, are questions for the kernel, never answered by comparing content. The same module has the same keys in every kernel and every phase, and after it is saved and loaded. No other content has them. A holder of a key can derive further keys from data.
+- Status: partly built (the reference kernel makes modules and keys; deriving a key from data is not built); ruled 2026-11-15
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is an extension that arrives as a file; Authority is an unforgeable value; The same program and the same information give the same result; Reading an expression never yields authority; Trust in a value needs no seal
+- Significance: 4 — where every unforgeable value of a program comes from
+- Label: foundational — private members, the writers of metadata fields, and anything else held by a key
+- Options recorded: making a key as an effect, performed once (rejected: it breaks determinism and the rule that only the module being run performs effects, and a saved program's keys would be restored on trust); a key identified by the place in the text where it is made (rejected: another party can read that expression and evaluate it again); a key as bits or a structure with no mark (it could be forged: its content is derived from a hash of public code); a key as an eighth kind of value (the first build; safe with nothing to get right, but a special case where the design already has the mechanism: "Trust in a value needs no seal"); a key as marked bits (would work; a structure's parts are readable, and a derived key has a natural shape); a key as a function made by the kernel
+- Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Use case: a library defines a type with a private member; a program saved on a build server and loaded on a laptop reaches the member with the same key, and no other library can make that key.
+- Notes: new, by ruling; answers issues 11 and 12 of the adversarial review. To forge a module's key one must present the module's exact content, which only yields the module, whose code does not hand its keys out; change the content to export a key, and the identity and the keys change. A module's content names its parameters by their place, so renaming them changes nothing. The cost: the kernel hashes content, where it computed nothing on bits. The hash is SHA-256.
 - Chapter: Modules and programs
 
 #### The loader reaches files through a capability
@@ -2012,11 +2046,11 @@ They came together over years of exploration into most of what Allegro is today.
 ### Reaching a member
 
 #### A private member is one whose key not all code holds
-- Decides: the key is an unforgeable value made where the type is defined. Code that holds it can reach the member; no other code can, by any name. A key cannot be written out and read back into existence. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
+- Decides: the key is one of the keys of the module that defines the type. Code that holds it can reach the member; no other code can, by any name. A saved program records key slots, never keys. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
 - Status: open (the code mediates each access and asks whether the requesting scope holds a name); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Authority is an unforgeable value; Reading an expression never yields authority; Members are keyed by symbol and conformance is membership
+- Depends on: Authority is an unforgeable value; Reading an expression never yields authority; Members are keyed by symbol and conformance is membership; A key is made with the module that holds it
 - Significance: 4 — what a type can keep to itself
 - Label: foundational — secrecy, and the base of every access rule
 - Units: type-core
@@ -2024,6 +2058,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: D41 (docs/decisions.md; structures.md §6, §13); V-R1 (docs/plans/visibility.md §3); D43 (docs/decisions.md); V-R3, V-R5 (docs/plans/visibility.md §3); docs/book/standard/type-system.md §3; D42 (docs/decisions.md; structures.md §13); V-R2 (docs/plans/visibility.md §3); forgery-E criterion (visibility.md §3); V-R6, V-R7, V-R8 (docs/plans/visibility.md §3; docs/decisions.md); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: replaces "Mediated member access", "Access is what a type's member lookup returns, in two tiers", "Evidence is possession" and "Privacy across readers, reflection and mediation effects", and takes the rule on serialising symbols that the Part II review sent here. Every access pattern is a rule for who is handed the key and in what form: private, the defining module keeps it; shared within a group, the module hands it to the modules it names; read-only, the module hands out a function that reads; protected, the type hands it to any definition that refines or draws from it. Protected is a discipline unless the type also limits who may refine it.
 - Held finding (2026-11-12, DR4): member access runs through an installed mediation path with a policy hook (`type_dispatch`, `fallbackMember`), and privacy asks what the requesting scope can reach.
+- Notes (2026-11-15, the rulings on strength and on identity): the key is now made as "A key is made with the module that holds it" says. "Cannot be written out and read back into existence" is replaced: a record holds slots, and loading derives the keys again from the module's content (issue 12).
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written
@@ -2733,6 +2768,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a primitive that asks of any value whether it is resolved (`is_resolved`, removed in the Part IV review: it makes any function's behaviour depend on the phase; here only a function that declares an unevaluated argument sees a residual, and it sees it by reading an expression)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr5-part-5-vivace.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: unknowns may be represented by unbound symbols, and normal evaluation turns those, and hence a solver function, into a residual; solver functions can take unevaluated arguments, "but this may be a use case for something akin to `is_resolved`"; "Vivace should provide functions that parse expressions and return resolved and unresolved parts." The maintainer confirmed on PR #193: reading the residual of an expression the solver evaluated itself is correct, and `is_resolved` is not; different grammars may handle unknowns differently, so an unbound symbol is one representation. A second use case for unevaluated arguments, after `if` with knowledge in its branches. A candidate is tried by evaluating the problem with the unknown's name rebound, a kernel primitive.
+- Notes (2026-11-14, issue 15 of the adversarial review): consistent with the ruling: a name nothing has bound gives a residual in ordinary evaluation, for a solver's unknown as for any name.
 - Chapter: Search and optimization
 
 #### Feasible is decided; best says how strongly it holds
@@ -3088,6 +3124,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer listed constructing, binding, evaluating and creating scopes; the review added cells, results, residuals, limits and faults. A scope that shares nothing with any other is what lets specific code be given specific capabilities. Inside Allegro the environment is still not a value: a scope is a handle of the interface.
 - Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
 - Notes (2026-11-13, with the first version of the interface): filling a cell records the value and evaluates nothing. A kernel-wide call evaluates again everything that waited on cells filled since, under a step budget: the kernel tracks what waits on what, and the host says when the work happens. Ruled against the host asking for each result it kept (it cannot know every waiter) and against evaluation inside the fill (no budget, and effects in arrival order).
+- Notes (2026-11-15, the rulings on strength and on identity): the second version, `Kernel2` in `next/kernel/interface.ts`, adds: making a module, with its keys; reading a key; what a result rests on; the reason for a refutation; restore; and whether a value is a cell.
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome
@@ -3239,7 +3276,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of the capabilities it declares
-- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. Only the module being run performs effects when instantiated: instantiating the module a launcher runs performs its top-level effects in written order, and instantiating any other module performs none. A library holds capabilities inside its functions and uses them when called; one that must act at startup offers a function for the program to call. A session at a prompt is the module being run.
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3250,7 +3287,22 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a logging module declares output; the module that imports it hands over a narrowed form that can only append to one file.
 - Notes: new, by ruling. It needs the kernel primitive for evaluating with names rebound to supply the complete set of names (noted on "The kernel's primitives are pure and few").
-- Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open. The rule on top-level effects is a second ruled decision, "Only the module being run performs effects when instantiated", stated here until it has an entry of its own: adding an entry changes the decision map's row count, which a test of the acceptance stream pins. Rejected for it: any module performing top-level effects in dependency order (the order of instantiation would be observable); a saved program that evaluates at load; effects gathered into a function under a reserved name (the maintainer's suggestion, of which the module as one function is the form without the name). It is checkable as a claim: instantiated with no capabilities, a library's residual has no effect call outside a function body. Registering a metadata field is a kernel primitive, not an effect in this sense.
+- Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open. The rule on top-level effects is the next entry.
+- Notes (2026-11-15, the rulings on strength and on identity): a reading, not yet ruled, for issue 13: a module is instantiated once for each set of arguments, and every instance shares the module's identity and keys, so the types they define are the same types.
+- Chapter: Capabilities and primitive functions
+
+#### Only the module being run performs effects when instantiated
+- Decides: instantiating the module a launcher runs performs its top-level effects, in written order. Instantiating any other module performs none: a library holds capabilities inside its functions and uses them when called, and one that must act at startup offers a function for the program to call. A session at a prompt is the module being run.
+- Status: open; ruled 2026-11-13
+- Type: capability
+- Rationale kind: technical
+- Depends on: A module is a function of the capabilities it declares; Order of definition carries no meaning; The same program and the same information give the same result
+- Significance: 3 — importing a library never does anything
+- Label: foundational — the order in which modules are instantiated cannot be observed
+- Options recorded: any module may perform top-level effects, in dependency order, with the order among independent modules unspecified (rejected: that order would be observable); a saved program that evaluates at load (rejected: the loader loses control of when effects happen); top-level effects gathered into a function under a reserved name (the maintainer's suggestion; the module as one function is the same idea without the name)
+- Sources: the maintainer's rulings of 2026-11-13 and 2026-11-14 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Use case: a library's author leaves a `print` at its top level; the check phase refutes it, where another platform would print on every import.
+- Notes: new, by ruling; an entry of its own since 2026-11-14. It is checkable as a claim: instantiated with no capabilities, a library's residual has no effect call outside a function body. Registering a metadata field is a kernel primitive, not an effect in this sense.
 - Chapter: Capabilities and primitive functions
 
 #### Loading is three capabilities of rising strength
@@ -3343,6 +3395,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: the standard language is built once and saved; every later start replays the record.
 - Notes: new, by ruling. "The platform's parser engine ships already built" is its first use.
 - Notes (2026-11-13, after the adversarial review): reworded by ruling, answering issue 25 of the adversarial review (a record could contain any interface call). The first version of the data form, `next/kernel/saved-program.ts`, holds no claim outcomes, no keys and no origins, and defines the data form only; those return with the rulings on identity and on strength.
+- Notes (2026-11-15, the rulings on strength and on identity): the second version of the data form adds key slots and stored outcomes (`next/kernel/saved-program.ts`).
 - Chapter: Saved programs and export
 
 #### A saved program names what it needs by content hash
@@ -3360,7 +3413,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Saved programs and export
 
 #### A stored outcome is restored with its builder's name
-- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. Deciding again is always available.
+- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. An outcome that rests on a capability's answer is never stored: it is decided again when the program is loaded. Deciding again is always available.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3371,6 +3424,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a team's build server saves a library with its laws decided; a developer's kernel restores them stamped with the server's name, and an auditor decides them again.
 - Notes: new, by ruling. The maintainer: fully rechecking on load "will likely be opt-in"; restore is allowed inside the kernel and is configurable, which "means mostly we need to always analyze for vulnerabilities".
+- Notes (2026-11-15, the rulings on strength and on identity): determinism justifies restoring only where it holds, so an outcome that rested on a capability's answer is never stored (issue 10). A restored claim keeps the word its builder's kernel recorded. The kernel computes each outcome's key itself, from the claim's content, the content of the function it sits in and what it rests on (`Kernel2.claimKey`), and `restore` refuses a stored key that differs. The first build left this out; the maintainer asked for it on PR #215.
 - Chapter: Saved programs and export
 
 #### A target platform is a model, and export is a transformation into it

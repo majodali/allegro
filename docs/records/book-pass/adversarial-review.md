@@ -340,7 +340,115 @@ ready, under a step budget, each waiter once after all it depends on.
 Cells stay opaque handles and all logic is in the kernel's calls. The
 order of effects that become ready together waits on issue 17.
 
+**On PR #207, 2026-11-14.** The maintainer merged the first versions
+of the two contracts: "Everything looks good." Confirmed with it: the
+interface with `advance`; a record that constructs values and binds
+nothing; issue 29, plain data in a cell; what the first version
+leaves out. The kernel stream's remaining chunks are approved
+(`docs/plans/book-pass.md` §2.9 and §5).
+
+**Issue 15, under discussion, 2026-11-14.** The review session
+recommended that a name is declared when something binds it, and that
+a name bound to nothing is a refutation. The maintainer leans the
+other way: "I want Allegro to support using a name before it is
+defined, as in function hoisting in Javascript, nonterminals in
+grammar definitions, or variables in Prolog. Since there are a few
+use cases, and we're supporting it as an extension mechanism, there
+doesn't seem to be a simple rule to govern when an unidentified
+symbol becomes a refutation. I'm not greatly concerned about finding
+misspellings late. This needs more thought." Not ruled.
+
+**Issue 15, ruled 2026-11-14.** The maintainer set out three ways to
+make the handling of identifiers depend on the language, since it
+"may even be specific to certain symbols within a parsed expression":
+a property on symbols; a kernel primitive in expressions that checks
+a symbol is bound; the loader calling the kernel to check bindings,
+which "would make the loader responsible for something that only the
+parse grammar knows about". The review session withdrew its proposal
+of closing a scope and offered a fourth, which adds nothing to the
+kernel. Ruled: "This approach is the right way to handle issue 15."
+
+- The kernel never refutes an unbound name; evaluating one gives a
+  residual.
+- A language checks the names it cares about. From the expression it
+  built, it computes the names used and the names bound, and states
+  the result as a claim on that constant. The claim is about the
+  expression, so it is decided at once; a claim on the name's value
+  would wait for ever. The maintainer: it checks "which symbols are
+  bound and which are not for the expression as a whole - up to that
+  point", with "a utility function for doing this kind of check being
+  defined outside the kernel, but available to parsers and language
+  specific loaders".
+- The standard language checks at the end of a text.
+- A form's mapping from what it matched to its expression is a pure
+  function that may compute.
+
+In the inventory: the new entry "A language checks the names it cares
+about"; "a name that nothing declares" leaves the causes listed in "A
+refutation marks everything computed from it"; a name nothing has
+bound is a cell, in "A missing value is a cell that is filled once".
+"Only the module being run performs effects when instantiated" now
+has its own entry, the acceptance stream having loosened the test
+that pinned the decision map's row count.
+
+**On PR #214, 2026-11-15.** The maintainer merged the reference
+kernel's first part and signed milestone 1. Confirmed with it: the
+truth values are the bits of length one; the kernel primitives `if`,
+`claim` and `quote`; a structure's entries are evaluated in order.
+
+**Strength, issues 8 to 10, ruled 2026-11-15.** "Agreed on both
+rulings." Strength says how the claim itself was settled; what a
+result rests on is recorded beside it and never changes the word.
+
+- Decided means a kernel evaluated the claim, on the values in hand,
+  and it came out true. Assumed means someone stated it and no kernel
+  evaluated it.
+- The weakest-link rule applies among claims only. A claim that used
+  a pure primitive stays decided and names it (issue 9).
+- A claim evaluated on a capability's answer is decided, about that
+  answer, and names the capability; a claim a solver merely vouches
+  for is assumed (issue 8). Lowering every result that used a
+  capability to assumed was rejected: a program that reads a number
+  and checks it has truly checked that number.
+- A restored outcome keeps the word its builder's kernel recorded and
+  names the builder. An outcome that rests on a capability's answer
+  is never stored (issue 10).
+
+**Identity, issues 11 and 12, ruled 2026-11-15.** "A key is made
+with the module that holds it." The kernel derives a module's
+identity from its content, and its keys from that identity. A saved
+program records key slots, never keys. Rejected: making a key as an
+effect; a key identified by the place in the text where it is made.
+Not ruled, and noted as a reading on the module decision: issue 13, a module instantiated once for each
+set of arguments, every instance sharing the module's identity and
+keys.
+
+**What a key is, ruled 2026-11-15.** The first build made a key an
+eighth kind of value. The maintainer asked for an alternative: "I was
+assuming a key would be a Bits value or a structure." Bits or a
+structure alone can be forged, since a key's content is derived from
+a hash of public code. With a mark that only the kernel writes it
+cannot, which is the mechanism of "Trust in a value needs no seal".
+Ruled: a key is a structure that the kernel marks. The kinds stay
+seven. The mark is never carried onto another value, and whether a
+value is a key, or two are the same key, is asked of the kernel and
+never answered by comparing content.
+
+**On PR #215, 2026-11-15.** The maintainer: "Go ahead with the
+temporary second version, the other stream is going to be a while."
+The second versions of both contracts sit beside the first until the
+acceptance stream moves over. And: "Let's implement the kernel
+building a key for each restore claim." The first build had tied a
+stored outcome to its claim only by the record's content. Now the
+kernel computes a key from the claim's content, the content of the
+function it sits in, and what the outcome rests on; a builder stores
+it; the loading kernel computes it again and refuses the record where
+the two differ.
+
 ## Terms introduced
 
+- **Rests on**: what a result's evaluation used that the kernel did
+  not itself evaluate.
+- **Key slot**: a place in a module where one of its keys goes.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
