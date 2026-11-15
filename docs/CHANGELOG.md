@@ -574,6 +574,39 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-15 — Identity and strength ruled; the contracts' second
+  versions (K3).** A key is made with the module that holds it: the
+  kernel hashes a module's content and makes its keys from that
+  identity, the same in every kernel. Strength says how a claim was
+  settled, and what a result rests on is recorded beside it: a claim
+  that used arithmetic is decided and names its primitives. In
+  `next/kernel/`: the interface's second version (`Kernel2`) with
+  modules, keys, `restsOn` and restore; key slots and stored outcomes
+  in the saved-program form; the reference kernel implementing both;
+  a SHA-256 checked against the standard's vectors. A key is a
+  structure the kernel marks, so the kinds stay seven. The kernel
+  computes a key for each stored outcome and refuses one that does
+  not match its claim.
+- **2026-11-15 — The reference kernel, first part (K2).**
+  `next/kernel/kernel.ts` implements the kernel's interface: values of
+  the seven kinds, scopes and names, cells, and the evaluation of
+  names, structures and calls of composed and primitive functions,
+  under a step budget. A name not yet bound is a residual, and what
+  waited on a name or a cell is evaluated again by `advance`. Three
+  kernel primitives for now: a conditional, a claim and a quotation.
+  Tested through the interface only (23 tests), and by the acceptance
+  stream's launcher, which runs a saved program on it:
+  `npm run launch -- next/launch/fixtures/hello.json` prints
+  `hello, world`. Not yet: metadata fields, origins, recursion on
+  unknown arguments.
+- **2026-11-14 — How a name comes to be checked, ruled.** The kernel
+  never refutes an unbound name; evaluating one gives a residual. A
+  language checks the names it cares about, from the expression it
+  built, and states the result as a claim; the standard language does
+  so at the end of a text, so a name may be used before it is defined.
+  `docs/plans/book-pass-inventory.md` gains the decision "A language
+  checks the names it cares about", and "Only the module being run
+  performs effects when instantiated" has its own entry: 233 decisions.
 - **2026-11-13 — The kernel's interface and the saved-program data
   form, first versions (K1).** The kernel stream of the rebuild
   program begins. `next/kernel/interface.ts` states what host code can

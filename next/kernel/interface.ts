@@ -1,4 +1,4 @@
-// The kernel's interface, first version.
+// The kernel's interface, first and second versions.
 //
 // One of the three contracts between the two streams of the rebuild
 // (docs/plans/rebuild.md §8 rule 2): a change to this file is a pull
@@ -18,15 +18,18 @@
 // this interface; what Allegro code may do is the kernel's primitives,
 // which are Part II's and are not stated here.
 //
-// What the first version leaves out, on purpose (the rulings of
-// 2026-11-13, docs/records/book-pass/adversarial-review.md):
-//   - restore: no call records a stored claim outcome. It returns with
-//     the ruling on strength (issues 8 to 10 of that record).
-//   - keys: no call makes an unforgeable value other than a primitive
-//     function. It returns with the ruling on identity (issues 11, 12).
-//   - the strength of an outcome and what it rests on: `Outcome` below
-//     has the three states the kernel records today and nothing more.
-// Each will be an addition; no call below is expected to change.
+// Two versions are stated here. `Kernel` is the first: what a launcher
+// needs to run a program. `Kernel2` adds what the rulings of 2026-11-15
+// on identity and on strength made possible
+// (docs/records/book-pass/adversarial-review.md, issues 8 to 12):
+//   - modules and their keys: `module`, `keyOf`, `moduleOf`;
+//   - what a result rests on, beside how strongly it holds: `restsOn`;
+//   - restore: a stored outcome recorded under its builder's name;
+//   - three calls the first version lacked: `isCell`, `reasonOf`, and
+//     real classes for the two errors.
+// The two are kept apart so that code written against the first keeps
+// compiling. They become one interface when nothing implements only the
+// first.
 //
 // The kernel is passive. Creating one does nothing but create it. It
 // reads no file, no text, no environment and no clock. Every effect a
@@ -132,10 +135,33 @@ export interface Limits {
 }
 
 /**
- * What the kernel recorded when an expression was evaluated as a claim.
- * First version: the three states only.
+ * How strongly a claim holds, as the kernel recorded it. It says how the
+ * claim itself was settled, and nothing lowers it but another claim:
+ *   "decided"   a kernel evaluated the claim, on the values in hand, and
+ *               it came out true;
+ *   "sampled"   it was evaluated on some cases;
+ *   "assumed"   someone stated it and no kernel evaluated it;
+ *   "undecided" it still waits;
+ *   "refuted"   it was evaluated and is not true.
+ * The first version of a kernel records "decided", "refuted" and
+ * "undecided" only.
  */
-export type Outcome = "decided" | "refuted" | "undecided";
+export type Outcome = "decided" | "refuted" | "undecided" | "sampled" | "assumed";
+
+/**
+ * One thing a result rests on: something its evaluation used that the
+ * kernel did not itself evaluate. It is recorded beside the outcome and
+ * never changes the outcome's word.
+ */
+export type Rest =
+  /** The kernel variant that evaluated it. */
+  | { readonly kind: "kernel"; readonly variant: string }
+  /** A pure primitive function, by content hash. */
+  | { readonly kind: "primitive"; readonly hash: string; readonly name: string }
+  /** An effectful primitive whose answer was an input: a part of a capability. */
+  | { readonly kind: "capability"; readonly capability: string; readonly part: string }
+  /** Whoever built the saved program a restored outcome came from. */
+  | { readonly kind: "builder"; readonly builder: string };
 
 /** What one call of `evaluate` returns: how things stood when it returned. */
 export interface Result {
@@ -175,8 +201,10 @@ export interface Advance {
  * the kernel, never in the program: a wrong program is refuted, it does
  * not throw.
  */
-export declare class KernelFault extends Error {
-  readonly invariant: string;
+export class KernelFault extends Error {
+  constructor(readonly invariant: string) {
+    super(`kernel fault: ${invariant}`);
+  }
 }
 
 /**
@@ -184,7 +212,7 @@ export declare class KernelFault extends Error {
  * kernel, a call on the wrong kind, a symbol bound twice in one scope,
  * a cell filled twice.
  */
-export declare class InterfaceError extends Error {}
+export class InterfaceError extends Error {}
 
 /** The kernel, as host code sees it. */
 export interface Kernel {
@@ -287,5 +315,98 @@ export interface Kernel {
   originOf(value: Value): Value | undefined;
 }
 
+/** What `Kernel2.keyOf` reads of a key. */
+export interface KeyDescription {
+  /** The identity of the module the key was made with: `sha256:` and 64 hex digits. */
+  readonly module: string;
+  /** Which of that module's keys it is, from 0. */
+  readonly slot: number;
+}
+
+/**
+ * The second version: everything of `Kernel`, and modules, keys, what a
+ * result rests on, and restore.
+ */
+export interface Kernel2 extends Kernel {
+  // ---- Modules and keys -----------------------------------------------
+
+  /**
+   * Makes a module from a composed function. The function's first `keys`
+   * parameters are its key slots; the rest are what the module declares:
+   * capabilities, inputs, other modules.
+   *
+   * The kernel derives the module's identity from the function's content
+   * and makes one key for each slot from that identity. A key is a
+   * structure that the kernel marks: its entries say which module and
+   * which slot, and anyone can build a structure with the same entries,
+   * but only the kernel can mark one, and the mark is never carried onto
+   * another value. So a key is told from a lookalike by `isKey`, never
+   * by its content. It returns the
+   * module function: a composed function of the remaining parameters,
+   * with the keys in place. The same content gives the same identity and
+   * the same keys in every kernel; no other content gives them.
+   *
+   * The function must be closed: an InterfaceError where it holds a
+   * cell, a parameter of no function in it, an effectful primitive, or
+   * anything else that has no content to hash.
+   */
+  module(fn: Value, keys: number): Value;
+  /** The identity of the module a module function was made as, or undefined for any other value. */
+  moduleOf(value: Value): string | undefined;
+  /** True for a key: a structure carrying the kernel's mark. False for a structure with the same entries and no mark. */
+  isKey(value: Value): boolean;
+  /** Reads a key. An InterfaceError for a value that is not one. */
+  keyOf(value: Value): KeyDescription;
+
+  // ---- What a result rests on -------------------------------------------
+
+  /**
+   * What the kernel's record of a claim's outcome on this value rests
+   * on. Empty where the value carries no outcome.
+   */
+  restsOn(value: Value): readonly Rest[];
+  /** Why a refutation was recorded on this value, in a sentence, or undefined where none was. */
+  reasonOf(value: Value): string | undefined;
+
+  // ---- Restore ------------------------------------------------------------
+
+  /**
+   * The key of a claim's outcome: a hash the kernel computes from the
+   * claim's content, the content of the function it sits in, and what
+   * the outcome rests on. `within` is that function, as built and before
+   * `module` is applied to it; `claim` is an application of the kernel's
+   * claim primitive somewhere inside it. A builder stores the key beside
+   * the outcome. The same claim in the same function, resting on the
+   * same things, has the same key in every kernel; any change to one of
+   * the three changes it. An InterfaceError where `claim` is not inside
+   * `within`.
+   */
+  claimKey(claim: Value, within: Value, restsOn: readonly Rest[]): string;
+  /**
+   * Records that a claim was decided by the kernel of whoever built the
+   * saved program it came from. The kernel computes the claim's key
+   * itself, as `claimKey` does, and refuses with an InterfaceError
+   * unless it equals `key`: a stored outcome cannot be attached to
+   * another claim, to the claim in another function, or to other
+   * grounds. When evaluation reaches the claim it is not evaluated
+   * again: its outcome is "decided", resting on the builder named here
+   * and on what `restsOn` lists.
+   *
+   * The only call that records an outcome the kernel did not itself
+   * reach, and it cannot record one without a builder's name. An
+   * InterfaceError also where `claim` is not such an application, or
+   * where `restsOn` names a capability: an outcome that rests on a
+   * capability's answer is never stored.
+   */
+  restore(claim: Value, within: Value, builder: string, restsOn: readonly Rest[], key: string): void;
+
+  // ---- Cells --------------------------------------------------------------
+
+  /** True for a cell, filled or not, and for a name that waits to be bound. */
+  isCell(value: Value): boolean;
+}
+
 /** How a host obtains a kernel. Creating one performs nothing else. */
 export type CreateKernel = () => Kernel;
+/** How a host obtains a kernel of the second version. */
+export type CreateKernel2 = () => Kernel2;
