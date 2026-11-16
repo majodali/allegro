@@ -15,6 +15,7 @@ oracle:
   - npm run typecheck:next
   - npm run lint:corpus
   - npm run harness:present
+  - npm run harness:next
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
