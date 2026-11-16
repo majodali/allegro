@@ -411,7 +411,10 @@ test("a primitive outside its domain is a refutation with its reason", () => {
 test("a module with no export yields all its bindings, keyed by the symbols of their names; with export, those marked", () => {
   const all = run('input see\nf(x) => x\nn = 1\nm <- 2\nsee("ran")');
   assert.deepEqual(all.k.entriesOf(all.value).map(([key]) => all.k.symbolName(key as Value)), ["f", "n"]);
-  assert.equal(all.k.kind(all.k.entriesOf(all.value)[0][1]), "composed-function");
+  // An entry is evaluated when something reads it, so the entry is read through the kernel, not taken from `entriesOf`.
+  const f = all.k.evaluate(all.k.expression(all.k.kernelPrimitive("get"), [all.value, all.k.symbolData("f")]), all.k.scope());
+  assert.equal(f.refuted, false);
+  assert.equal(all.k.kind(f.value), "composed-function");
   const some = run('input see\nexport f(x) => x\nn = 1\nsee("ran")');
   assert.deepEqual(some.k.entriesOf(some.value).map(([key]) => some.k.symbolName(key as Value)), ["f"]);
 });
