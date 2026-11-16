@@ -227,3 +227,31 @@ test("a record with key slots does not load on a kernel of the first version", (
   const { kernel } = recorder();
   assert.throws(() => load(kernel, second, new Map([[EQ0, {} as Value]])), /key slots, and this kernel is of the first version/);
 });
+
+test("a record of the second version holds a symbol as data and a block of bindings", () => {
+  // The module's body:  block({x: `tag}, same(x, `tag))
+  const doc = {
+    format: "allegro-saved-program", version: 2, needs: [],
+    nodes: [
+      { k: "kernel", name: "block" },
+      { k: "symbol", fqn: "m.x" },
+      { k: "datum", fqn: "m.tag" },
+      { k: "kernel", name: "same" },
+      { k: "expression", fn: 3, args: [1, 2] },
+      { k: "structure", entries: [[1, 2]] },
+      { k: "expression", fn: 0, args: [5, 4] },
+      { k: "function", params: [], body: 6 },
+    ],
+    module: 7, declares: [], keys: 0, outcomes: [],
+  };
+  assert.deepEqual(check2(doc), []);
+  const k = createKernel();
+  const moduleFn = load(k, doc as unknown as SavedProgram, new Map());
+  const r = k.evaluate(k.expression(moduleFn, []), k.scope());
+  assert.deepEqual(k.bitsOf(r.value), { bytes: Uint8Array.of(1), bitLength: 1 });
+  // The first version has no symbol as data.
+  const first = { ...doc, version: 1, keys: undefined, outcomes: undefined };
+  delete (first as Record<string, unknown>).keys;
+  delete (first as Record<string, unknown>).outcomes;
+  assert.ok(check(first).some((f) => f.includes("needs version 2")));
+});

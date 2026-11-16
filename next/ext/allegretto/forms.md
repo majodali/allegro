@@ -150,23 +150,35 @@ is not a number.
 
 ## 4. What the kernel stream owes for this
 
-1. **The block of bindings**, in the kernel and in the saved-program
-   data form: a group of named values that may refer to each other, and
-   a body. It is what makes a recursive function one value with one
-   identity, where self-application made it a wrapper.
-2. **The kernel's primitives on bits**: telling two apart, ruled in
-   "The kernel's primitives are pure and few" and not built; and
-   joining two, measuring one and taking a part of one, bound in
-   Allegretto to the names `bits.join`, `bits.length` and `bits.slice`.
-   They are the kernel's and not shipped primitives because every
-   shipped primitive is to have a reference definition, and these are
-   what such a definition is written in (issue 21 of the adversarial
-   review).
-3. **Reading a structure**: an entry by key, an entry by place, and the
-   number of entries. Entries are evaluated when read.
-4. **The shipped primitives** of section 3, under `next/prims/`.
-5. **A primitive function that refuses**: a way for a primitive's host
-   code to answer a refutation with its reason.
+1. **The block of bindings**: the kernel primitive `block(bindings,
+   body)`. The bindings are a structure keyed by names; they are one
+   group, each may use any other and itself, and a recursive function is
+   one value with one identity. In the data form a block is an
+   application of the primitive, so it needs no node of its own. `x <- e`
+   is `block({x: e}, then(x, rest))`. *Built.*
+2. **The kernel's primitives on bits**: `same` tells two bits values or
+   two symbols apart; `join`, `length` and `slice` join two bits values,
+   measure one and take a part of one. Allegretto binds the last three
+   to the names `bits.join`, `bits.length` and `bits.slice`. They are
+   the kernel's and not shipped primitives because every shipped
+   primitive is to have a reference definition, and these are what such
+   a definition is written in (issue 21 of the adversarial review).
+   *Built.*
+3. **Reading a structure**: `get` reads an entry by key or by place, and
+   `count` gives the number of entries. *Built.* Entries evaluated when
+   read are not built: the kernel still evaluates them when the
+   structure is built.
+4. **The shipped primitives** of section 3, in `next/prims/index.ts`.
+   *Built.* Each is named by a hash over its host code, by ruling: the
+   helpers all share and its own entry, comments left out. The hashes
+   are committed in `next/prims/hashes.ts` and a test computes them
+   again.
+5. **A primitive function that refuses**: its host code throws
+   `Refusal` with a reason, and the kernel answers a refutation.
+   *Built.*
+6. **A symbol as data**, for the symbol literal: `Kernel2.symbolData`.
+   *Built.* In the data form it is the node `datum`, in a record of the
+   second version.
 
 ## 5. Against the present tree's base grammar
 

@@ -60,6 +60,8 @@ export type Node =
   | { readonly k: "bits"; readonly hex: string; readonly bits: number }
   /** A symbol, by its fully-qualified name. */
   | { readonly k: "symbol"; readonly fqn: string }
+  /** A symbol as data, by its fully-qualified name: what a symbol literal stands for. Second version only. */
+  | { readonly k: "datum"; readonly fqn: string }
   /** A positional parameter. Each param node is listed by exactly one function node. */
   | { readonly k: "param"; readonly name: string }
   /** A structure: entries of [key or null, value]. */
@@ -131,6 +133,7 @@ const HEX = /^([0-9a-f]{2})*$/;
 const NODE_KEYS: Record<Node["k"], readonly string[]> = {
   bits: ["k", "hex", "bits"],
   symbol: ["k", "fqn"],
+  datum: ["k", "fqn"],
   param: ["k", "name"],
   structure: ["k", "entries"],
   expression: ["k", "fn", "args"],
@@ -220,6 +223,10 @@ export function check2(doc: unknown): string[] {
         break;
       }
       case "symbol":
+        if (typeof node.fqn !== "string" || node.fqn === "") out.push(`nodes[${i}].fqn is not a name`);
+        break;
+      case "datum":
+        if (doc.version !== 2) out.push(`nodes[${i}] is a symbol as data, which needs version 2`);
         if (typeof node.fqn !== "string" || node.fqn === "") out.push(`nodes[${i}].fqn is not a name`);
         break;
       case "param":
@@ -343,6 +350,10 @@ function build(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string
         break;
       case "symbol":
         values.push(kernel.symbol(node.fqn));
+        break;
+      case "datum":
+        if (!("symbolData" in kernel)) throw new Error("a symbol as data needs a kernel of the second interface");
+        values.push((kernel as Kernel2).symbolData(node.fqn));
         break;
       case "param":
         values.push(kernel.param(node.name));

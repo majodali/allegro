@@ -66,11 +66,28 @@
 //   "build"     build(description). The function a description describes.
 //               A refutation where the description holds the identity of
 //               an unforgeable value: nothing makes authority from data.
+//   "block"     block(bindings, body). The bindings are a structure keyed
+//               by symbols. They are one group, in a scope of their own:
+//               each may use any other, and itself, so a recursive
+//               function is one value. A binding's value is evaluated
+//               when needed, at most once. The block's value is its
+//               body's. No value of the language is or holds a scope.
 //   "then"      then(first, second). It needs its first argument, and then
 //               its value is the second. This is the one way a text's
 //               order becomes an order of effects. While the first
 //               waits, the second is evaluated ahead with no effect
 //               performed, so a refutation in it is found at once.
+//   "same"      same(a, b). Tells two bits values apart, or two symbols:
+//               true where they are the same. Anything else is a
+//               refutation; the kernel gives bits no other meaning.
+//   "join"      join(a, b). The bits of a followed by the bits of b.
+//   "length"    length(a). The number of bits, as 64 bits.
+//   "slice"     slice(a, from, count). `count` bits of a from place
+//               `from`, the first bit being place 0.
+//   "get"       get(structure, key). The entry keyed by a symbol, or at a
+//               place counted from 0. The entry may itself still wait.
+//   "count"     count(structure). The number of entries, as 64 bits.
+//               A place or a count outside the value is a refutation.
 //   "attempt"   attempt(x, budget). Evaluates its first argument under a
 //               budget of steps and answers how that ended, as data: a
 //               value, a refutation with its reason, or the limit
@@ -114,7 +131,7 @@ import type {
   Advance, Cell, CreateKernel2, Entry, Kernel2, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
   Value,
 } from "./interface.js";
-import { INTERFACE_VERSION, InterfaceError, KernelFault } from "./interface.js";
+import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
 import { sha256Text } from "./hash.js";
 
 export { InterfaceError, KernelFault } from "./interface.js";
@@ -210,7 +227,10 @@ interface Root {
   done: boolean;
 }
 
-const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [["attempt", 2], ["build", 1], ["claim", 1], ["describe", 2], ["if", 3], ["then", 2]];
+const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
+  ["attempt", 2], ["block", 2], ["build", 1], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["join", 2], ["length", 1], ["same", 2], ["slice", 3], ["then", 2],
+];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
 const INSPECT = "kernel:inspect";
 
@@ -242,6 +262,8 @@ export const createKernel: CreateKernel2 = () => {
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
   let ahead = false;
+  /** The calls being opened while evaluating ahead: a function and what it was given. */
+  const opening: { fn: Fn; args: readonly V[] }[] = [];
 
   const restKey = (r: Rest): string =>
     r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : `builder ${r.builder}`;
@@ -338,21 +360,33 @@ export const createKernel: CreateKernel2 = () => {
   // ---- Functions ----------------------------------------------------------
 
   /** Ties the free names of an expression to a scope. Returns the same object where nothing changed. */
-  const tie = (v: V, scope: ScopeV, memo: Map<V, V>): V => {
+  /** The names a block of bindings binds, where the value is one; otherwise undefined. */
+  const blockNames = (v: V): Sym[] | undefined => {
+    if (!(v instanceof Expr) || !(v.fn instanceof KernelPrim) || v.fn.name !== "block" || v.args.length !== 2) return undefined;
+    const bindings = v.args[0];
+    if (!(bindings instanceof Struct)) return undefined;
+    return bindings.entries.flatMap(([k]) => (k !== null && seen(k) instanceof Sym ? [seen(k) as Sym] : []));
+  };
+
+  const tie = (v: V, scope: ScopeV, memo: Map<V, V>, skip?: ReadonlySet<Sym>): V => {
     const done = memo.get(v);
     if (done !== undefined) return done;
     if (v instanceof Expr && restored.has(v)) return v;
     let r: V = v;
-    if (v instanceof Sym) r = new NameRef(scope, v);
+    if (v instanceof Sym) r = skip?.has(v) ? v : new NameRef(scope, v);
     else if (v instanceof Expr) {
-      const fn = tie(v.fn, scope, memo);
-      const args = v.args.map((a) => tie(a, scope, memo));
+      // The names a block binds are its own: they are tied when the block is evaluated.
+      const names = blockNames(v);
+      const inner = names === undefined ? skip : new Set([...(skip ?? []), ...names]);
+      const within = names === undefined ? memo : new Map<V, V>();
+      const fn = tie(v.fn, scope, memo, skip);
+      const args = v.args.map((a) => tie(a, scope, within, inner));
       if (fn !== v.fn || args.some((a, i) => a !== v.args[i])) r = new Expr(fn, args);
     } else if (v instanceof Struct && !settled.has(v)) {
-      const entries = v.entries.map(([k, e]) => [k, tie(e, scope, memo)] as const);
+      const entries = v.entries.map(([k, e]) => [k, tie(e, scope, memo, skip)] as const);
       if (entries.some(([, e], i) => e !== v.entries[i][1])) r = new Struct(entries);
     } else if (v instanceof Fn && !settled.has(v)) {
-      const body = tie(v.body, scope, memo);
+      const body = tie(v.body, scope, memo, skip);
       r = body === v.body ? v : new Fn(v.params, body);
       settled.add(r);
       const maker = madeBy.get(v);
@@ -507,6 +541,20 @@ export const createKernel: CreateKernel2 = () => {
         if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
         return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
       }
+      if (fn.name === "block") {
+        // The bindings are one group in a scope of their own: each may use any other, and
+        // itself. A binding's value is evaluated when something needs it, at most once.
+        const bindings = v.args[0];
+        if (!(bindings instanceof Struct)) return new Refuted("a block's bindings are written as a structure", undefined);
+        const inner = new ScopeV(scope);
+        for (const [k, e] of bindings.entries) {
+          const name = k === null ? undefined : seen(k);
+          if (!(name instanceof Sym)) return new Refuted("each binding of a block is keyed by a symbol", undefined);
+          if (inner.bindings.has(name)) return new Refuted(`the name ${name.fqn} is bound twice in one block`, undefined);
+          inner.bindings.set(name, { value: e instanceof Fn || !(e instanceof Expr || e instanceof Sym || e instanceof Struct) ? e : new Lazy(e, inner), memo: undefined, rests: [] });
+        }
+        return evaluate(v.args[1], inner);
+      }
       if (fn.name === "then") {
         // The first is needed, and only then the second. While the first waits, the second
         // is evaluated ahead with no effect performed, so a refutation in it is found now.
@@ -569,6 +617,50 @@ export const createKernel: CreateKernel2 = () => {
         const built = build(args[0], []);
         return built instanceof Fn ? close(built, scope) : built instanceof Refuted ? built : new Refuted("only the description of a function can be built", args[0]);
       }
+      if (fn.name === "same") {
+        if (!known(args[0]) || !known(args[1])) return waits();
+        const [a, b] = [seen(args[0]), seen(args[1])];
+        if (a instanceof Bits && b instanceof Bits) return a.bitLength === b.bitLength && bitList(a).every((x, i) => x === bitList(b)[i]) ? TRUE : FALSE;
+        if (a instanceof Sym && b instanceof Sym) return a === b ? TRUE : FALSE;
+        return new Refuted("only two bits values or two symbols can be told apart", undefined);
+      }
+      if (fn.name === "join") {
+        if (!known(args[0]) || !known(args[1])) return waits();
+        const [a, b] = [seen(args[0]), seen(args[1])];
+        if (!(a instanceof Bits && b instanceof Bits)) return new Refuted("only two bits values can be joined", undefined);
+        return packed([...bitList(a), ...bitList(b)]);
+      }
+      if (fn.name === "length") {
+        if (!known(args[0])) return waits();
+        const a = seen(args[0]);
+        return a instanceof Bits ? count64(a.bitLength) : new Refuted("only a bits value has a length", args[0]);
+      }
+      if (fn.name === "slice") {
+        if (!args.every(known)) return waits();
+        const [a, from, n] = [seen(args[0]), countOf(args[1]), countOf(args[2])];
+        if (!(a instanceof Bits)) return new Refuted("only a bits value can be taken apart", args[0]);
+        if (from === undefined || n === undefined) return new Refuted("a place and a count are whole numbers, as bits", undefined);
+        if (from + n > a.bitLength) return new Refuted(`${n} bit(s) from place ${from} is outside a value of ${a.bitLength} bit(s)`, undefined);
+        return packed(bitList(a).slice(from, from + n));
+      }
+      if (fn.name === "count") {
+        const s = seen(args[0]);
+        if (s instanceof Struct) return count64(s.entries.length);
+        return known(args[0]) ? new Refuted("only a structure has a number of entries", args[0]) : waits();
+      }
+      if (fn.name === "get") {
+        const s = seen(args[0]);
+        if (!(s instanceof Struct)) return known(args[0]) ? new Refuted("only a structure has entries to read", args[0]) : waits();
+        if (!known(args[1])) return waits();
+        const key = seen(args[1]);
+        if (key instanceof Sym) {
+          const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
+          return entry !== undefined ? entry[1] : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
+        }
+        const place = key instanceof Bits ? countOf(key) : undefined;
+        if (place === undefined) return new Refuted("an entry is read by a symbol or by a place", args[1]);
+        return place < s.entries.length ? s.entries[place][1] : new Refuted(`place ${place} is outside a structure of ${s.entries.length} entr${s.entries.length === 1 ? "y" : "ies"}`, undefined);
+      }
       throw new KernelFault(`the kernel primitive "${fn.name}" has no evaluation`);
     }
 
@@ -577,8 +669,18 @@ export const createKernel: CreateKernel2 = () => {
       // it was written, and is evaluated when something in the body needs it.
       if (fn.params.length !== v.args.length)
         return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
-      const env = new Map(fn.params.map((p, i) => [p, later(v.args[i], scope)] as const));
-      return evaluate(substitute(fn.body, env, new Map()), scope);
+      const given = v.args.map((a) => later(a, scope));
+      const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
+      // Ahead of what is done, a call to a function already being opened with the same
+      // information is not opened again: it stays in the residual.
+      if (opening.some((o) => o.fn === fn && o.args.every((a, i) => sameInformation(a, given[i])))) return new Expr(fn, given);
+      opening.push({ fn, args: given });
+      try {
+        return evaluate(substitute(fn.body, env, new Map()), scope);
+      } finally {
+        opening.pop();
+      }
     }
     if (!(fn instanceof Prim)) {
       if (known(fn)) return new Refuted("a call on something that is not a function", fn);
@@ -604,6 +706,9 @@ export const createKernel: CreateKernel2 = () => {
       let r: V;
       try {
         r = into(d.run(args.map(out), context), "what a primitive returned");
+      } catch (e) {
+        if (e instanceof Refusal) return new Refuted(e.reason, undefined);
+        throw e;
       } finally {
         running = before;
       }
@@ -620,6 +725,13 @@ export const createKernel: CreateKernel2 = () => {
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
     return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied)) ? new Lazy(tied, scope) : tied;
+  };
+
+  /** True where two arguments carry the same information: the same thing, or the same known bits. */
+  const sameInformation = (a: V, b: V): boolean => {
+    const [x, y] = [seen(a), seen(b)];
+    if (x === y) return true;
+    return x instanceof Bits && y instanceof Bits && x.bitLength === y.bitLength && bitList(x).every((bit, i) => bit === bitList(y)[i]);
   };
 
   const truthOf = (v: V): boolean | undefined => {
@@ -777,6 +889,28 @@ export const createKernel: CreateKernel2 = () => {
   const text = (t: string): V => new Bits(utf8.encode(t), utf8.encode(t).length * 8);
   const number = (n: number): V => new Bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255), 32);
   const numberOf = (b: Bits): number => b.bytes.reduce((n, byte) => (n * 256 + byte) % 0x100000000, 0);
+  /** The bits of a value, one number each: the last `bitLength` bits of its bytes. */
+  const bitList = (b: Bits): number[] => {
+    const all: number[] = [];
+    for (const byte of b.bytes) for (let i = 7; i >= 0; i--) all.push((byte >> i) & 1);
+    return all.slice(all.length - b.bitLength);
+  };
+  /** A bits value from its bits, held in as few bytes as hold them. */
+  const packed = (bits: readonly number[]): V => {
+    const bytes = new Uint8Array(Math.ceil(bits.length / 8));
+    const pad = bytes.length * 8 - bits.length;
+    bits.forEach((bit, i) => { if (bit) bytes[(i + pad) >> 3] |= 128 >> ((i + pad) & 7); });
+    return new Bits(bytes, bits.length);
+  };
+  /** A count as the kernel answers one: 64 bits, most significant first. */
+  const count64 = (n: number): V => packed(Array.from({ length: 64 }, (_, i) => (i < 11 ? 0 : Math.floor(n / 2 ** (63 - i)) % 2)));
+  /** A whole number read from bits, or undefined where the value is not bits or is too large to count with. */
+  const countOf = (v: V): number | undefined => {
+    const b = seen(v);
+    if (!(b instanceof Bits)) return undefined;
+    const n = bitList(b).reduce((acc, bit) => acc * 2 + bit, 0);
+    return Number.isSafeInteger(n) ? n : undefined;
+  };
   const textOf = (b: Bits): string => new TextDecoder().decode(b.bytes);
   /** A structure of plain data whose first entry is a symbol naming its form. */
   const data = (form: string, ...parts: V[]): V => {
@@ -914,6 +1048,7 @@ export const createKernel: CreateKernel2 = () => {
       return out(new Bits(bytes, n));
     },
     symbol: (fqn) => out(intern(fqn)),
+    symbolData: (fqn) => out(new Quoted(intern(fqn))),
     param: (name) => out(new Param(name)),
     structure: (entries) => out(new Struct(entries.map(([k, e]) => [k === null ? null : into(k, "a key"), into(e, "an entry")] as const))),
     expression: (fn, args) => out(new Expr(into(fn, "the function"), args.map((a) => into(a, "an argument")))),

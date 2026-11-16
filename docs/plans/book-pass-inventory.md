@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 243 decisions in 6 parts and 38 chapters (231 when the phase closed; twelve added by rulings since) after the preface and the tour. Part I: 23; Part II: 56; Part III: 25; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 244 decisions in 6 parts and 38 chapters (231 when the phase closed; thirteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 57; Part III: 25; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -38,7 +38,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A block of bindings is one kernel primitive; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -991,6 +991,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
 - Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
 - Notes (2026-11-16, Allegretto's forms): a primitive function applied outside its domain gives a refutation, by ruling: division by zero, a place outside a structure. A handled failure does not exist below the standard language, whose operators may wrap a primitive to raise an exception.
+- Notes (2026-11-16, the shipped primitives built): 22 primitives in `next/prims/index.ts`: signed 64-bit integer arithmetic, wrapping, with division truncated toward zero; the signed orderings; an integer's decimal text and back; binary64 float arithmetic, two orderings and text; the two conversions. Integer division by zero refuses; float division by zero follows IEEE 754.
 - Chapter: Authority
 
 ### Metadata
@@ -1179,6 +1180,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. A function has one body expression, so "a body needs its statements in written order" had nothing to stand on; the acceptance stream's first-notation proposal met the gap and wrote statements as a structure's entries.
 - Chapter: Evaluation
 
+#### A block of bindings is one kernel primitive
+- Decides: the kernel primitive `block(bindings, body)` binds a group of names and gives its body's value. The bindings are one group in a scope of their own: each may use any other, and itself, so a recursive function is one value with one identity. A binding's value is evaluated when something needs it, at most once. A name means the innermost block's binding. No value of the language is a scope or holds one.
+- Status: partly built (the reference kernel); ruled 2026-11-16
+- Type: capability
+- Rationale kind: technical
+- Depends on: An expression is evaluated when its value is needed; The environment is not a value; The kernel contains only what no extension could supply
+- Significance: 4 — how a name comes to mean something inside a program
+- Label: foundational — every block, every recursive function and every module's bindings
+- Options recorded: recursion by handing a function to itself as an argument (the acceptance stream's first emitter: the public function is a wrapper, so a repeated call cannot be recognised and the function has two identities); a primitive that makes a scope as a value (removed by the rulings on values and descriptions); a node of its own in the saved-program data form (not needed: a block is an application of the primitive to a structure keyed by names)
+- Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken); next/ext/allegretto/forms.md §4
+- Notes: new, by ruling: Allegretto's forms, as ruled, name the block of bindings as what a block stands for. A binding at a place, `x <- e`, is a block that binds `x` around a sequence that needs `x` first.
+- Chapter: Evaluation
+
 #### Effects on one capability keep their order
 - Decides: where need alone orders two effects, the order is fixed: a primitive function needs its arguments left to right. Effects on one capability keep the order that sequence and need give them, and no rewrite may change it. Effects on different capabilities are unordered unless an order between the two is declared; a capability's definition may also declare parts of itself unordered. An effect is performed only when every effect ordered before it has been performed, and otherwise stays in the residual, so a phase that holds one capability and lacks another cannot perform an order in part. The order is read from the residual of a phase that holds no capability, and a claim about it is stated over that residual's description. Two chains that each wait on a different late answer are not ordered: they act in the order the answers arrive, which is information like any other, unless an order is declared.
 - Status: open (the reference kernel performs nothing after a statement that waits, whatever the capability; declared orders are not built); ruled 2026-11-16
@@ -1246,6 +1260,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling; the principled replacement for both exceptions of the former rule. A state of knowledge at a call is everything the evaluator knows about its arguments, their values and their metadata. A recursive function needs a stated claim, or nothing is known at the inner call. Where the states of knowledge never repeat, evaluation reaches a resource limit and the outcome is undecided. The maintainer: recursion "will be where we deliver a lot of Allegro's potential"; it will likely need a whole section. Read with B-180 (recursion handling under partial evaluation).
 - Held finding (2026-11-11, DR2): the recursion cutoff residualises by rule of thumb and names typed compilation (`src/evaluator.ts`, the inline cutoff; docs/book/concepts.md §25).
+- Notes (2026-11-16, built in part): what building showed. In ordinary evaluation the rule is not needed: an undecided conditional's branches stay unevaluated, so a recursion on an unknown argument ends with the inner call unopened. Where effects are performed the rule must not apply: a function that prints and calls itself with the same argument is a program that prints for ever, and each call is opened. The rule is needed where the kernel evaluates ahead of what is done, with no effect performed, and there it is built: a call to a function already being opened with the same information stays in the residual. The same information means the same argument, or the same known bits. Not answered by this: a recursion whose argument changes with known values, evaluated ahead, runs to its budget (the second half of issue 6 of the adversarial review); it needs a rule for generalising, with specialization. On issue 5: a claim on a call left in the residual is undecided, never decided; assuming a function's claims at its own inner call is the standard language's, to be licensed by a decided decrease.
 - Chapter: Evaluation
 
 #### A branch that may not be taken is evaluated without capabilities
@@ -1363,7 +1378,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover ten things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1381,6 +1396,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, solving): nine, with specializing a function ("A function can be specialized with its parameters unknown").
 - Notes (2026-11-16, the order of effects): ten, with sequence ("Sequence is one kernel primitive").
 - Notes (2026-11-16, Allegretto's forms): joining, measuring and taking apart a bits value are added to the first of the ten, by the maintainer's ruling on issue 21 of the adversarial review: a reference definition of arithmetic is written in them, so they cannot themselves be shipped primitives with reference definitions.
+- Notes (2026-11-16, built): the reference kernel has the primitives on bits (`same`, `join`, `length`, `slice`) and on structures (`get`, `count`). `same` also tells two symbols apart: a grammar is keyed and tagged by symbols, and nothing else could compare them. A symbol is written as data through the interface, for a notation's symbol literal; quotation of an expression stays removed.
+- Notes (2026-11-16, the block of bindings): eleven, with the block of bindings ("A block of bindings is one kernel primitive").
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -3286,6 +3303,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
 - Notes (2026-11-13, with the first version of the interface): filling a cell records the value and evaluates nothing. A kernel-wide call evaluates again everything that waited on cells filled since, under a step budget: the kernel tracks what waits on what, and the host says when the work happens. Ruled against the host asking for each result it kept (it cannot know every waiter) and against evaluation inside the fill (no budget, and effects in arrival order).
 - Notes (2026-11-15, the rulings on strength and on identity): the second version, `Kernel2` in `next/kernel/interface.ts`, adds: making a module, with its keys; reading a key; what a result rests on; the reason for a refutation; restore; and whether a value is a cell.
+- Notes (2026-11-16, the block of bindings): by ruling, `scope` and `bind` may leave the interface ("Scope and bind may leave the interface"). A block of bindings gives an expression its names, and a name whose value arrives later is bound to a cell. The host then cannot put a name into a program from outside, and two evaluations share nothing. They leave when the interface's two versions are made one.
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome
@@ -3576,6 +3594,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a saved library built against one arithmetic implementation refuses to load beside another.
 - Notes: new, by ruling. The maintainer: this "is inviting dependency hell, but every modular programming platform that's successful goes to dependency hell as punishment. I think hash checks will work for now." A checked mapping between two versions of a model might later serve as a compatibility claim; the maintainer is sceptical on grounds of combinatorial complexity.
+- Notes (2026-11-16, the shipped primitives built): by the maintainer's ruling a shipped primitive's hash is taken over its host code: the helpers every primitive shares and its own entry, with comments left out. The review session had proposed hashing a sentence that states the primitive's meaning. The hashes are committed, since a browser cannot read the source, and a test computes them again.
 - Chapter: Saved programs and export
 
 #### A stored outcome is restored with its builder's name

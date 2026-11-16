@@ -1545,6 +1545,18 @@ its approval.
   parser engine reads it first. The proposal is
   `next/ext/allegretto/forms.md`. The maintainer approved it the
   same day, with `capability` as the word that declares one.
+- **2026-11-16 — the kernel reads structures and works on bits** (the
+  review session): the primitives on bits and structures, a primitive
+  that refuses, and a symbol as data. Still owed to Allegretto: the
+  block of bindings, entries evaluated when read, the shipped
+  primitives.
+- **2026-11-16 — the block of bindings and recursion** (the review
+  session): `block` in the reference kernel; a repeated call is left
+  unopened where the kernel evaluates ahead. Open: a recursion whose
+  argument changes with known values, ahead. 244 decisions.
+- **2026-11-16 — the shipped primitives** (the review session): 22
+  pure primitives in `next/prims/index.ts`. Still owed to Allegretto:
+  a structure's entries evaluated when read.
 
 ## 8. Sessions
 
