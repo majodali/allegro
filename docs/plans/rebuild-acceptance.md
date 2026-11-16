@@ -869,8 +869,8 @@ policy is the gate ruled there.
     item 1 for 103, item 2 for 50, item 3 for 6, item 4 for 114, item 5
     for 17. The name most used and bound nowhere is `print`, in 36.
     A text that reads may still mean something else: `"a" + "b"` reads,
-    and `+` stands for `int.add`. `next/corpus/cases.json` is not
-    changed; the orchestrating session moves the cases.
+    and `+` stands for `int.add`. The census as the chunk's agent ran
+    it left `next/corpus/cases.json` unchanged.
   - **The launcher, once a structure can be read.** Nothing changed but
     the end at the kernel's own limit with no budget set, which now says
     so. Once item 3 is built: step 4 of `next/launch/launcher.ts` hands
@@ -897,3 +897,18 @@ policy is the gate ruled there.
     the pipe's right side is any expression whose value is a function;
     a record with one key twice is written as it stands; the record is
     of the first version, with no key slots.
+  - **The cases moved, in review.** By the fifth answer of the ruled
+    forms document, a present-surface case that needs types belongs to
+    milestone 4. The census names them (`npx tsx
+    next/bootstrap/census.ts --moves`): a case with a text that does
+    not read as Allegretto, 41; and a case whose texts read and show a
+    meaning chosen by a type, 37: `print`, which renders by type, in
+    36 (all 31 pins among them), an integer operator on a decimal
+    fraction in 14, and on a text in 13. 78 cases moved from milestone
+    3 to milestone 4: 31 pins and 47 tests. No class changed.
+    Milestone 3 now holds 138 present cases, all tests: 134 read as
+    Allegretto, 21 of them emitted today, 3 assert through host code,
+    and one tests a text the present parser refuses. An operand that is
+    a name is not judged, so a case that reads may still rest on a type
+    the text does not show; such a case shows when its Allegretto text
+    is run.

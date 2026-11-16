@@ -1189,7 +1189,8 @@ literals, structures, functions, application, `if`, `claim`, statements
 as a chain of `then` and `x <- e` today; every other form gives a
 finding that names the item of forms.md §4 it waits on, and no record.
 `npx tsx next/bootstrap/census.ts` finds 171 of milestone 3's 216 cases
-read as Allegretto unchanged. The launcher's end at the kernel's own
+read as Allegretto unchanged. 78 cases that need types moved from
+milestone 3 to milestone 4, all 31 pins among them. The launcher's end at the kernel's own
 limit now says that no budget was set. Record:
 
 ### 2026-11 — The corpus follows the retitle of PR #220 (B-196)
