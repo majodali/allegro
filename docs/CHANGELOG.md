@@ -1191,6 +1191,15 @@ finding that names the item of forms.md §4 it waits on, and no record.
 `npx tsx next/bootstrap/census.ts` finds 171 of milestone 3's 216 cases
 read as Allegretto unchanged. The launcher's end at the kernel's own
 limit now says that no budget was set. Record:
+
+### 2026-11 — The corpus follows the retitle of PR #220 (B-196)
+
+B-196 (the rebuild's acceptance side). "An effect consumes only values
+whose claims are decided" is now "A refuted value never reaches an
+effect": 4 cases moved, and three scenarios cite the title now. The
+plan's record says what the rulings of 2026-11-16 change for this
+stream: the first notation is Allegretto, as
+`next/ext/allegretto/forms.md` rules it. Record:
 `docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — The corpus and the specifications follow the kernel stream's K4 (B-196)

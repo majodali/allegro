@@ -3707,7 +3707,7 @@ table and the stream plans.
   other session does. Filed 2026-11-13 by the rebuild program's plan
   (`docs/plans/rebuild.md` §8). The lines below are rulings to record
   in the inventory, not evidence to bring.
-  1. "An effect consumes only values whose claims are decided"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session.
+  1. "An effect consumes only values whose claims are decided" (now "A refuted value never reaches an effect"); the maintainer's ruling of 2026-11-15 in the acceptance stream's session.
      A strength (assumed, sampled, undecided) prevents no effect unless
      a policy or configuration requires it, a refuted claim never
      reaches an effect, and the result holds every undecided claim,

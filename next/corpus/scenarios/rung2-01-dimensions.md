@@ -84,7 +84,7 @@ program prints eight lines and then halts.
   Acceleration" becomes the refutation of `speed`'s entry claim. Under
   "Every failure carries a legible counterexample" it names the
   parameter `a`, where today it gives a position.
-- "An effect consumes only values whose claims are decided": the
+- "A refuted value never reaches an effect": the
   break-it halt follows eight printed lines. A refutation is found
   before any effect, and the run prints nothing.
 - Ruling 1 of 2026-11-15: the run prints although the units library's
