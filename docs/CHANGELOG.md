@@ -1198,6 +1198,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — Allegretto programs in the corpus, and the harness counts the cases they realise (B-196, chunk Q6 (the comparison harness), part 2)
+
+B-196 (the rebuild's acceptance side). A case is now shown on the new
+kernel by an Allegretto program under `next/corpus/allegretto/m<milestone>/`
+that names it in a `// realises:` line and passes. The thirteen programs
+of milestone 3 moved there from `next/bootstrap/fixtures/`, and the
+convention is `next/corpus/allegretto/README.md`. `npm run harness:next`
+runs every program on the reference kernel and reports, per milestone,
+the programs passing and failing and the cases realised, named only by a
+failing program, and not yet named. Eight new programs and two
+`// realises:` lines on the old ones realise 45 of the 58 milestone 3
+cases of `src/test/base.ts`; the other 13 rest on the present host's
+evaluation context, a host extension's names, or a refused text. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The emitter writes every form of Allegretto, and the launcher runs one (B-196, chunk Q5 (the first notation and the bootstrap), part 3)
 
 B-196 (the rebuild's acceptance side). `next/bootstrap/emit.ts` writes
