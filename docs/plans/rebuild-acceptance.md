@@ -808,3 +808,107 @@ policy is the gate ruled there.
     written for the purpose; a present-surface case that needs types
     moves to milestone 4. The census of chunk Q5 (the first notation
     and the bootstrap) is redone on that rule once the reader exists.
+- **2026-11-16 — Q5, part 2: the Allegretto grammar, reader and emitter.**
+  Built against `next/ext/allegretto/forms.md` as ruled that day, on
+  `origin/main` at `f832812`. The present tree is not changed.
+  - **The grammar.** `next/bootstrap/allegretto-grammar.ts` edits the
+    value `buildLeftRecursiveBaseGrammar` returns, which is new on every
+    call and is the form the present tree's own grammar extension edits.
+    It removes the productions and alternatives forms.md §5 names, adds
+    the five with the engine's own constructors, and has `ladderLevels`
+    rewrite the precedence levels. It checks that every production
+    referred to exists and that no level stays left recursive. Built
+    this way, a change in the present base grammar shows as an error.
+    Building a grammar from scratch with the constructors would copy
+    about 400 lines of productions and drift from the base. One change
+    forms.md §5 does not list: `then` is unreserved, since §2 binds the
+    kernel primitive to that name. The keywords `and` and `or` and the
+    number `0b…` stay in the grammar, as §5 does not remove them; the
+    reader refuses them, since §2 gives them no meaning. A text may not
+    hold `{`, so `"a{x}"` is refused rather than read with a new
+    meaning.
+  - **The reader.** `next/bootstrap/reader.ts` reads the engine's parse
+    tree, never through the present tree builder. Literals come from
+    their digits in the text; every node keeps its place.
+  - **The emitter.** `next/bootstrap/emit.ts`, and `npm run emit -- <file>
+    [-o out.json]`. Each form, checked against the reference kernel on
+    this base:
+
+    | Form of forms.md §2 | Today |
+    |---|---|
+    | `"text"`, `42`, `0xFF`, `1.5`, `true`, `false` | emitted: a bits node |
+    | `{a: e}`, `[e, f]` | emitted: a structure node, keyed by symbols or with no keys |
+    | `x`, `x => e`, `f(a, b)`, `a \|> f` | emitted: the parameter or kernel node bound; a function node; an expression node |
+    | `if c then a else b`, `&&`, `\|\|`, `!` | emitted: the kernel's `if` |
+    | `claim(e)`, `then`, `attempt`, `describe`, `build` | emitted: the kernel primitive |
+    | a block's statements | emitted: a chain of `then` |
+    | `x <- e` | emitted: `((x) => then(x, r))(e)`, `r` the rest of the block |
+    | `capability`, `input`, `import` | emitted: the module function's parameters and `declares` |
+    | `x = e`, `f(x, y) => e`, `export` | waits on item 1, the block of bindings |
+    | `==`, `!=`, `++`, `bits.*` | waits on item 2, the kernel's primitives on bits |
+    | `p.a`, `p[i]`, `output.write` | waits on item 3, reading a structure |
+    | `+`, `-`, `*`, `<`, `>`, `<=`, `>=`, prefix `-`, `int.*`, `float.*`, `text.*` | waits on item 4, the shipped primitives; `/`, `%`, `int.div`, `int.mod` and `text.int` on item 5 as well |
+    | `` `name `` | waits on a way to put a symbol in an expression as data, which §4 does not list |
+
+    `x <- e` was verified on the kernel: `e` happens once, after the
+    statements before it, and every use of `x` reads its value; on a
+    cell, nothing after it is performed until the cell is filled. A
+    module yields the structure of its bindings, empty today. The tests
+    give a text effects through inputs: `input see` and its kin, handed
+    effectful primitives made through the kernel's interface. Three
+    tests marked todo hold the texts that run once §4 is supplied:
+    hello, world through `output.write`, a block of bindings, recursion.
+  - **The census.** `npx tsx next/bootstrap/census.ts` over the 216
+    cases of milestone 3: 171 read as Allegretto unchanged (31 pins,
+    140 tests), 42 do not (all tests), 3 are host code. Of the 171, 21
+    emit today; emitted is not yet passing, since a case's assertion is
+    made by the present host. Of those that do not read: 21 use `when`
+    and patterns, 8 a type annotation, 6 text interpolation, 2 `Y of x`,
+    2 `0b…`, 2 an escape §2 does not list, 2 `and` or `or`, 1 is a text
+    the present parser refuses too. Of the 171 that read, the waits:
+    item 1 for 103, item 2 for 50, item 3 for 6, item 4 for 114, item 5
+    for 17. The name most used and bound nowhere is `print`, in 36.
+    A text that reads may still mean something else: `"a" + "b"` reads,
+    and `+` stands for `int.add`. The census as the chunk's agent ran
+    it left `next/corpus/cases.json` unchanged.
+  - **The launcher, once a structure can be read.** Nothing changed but
+    the end at the kernel's own limit with no budget set, which now says
+    so. Once item 3 is built: step 4 of `next/launch/launcher.ts` hands
+    a capability as a structure of its parts keyed by the symbols of
+    their names, and drops the refusal of a capability of more than one
+    part; its header says so; `next/launch/fixtures/hello.json` becomes
+    the emitted record of `capability output` and
+    `output.write("hello, world")`; the hand-built records of
+    `next/launch/launcher.test.ts` read the part, and the record of two
+    lines uses `then` in place of a structure's entries; the test that
+    the fixture equals `encode(HELLO)` follows. The kernel stream's
+    milestone 2 test in `next/kernel/kernel.test.ts` runs the fixture
+    and needs no change of its own.
+  - **Read narrowly where forms.md is silent**, each a question for the
+    kernel stream: `then` unreserved; `and`, `or`, `0b…` refused; `{`
+    refused in a text; a whole number above the signed range refused
+    even under a prefix `-`; a hex number refused above the signed range
+    too; a statement `a <- b` is always the binding, never `a < -b`; a
+    header name bound again in the module's block is refused; `export`
+    in an inner block is refused; the name of `x <- e` is not a binding
+    of the module's structure; a module's value is its statements
+    chained before the structure of its bindings; an inner block's last
+    `x <- e` gives `e`'s value; a block with no statement is refused;
+    the pipe's right side is any expression whose value is a function;
+    a record with one key twice is written as it stands; the record is
+    of the first version, with no key slots.
+  - **The cases moved, in review.** By the fifth answer of the ruled
+    forms document, a present-surface case that needs types belongs to
+    milestone 4. The census names them (`npx tsx
+    next/bootstrap/census.ts --moves`): a case with a text that does
+    not read as Allegretto, 41; and a case whose texts read and show a
+    meaning chosen by a type, 37: `print`, which renders by type, in
+    36 (all 31 pins among them), an integer operator on a decimal
+    fraction in 14, and on a text in 13. 78 cases moved from milestone
+    3 to milestone 4: 31 pins and 47 tests. No class changed.
+    Milestone 3 now holds 138 present cases, all tests: 134 read as
+    Allegretto, 21 of them emitted today, 3 assert through host code,
+    and one tests a text the present parser refuses. An operand that is
+    a name is not judged, so a case that reads may still rest on a type
+    the text does not show; such a case shows when its Allegretto text
+    is run.

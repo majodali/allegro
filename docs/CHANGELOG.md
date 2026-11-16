@@ -1191,6 +1191,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The Allegretto grammar, reader and emitter (B-196, chunk Q5 (the first notation and the bootstrap), part 2)
+
+B-196 (the rebuild's acceptance side). Allegretto's grammar is the
+present base grammar edited as `next/ext/allegretto/forms.md` §5 says,
+built by `next/bootstrap/allegretto-grammar.ts`. `next/bootstrap/reader.ts`
+reads the engine's parse tree, never through the present tree builder.
+`next/bootstrap/emit.ts`, run as `npm run emit`, writes a saved program:
+literals, structures, functions, application, `if`, `claim`, statements
+as a chain of `then` and `x <- e` today; every other form gives a
+finding that names the item of forms.md §4 it waits on, and no record.
+`npx tsx next/bootstrap/census.ts` finds 171 of milestone 3's 216 cases
+read as Allegretto unchanged. 78 cases that need types moved from
+milestone 3 to milestone 4, all 31 pins among them. The launcher's end at the kernel's own
+limit now says that no budget was set. Record:
+
 ### 2026-11 — The corpus follows the retitle of PR #220 (B-196)
 
 B-196 (the rebuild's acceptance side). "An effect consumes only values
