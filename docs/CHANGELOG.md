@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — The acceptance stream's rulings recorded; five
+  findings of the adversarial review closed.** The nine lines handed
+  over under B-197 (evidence against a ruled decision) are in the
+  inventory: effects and strength, a refused proposal, parameter
+  claims, the laws of the core types, the standard deriver, sampling,
+  how an obligation is named, and `import` against `use`. One entry
+  is retitled "A refuted value never reaches an effect". Issues 17
+  to 20, 26 and 30 of the adversarial review are closed, and two of
+  its notes are filed in the backlog.
 - **2026-11-15 — Decision titles made accurate.** Seven entries are
   retitled, and two are new: the general rule that an expression is
   evaluated when its value is needed, and "Describing a function

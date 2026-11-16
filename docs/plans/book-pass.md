@@ -1525,6 +1525,11 @@ its approval.
   added, 239 decisions. Open: whether a structure needs its entries,
   and how the order of effects is determined. The table is in the
   record of the adversarial review, "Titles made accurate".
+- **2026-11-16 — the acceptance stream's rulings recorded** (the
+  review session). The nine hand-off lines are in the inventory, and
+  the maintainer ruled issues 18, 20 and 26 of the adversarial
+  review. Open: issues 5 and 6 by building; 7, 21, 22 and 28 for
+  discussion; the first notation's requirements.
 
 ## 8. Sessions
 
