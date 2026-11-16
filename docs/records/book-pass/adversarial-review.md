@@ -625,6 +625,60 @@ and 28, which the maintainer set for discussion; 13, 16, 24 and 27,
 which the first notation's questions touch; and the requirements of
 the first notation itself.
 
+### The order of effects (2026-11-16)
+
+The first of the discussions the maintainer set. Three gaps: the
+kernel could not say "this, then that"; need alone would let a rewrite
+swap two reads; and a phase holding one capability could perform half
+of an order. Ruled ("Yes, this meets the need"; "I agree with this
+approach and your recommendations"):
+
+- One kernel primitive for sequence, `then(first, second)`. A body of
+  statements is a chain of it.
+- A primitive function needs its arguments left to right.
+- Effects on one capability keep their order, and no rewrite changes
+  it.
+- Effects on different capabilities are unordered unless an order is
+  declared. A capability's definition may declare parts of itself
+  unordered.
+- An effect is performed only when every effect ordered before it has
+  been performed; otherwise it stays in the residual.
+- The order is read from the residual of a phase that holds no
+  capability.
+- A structure's entries are evaluated when needed. A statement needs
+  its value and no more; the standard language's check reports an
+  effect that nothing needs.
+- Late answers: the order of arrival is information, and a program
+  that needs an order declares it.
+
+Recorded in "Sequence is one kernel primitive", "Effects on one capability keep their order" and "An expression is evaluated when its value is needed". Built in the reference
+kernel: `then`, which evaluates what follows a waiting statement
+ahead with no effect performed. Not built: entries evaluated when
+needed, and declared orders.
+
+### Allegretto (2026-11-16)
+
+The acceptance stream proposed a first notation: a subset of the
+standard language's surface, read through the present tree's parser.
+The maintainer judged it "far from complete, or even sound". The
+review session's reading: it cannot write an extension, its statements
+run only by the order of a structure's entries, its recursion is a
+workaround, and its emitter guesses an operator's meaning from what it
+can see of an operand. The maintainer asked whether the first notation
+is Allegretto, and what a text form is worth when a host loader can
+load the first extensions as saved programs. Ruled:
+
+- The first notation is Allegretto: a small language for the bare
+  kernel and nothing else, usable, with blocks, bindings, operator
+  expressions and function definitions. It ships with the platform.
+- The parser engine and the module loader are written in Allegretto,
+  test first, with their checks written out as calls. Writing them in
+  the standard language and compiling with the previous build, which
+  the review session recommended, is rejected as too risky.
+
+Recorded in "Allegretto is a small language for the kernel and nothing else" and "The parser engine and the module loader are written in Allegretto". To design: the forms, and first what
+an operator stands for in a language without types.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

@@ -1530,6 +1530,14 @@ its approval.
   the maintainer ruled issues 18, 20 and 26 of the adversarial
   review. Open: issues 5 and 6 by building; 7, 21, 22 and 28 for
   discussion; the first notation's requirements.
+- **2026-11-16 — the order of effects ruled** (the review session).
+  Sequence is a kernel primitive, built; effects on one capability
+  keep their order; a structure's entries are evaluated when needed,
+  not yet built. 241 decisions.
+- **2026-11-16 — Allegretto ruled** (the review session). The first
+  notation is Allegretto, a usable language for the bare kernel; the
+  parser engine and the module loader are written in it. 243
+  decisions. To design: its forms.
 
 ## 8. Sessions
 

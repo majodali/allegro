@@ -52,7 +52,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "build", "claim", "describe", "if"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "build", "claim", "describe", "if", "then"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -273,6 +273,42 @@ test("an effect happens when its value is needed, and a structure needs its entr
   said.length = 0;
   k.evaluate(k.structure([[null, call(say, byte(k, 1))], [null, call(say, byte(k, 2))]]), k.scope());
   assert.deepEqual(said, [1, 2], "the statements of a body, in the order written");
+});
+
+test("then: the first is done, and then the second; a text's order becomes an order of effects", () => {
+  const { k, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), c.structure([])) });
+  const body = call(kp("then"), call(say, byte(k, 1)), call(kp("then"), call(say, byte(k, 2)), byte(k, 9)));
+  const r = k.evaluate(body, k.scope());
+  assert.deepEqual(said, [1, 2]);
+  assert.equal(num(k, r.value), 9, "its value is the second's");
+  // Inside a function that does not use the first for its value, the first still happens.
+  said.length = 0;
+  const x = k.param("x");
+  const twice = k.composedFunction([x], call(kp("then"), call(say, x), call(say, x)));
+  k.evaluate(call(twice, byte(k, 5)), k.scope());
+  assert.deepEqual(said, [5, 5]);
+});
+
+test("then: while the first waits, nothing after it is performed, and a refutation after it is found at once", () => {
+  const { k, isZero, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), c.structure([])) });
+  const scope = k.scope();
+  const c = k.cell();
+  k.evaluate(call(kp("then"), call(say, c), call(say, byte(k, 2))), scope);
+  assert.equal(k.waiting().length, 1);
+  assert.deepEqual(said, [], "the second is not performed before the first");
+  k.fill(c, byte(k, 1));
+  k.advance({ steps: 1000 });
+  assert.deepEqual(said, [1, 2], "both, in the order written, each once");
+  // What follows a waiting statement is still checked: the refutation is found before any effect.
+  said.length = 0;
+  const d = k.cell();
+  const bad = k.evaluate(call(kp("then"), call(say, d), call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), call(say, byte(k, 4)))), scope);
+  assert.equal(bad.refuted, true);
+  assert.deepEqual(said, []);
 });
 
 test("a branch gets more knowledge as an argument: it is a function of the name its condition tested", () => {

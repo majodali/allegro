@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — Allegretto ruled.** The first notation is
+  Allegretto: a small, usable language for the bare kernel and
+  nothing else, shipped with the platform. The parser engine and the
+  module loader are written in it. The inventory holds 243 decisions.
+- **2026-11-16 — The order of effects ruled; sequence built.** The
+  kernel gains the primitive `then(first, second)`: the one way a
+  text's order becomes an order of effects. Effects on one capability
+  keep their order; effects on different capabilities are unordered
+  unless an order is declared; a structure's entries are evaluated
+  when needed. In `next/kernel/kernel.ts`: `then`, with what follows
+  a waiting statement evaluated ahead and no effect performed.
+  Entries evaluated when needed and declared orders are not built.
+  The inventory holds 241 decisions.
 - **2026-11-16 — The acceptance stream's rulings recorded; five
   findings of the adversarial review closed.** The nine lines handed
   over under B-197 (evidence against a ruled decision) are in the
