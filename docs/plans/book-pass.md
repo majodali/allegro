@@ -1554,6 +1554,9 @@ its approval.
   session): `block` in the reference kernel; a repeated call is left
   unopened where the kernel evaluates ahead. Open: a recursion whose
   argument changes with known values, ahead. 244 decisions.
+- **2026-11-16 — the shipped primitives** (the review session): 22
+  pure primitives in `next/prims/index.ts`. Still owed to Allegretto:
+  a structure's entries evaluated when read.
 
 ## 8. Sessions
 

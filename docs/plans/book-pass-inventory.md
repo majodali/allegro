@@ -991,6 +991,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
 - Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
 - Notes (2026-11-16, Allegretto's forms): a primitive function applied outside its domain gives a refutation, by ruling: division by zero, a place outside a structure. A handled failure does not exist below the standard language, whose operators may wrap a primitive to raise an exception.
+- Notes (2026-11-16, the shipped primitives built): 22 primitives in `next/prims/index.ts`: signed 64-bit integer arithmetic, wrapping, with division truncated toward zero; the signed orderings; an integer's decimal text and back; binary64 float arithmetic, two orderings and text; the two conversions. Integer division by zero refuses; float division by zero follows IEEE 754.
 - Chapter: Authority
 
 ### Metadata
@@ -3592,6 +3593,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a saved library built against one arithmetic implementation refuses to load beside another.
 - Notes: new, by ruling. The maintainer: this "is inviting dependency hell, but every modular programming platform that's successful goes to dependency hell as punishment. I think hash checks will work for now." A checked mapping between two versions of a model might later serve as a compatibility claim; the maintainer is sceptical on grounds of combinatorial complexity.
+- Notes (2026-11-16, the shipped primitives built): a shipped primitive's content is its meaning, which is to be its reference definition. Until those are written its hash is taken over its name, its arity and a sentence stating what it computes; the host code is not hashed, being an implementation claimed equal to the meaning.
 - Chapter: Saved programs and export
 
 #### A stored outcome is restored with its builder's name
