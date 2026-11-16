@@ -144,14 +144,20 @@ const CLAIM_LATER: SavedProgram = (() => {
   return r.done(r.apply(r.kernel("claim"), [r.apply(r.part(later, "ask"), [])]));
 })();
 
-/** module(later, output) => [later.ask(), output.write(greeting)]: it waits on a cell and on a name. */
+/**
+ * module(later, output) => then(later.ask(), output.write(greeting)): it
+ * waits on a cell and on a name. The two are statements, so they are a
+ * link of `then`, never a structure's entries: an entry is evaluated only
+ * when something reads it. While the first waits, the kernel evaluates the
+ * second ahead and meets the name.
+ */
 const BOTH: SavedProgram = (() => {
   const r = new Record();
   const later = r.capability("later");
   const out = r.capability("output");
   const asked = r.apply(r.part(later, "ask"), []);
   const wrote = r.apply(r.part(out, "write"), [r.add({ k: "symbol", fqn: "greeting" })]);
-  return r.done(r.add({ k: "structure", entries: [[null, asked], [null, wrote]] }));
+  return r.done(r.then(asked, wrote));
 })();
 
 /** module(pair) => pair.left("one") then pair.right("two"): a capability of two parts. */
