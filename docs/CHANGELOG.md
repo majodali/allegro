@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — The block of bindings, and recursion.** In
+  `next/kernel/kernel.ts`: the kernel primitive `block(bindings,
+  body)`, whose bindings may use each other and themselves, so a
+  recursive function is one value. Ahead of what is done, a call
+  with the same information is not opened again, so checking a
+  program that loops for ever ends. The saved-program data form's
+  second version gains the node `datum`, a symbol as data. The
+  inventory holds 244 decisions.
 - **2026-11-16 — The kernel reads structures and works on bits.** In
   `next/kernel/kernel.ts`: `same` tells two bits values or two symbols
   apart; `join`, `length` and `slice` join, measure and take apart a

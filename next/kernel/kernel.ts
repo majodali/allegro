@@ -66,6 +66,12 @@
 //   "build"     build(description). The function a description describes.
 //               A refutation where the description holds the identity of
 //               an unforgeable value: nothing makes authority from data.
+//   "block"     block(bindings, body). The bindings are a structure keyed
+//               by symbols. They are one group, in a scope of their own:
+//               each may use any other, and itself, so a recursive
+//               function is one value. A binding's value is evaluated
+//               when needed, at most once. The block's value is its
+//               body's. No value of the language is or holds a scope.
 //   "then"      then(first, second). It needs its first argument, and then
 //               its value is the second. This is the one way a text's
 //               order becomes an order of effects. While the first
@@ -222,7 +228,7 @@ interface Root {
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["attempt", 2], ["build", 1], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["attempt", 2], ["block", 2], ["build", 1], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
   ["join", 2], ["length", 1], ["same", 2], ["slice", 3], ["then", 2],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
@@ -256,6 +262,8 @@ export const createKernel: CreateKernel2 = () => {
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
   let ahead = false;
+  /** The calls being opened while evaluating ahead: a function and what it was given. */
+  const opening: { fn: Fn; args: readonly V[] }[] = [];
 
   const restKey = (r: Rest): string =>
     r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : `builder ${r.builder}`;
@@ -352,21 +360,33 @@ export const createKernel: CreateKernel2 = () => {
   // ---- Functions ----------------------------------------------------------
 
   /** Ties the free names of an expression to a scope. Returns the same object where nothing changed. */
-  const tie = (v: V, scope: ScopeV, memo: Map<V, V>): V => {
+  /** The names a block of bindings binds, where the value is one; otherwise undefined. */
+  const blockNames = (v: V): Sym[] | undefined => {
+    if (!(v instanceof Expr) || !(v.fn instanceof KernelPrim) || v.fn.name !== "block" || v.args.length !== 2) return undefined;
+    const bindings = v.args[0];
+    if (!(bindings instanceof Struct)) return undefined;
+    return bindings.entries.flatMap(([k]) => (k !== null && seen(k) instanceof Sym ? [seen(k) as Sym] : []));
+  };
+
+  const tie = (v: V, scope: ScopeV, memo: Map<V, V>, skip?: ReadonlySet<Sym>): V => {
     const done = memo.get(v);
     if (done !== undefined) return done;
     if (v instanceof Expr && restored.has(v)) return v;
     let r: V = v;
-    if (v instanceof Sym) r = new NameRef(scope, v);
+    if (v instanceof Sym) r = skip?.has(v) ? v : new NameRef(scope, v);
     else if (v instanceof Expr) {
-      const fn = tie(v.fn, scope, memo);
-      const args = v.args.map((a) => tie(a, scope, memo));
+      // The names a block binds are its own: they are tied when the block is evaluated.
+      const names = blockNames(v);
+      const inner = names === undefined ? skip : new Set([...(skip ?? []), ...names]);
+      const within = names === undefined ? memo : new Map<V, V>();
+      const fn = tie(v.fn, scope, memo, skip);
+      const args = v.args.map((a) => tie(a, scope, within, inner));
       if (fn !== v.fn || args.some((a, i) => a !== v.args[i])) r = new Expr(fn, args);
     } else if (v instanceof Struct && !settled.has(v)) {
-      const entries = v.entries.map(([k, e]) => [k, tie(e, scope, memo)] as const);
+      const entries = v.entries.map(([k, e]) => [k, tie(e, scope, memo, skip)] as const);
       if (entries.some(([, e], i) => e !== v.entries[i][1])) r = new Struct(entries);
     } else if (v instanceof Fn && !settled.has(v)) {
-      const body = tie(v.body, scope, memo);
+      const body = tie(v.body, scope, memo, skip);
       r = body === v.body ? v : new Fn(v.params, body);
       settled.add(r);
       const maker = madeBy.get(v);
@@ -521,6 +541,20 @@ export const createKernel: CreateKernel2 = () => {
         if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
         return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
       }
+      if (fn.name === "block") {
+        // The bindings are one group in a scope of their own: each may use any other, and
+        // itself. A binding's value is evaluated when something needs it, at most once.
+        const bindings = v.args[0];
+        if (!(bindings instanceof Struct)) return new Refuted("a block's bindings are written as a structure", undefined);
+        const inner = new ScopeV(scope);
+        for (const [k, e] of bindings.entries) {
+          const name = k === null ? undefined : seen(k);
+          if (!(name instanceof Sym)) return new Refuted("each binding of a block is keyed by a symbol", undefined);
+          if (inner.bindings.has(name)) return new Refuted(`the name ${name.fqn} is bound twice in one block`, undefined);
+          inner.bindings.set(name, { value: e instanceof Fn || !(e instanceof Expr || e instanceof Sym || e instanceof Struct) ? e : new Lazy(e, inner), memo: undefined, rests: [] });
+        }
+        return evaluate(v.args[1], inner);
+      }
       if (fn.name === "then") {
         // The first is needed, and only then the second. While the first waits, the second
         // is evaluated ahead with no effect performed, so a refutation in it is found now.
@@ -635,8 +669,18 @@ export const createKernel: CreateKernel2 = () => {
       // it was written, and is evaluated when something in the body needs it.
       if (fn.params.length !== v.args.length)
         return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
-      const env = new Map(fn.params.map((p, i) => [p, later(v.args[i], scope)] as const));
-      return evaluate(substitute(fn.body, env, new Map()), scope);
+      const given = v.args.map((a) => later(a, scope));
+      const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
+      // Ahead of what is done, a call to a function already being opened with the same
+      // information is not opened again: it stays in the residual.
+      if (opening.some((o) => o.fn === fn && o.args.every((a, i) => sameInformation(a, given[i])))) return new Expr(fn, given);
+      opening.push({ fn, args: given });
+      try {
+        return evaluate(substitute(fn.body, env, new Map()), scope);
+      } finally {
+        opening.pop();
+      }
     }
     if (!(fn instanceof Prim)) {
       if (known(fn)) return new Refuted("a call on something that is not a function", fn);
@@ -681,6 +725,13 @@ export const createKernel: CreateKernel2 = () => {
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
     return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied)) ? new Lazy(tied, scope) : tied;
+  };
+
+  /** True where two arguments carry the same information: the same thing, or the same known bits. */
+  const sameInformation = (a: V, b: V): boolean => {
+    const [x, y] = [seen(a), seen(b)];
+    if (x === y) return true;
+    return x instanceof Bits && y instanceof Bits && x.bitLength === y.bitLength && bitList(x).every((bit, i) => bit === bitList(y)[i]);
   };
 
   const truthOf = (v: V): boolean | undefined => {

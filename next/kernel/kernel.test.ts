@@ -53,7 +53,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "build", "claim", "count", "describe", "get", "if", "join", "length", "same", "slice", "then"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "same", "slice", "then"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -389,6 +389,88 @@ test("a primitive function applied outside its domain refuses, and that is a ref
   assert.equal(k.reasonOf(bad.value), "division by zero");
   const broken = k.primitiveFunction({ purity: "pure", hash: hash(41), name: "broken", arity: 0, run: () => { throw new Error("a bug in the host code"); } });
   assert.throws(() => k.evaluate(call(broken), k.scope()), /a bug in the host code/, "any other error is the primitive's fault and is not caught");
+});
+
+test("a block of bindings: each may use any other and itself, so a recursive function is one value", () => {
+  const { k, add, mul, dec, isZero, call, kp } = setup();
+  const [fact, n, even, odd, base] = ["t.fact", "t.n", "t.even", "t.odd", "t.base"].map((x) => k.symbol(x));
+  const x = k.param("x");
+  // fact(x) = if isZero(x) then base else mul(x, fact(dec(x))), with base bound after its use.
+  const factFn = k.composedFunction([x], call(kp("if"), call(isZero, x), base, call(mul, x, call(fact, call(dec, x)))));
+  const block = call(kp("block"), k.structure([[fact, factFn], [base, call(add, byte(k, 0), byte(k, 1))], [n, byte(k, 5)]]), call(fact, n));
+  assert.equal(num(k, k.evaluate(block, k.scope()).value), 120);
+  // Two functions that call each other.
+  const y = k.param("y");
+  const evenFn = k.composedFunction([y], call(kp("if"), call(isZero, y), truth(k, true), call(odd, call(dec, y))));
+  const oddFn = k.composedFunction([y], call(kp("if"), call(isZero, y), truth(k, false), call(even, call(dec, y))));
+  const both = (m: number) => k.evaluate(call(kp("block"), k.structure([[even, evenFn], [odd, oddFn]]), call(even, byte(k, m))), k.scope());
+  assert.deepEqual(k.bitsOf(both(6).value), k.bitsOf(truth(k, true)));
+  assert.deepEqual(k.bitsOf(both(7).value), k.bitsOf(truth(k, false)));
+  // The function is one value: what the name gives inside is what it gives outside.
+  const same = k.evaluate(call(kp("block"), k.structure([[fact, factFn], [base, byte(k, 1)]]), k.structure([[null, fact], [null, fact]])), k.scope());
+  const [first, second] = k.entriesOf(same.value).map(([, v]) => v);
+  assert.equal(first, second);
+  assert.equal(k.kind(first), "composed-function");
+});
+
+test("a block of bindings: a value is evaluated when needed, at most once, and a name is the innermost block's", () => {
+  const { k, add, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const [a, b, unused] = ["t.a", "t.b", "t.unused"].map((x) => k.symbol(x));
+  // a is used twice and said once; unused is never said; the body's statement comes first.
+  const body = call(kp("then"), call(say, byte(k, 9)), call(add, a, a));
+  const r = k.evaluate(call(kp("block"), k.structure([[a, call(say, byte(k, 1))], [unused, call(say, byte(k, 2))]]), body), k.scope());
+  assert.equal(num(k, r.value), 2);
+  assert.deepEqual(said, [9, 1]);
+  // Binding at a place: the block binds the name, and a sequence needs it there.
+  said.length = 0;
+  const atPlace = call(kp("block"), k.structure([[a, call(say, byte(k, 1))]]), call(kp("then"), a, call(kp("then"), call(say, byte(k, 9)), a)));
+  assert.equal(num(k, k.evaluate(atPlace, k.scope()).value), 1);
+  assert.deepEqual(said, [1, 9]);
+  // An inner block binds the name again; the outer binding is untouched, and reaches inner code that does not rebind it.
+  const nested = call(kp("block"), k.structure([[a, byte(k, 1)], [b, byte(k, 10)]]),
+    k.structure([[null, call(kp("block"), k.structure([[a, byte(k, 2)]]), call(add, a, b))], [null, a]]));
+  assert.deepEqual(k.entriesOf(k.evaluate(nested, k.scope()).value).map(([, v]) => num(k, v)), [12, 1]);
+  // A block written inside a function, and one handed on as an argument, keep their own names.
+  const p = k.param("p");
+  const inFn = k.composedFunction([p], call(kp("block"), k.structure([[a, call(add, p, byte(k, 1))]]), call(add, a, a)));
+  assert.equal(num(k, k.evaluate(call(inFn, byte(k, 4)), k.scope()).value), 10);
+  const id = k.composedFunction([p], p);
+  assert.equal(num(k, k.evaluate(call(id, call(kp("block"), k.structure([[a, byte(k, 6)]]), a)), k.scope()).value), 6);
+  // A binding that waits is taken up again, and its effect is not repeated.
+  said.length = 0;
+  const c = k.cell();
+  const scope = k.scope();
+  const waits = k.evaluate(call(kp("block"), k.structure([[a, call(add, call(say, byte(k, 3)), c)]]), call(add, a, a)), scope);
+  k.fill(c, byte(k, 4));
+  k.advance({ steps: 1000 });
+  assert.equal(num(k, k.current(waits.value)), 14);
+  assert.deepEqual(said, [3]);
+  // Malformed blocks are refutations.
+  assert.equal(k.evaluate(call(kp("block"), k.structure([[a, byte(k, 1)], [a, byte(k, 2)]]), a), k.scope()).refuted, true, "a name bound twice");
+  assert.equal(k.evaluate(call(kp("block"), k.structure([[null, byte(k, 1)]]), byte(k, 0)), k.scope()).refuted, true, "a binding with no name");
+});
+
+test("ahead of what is done, a call with the same information is not opened again", () => {
+  const { k, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), c.structure([])) });
+  const loop = k.symbol("t.loop");
+  const x = k.param("x");
+  // loop(x) = then(say(x), loop(x)): a program that prints for ever.
+  const loopFn = k.composedFunction([x], call(kp("then"), call(say, x), call(loop, x)));
+  const c = k.cell();
+  const scope = k.scope();
+  // Its first statement waits, so the rest is evaluated ahead. It ends, with the inner call left in the residual.
+  const r = k.evaluate(call(kp("block"), k.structure([[loop, loopFn]]), call(loop, c)), scope, { steps: 500 });
+  assert.equal(r.ended, "complete");
+  assert.equal(r.refuted, false);
+  assert.deepEqual(said, []);
+  // With the value known and the effect performed, the same program runs to its budget: nothing is ahead.
+  const run = k.evaluate(call(kp("block"), k.structure([[loop, loopFn]]), call(loop, byte(k, 1))), k.scope(), { steps: 200 });
+  assert.equal(run.ended, "limit");
+  assert.ok(said.length > 10 && said.every((n) => n === 1));
 });
 
 test("a branch gets more knowledge as an argument: it is a function of the name its condition tested", () => {

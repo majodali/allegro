@@ -150,10 +150,12 @@ is not a number.
 
 ## 4. What the kernel stream owes for this
 
-1. **The block of bindings**, in the kernel and in the saved-program
-   data form: a group of named values that may refer to each other, and
-   a body. It is what makes a recursive function one value with one
-   identity, where self-application made it a wrapper. *Not built.*
+1. **The block of bindings**: the kernel primitive `block(bindings,
+   body)`. The bindings are a structure keyed by names; they are one
+   group, each may use any other and itself, and a recursive function is
+   one value with one identity. In the data form a block is an
+   application of the primitive, so it needs no node of its own. `x <- e`
+   is `block({x: e}, then(x, rest))`. *Built.*
 2. **The kernel's primitives on bits**: `same` tells two bits values or
    two symbols apart; `join`, `length` and `slice` join two bits values,
    measure one and take a part of one. Allegretto binds the last three
@@ -172,8 +174,8 @@ is not a number.
    `Refusal` with a reason, and the kernel answers a refutation.
    *Built.*
 6. **A symbol as data**, for the symbol literal: `Kernel2.symbolData`.
-   *Built in the interface.* The saved-program data form has no node for
-   it yet; it comes with the node for the block of bindings.
+   *Built.* In the data form it is the node `datum`, in a record of the
+   second version.
 
 ## 5. Against the present tree's base grammar
 
