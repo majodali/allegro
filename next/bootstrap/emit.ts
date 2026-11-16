@@ -414,7 +414,7 @@ export function emitModule(module: Module): EmitResult {
     /** The names this block's `x <- e` lines bind, so a second binding of one in the block is refused. */
     const arrows = new Set<string>();
     const statements = items.filter((i) => i.k === "statement" || i.k === "arrow");
-    if (statements.length > 1 || (statements.length > 0 && tail !== undefined)) forms.add("statements");
+    if (statements.length > 1) forms.add("statements");
     /** The chain from the i-th line on, in the scope that line sees. */
     const rest = (i: number, here: Scope): Ref | undefined => {
       if (i === items.length) return tail?.();

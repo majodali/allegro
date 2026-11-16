@@ -314,7 +314,7 @@ test("every finding of a text is given, each at its place, and the forms it uses
   assert.equal(r.ok, false);
   if (r.ok) return;
   assert.deepEqual(r.findings.map((f) => [f.at.line, f.form]), [[2, "binding"], [3, "capability part"], [3, "integer operator"], [3, "== !="]]);
-  assert.deepEqual(r.forms, ["== !=", "application", "binding", "capability", "capability part", "integer operator", "name", "statements", "whole number"]);
+  assert.deepEqual(r.forms, ["== !=", "application", "binding", "capability", "capability part", "integer operator", "name", "whole number"]);
 });
 
 // ── The command ───────────────────────────────────────────────────────

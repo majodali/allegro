@@ -9,6 +9,10 @@
 // builder, no evaluator. The exports it uses:
 //   - `buildLeftRecursiveBaseGrammar`, `ladderLevels`
 //                                 src/grammar2/base-grammar.ts
+//   - `getBaseGrammar`            src/grammar2/base-grammar.ts, read
+//                                 only, by the census
+//                                 (next/bootstrap/census.ts), to see what
+//                                 a present text uses
 //   - `parse`                     src/grammar2/engine.ts
 //   - `lit`, `regex`, `nonterm`, `seq`, `alt`, `rep`, `opt`
 //                                 src/grammar2/types.ts, the grammar
@@ -109,6 +113,7 @@ export type ParseResult =
 
 interface Present {
   buildLeftRecursiveBaseGrammar(): Grammar;
+  getBaseGrammar(): Grammar;
   ladderLevels(g: Grammar): void;
   parse(g: Grammar, input: string): ParseResult;
   lit(text: string): Rule;
@@ -125,6 +130,7 @@ const load = async (file: string): Promise<Record<string, unknown>> => (await im
 const [baseModule, engineModule, typesModule] = await Promise.all([load("base-grammar.js"), load("engine.js"), load("types.js")]);
 const present = {
   buildLeftRecursiveBaseGrammar: baseModule.buildLeftRecursiveBaseGrammar,
+  getBaseGrammar: baseModule.getBaseGrammar,
   ladderLevels: baseModule.ladderLevels,
   parse: engineModule.parse,
   lit: typesModule.lit,
@@ -336,6 +342,31 @@ let cached: Grammar | undefined;
 export function parseAllegretto(text: string): ParseResult {
   cached ??= allegrettoGrammar();
   return present.parse(cached, text);
+}
+
+const TYPED = new Set(["binding", "export_binding", "fn_decl", "export_fn_decl", "typed_param", "lambdaN"]);
+
+/**
+ * The tags of the parse tree the present base grammar gives a text, or
+ * undefined where it does not parse. For the census: which forms of the
+ * present surface a text uses. A type annotation, which has no tag of its
+ * own, is added as the tag "type annotation". The present grammar value is
+ * read, never changed.
+ */
+export function presentTags(text: string): Set<string> | undefined {
+  const r = present.parse(present.getBaseGrammar(), text);
+  if (!r.ok) return undefined;
+  const tags = new Set<string>();
+  const walk = (t: ParseTree): void => {
+    if (t.kind !== "branch") return;
+    if (t.tag !== undefined) tags.add(t.tag);
+    // A type annotation has no tag of its own: it is the `: T` part of one of these.
+    if (t.tag !== undefined && TYPED.has(t.tag) && t.children.some((c) => c.kind === "branch" && c.tag === undefined && c.children.some((d) => d.kind === "leaf" && d.text === ":")))
+      tags.add("type annotation");
+    t.children.forEach(walk);
+  };
+  walk(r.tree);
+  return tags;
 }
 
 /** The tag the ladder gives a level's node (src/grammar2/base-grammar.ts `LADDER_TAG`). */
