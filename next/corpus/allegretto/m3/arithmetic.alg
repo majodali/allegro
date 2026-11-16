@@ -1,5 +1,7 @@
 // The integer arithmetic of the present tree's src/test/base.ts, each
-// present text printed through int.text.
+// present text printed through int.text. The texts 42, 3 + 4, 3 + 4 * 2,
+// (3 + 4) * 2 and 0xFF are also the cases of src/test/grammar2-language.ts
+// and src/test/grammar-legacy.ts named below, with the same values.
 // realises: test:base:integer literal
 // realises: test:base:addition
 // realises: test:base:subtraction
@@ -14,6 +16,12 @@
 // realises: test:base:zero
 // realises: test:base:large number
 // realises: test:base:deeply nested arithmetic
+// realises: test:grammar2-language:grammar2/base: integer literal
+// realises: test:grammar2-language:grammar2/base: arithmetic evaluates
+// realises: test:grammar2-language:grammar2/base: precedence — mul tighter than add
+// realises: test:grammar2-language:grammar2/base: parentheses override precedence
+// realises: test:grammar2-language:grammar2/std: hex literal
+// realises: test:grammar-legacy:hybrid parser: base syntax
 capability output
 show(n) => output.write(int.text(n))
 show(42)
