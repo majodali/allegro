@@ -1198,6 +1198,18 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The rest of milestone 3's present cases, realised in Allegretto (B-196, chunk Q6 (the comparison harness), part 3)
+
+B-196 (the rebuild's acceptance side). Forty-nine more cases of milestone
+3 are realised by programs under `next/corpus/allegretto/m3/`. Six programs
+are new, and eight older ones name more cases of their topic. The other 31
+cases of the 80 outside `src/test/base.ts` are left with a reason: 21 assert
+through a host API of the present tree, 14 of them through `ModuleLoader`;
+5 need the standard language and are candidates for milestone 4; 3 read a
+name a host extension or a library supplied; 2 are said plainly.
+`npm run harness:next` counts 94 of milestone 3's 138 cases realised. The record is
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — Allegretto programs in the corpus, and the harness counts the cases they realise (B-196, chunk Q6 (the comparison harness), part 2)
 
 B-196 (the rebuild's acceptance side). A case is now shown on the new
