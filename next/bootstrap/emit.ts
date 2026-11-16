@@ -74,7 +74,7 @@
 // The record is always of the second version: see `emitModule`.
 //
 // Tested by next/bootstrap/emit.test.ts and, through the launcher, by
-// next/bootstrap/fixtures.test.ts.
+// next/corpus/allegretto.test.ts over the programs of next/corpus/allegretto/.
 
 import * as fs from "fs";
 import * as path from "path";

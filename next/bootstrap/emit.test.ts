@@ -11,8 +11,8 @@
 // value it is given, in the order the kernel performs it; `tick` records
 // that it ran and answers the next whole number; `ask` answers with a cell
 // the test fills later. The programs of milestone 3, run through the
-// launcher with the output capability, are next/bootstrap/fixtures/ and
-// their test next/bootstrap/fixtures.test.ts.
+// launcher with the output capability, are next/corpus/allegretto/m3/ and
+// their test next/corpus/allegretto.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
