@@ -1,73 +1,97 @@
 // The emitter of Allegretto (B-196 (the rebuild's acceptance side), chunk
-// Q5 (the first notation and the bootstrap), part 2): a text read by
-// next/bootstrap/reader.ts becomes a saved program in the data form of
+// Q5 (the first notation and the bootstrap), parts 2 and 3): a text read
+// by next/bootstrap/reader.ts becomes a saved program in the data form of
 // next/kernel/saved-program.ts.
 //
 //   npm run emit -- <file> [-o out.json]
 //   npx tsx next/bootstrap/emit.ts <file> [-o out.json]
 //
-// Each form becomes exactly what next/ext/allegretto/forms.md says it
-// stands for. Where the kernel thing a form stands for does not exist
-// yet, the emitter gives a finding that names the item of forms.md §4 it
-// waits on, and writes no record. It never writes an encoding of its own
-// for such a form. `emit` returns every finding of a text, so the census
-// (next/bootstrap/census.ts) counts what the emitter refuses on.
+// Each form becomes exactly what next/ext/allegretto/forms.md §2 says it
+// stands for, on the kernel as forms.md §4 lists it built. It never writes
+// an encoding of its own for a form. `emit` returns every finding of a
+// text, so the census (next/bootstrap/census.ts) counts what the emitter
+// refuses.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Allegretto is a small language for the kernel and nothing else"
 //   "A saved program is a recorded sequence of interface calls": the
-//     record constructs values only; names are resolved here
+//     record constructs values only
+//   "A saved program names what it needs by content hash": `needs` lists
+//     the shipped primitives the text uses, each by the hash `shippedByName`
+//     of next/prims/index.ts gives when the record is built
 //   "A module is a function of its capabilities, inputs and imports": the
 //     header lines are the module function's parameters, in order
-//   "Sequence is one kernel primitive": a block's statements are a chain
-//     of the kernel primitive `then`
+//   "Export marks the binding, and a module with no exports is open"
+//   "A block of bindings is one kernel primitive", "Sequence is one kernel
+//     primitive"
+//   "Machine arithmetic is a set of pure primitives that ships with the
+//     platform": an operator is one shipped primitive
 //   "A language checks the names it cares about": a name nothing binds is
 //     refused at the end of the text
 //
-// How each form is written, today:
+// How a name is written. Two kinds of name are told apart in the record,
+// as the kernel tells them apart:
+//   - a parameter of a function, and a header line, which is a parameter
+//     of the module function: the function's param node. The kernel puts
+//     the argument in its place when the function is applied;
+//   - a name a block binds (`x = e`, `f(x) => e`, `x <- e`): a symbol node
+//     whose name is the name as written. The kernel looks it up from where
+//     it is used, and finds the innermost block's binding.
+// A name Allegretto binds is the node it stands for: a kernel node, or a
+// primitive node of a shipped primitive. The emitter resolves every name
+// lexically first, and refuses one nothing binds.
+//
+// How each form is written:
 //   - `"text"`, `42`, `0xFF`, `1.5`, `true`, `false`: a bits node.
-//   - `x`: the node the name is bound to: a parameter, or one of the
-//     kernel's primitives `then`, `attempt`, `describe`, `build`, `claim`.
-//     No name is written as a symbol, so nothing rests on a scope.
-//   - `x => e` and its kin: a function node; `f(a, b)` an expression
-//     node; `a |> f` the expression node of `f(a)`.
-//   - `if c then a else b`: `if(c, a, b)` of the kernel; `a && b`,
-//     `a || b`, `!a`: `if(a, b, false)`, `if(a, true, b)`,
-//     `if(a, false, true)`.
-//   - `{a: e}`: a structure node keyed by the symbol `a`; `[e, f]`: a
-//     structure node with no keys.
-//   - a block's statements `s1`, `s2`, `s3`: `then(s1, then(s2, s3))`.
+//   - `{a: e}`: a structure node keyed by the symbol `a`; `[e, f]`: one
+//     with no keys. `` `a ``: the node `datum` of the symbol `a`.
+//   - `x => e` and its kin: a function node; `f(a, b)`: an expression
+//     node; `a |> f`: the expression node of `f(a)`.
+//   - `p.a`: `get(p, `a)`, with `` `a `` a datum node; `p[i]`: `get(p, i)`.
+//     A capability's part, `output.write`, is the same reading.
+//   - `int.add` and the other names of forms.md §3: the shipped primitive;
+//     `bits.join`, `bits.length`, `bits.slice`: the kernel's `join`,
+//     `length`, `slice`; `then`, `attempt`, `describe`, `build`, `get`,
+//     `count`, `claim`: the kernel primitive of that name.
+//   - `if c then a else b`: `if(c, a, b)`; `a && b`, `a || b`, `!a`:
+//     `if(a, b, false)`, `if(a, true, b)`, `if(a, false, true)`.
+//   - `+ - * / %`, `< > <= >=`, prefix `-`: `int.add` and its kin, one
+//     shipped primitive each; `==`: `same(a, b)`; `!=`:
+//     `if(same(a, b), false, true)`; `++`: `join(a, b)`.
+//   - a block: `block(bindings, body)`, the bindings a structure keyed by
+//     the symbols of their names, the body the chain of `then` of its
+//     statements. A block with no binding is the chain alone.
 //   - `x <- e` followed by the rest `r` of the block:
-//     `((x) => then(x, r))(e)`. The kernel puts `e`, unevaluated and
-//     shared, in place of `x`; `then` needs its first argument, so `e` is
-//     evaluated there, after the statements before it; every use of `x`
-//     in `r` reads that one value, since an argument is evaluated at most
-//     once. Where nothing follows, the block's value is `e`.
+//     `block({x: e}, then(x, r))`; where nothing follows, `e`. Where `e`
+//     reads a name `x` an enclosing block binds, `e` is handed in as an
+//     argument, `((t) => block({x: t}, then(x, r)))(e)`, so it still reads
+//     the enclosing `x` and not itself.
 //   - the module: a function node whose parameters are the header lines,
-//     in order, with `declares` naming each. Its body is the chain of its
-//     statements, ended by the structure of its bindings
-//     (forms.md §2, "The module"): today that structure is empty, since a
-//     module with a binding waits on the block of bindings.
+//     with `declares` naming each. Its body is its block, ended by the
+//     structure of the bindings it yields, keyed by the symbols of their
+//     names: those marked `export`, or all of them where none is.
 //
-// What it does not write: see `FORMS`. Every finding names its form and,
-// where there is one, the item of forms.md §4 it waits on.
+// The record is always of the second version: see `emitModule`.
 //
-// Tested by next/bootstrap/emit.test.ts.
+// Tested by next/bootstrap/emit.test.ts and, through the launcher, by
+// next/bootstrap/fixtures.test.ts.
 
 import * as fs from "fs";
 import * as path from "path";
 import { read, type Expr, type Header, type Item, type Module, type Name, type Place } from "./reader.js";
-import { check2, encode, SAVED_PROGRAM_FORMAT, SAVED_PROGRAM_VERSION, type Declared, type Node, type Ref, type SavedProgram } from "../kernel/saved-program.js";
+import { check2, encode, SAVED_PROGRAM_FORMAT, SAVED_PROGRAM_VERSION_2, type Declared, type Need, type Node, type Ref, type SavedProgram } from "../kernel/saved-program.js";
+import { shippedByName } from "../prims/index.js";
 
-// ── The forms and what each waits on ──────────────────────────────────
+// ── The forms ─────────────────────────────────────────────────────────
 
-/** The items of forms.md §4: what the kernel stream owes. */
+/** The items of forms.md §4: what the kernel stream owes, each built by now. */
 export const ITEMS = {
   1: "the block of bindings",
   2: "the kernel's primitives on bits",
   3: "reading a structure",
   4: "the shipped primitives",
   5: "a primitive function that refuses",
+  6: "a symbol as data",
 } as const;
 export type ItemNumber = keyof typeof ITEMS;
 
@@ -81,61 +105,58 @@ export type FormId =
   | "capability" | "input" | "import" | "capability part" | "export";
 
 export interface FormInfo {
-  /** What the form stands for, in forms.md's words. */
+  /** What the form stands for, in forms.md's words, and the node the emitter writes. */
   readonly standsFor: string;
-  /**
-   * The items of forms.md §4 it waits on: empty when it is emitted today.
-   * `null` where it waits on something forms.md §4 does not list.
-   */
-  readonly waits: readonly ItemNumber[] | null;
 }
 
-/** Every form of forms.md §2, what it stands for, and what it waits on. Checked against the kernel by the tests. */
+/** Every form of forms.md §2 and what it stands for. Each is written; the tests run each on the kernel. */
 export const FORMS: Readonly<Record<FormId, FormInfo>> = {
-  "text": { standsFor: "bits: the text's UTF-8 bytes", waits: [] },
-  "whole number": { standsFor: "bits: 64, the number in two's complement, most significant byte first", waits: [] },
-  "fraction": { standsFor: "bits: 64, IEEE 754 binary64", waits: [] },
-  "truth": { standsFor: "bits of length one: 1 and 0", waits: [] },
-  "structure": { standsFor: "a structure whose keys are symbols", waits: [] },
-  "list": { standsFor: "a structure with no keys", waits: [] },
-  "symbol": { standsFor: "the symbol, as data: the data form has no node that puts a symbol in an expression as data, and the kernel has no quotation", waits: null },
-  "name": { standsFor: "what the name is bound to", waits: [] },
-  "function": { standsFor: "a composed function", waits: [] },
-  "application": { standsFor: "an application", waits: [] },
-  "pipe": { standsFor: "f(a)", waits: [] },
-  "entry by key": { standsFor: "reading the entry keyed by a symbol", waits: [3] },
-  "entry at place": { standsFor: "reading the entry at a place, counted from 0", waits: [3] },
-  "if": { standsFor: "the kernel's conditional", waits: [] },
-  "&& || !": { standsFor: "the kernel's conditional", waits: [] },
-  "claim": { standsFor: "the kernel's claim", waits: [] },
-  "kernel name": { standsFor: "a kernel primitive Allegretto binds a name to: then, attempt, describe, build", waits: [] },
-  "integer operator": { standsFor: "a shipped primitive on signed 64-bit integers: int.add and its kin", waits: [4] },
-  "== !=": { standsFor: "the kernel's primitive that tells two bits values apart, and its negation", waits: [2] },
-  "++": { standsFor: "the kernel's primitive that joins two bits values", waits: [2] },
-  "shipped name": { standsFor: "a shipped pure primitive, by its name in forms.md §3", waits: [4] },
-  "bits name": { standsFor: "a kernel primitive on bits: bits.join, bits.length, bits.slice", waits: [2] },
-  "binding": { standsFor: "a binding in the enclosing block of bindings", waits: [1] },
-  "function binding": { standsFor: "the binding f = (x, y) => e", waits: [1] },
-  "x <- e": { standsFor: "a statement: e happens here, and x is bound to its value for the rest of the block", waits: [] },
-  "block": { standsFor: "a block of bindings around a chain of then; with no bindings, the chain alone", waits: [] },
-  "statements": { standsFor: "a chain of the kernel primitive then", waits: [] },
-  "capability": { standsFor: "a parameter of the module, declared as a capability", waits: [] },
-  "input": { standsFor: "a parameter of the module, declared as an input", waits: [] },
-  "import": { standsFor: "a parameter of the module, declared as another module", waits: [] },
-  "capability part": { standsFor: "a part of a capability, read as an entry", waits: [3] },
-  "export": { standsFor: "a binding marked to be yielded by the module", waits: [1] },
+  "text": { standsFor: "bits: the text's UTF-8 bytes" },
+  "whole number": { standsFor: "bits: 64, the number in two's complement, most significant byte first" },
+  "fraction": { standsFor: "bits: 64, IEEE 754 binary64" },
+  "truth": { standsFor: "bits of length one: 1 and 0" },
+  "structure": { standsFor: "a structure whose keys are symbols" },
+  "list": { standsFor: "a structure with no keys" },
+  "symbol": { standsFor: "the symbol, as data: the node datum" },
+  "name": { standsFor: "what the name is bound to: a parameter, or a symbol the kernel looks up" },
+  "function": { standsFor: "a composed function" },
+  "application": { standsFor: "an application" },
+  "pipe": { standsFor: "f(a)" },
+  "entry by key": { standsFor: "get(p, the symbol as data)" },
+  "entry at place": { standsFor: "get(p, i)" },
+  "if": { standsFor: "the kernel's conditional" },
+  "&& || !": { standsFor: "the kernel's conditional" },
+  "claim": { standsFor: "the kernel's claim" },
+  "kernel name": { standsFor: "a kernel primitive Allegretto binds a name to: then, attempt, describe, build, get, count" },
+  "integer operator": { standsFor: "a shipped primitive on signed 64-bit integers: int.add and its kin" },
+  "== !=": { standsFor: "same(a, b), and if(same(a, b), false, true)" },
+  "++": { standsFor: "join(a, b)" },
+  "shipped name": { standsFor: "a shipped pure primitive, by its name in forms.md §3" },
+  "bits name": { standsFor: "a kernel primitive on bits: bits.join, bits.length, bits.slice" },
+  "binding": { standsFor: "a binding in the enclosing block of bindings" },
+  "function binding": { standsFor: "the binding f = (x, y) => e" },
+  "x <- e": { standsFor: "block({x: e}, then(x, rest))" },
+  "block": { standsFor: "block(bindings, a chain of then); with no bindings, the chain alone" },
+  "statements": { standsFor: "a chain of the kernel primitive then" },
+  "capability": { standsFor: "a parameter of the module, declared as a capability" },
+  "input": { standsFor: "a parameter of the module, declared as an input" },
+  "import": { standsFor: "a parameter of the module, declared as another module" },
+  "capability part": { standsFor: "a part of a capability, read as an entry: get(output, `write)" },
+  "export": { standsFor: "a binding marked to be yielded by the module" },
 };
 
-/** The names of forms.md §3, as Allegretto writes them, with the items each waits on. */
-const SHIPPED: ReadonlyMap<string, readonly ItemNumber[]> = new Map<string, readonly ItemNumber[]>([
-  ...["int.add", "int.sub", "int.mul", "int.neg", "int.lt", "int.gt", "int.le", "int.ge", "int.text", "int.float"].map((n): [string, readonly ItemNumber[]] => [n, [4]]),
-  ...["int.div", "int.mod", "text.int"].map((n): [string, readonly ItemNumber[]] => [n, [4, 5]]),
-  ...["float.add", "float.sub", "float.mul", "float.div", "float.neg", "float.lt", "float.le", "float.text", "float.int"].map((n): [string, readonly ItemNumber[]] => [n, [4]]),
-]);
-const BITS_NAMES: readonly string[] = ["bits.join", "bits.length", "bits.slice"];
+/** The names of forms.md §3. Each stands for the shipped primitive of that name. */
+export const SHIPPED_NAMES: readonly string[] = [
+  "int.add", "int.sub", "int.mul", "int.neg", "int.div", "int.mod", "int.lt", "int.gt", "int.le", "int.ge", "int.text", "text.int",
+  "float.add", "float.sub", "float.mul", "float.div", "float.neg", "float.lt", "float.le", "float.text", "int.float", "float.int",
+];
+/** The names Allegretto binds to the kernel's primitives on bits (forms.md §4 item 2). */
+const BITS_NAMES: Readonly<Record<string, string>> = { "bits.join": "join", "bits.length": "length", "bits.slice": "slice" };
 const NAMESPACES: readonly string[] = ["int", "float", "text", "bits"];
-/** The kernel primitives Allegretto binds a name to (forms.md §2, "Control and claims"). */
-const KERNEL_NAMES: readonly string[] = ["then", "attempt", "describe", "build", "claim"];
+/** The kernel primitives Allegretto binds a name to (forms.md §2, "Control and claims", and `get` and `count` of §4 item 3). */
+export const KERNEL_NAMES: readonly string[] = ["then", "attempt", "describe", "build", "get", "count", "claim"];
+/** Every kernel primitive a record of this emitter may name. */
+export const KERNEL_WRITTEN: readonly string[] = ["attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "same", "slice", "then"];
 /** The operators of forms.md §2 that stand for a shipped primitive, with its name. */
 const INT_OPERATORS: Readonly<Record<string, string>> = {
   "+": "int.add", "-": "int.sub", "*": "int.mul", "/": "int.div", "%": "int.mod", "<": "int.lt", ">": "int.gt", "<=": "int.le", ">=": "int.ge",
@@ -145,14 +166,14 @@ const INT_OPERATORS: Readonly<Record<string, string>> = {
 export interface Finding {
   readonly at: Place;
   /**
-   * "read": the reader refused the text. "waits": the form waits on the
-   * kernel stream. "unbound", "rebound": a name. "refused": a block with
-   * no statement, which has no value.
+   * "read": the reader refused the text. "unbound", "rebound": a name.
+   * "refused": a block with no statement, which has no value. "waits": a
+   * name of forms.md §3 that the shipped primitives lack.
    */
   readonly kind: "read" | "waits" | "unbound" | "rebound" | "refused";
-  /** The form, for "waits"; the name, for "unbound" and "rebound". */
+  /** The form, for "waits". */
   readonly form?: FormId;
-  /** The items of forms.md §4 it waits on, for "waits"; empty where forms.md §4 lists none. */
+  /** The items of forms.md §4 it waits on, for "waits". */
   readonly items?: readonly ItemNumber[];
   readonly message: string;
 }
@@ -175,7 +196,7 @@ class Builder {
     this.nodes.push(n);
     return this.nodes.length - 1;
   }
-  /** A node with no parts, written once: bits, a symbol, a kernel primitive. */
+  /** A node with no parts, written once: bits, a symbol, a datum, a kernel primitive, a shipped primitive. */
   constant(n: Node): Ref {
     const key = JSON.stringify(n);
     let r = this.shared.get(key);
@@ -190,6 +211,12 @@ class Builder {
   }
   symbol(fqn: string): Ref {
     return this.constant({ k: "symbol", fqn });
+  }
+  datum(fqn: string): Ref {
+    return this.constant({ k: "datum", fqn });
+  }
+  primitive(hash: string): Ref {
+    return this.constant({ k: "primitive", hash });
   }
   apply(fn: Ref, args: readonly Ref[]): Ref {
     return this.add({ k: "expression", fn, args });
@@ -218,15 +245,16 @@ function floatBytes(x: number): Uint8Array {
   return out;
 }
 
-/** No node: a form that waits writes none, and the record is not written. */
+/** No node: a text with a finding writes no record. */
 const NONE: Ref = -1;
 
 /** What a name stands for where it is used. */
 type Meaning =
+  /** A parameter of a function, or a header line. */
   | { readonly k: "param"; readonly ref: Ref; readonly role?: Header["k"] }
-  | { readonly k: "kernel"; readonly name: string }
-  /** Bound by a binding that waits on the block of bindings. */
-  | { readonly k: "waiting" };
+  /** A name a block binds: a symbol the kernel looks up. */
+  | { readonly k: "symbol"; readonly name: string }
+  | { readonly k: "kernel"; readonly name: string };
 
 class Scope {
   readonly names = new Map<string, Meaning>();
@@ -242,21 +270,26 @@ class Scope {
 
 // ── Emitting ──────────────────────────────────────────────────────────
 
-/** Emits a module read from a text. */
+/**
+ * Emits a module read from a text.
+ *
+ * The record is always of the second version. A symbol as data, the node
+ * `datum`, needs it, and a text holds one as soon as it reads a key with
+ * `.`, which every text that prints does. Writing every record so keeps one
+ * rule: a text is one module (forms.md §2), and `load` has the kernel make
+ * every record into one, with its identity. A text's record does not
+ * change version when the text gains a `.`. A record has no key slots and
+ * no stored outcomes.
+ */
 export function emitModule(module: Module): EmitResult {
   const b = new Builder();
   const findings: Finding[] = [];
   const forms = new Set<FormId>();
   const unbound: Array<{ name: string; at: Place }> = [];
+  const needs = new Map<string, Need>();
+  /** The meanings looked up while an expression is written, for each `x <- e` whose `e` is being written. */
+  const trackers: Set<Meaning>[] = [];
 
-  const waits = (form: FormId, at: Place, what: string, items: readonly ItemNumber[] | null = FORMS[form].waits): Ref => {
-    forms.add(form);
-    const on = items === null || items.length === 0
-      ? "a way to put a symbol in an expression as data, which forms.md §4 does not list"
-      : items.map((i) => `forms.md §4 item ${i} (${ITEMS[i]})`).join(" and ");
-    findings.push({ at, kind: "waits", form, items: items ?? [], message: `${what} waits on ${on}` });
-    return NONE;
-  };
   /** Binds a name in a block, refusing a second binding of it there. */
   const bind = (scope: Scope, name: Name, meaning: Meaning): void => {
     if (scope.names.has(name.name)) {
@@ -265,6 +298,11 @@ export function emitModule(module: Module): EmitResult {
     }
     scope.names.set(name.name, meaning);
   };
+  const lookup = (scope: Scope, name: string): Meaning | undefined => {
+    const m = scope.lookup(name);
+    if (m !== undefined) for (const t of trackers) t.add(m);
+    return m;
+  };
 
   const allegretto = new Scope(undefined);
   for (const name of KERNEL_NAMES) allegretto.names.set(name, { k: "kernel", name });
@@ -272,6 +310,17 @@ export function emitModule(module: Module): EmitResult {
   const FALSE = (): Ref => b.bits(Uint8Array.of(0), 1);
   const TRUE = (): Ref => b.bits(Uint8Array.of(1), 1);
   const cond = (c: Ref, a: Ref, e: Ref): Ref => b.apply(b.kernel("if"), [c, a, e]);
+  const shipped = (name: string, at: Place, form: FormId): Ref => {
+    forms.add(form);
+    const p = shippedByName.get(name);
+    if (p === undefined) {
+      findings.push({ at, kind: "waits", form, items: [4], message: `the shipped primitive ${name} waits on forms.md §4 item 4 (${ITEMS[4]}): next/prims/index.ts does not ship it` });
+      return NONE;
+    }
+    needs.set(p.hash, { hash: p.hash, name: p.name });
+    return b.primitive(p.hash);
+  };
+  const named = (m: Meaning): Ref => (m.k === "param" ? m.ref : m.k === "symbol" ? b.symbol(m.name) : b.kernel(m.name));
 
   const expr = (e: Expr, scope: Scope): Ref => {
     switch (e.k) {
@@ -288,20 +337,17 @@ export function emitModule(module: Module): EmitResult {
         forms.add("truth");
         return e.value ? TRUE() : FALSE();
       case "symbol":
-        return waits("symbol", e.at, `the symbol literal \`${e.name}`);
+        forms.add("symbol");
+        return b.datum(e.name);
       case "name": {
-        const m = scope.lookup(e.name);
+        const m = lookup(scope, e.name);
         if (m === undefined) {
           forms.add("name");
           unbound.push({ name: e.name, at: e.at });
           return NONE;
         }
-        if (m.k === "kernel") {
-          forms.add(m.name === "claim" ? "claim" : "kernel name");
-          return b.kernel(m.name);
-        }
-        forms.add("name");
-        return m.k === "param" ? m.ref : NONE;
+        forms.add(m.k !== "kernel" ? "name" : m.name === "claim" ? "claim" : "kernel name");
+        return named(m);
       }
       case "lambda": {
         forms.add("function");
@@ -311,8 +357,7 @@ export function emitModule(module: Module): EmitResult {
           bind(inner, p, { k: "param", ref });
           return ref;
         });
-        const body = expr(e.body, inner);
-        return b.fn(params, body);
+        return b.fn(params, expr(e.body, inner));
       }
       case "apply": {
         forms.add("application");
@@ -330,23 +375,24 @@ export function emitModule(module: Module): EmitResult {
         // `int.add` and its kin: a name of forms.md §3, where the first part is not bound.
         if (e.object.k === "name" && NAMESPACES.includes(e.object.name) && scope.lookup(e.object.name) === undefined) {
           const full = `${e.object.name}.${e.name.name}`;
-          const shipped = SHIPPED.get(full);
-          if (shipped !== undefined) return waits("shipped name", e.at, `the shipped primitive ${full}`, shipped);
-          if (BITS_NAMES.includes(full)) return waits("bits name", e.at, `the kernel primitive ${full}`);
+          if (SHIPPED_NAMES.includes(full)) return shipped(full, e.at, "shipped name");
+          if (full in BITS_NAMES) {
+            forms.add("bits name");
+            return b.kernel(BITS_NAMES[full]);
+          }
           forms.add("name");
           unbound.push({ name: full, at: e.at });
           return NONE;
         }
         const object = e.object.k === "name" ? scope.lookup(e.object.name) : undefined;
-        expr(e.object, scope);
-        if (object?.k === "param" && object.role === "capability")
-          return waits("capability part", e.at, `the part ${e.name.name} of the capability ${(e.object as { name: string }).name}`);
-        return waits("entry by key", e.at, `reading the entry ${e.name.name} of a structure`);
+        forms.add(object?.k === "param" && object.role === "capability" ? "capability part" : "entry by key");
+        return b.apply(b.kernel("get"), [expr(e.object, scope), b.datum(e.name.name)]);
       }
-      case "index":
-        expr(e.object, scope);
-        expr(e.index, scope);
-        return waits("entry at place", e.at, "reading an entry of a structure at a place");
+      case "index": {
+        forms.add("entry at place");
+        const object = expr(e.object, scope);
+        return b.apply(b.kernel("get"), [object, expr(e.index, scope)]);
+      }
       case "if": {
         forms.add("if");
         return cond(expr(e.condition, scope), expr(e.then, scope), expr(e.else, scope));
@@ -357,19 +403,30 @@ export function emitModule(module: Module): EmitResult {
           forms.add("&& || !");
           return cond(operand, FALSE(), TRUE());
         }
-        return waits("integer operator", e.at, "the prefix - (int.neg)");
+        return b.apply(shipped("int.neg", e.at, "integer operator"), [operand]);
       }
       case "binary": {
         const left = expr(e.left, scope);
         const right = expr(e.right, scope);
-        if (e.op === "&&" || e.op === "||") {
-          forms.add("&& || !");
-          return e.op === "&&" ? cond(left, right, FALSE()) : cond(left, TRUE(), right);
+        switch (e.op) {
+          case "&&":
+            forms.add("&& || !");
+            return cond(left, right, FALSE());
+          case "||":
+            forms.add("&& || !");
+            return cond(left, TRUE(), right);
+          case "==":
+            forms.add("== !=");
+            return b.apply(b.kernel("same"), [left, right]);
+          case "!=":
+            forms.add("== !=");
+            return cond(b.apply(b.kernel("same"), [left, right]), FALSE(), TRUE());
+          case "++":
+            forms.add("++");
+            return b.apply(b.kernel("join"), [left, right]);
+          default:
+            return b.apply(shipped(INT_OPERATORS[e.op], e.at, "integer operator"), [left, right]);
         }
-        if (e.op === "==" || e.op === "!=") return waits("== !=", e.at, `the operator ${e.op}`);
-        if (e.op === "++") return waits("++", e.at, "the operator ++");
-        const prim = INT_OPERATORS[e.op];
-        return waits("integer operator", e.at, `the operator ${e.op} (${prim})`, SHIPPED.get(prim) ?? [4]);
       }
       case "record": {
         forms.add("structure");
@@ -393,66 +450,78 @@ export function emitModule(module: Module): EmitResult {
     }
   };
 
+  /** A binding's value: a function node for `f(x) => e`, the expression for `x = e`. */
+  const bindingValue = (it: Extract<Item, { k: "binding" | "function" }>, scope: Scope): Ref => {
+    if (it.k === "binding") return expr(it.value, scope);
+    const inner = new Scope(scope);
+    const params = it.params.map((p) => {
+      const ref = b.param(p.name);
+      bind(inner, p, { k: "param", ref });
+      return ref;
+    });
+    return b.fn(params, expr(it.body, inner));
+  };
+
   /**
-   * A block: its bindings bound first, since they are order-free, then
-   * its statements in written order, as a chain of `then`. `tail` ends the
-   * chain where it is given: the module's structure of its bindings. The
-   * value is undefined for a block with no statement and no tail.
+   * A block: its bindings are one group, bound before anything is written,
+   * since they are order-free; its statements are a chain of `then` in
+   * written order. `tail` ends the chain where it is given: the module's
+   * structure of its bindings. The value is undefined for a block with no
+   * statement and no tail.
    */
   const block = (items: readonly Item[], scope: Scope, tail: (() => Ref) | undefined): Ref | undefined => {
-    for (const it of items) {
-      if (it.k === "binding") {
-        forms.add("binding");
-        if (it.exported) forms.add("export");
-        bind(scope, it.name, { k: "waiting" });
-      } else if (it.k === "function") {
-        forms.add("function binding");
-        if (it.exported) forms.add("export");
-        bind(scope, it.name, { k: "waiting" });
-      }
+    const bindings = items.filter((i): i is Extract<Item, { k: "binding" | "function" }> => i.k === "binding" || i.k === "function");
+    for (const it of bindings) {
+      forms.add(it.k === "binding" ? "binding" : "function binding");
+      if (it.exported) forms.add("export");
+      bind(scope, it.name, { k: "symbol", name: it.name.name });
     }
+    const values = bindings.map((it) => [b.symbol(it.name.name), bindingValue(it, scope)] as const);
+
     /** The names this block's `x <- e` lines bind, so a second binding of one in the block is refused. */
     const arrows = new Set<string>();
     const statements = items.filter((i) => i.k === "statement" || i.k === "arrow");
     if (statements.length > 1) forms.add("statements");
-    /** The chain from the i-th line on, in the scope that line sees. */
+    /** The chain from the i-th statement on, in the scope that line sees. */
     const rest = (i: number, here: Scope): Ref | undefined => {
-      if (i === items.length) return tail?.();
-      const it = items[i];
-      if (it.k === "binding" || it.k === "function") {
-        const what = it.k === "binding" ? `the binding ${it.name.name} = …` : `the function binding ${it.name.name}(…) => …`;
-        waits(it.k === "binding" ? "binding" : "function binding", it.at, what);
-        if (it.exported) waits("export", it.at, `export of the binding ${it.name.name}`);
-        if (it.k === "binding") expr(it.value, here);
-        else {
-          const inner = new Scope(here);
-          for (const p of it.params) bind(inner, p, { k: "param", ref: b.param(p.name) });
-          expr(it.body, inner);
-        }
-        return rest(i + 1, here);
-      }
-      const more = tail !== undefined || items.slice(i + 1).some((j) => j.k === "statement" || j.k === "arrow");
+      if (i === statements.length) return tail?.();
+      const it = statements[i];
+      const more = tail !== undefined || i + 1 < statements.length;
       if (it.k === "statement") {
         const value = expr(it.expr, here);
         if (!more) return value;
         const after = rest(i + 1, here);
         return after === undefined ? value : b.apply(b.kernel("then"), [value, after]);
       }
+      if (it.k !== "arrow") return undefined;
       forms.add("x <- e");
+      const name = it.name.name;
+      const outer = here.lookup(name);
+      const read = new Set<Meaning>();
+      trackers.push(read);
       const value = expr(it.value, here);
-      if (scope.names.has(it.name.name) || arrows.has(it.name.name))
-        findings.push({ at: it.name.at, kind: "rebound", message: `the name ${it.name.name} is bound twice in one block` });
-      arrows.add(it.name.name);
+      trackers.pop();
+      if (scope.names.has(name) || arrows.has(name))
+        findings.push({ at: it.name.at, kind: "rebound", message: `the name ${name} is bound twice in one block` });
+      arrows.add(name);
       // Nothing follows: the block's value is e's, and the name is bound for no line.
       if (!more) return value;
-      // ((x) => then(x, rest))(e): e happens here, and x is bound to its value for the rest.
-      const x = b.param(it.name.name);
+      // block({x: e}, then(x, rest)): e happens here, and x is bound to its value for the rest.
       const after = new Scope(here);
-      after.names.set(it.name.name, { k: "param", ref: x });
+      after.names.set(name, { k: "symbol", name });
+      const x = b.symbol(name);
       const body = rest(i + 1, after) ?? x;
-      return b.apply(b.fn([x], b.apply(b.kernel("then"), [x, body])), [value]);
+      const chain = b.apply(b.kernel("then"), [x, body]);
+      if (outer?.k === "symbol" && read.has(outer)) {
+        // e reads the x of an enclosing block: it is handed in, so it does not read itself.
+        const t = b.param(name);
+        return b.apply(b.fn([t], b.apply(b.kernel("block"), [b.structure([[x, t]]), chain])), [value]);
+      }
+      return b.apply(b.kernel("block"), [b.structure([[x, value]]), chain]);
     };
-    return rest(0, scope);
+    const body = rest(0, scope);
+    if (body === undefined || bindings.length === 0) return body;
+    return b.apply(b.kernel("block"), [b.structure(values), body]);
   };
 
   // The module: its header lines are its parameters, its block the body.
@@ -466,19 +535,23 @@ export function emitModule(module: Module): EmitResult {
     params.push(ref);
     declares.push({ param: ref, role: h.k === "import" ? "module" : h.k, name: h.name.name });
   }
-  // What the module yields: the structure of its bindings. A binding waits on the block of bindings, so today it is empty.
-  const body = block(module.items, top, () => b.structure([])) as Ref;
+  // What the module yields: the structure of its bindings, keyed by the symbols of their names.
+  const own = module.items.filter((i): i is Extract<Item, { k: "binding" | "function" }> => i.k === "binding" || i.k === "function");
+  const yielded = own.some((i) => i.exported) ? own.filter((i) => i.exported) : own;
+  const body = block(module.items, top, () => b.structure(yielded.map((i) => [b.symbol(i.name.name), b.symbol(i.name.name)] as const))) as Ref;
   for (const u of unbound) findings.push({ at: u.at, kind: "unbound", message: `the name ${u.name} is bound nowhere in the text` });
 
   const used = [...forms].sort() as FormId[];
   if (findings.length > 0) return { ok: false, findings: [...findings].sort((x, y) => x.at.start - y.at.start), forms: used };
   const program: SavedProgram = {
     format: SAVED_PROGRAM_FORMAT,
-    version: SAVED_PROGRAM_VERSION,
-    needs: [],
+    version: SAVED_PROGRAM_VERSION_2,
+    needs: [...needs.values()].sort((x, y) => x.name.localeCompare(y.name)),
     nodes: b.nodes,
     module: b.fn(params, body),
     declares,
+    keys: 0,
+    outcomes: [],
   };
   const problems = check2(program);
   if (problems.length > 0) throw new Error(`the emitter wrote a record that does not check: ${problems.join("; ")}`);

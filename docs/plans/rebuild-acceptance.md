@@ -924,3 +924,95 @@ policy is the gate ruled there.
   turns to a todo that names what the emitter can stop refusing. It
   still fails if a kernel primitive the emitter writes is missing.
 
+- **2026-11-16 — Q5, part 3: the emitter writes every form; the launcher runs an Allegretto program.**
+  Built on `origin/main` at `d2500b5`, after the kernel stream's PRs
+  #224 (the kernel reads structures and works on bits), #226 (the
+  block of bindings) and #228 (the shipped primitives). The present
+  tree is not changed.
+  - **The forms, each written.** `next/bootstrap/emit.ts`, checked by
+    `next/bootstrap/emit.test.ts` on the reference kernel:
+
+    | Form of forms.md §2 | Written as |
+    |---|---|
+    | literals, `{a: e}`, `[e, f]` | a bits node; a structure node |
+    | `` `name `` | the node `datum` |
+    | a name a block binds | a symbol node the kernel looks up |
+    | a parameter, a header line | its param node |
+    | `x => e`, `f(a, b)`, `a \|> f` | a function node; an expression node |
+    | `p.a`, `output.write`, `p[i]` | ``get(p, `a)``, `get(p, i)` |
+    | `if`, `&&`, `\|\|`, `!`, `claim` | the kernel's `if` and `claim` |
+    | `==`, `!=`, `++`, `bits.*` | `same`; `if(same(a, b), false, true)`; `join`; `join`, `length`, `slice` |
+    | the integer operators, prefix `-`, the names of §3 | the shipped primitive, listed in `needs` with the hash `shippedByName` gives |
+    | `x = e`, `f(x) => e` | an entry of the block's bindings |
+    | `x <- e` | `block({x: e}, then(x, rest))` |
+    | a block, the module | `block(bindings, chain of then)`; the module ends with the structure of what it yields |
+    | `export` | the module yields the bindings marked, or all |
+
+    Nothing waits on the forms. One thing waits on the kernel: entries
+    evaluated when read, the open part of forms.md §4 item 3. The
+    structure a module yields is built at the module's end, so the
+    kernel evaluates every binding it holds there. The smallest text:
+    `capability output` and `unused = output.write("x")` writes `x`
+    after the module's statements, and `bad = 1 / 0`, needed by
+    nothing, refutes the run. A binding left out by `export` is never
+    evaluated. No test of this stream pins the present order.
+  - **The record.** Every record is of the second version, with no key
+    slots and no outcomes. A text needs the node `datum` as soon as it
+    reads a key with `.`, which every text that prints does. One rule
+    for every text keeps a text's record from changing version when the
+    text gains a `.`, and `load` makes each record a module with its
+    identity.
+  - **The launcher.** Step 4 of `next/launch/launcher.ts` hands a
+    capability as a structure of its parts keyed by the symbols of the
+    part names; the refusal of a capability of more than one part is
+    gone, and a test runs one of two parts. The terminal's entry
+    supplies `shipped` of `next/prims/index.ts` as the target's
+    primitives; a record that needs a hash the target lacks is still
+    refused, naming it. `next/launch/fixtures/hello.json` is the record
+    the emitter writes for `next/launch/fixtures/hello.alg`, and a test
+    holds the two equal. The hand-built records of
+    `next/launch/launcher.test.ts` read the part, and the record of two
+    lines uses `then`. The kernel stream's two tests in
+    `next/kernel/kernel.test.ts` that run the fixture through `launch`
+    pass with no change to that file. `npm run allegretto -- <file.alg>
+    [--steps <n>]` (`next/launch/allegretto.ts`) emits and launches in
+    one step.
+  - **The programs of milestone 3.** Thirteen texts under
+    `next/bootstrap/fixtures/`, each with its lines as `// expect:`
+    comments and its end as `// end:`: hello world; a function and its
+    application; order-free bindings; `=` and `<-` side by side;
+    factorial and a sum through `int.text`; two functions that call
+    each other; a recursion over a structure with `get` and `count`; a
+    claim that holds; a claim refuted after a line is printed, ending
+    refuted; `7 / 0`, refuted with "division by zero"; the operators at
+    each precedence level; a module open and one with exports, whose
+    yielded keys (`// yields:`) are read through the kernel's
+    interface. `next/bootstrap/fixtures.test.ts` runs every one through
+    the emitter and the launcher. The three tests part 2 marked as
+    waiting are ordinary tests, and the test "what waits, against the
+    kernel on this base" ends with nothing owed.
+  - **For the kernel stream: recursion depth.** A recursion of a few
+    hundred calls ends at the kernel's own limit with no step budget
+    set: the host's stack runs out. The smallest text: `capability
+    output`, `loop(n) => if n == 0 then 0 else loop(n - 1)`,
+    `output.write(int.text(loop(2000)))`. A sum to 400 completes; a sum
+    to 450 does not. The fixtures stay below it.
+  - **The census.** `npx tsx next/bootstrap/census.ts` over the 138
+    cases of milestone 3: 3 host, 1 does not read, 134 read. Of the
+    134, 108 emit; the 26 that do not each use a name nothing binds
+    (`abs` in 4, `double`, `math` and `max` in 3 each), and none uses a
+    form the emitter refuses. Its `--moves` list is empty: no case newly
+    shows that it needs types. `next/corpus/cases.json` is unchanged.
+  - **Read narrowly where forms.md is silent**, each a question for the
+    kernel stream: a name a block binds is the symbol of the name as
+    written; `get` and `count` are names Allegretto binds, and `same`,
+    `join`, `length`, `slice`, `block` and `if` are not, since each has
+    a form; where `e` of `x <- e` reads an enclosing block's `x`, it is
+    handed in as an argument, `((t) => block({x: t}, then(x, r)))(e)`,
+    so it does not read itself; a binding written with `=` cannot read
+    a name bound by `<-`, since the group is bound before any
+    statement, and the name is refused as unbound; a yielded entry's
+    value is its name, looked up; `needs` is in name order; prefix `-`
+    on a number is `int.neg` applied to it; a capability's parts are
+    keyed by `kernel.symbol` of the part names. Part 2's readings stand
+    where this part does not change them.
