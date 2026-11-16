@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 241 decisions in 6 parts and 38 chapters (231 when the phase closed; ten added by rulings since) after the preface and the tour. Part I: 23; Part II: 56; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 243 decisions in 6 parts and 38 chapters (231 when the phase closed; twelve added by rulings since) after the preface and the tour. Part I: 23; Part II: 56; Part III: 25; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -55,7 +55,7 @@ As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed o
 12. **The parser engine** (2 decisions). What any parsing algorithm must do, and how the first engine arrives.
    - Decisions: Any parsing algorithm will do that meets five conditions; The platform's parser engine ships already built.
 13. **Modules and programs** (5 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
-   - Decisions: A module is an extension that arrives as a file; A key is made with the module that holds it; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
+   - Decisions: A module is an extension that arrives as a file; Allegretto is a small language for the kernel and nothing else; The parser engine and the module loader are written in Allegretto; A key is made with the module that holds it; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
 
 **Part IV: Allegro Standard**
 
@@ -1791,6 +1791,32 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/extension/modules.md "Loading (L1)", Import syntax; docs/book/extension/README.md "Provides"; docs/book/grammar-formalism.md §6.2; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Extensions are the module substrate" and the import half of "`use` header for language extension, `import` for module values". The maintainer: a module is an extension, with the same interface; the kinds of artifact differ because the kernel's mechanism is kept as simple as possible and more sophisticated mechanisms are loaded as extensions. The entry "Module loading and typed module objects are separate layers" is dissolved: layers go, and typed module objects are a decision of the standard language.
 - Held finding (2026-11-12, DR3): the loader is host code (`src/modules.ts`), still mixed with the standard language's typed modules (scripts/analyze/units.json).
+- Chapter: Modules and programs
+
+#### Allegretto is a small language for the kernel and nothing else
+- Decides: Allegretto is the language of the bare kernel. Each of its forms stands for something the kernel has, and it adds nothing of its own: no types, no checks beyond the kernel's claim. It is a usable language, with blocks, bindings, operator expressions and function definitions. A check that the standard language writes as an annotation is written out in Allegretto as a call. It ships with the platform: the kernel's tests, the seed of the standard language and the first extensions are written in it, and so is the work of anyone who builds a language from the bare kernel.
+- Status: open; ruled 2026-11-16
+- Type: capability
+- Rationale kind: vision
+- Depends on: The kernel holds no language; Every notation stands for an expression; Everything above the kernel is an extension, and there is one way to extend
+- Significance: 4 — what everything below the standard language is written in
+- Label: foundational — the first extensions and every language built from the kernel
+- Options recorded: no text form at all, the first extensions built by host code calling the interface (authoring a parser engine that way costs more than the language does); a text form of a description and no more, fully bracketed, with no operators or blocks (the review session's proposal: the maintainer wants a language usable for tests and the seed); a subset of the standard language's surface without its types (the acceptance stream's first proposal: an operator's meaning there depends on a type the subset does not have)
+- Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "That was my original plan for the Allegretto language - an absolutely minimal language mapped to bare kernel functionality and nothing else"; "I don't see a problem with implementing Allegretto as a reasonably usable language - with blocks, bindings, operator expressions and function definitions. It needs all that to be at all useful for authoring even simple tests and the Allegro standard seed code." It is what the rebuild's plan calls the first notation. Its forms are to be designed; what an operator stands for with no types is the first question.
+- Chapter: Modules and programs
+
+#### The parser engine and the module loader are written in Allegretto
+- Decides: the platform's parser engine and its module loader are written in Allegretto, test first and in small steps, with their type checks and other claims written out as calls. They rest on nothing of the standard language.
+- Status: open; ruled 2026-11-16
+- Type: implementation
+- Rationale kind: technical
+- Depends on: Allegretto is a small language for the kernel and nothing else; The platform's parser engine ships already built; A module is an extension that arrives as a file
+- Significance: 3 — the layer under the standard language stays under it
+- Label: swappable — the source language of two extensions
+- Options recorded: the standard language, compiled by the previous build as a self-hosted compiler is (rejected by the maintainer: "too risky, and the effort is an investment in the wrong place"); host code (not possible: a parser for one grammar is obtained by evaluating the engine, which must therefore be expressions)
+- Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. The maintainer: "With an incremental TDD approach, I think we'll find development in Allegretto not too inefficient. We can also include type checking and other checks, just in verbose Allegretto syntax."
 - Chapter: Modules and programs
 
 #### A key is made with the module that holds it

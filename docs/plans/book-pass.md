@@ -1534,6 +1534,10 @@ its approval.
   Sequence is a kernel primitive, built; effects on one capability
   keep their order; a structure's entries are evaluated when needed,
   not yet built. 241 decisions.
+- **2026-11-16 — Allegretto ruled** (the review session). The first
+  notation is Allegretto, a usable language for the bare kernel; the
+  parser engine and the module loader are written in it. 243
+  decisions. To design: its forms.
 
 ## 8. Sessions
 

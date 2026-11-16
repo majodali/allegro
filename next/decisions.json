@@ -103,6 +103,8 @@
     {"title":"Any parsing algorithm will do that meets five conditions","part":"III","chapter":"The parser engine","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"The platform's parser engine ships already built","part":"III","chapter":"The parser engine","type":"implementation","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A module is an extension that arrives as a file","part":"III","chapter":"Modules and programs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"Allegretto is a small language for the kernel and nothing else","part":"III","chapter":"Modules and programs","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"The parser engine and the module loader are written in Allegretto","part":"III","chapter":"Modules and programs","type":"implementation","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A key is made with the module that holds it","part":"III","chapter":"Modules and programs","type":"capability","present":"partly built","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
     {"title":"The loader reaches files through a capability","part":"III","chapter":"Modules and programs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Running a program is evaluating its main module with a configuration's capabilities","part":"III","chapter":"Modules and programs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},

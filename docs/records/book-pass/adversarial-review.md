@@ -656,6 +656,29 @@ kernel: `then`, which evaluates what follows a waiting statement
 ahead with no effect performed. Not built: entries evaluated when
 needed, and declared orders.
 
+### Allegretto (2026-11-16)
+
+The acceptance stream proposed a first notation: a subset of the
+standard language's surface, read through the present tree's parser.
+The maintainer judged it "far from complete, or even sound". The
+review session's reading: it cannot write an extension, its statements
+run only by the order of a structure's entries, its recursion is a
+workaround, and its emitter guesses an operator's meaning from what it
+can see of an operand. The maintainer asked whether the first notation
+is Allegretto, and what a text form is worth when a host loader can
+load the first extensions as saved programs. Ruled:
+
+- The first notation is Allegretto: a small language for the bare
+  kernel and nothing else, usable, with blocks, bindings, operator
+  expressions and function definitions. It ships with the platform.
+- The parser engine and the module loader are written in Allegretto,
+  test first, with their checks written out as calls. Writing them in
+  the standard language and compiling with the previous build, which
+  the review session recommended, is rejected as too risky.
+
+Recorded in "Allegretto is a small language for the kernel and nothing else" and "The parser engine and the module loader are written in Allegretto". To design: the forms, and first what
+an operator stands for in a language without types.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

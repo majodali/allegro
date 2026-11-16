@@ -574,6 +574,10 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — Allegretto ruled.** The first notation is
+  Allegretto: a small, usable language for the bare kernel and
+  nothing else, shipped with the platform. The parser engine and the
+  module loader are written in it. The inventory holds 243 decisions.
 - **2026-11-16 — The order of effects ruled; sequence built.** The
   kernel gains the primitive `then(first, second)`: the one way a
   text's order becomes an order of effects. Effects on one capability
