@@ -1203,6 +1203,24 @@ policy is the gate ruled there.
     in the present tree and a refutation on the new kernel, and no
     ruled decision's title says which, so the case is neither realised
     nor reclassed.
+- **2026-11-16 — Two tests follow a structure's entries being evaluated when read.**
+  PR #229 (a structure's entries are evaluated when read) could not
+  merge: tests of this stream failed on it. It named six, all in
+  `next/launch/launcher.test.ts`; four of them had already been
+  rewritten with `then` at part 3 of chunk Q5 (the first notation and
+  the bootstrap). Two failed on that PR merged with main. The record of
+  a run that waits on a cell and on a name still wrote its two
+  statements as a structure's entries; it is a link of `then` now. One
+  test of `next/bootstrap/emit.test.ts` took a yielded binding's value
+  from `entriesOf`, where an entry nothing has read is still an
+  expression; it reads the entry through the kernel's `get` now. Both
+  pass on the kernel of main and on the kernel of that PR. Checked on
+  that PR merged with main and with these two changes: 262 tests pass,
+  the 27 programs of the corpus pass, and the speed tests of chunk Q8
+  (the speed tests of milestone 3) pass. No statement of this stream is
+  written as a structure's entry any more. A module that yields no
+  longer evaluates every binding it holds once that PR merges, which
+  closes the first finding of part 3 of chunk Q5.
 - **2026-11-16 — Q8, part 1: the speed tests of milestone 3, measured.**
   Built on `origin/main` at `9aa0c78`. The present tree is not changed.
   The kernel, the shipped primitives, the emitter and the launcher are

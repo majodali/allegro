@@ -1214,6 +1214,15 @@ deterministic, a step costs more under nested arguments, `==` on texts
 is quadratic, and `bits.slice` costs time in the length of the whole
 value. The record is `docs/plans/rebuild-acceptance.md` §7.
 
+### 2026-11 — Two tests follow a structure's entries being evaluated when read (B-196)
+
+B-196 (the rebuild's acceptance side). The kernel stream's PR #229
+could not merge while two tests of this stream failed on it. One
+launcher test record wrote two statements as a structure's entries and
+is a link of `then` now; one emitter test read a yielded binding from
+`entriesOf` and reads it through `get` now. Both pass on either kernel.
+Record: `docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The rest of milestone 3's present cases, realised in Allegretto (B-196, chunk Q6 (the comparison harness), part 3)
 
 B-196 (the rebuild's acceptance side). Forty-nine more cases of milestone
