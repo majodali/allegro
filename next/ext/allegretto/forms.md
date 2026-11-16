@@ -83,7 +83,7 @@ it says otherwise.
 | `a + b`, `a - b`, `a * b`, `a / b`, `a % b`, `-a` | `int.add`, `int.sub`, `int.mul`, `int.div`, `int.mod`, `int.neg` |
 | `a < b`, `a > b`, `a <= b`, `a >= b` | `int.lt`, `int.gt`, `int.le`, `int.ge` |
 | `a == b`, `a != b` | the kernel's primitive that tells two bits values apart, and its negation |
-| `a ++ b` | `bits.join`: the bits of `a` followed by the bits of `b`; on two texts, the joined text |
+| `a ++ b` | the kernel's primitive that joins two bits values: the bits of `a` followed by the bits of `b`; on two texts, the joined text |
 
 Precedence, loosest first: `|>`; `||`; `&&`; `==` `!=`; `<` `>` `<=`
 `>=`; `++`; `+` `-`; `*` `/` `%`; prefix `-` `!`; application, `.` and
@@ -145,9 +145,6 @@ is not a number.
 - `int.div`, `int.mod`: signed, truncating toward zero.
 - `int.lt`, `int.gt`, `int.le`, `int.ge`: signed.
 - `int.text`: an integer's decimal text. `text.int`: the reverse.
-- `bits.join`, `bits.length`, `bits.slice`: joining, measuring and
-  taking apart a bits value. With these the reference definitions of
-  the others can be written (issue 21 of the adversarial review).
 - `float.add`, `float.sub`, `float.mul`, `float.div`, `float.neg`,
   `float.lt`, `float.le`, `float.text`, `int.float`, `float.int`.
 
@@ -157,8 +154,14 @@ is not a number.
    data form: a group of named values that may refer to each other, and
    a body. It is what makes a recursive function one value with one
    identity, where self-application made it a wrapper.
-2. **Telling bits apart**, ruled in "The kernel's primitives are pure
-   and few" and not built.
+2. **The kernel's primitives on bits**: telling two apart, ruled in
+   "The kernel's primitives are pure and few" and not built; and
+   joining two, measuring one and taking a part of one, bound in
+   Allegretto to the names `bits.join`, `bits.length` and `bits.slice`.
+   They are the kernel's and not shipped primitives because every
+   shipped primitive is to have a reference definition, and these are
+   what such a definition is written in (issue 21 of the adversarial
+   review).
 3. **Reading a structure**: an entry by key, an entry by place, and the
    number of entries. Entries are evaluated when read.
 4. **The shipped primitives** of section 3, under `next/prims/`.

@@ -667,6 +667,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Bits is the only scalar" and "Scalar encodings inside Bits". The 64-bit width, the IEEE float and the UTF-8 text encoding become choices of the standard language and of the arithmetic capability.
 - Held finding (2026-11-11, DR2): arithmetic, comparison and the scalar encodings are base primitives (`src/primitives.ts`).
+- Notes (2026-11-16, Allegretto's forms): the kernel also joins two bits values, measures one and takes a part of one. It still gives the bits no meaning: no arithmetic and no order.
 - Chapter: Values
 
 #### One composite kind: Structure
@@ -989,6 +990,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
 - Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
+- Notes (2026-11-16, Allegretto's forms): a primitive function applied outside its domain gives a refutation, by ruling: division by zero, a place outside a structure. A handled failure does not exist below the standard language, whose operators may wrap a primitive to raise an exception.
 - Chapter: Authority
 
 ### Metadata
@@ -1361,7 +1363,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover ten things: telling bits apart; making and reading structures; one conditional; one sequence; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover ten things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1378,6 +1380,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, values and descriptions): the list is fixed by the rulings on values and descriptions. "Evaluating an expression with names rebound" goes: a loader builds a function from a description and calls it, so no primitive inside the language makes or reads a scope (issue 23 of the adversarial review). Quotation goes: a quoted symbol is a description. The title says six in its history and eight now.
 - Notes (2026-11-15, solving): nine, with specializing a function ("A function can be specialized with its parameters unknown").
 - Notes (2026-11-16, the order of effects): ten, with sequence ("Sequence is one kernel primitive").
+- Notes (2026-11-16, Allegretto's forms): joining, measuring and taking apart a bits value are added to the first of the ten, by the maintainer's ruling on issue 21 of the adversarial review: a reference definition of arithmetic is written in them, so they cannot themselves be shipped primitives with reference definitions.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1804,6 +1807,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: no text form at all, the first extensions built by host code calling the interface (authoring a parser engine that way costs more than the language does); a text form of a description and no more, fully bracketed, with no operators or blocks (the review session's proposal: the maintainer wants a language usable for tests and the seed); a subset of the standard language's surface without its types (the acceptance stream's first proposal: an operator's meaning there depends on a type the subset does not have)
 - Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: "That was my original plan for the Allegretto language - an absolutely minimal language mapped to bare kernel functionality and nothing else"; "I don't see a problem with implementing Allegretto as a reasonably usable language - with blocks, bindings, operator expressions and function definitions. It needs all that to be at all useful for authoring even simple tests and the Allegro standard seed code." It is what the rebuild's plan calls the first notation. Its forms are to be designed; what an operator stands for with no types is the first question.
+- Notes (2026-11-16, Allegretto's forms): the forms are ruled, in `next/ext/allegretto/forms.md`: an operator stands for exactly one primitive function; a block is bindings, order-free and recursive, and statements in written order; `x <- e` binds a statement's value at its place; a module's header declares each capability, input and import. The present tree's parser engine reads it first, with the base grammar less the standard language's productions.
 - Chapter: Modules and programs
 
 #### The parser engine and the module loader are written in Allegretto
