@@ -36,7 +36,8 @@
     "harness:next": "tsx next/corpus/harness.ts --next",
     "emit": "tsx next/bootstrap/emit.ts",
     "launch": "tsx next/launch/terminal.ts",
-    "allegretto": "tsx next/launch/allegretto.ts"
+    "allegretto": "tsx next/launch/allegretto.ts",
+    "bench:next": "tsx next/corpus/speed/bench.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",
