@@ -1191,3 +1191,14 @@ policy is the gate ruled there.
       the forms rule; `partial eval: eval_if with unresolved condition propagates type from matching branches`
       asserts only that a
       function value is not null, which no program can print.
+  - **Added in review.** The five cases of kind (a) moved from
+    milestone 3 to milestone 4 in `next/corpus/cases.json`; no class
+    changed. Milestone 3 then holds 133 present cases, 94 realised and
+    39 not yet named: 13 of `src/test/base.ts`, and the 26 of kinds
+    (b), (c) and (e) above. `yieldedKeys` in `next/corpus/allegretto.ts`
+    handed every module one capability; it now hands a module what its
+    header declares, so a module with no capability can state
+    `// yields:`. Open for the maintainer: `if 1 then 42 else 0` is 42
+    in the present tree and a refutation on the new kernel, and no
+    ruled decision's title says which, so the case is neither realised
+    nor reclassed.
