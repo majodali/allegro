@@ -43,19 +43,44 @@
 // program, and so is a run that stopped after printing a line for every
 // pin; runAlgFile fails both.
 //
-// What it cannot do yet. A test case is counted as not yet realised: how
-// a test of the new tree names the case it realises is part 2 of Q6. A
-// program whose run a ruling ends early, or whose detail pins no longer
-// print, shifts every later ordinal; the comparison by ordinal reports
-// those lines as found elsewhere.
+// What it cannot do yet. A program whose run a ruling ends early, or whose
+// detail pins no longer print, shifts every later ordinal; the comparison
+// by ordinal reports those lines as found elsewhere.
 //
-// Tested by next/corpus/harness.test.ts, against stub runners.
+// The new tree: `--next` (part 2 of Q6). By the maintainer's ruling of
+// 2026-11-16 a case is shown on the new kernel by an Allegretto program
+// under next/corpus/allegretto/, not by running the present program there;
+// the convention is next/corpus/allegretto/README.md.
+//
+//   npx tsx next/corpus/harness.ts --next                    every program under
+//                                                            next/corpus/allegretto/
+//   npm run harness:next                                     the same
+//   npx tsx next/corpus/harness.ts --next --milestone N      the programs of the
+//                                                            directories m1 to mN,
+//                                                            and rows 1 to N
+//   npx tsx next/corpus/harness.ts --next --file <program>   one program
+//
+// It runs each program in process with `runProgram` of
+// next/corpus/allegretto.ts, the implementation the programs' test uses:
+// emitted, launched on the reference kernel, and its lines, end and yielded
+// keys compared with its pins. A case is realised when a passing program
+// names it in a `// realises:` line. The report gives, per milestone, the
+// programs passing and failing, and of the cases due there those realised,
+// those named only by a failing program, and those not yet named. It exits
+// 1 on a failing program, a `realises` line naming no case, one case named
+// twice by one program, and a program outside a directory `m<milestone>`. A
+// case named by a program of another milestone's directory, or a case due
+// at no milestone, is reported and does not fail.
+//
+// Tested by next/corpus/harness.test.ts, against stub runners and, for
+// `--next`, over the committed programs.
 
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import { CASES_PATH, type Case, type CaseClass, type Corpus, type PinCase } from "../tools/corpus.js";
+import { milestoneOf, programFiles, readPins, runProgram } from "./allegretto.js";
 
 // ── The runner ────────────────────────────────────────────────────────
 
@@ -325,18 +350,150 @@ export const PRESENT_RUN_DIFFERS: Record<string, string> = {
     "the suite passes it lib/proven.alg as an extension (src/test/proofs.ts); the program has no `use proven` and the file runner has no flag for an extension, so its run stops on a parse error",
 };
 
+// ── The new tree: the Allegretto programs ─────────────────────────────
+
+/** One Allegretto program as `--next` ran it. */
+export interface NextProgram {
+  file: string;
+  /** Its directory's milestone; null outside a directory `m<milestone>`. */
+  milestone: number | null;
+  /** The ids of its `// realises:` lines, as written. */
+  realises: string[];
+  /** Each way its run differs from its pins; empty when it passes. */
+  problems: string[];
+}
+
+export interface NextRow {
+  milestone: number;
+  programs: { passing: number; failing: number };
+  /** Cases of class survives or changes due at this milestone. */
+  due: number;
+  realised: number;
+  namedOnlyByFailing: number;
+  notNamed: number;
+}
+
+export interface NextReport {
+  rows: NextRow[];
+  programs: { run: number; passing: number; failing: number };
+  cases: { due: number; realised: number; namedOnlyByFailing: number; notNamed: number };
+  names: { total: number; noCase: number; twice: number; otherMilestone: number; notDue: number };
+  /** What makes the command exit 1, one per line. */
+  findings: string[];
+  /** What is reported and does not fail, one per line. */
+  notes: string[];
+}
+
+/** Run each program with `runProgram`, in process, one after another. */
+export async function runNextPrograms(root: string, files: string[]): Promise<NextProgram[]> {
+  const out: NextProgram[] = [];
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(root, file), "utf-8");
+    let problems: string[];
+    try { problems = (await runProgram(text, file)).problems; }
+    catch (e) { problems = [`the run threw: ${(e as Error).message}`]; }
+    out.push({ file, milestone: milestoneOf(file), realises: readPins(text).realises, problems });
+  }
+  return out;
+}
+
+/** The report of `--next`: programs by their directory's milestone, cases by their own. */
+export function buildNextReport(corpus: Corpus, programs: NextProgram[], upTo = 9): NextReport {
+  const byId = new Map(corpus.cases.map((c) => [c.id, c] as const));
+  const due = (c: Case) => (c.class === "survives" || c.class === "changes") && c.milestone !== null;
+  const findings: string[] = [];
+  const notes: string[] = [];
+  const names = { total: 0, noCase: 0, twice: 0, otherMilestone: 0, notDue: 0 };
+  /** For each case named: whether some passing program names it. */
+  const named = new Map<string, boolean>();
+  for (const p of programs) {
+    const passes = p.problems.length === 0;
+    if (p.milestone === null) findings.push(`${p.file}: not in a directory m<milestone> directly under next/corpus/allegretto/`);
+    for (const problem of p.problems) findings.push(`${p.file}: fails: ${problem}`);
+    const seen = new Set<string>();
+    for (const id of p.realises) {
+      names.total++;
+      if (seen.has(id)) { names.twice++; findings.push(`${p.file}: names ${id} twice`); continue; }
+      seen.add(id);
+      const c = byId.get(id);
+      if (c === undefined) { names.noCase++; findings.push(`${p.file}: realises ${JSON.stringify(id)}, which is no case of ${CASES_PATH}`); continue; }
+      if (!due(c)) { names.notDue++; notes.push(`${p.file}: names ${id}, of class ${c.class ?? "none"}, which no milestone is due`); }
+      else if (p.milestone !== null && c.milestone !== p.milestone) { names.otherMilestone++; notes.push(`${p.file}: in the directory of milestone ${p.milestone}, names ${id}, due at milestone ${c.milestone}`); }
+      named.set(id, (named.get(id) ?? false) || passes);
+    }
+  }
+  const rows = new Map<number, NextRow>(MILESTONES.filter((m) => m <= upTo).map((m) => [m, { milestone: m, programs: { passing: 0, failing: 0 }, due: 0, realised: 0, namedOnlyByFailing: 0, notNamed: 0 }]));
+  for (const p of programs) {
+    const r = p.milestone === null ? undefined : rows.get(p.milestone);
+    if (r) { if (p.problems.length === 0) r.programs.passing++; else r.programs.failing++; }
+  }
+  const cases = { due: 0, realised: 0, namedOnlyByFailing: 0, notNamed: 0 };
+  for (const c of corpus.cases) {
+    if (!due(c) || c.milestone! > upTo) continue;
+    const r = rows.get(c.milestone!)!;
+    const n = named.get(c.id);
+    cases.due++; r.due++;
+    if (n === true) { cases.realised++; r.realised++; }
+    else if (n === false) { cases.namedOnlyByFailing++; r.namedOnlyByFailing++; }
+    else { cases.notNamed++; r.notNamed++; }
+  }
+  const failing = programs.filter((p) => p.problems.length > 0).length;
+  return { rows: [...rows.values()], programs: { run: programs.length, passing: programs.length - failing, failing }, cases, names, findings, notes };
+}
+
+/** One line per milestone, with the running total up to it. */
+export function formatNextRows(report: NextReport): string[] {
+  let due = 0, realised = 0;
+  return report.rows.map((r) => {
+    due += r.due; realised += r.realised;
+    return `milestone ${r.milestone}: programs ${r.programs.passing + r.programs.failing} (passing ${r.programs.passing}, failing ${r.programs.failing}) · ` +
+      `cases due ${r.due} · realised ${r.realised}, named only by a failing program ${r.namedOnlyByFailing}, not yet named ${r.notNamed} · up to ${r.milestone}: ${realised} of ${due} realised`;
+  });
+}
+
+/** The summary line of `--next`, in the form of the present mode's. */
+export function formatNextSummary(report: NextReport): string {
+  const { programs: p, cases: c, names: n } = report;
+  const verdict = report.findings.length === 0 ? "no failing program" : `${p.failing} failing program(s), ${report.findings.length} finding(s)`;
+  return `harness: new tree · programs ${p.run} run (passing ${p.passing}, failing ${p.failing}) · ` +
+    `cases due ${c.due} (realised ${c.realised}, named only by a failing program ${c.namedOnlyByFailing}, not yet named ${c.notNamed}) · ` +
+    `realises lines ${n.total} (no case ${n.noCase}, twice in one program ${n.twice}, of another milestone's directory ${n.otherMilestone}, due at no milestone ${n.notDue}) — ${verdict}`;
+}
+
+/** Whether `--next` exits 1. */
+export function nextFailed(report: NextReport): boolean {
+  return report.findings.length > 0;
+}
+
 // ── main ──────────────────────────────────────────────────────────────
 
 function usage(msg: string): never {
   console.error(msg);
-  console.error("usage: npx tsx next/corpus/harness.ts --present [--milestone N] [--file <program>]");
+  console.error("usage: npx tsx next/corpus/harness.ts --present|--next [--milestone N] [--file <program>]");
   process.exit(2);
+}
+
+async function nextMain(root: string, corpus: Corpus, upTo: number, only: string | undefined, msGiven: boolean): Promise<void> {
+  let files = programFiles(root);
+  if (only !== undefined) {
+    if (!files.includes(only)) usage(`${only} is no program under next/corpus/allegretto/`);
+    files = [only];
+  }
+  if (msGiven) files = files.filter((f) => { const m = milestoneOf(f); return m === null || m <= upTo; });
+  const started = Date.now();
+  const report = buildNextReport(corpus, await runNextPrograms(root, files), upTo);
+  for (const f of report.findings) console.log(f);
+  for (const n of report.notes) console.log(n);
+  for (const r of formatNextRows(report)) console.log(r);
+  console.log(`${formatNextSummary(report)} · ${((Date.now() - started) / 1000).toFixed(1)} s`);
+  if (nextFailed(report)) process.exit(1);
 }
 
 async function main(): Promise<void> {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
   const argv = process.argv.slice(2);
-  if (!argv.includes("--present")) usage("the harness needs a runner: --present is the one this part has");
+  const present = argv.includes("--present"), next = argv.includes("--next");
+  if (present === next) usage("the harness needs one runner: --present (the present tree) or --next (the Allegretto programs on the new kernel)");
   const value = (flag: string): string | undefined => {
     const i = argv.indexOf(flag);
     if (i < 0) return undefined;
@@ -347,6 +504,7 @@ async function main(): Promise<void> {
   const upTo = msArg === undefined ? 9 : Number(msArg);
   if (!Number.isInteger(upTo) || upTo < 1 || upTo > 9) usage(`--milestone takes 1 to 9, not ${msArg}`);
   const corpus = JSON.parse(fs.readFileSync(path.join(root, CASES_PATH), "utf-8")) as Corpus;
+  if (next) return nextMain(root, corpus, upTo, value("--file"), msArg !== undefined);
   const byProgram = pinsByProgram(corpus);
   let files = [...byProgram.keys()];
   const only = value("--file");

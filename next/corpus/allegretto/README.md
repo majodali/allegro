@@ -54,3 +54,9 @@ here does so.
 
 - `npm run test:next` runs every program here
   (`next/corpus/allegretto.test.ts`).
+- `npm run harness:next` runs them with the same implementation and
+  reports, per milestone, the programs passing and failing and the cases
+  realised (`next/corpus/harness.ts --next`). It fails on a failing
+  program, on a `// realises:` line naming no case, and on one case named
+  twice by one program. A case named by a program of another milestone's
+  directory is reported and does not fail.

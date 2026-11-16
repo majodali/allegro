@@ -5,7 +5,8 @@
 // runner runs three small programs of the present tree, one of which the
 // file runner cannot run as the suite does. The whole calibration is the
 // command `npm run harness:present`, not a test: it takes about half a
-// minute.
+// minute. The mode `--next` is tested on a report built from stub runs,
+// then over the committed Allegretto programs on the reference kernel.
 
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
@@ -13,8 +14,10 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   compareProgram, buildReport, formatRows, formatSummary, failed, runAll, comparePrograms, presentTreeRunner, pinsByProgram, PRESENT_RUN_DIFFERS,
-  type Runner, type RunResult, type Program,
+  buildNextReport, formatNextRows, formatNextSummary, nextFailed, runNextPrograms,
+  type Runner, type RunResult, type Program, type NextProgram,
 } from "./harness.js";
+import { programFiles } from "./allegretto.js";
 import { CASES_PATH, type Corpus, type PinCase, type TestCase } from "../tools/corpus.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -164,4 +167,55 @@ test("the present-tree runner refuses a text that differs from the file on disk,
     run([], { kind: "stopped", reason: "the present-tree runner runs the file on disk, and the text given differs from tests/match-demo.alg" }));
   assert.deepEqual(await runner({ path: "tests/no-such.alg", text: "" }),
     run([], { kind: "stopped", reason: "tests/no-such.alg is no file under the repository root" }));
+});
+
+// ── The new tree: the Allegretto programs (--next) ──
+
+const M3 = "next/corpus/allegretto/m3";
+const prog = (file: string, realises: string[], problems: string[] = [], milestone: number | null = 3): NextProgram => ({ file, milestone, realises, problems });
+
+test("--next counts a case realised when a passing program names it, and only named when every program naming it fails", () => {
+  const report = buildNextReport(CORPUS, [
+    prog(`${M3}/a.alg`, ["test:m:changes at 3"]),
+    prog(`${M3}/b.alg`, ["pin:tests/p.alg#1"], ["printed [], expected [\"1\"]"]),
+  ]);
+  const row3 = report.rows.find((r) => r.milestone === 3)!;
+  assert.deepEqual(row3, { milestone: 3, programs: { passing: 1, failing: 1 }, due: 2, realised: 1, namedOnlyByFailing: 1, notNamed: 0 });
+  assert.deepEqual(report.findings, [`${M3}/b.alg: fails: printed [], expected ["1"]`]);
+  assert.equal(nextFailed(report), true);
+  assert.equal(formatNextRows(report)[2], "milestone 3: programs 2 (passing 1, failing 1) · cases due 2 · realised 1, named only by a failing program 1, not yet named 0 · up to 3: 1 of 3 realised");
+  assert.equal(formatNextSummary(report),
+    "harness: new tree · programs 2 run (passing 1, failing 1) · cases due 7 (realised 1, named only by a failing program 1, not yet named 5) · realises lines 2 (no case 0, twice in one program 0, of another milestone's directory 0, due at no milestone 0) — 1 failing program(s), 1 finding(s)");
+});
+
+test("--next fails on an id that is no case, on one case named twice by a program, and on a program outside m<milestone>; another milestone's case and a detail case are only reported", () => {
+  const report = buildNextReport(CORPUS, [
+    prog(`${M3}/a.alg`, ["test:m:no such", "test:m:at 5", "test:m:host layout", "test:m:kernel", "test:m:kernel"]),
+    prog("next/corpus/allegretto/loose.alg", [], [], null),
+  ]);
+  assert.deepEqual(report.findings, [
+    `${M3}/a.alg: realises "test:m:no such", which is no case of next/corpus/cases.json`,
+    `${M3}/a.alg: names test:m:kernel twice`,
+    "next/corpus/allegretto/loose.alg: not in a directory m<milestone> directly under next/corpus/allegretto/",
+  ]);
+  assert.deepEqual(report.notes, [
+    `${M3}/a.alg: in the directory of milestone 3, names test:m:at 5, due at milestone 5`,
+    `${M3}/a.alg: names test:m:host layout, of class detail, which no milestone is due`,
+    `${M3}/a.alg: in the directory of milestone 3, names test:m:kernel, due at milestone 1`,
+  ]);
+  assert.deepEqual(report.names, { total: 5, noCase: 1, twice: 1, otherMilestone: 2, notDue: 1 });
+  assert.equal(report.rows.find((r) => r.milestone === 5)!.realised, 1, "a case named from another milestone's directory is still realised");
+  assert.equal(nextFailed(report), true);
+  assert.equal(nextFailed(buildNextReport(CORPUS, [prog(`${M3}/a.alg`, ["test:m:at 5"])])), false);
+});
+
+test("--next over the committed programs: no program fails, and every id a program names is a case", async () => {
+  const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, CASES_PATH), "utf-8")) as Corpus;
+  const programs = await runNextPrograms(ROOT, programFiles(ROOT));
+  assert.ok(programs.length >= 13);
+  assert.deepEqual(programs.filter((p) => p.problems.length > 0).map((p) => `${p.file}: ${p.problems.join("; ")}`), []);
+  const ids = new Set(corpus.cases.map((c) => c.id));
+  assert.deepEqual(programs.flatMap((p) => p.realises.filter((id) => !ids.has(id)).map((id) => `${p.file}: ${id}`)), []);
+  const report = buildNextReport(corpus, programs);
+  assert.deepEqual(report.findings, []);
 });
