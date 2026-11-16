@@ -378,7 +378,25 @@ async function ceilings(p: Present, log: (line: string) => void): Promise<string
  * value once) taken out. A probe without `calls` does one operation once.
  */
 const xs = (n: number): string => `[${Array.from({ length: n }, (_, i) => i).join(", ")}]`;
-const probes: { name: string; sizes: number[]; calls: boolean; text: (n: number, calls: number) => string }[] = [
+const probes: { name: string; sizes: number[]; calls: boolean | "per step"; text: (n: number, calls: number) => string }[] = [
+  {
+    name: "time per step of sum(n) written n + sum(n - 1)",
+    sizes: [50, 100, 200, 350],
+    calls: "per step",
+    text: (n) => `capability output\nsum(n) => if n == 0 then 0 else n + sum(n - 1)\noutput.write(int.text(sum(${n})))\n`,
+  },
+  {
+    name: "time per step of sum(n) written pass(n, sum(n - 1)), with pass(a, b) => a + b",
+    sizes: [50, 100, 200, 350],
+    calls: "per step",
+    text: (n) => `capability output\npass(a, b) => a + b\nsum(n) => if n == 0 then 0 else pass(n, sum(n - 1))\noutput.write(int.text(sum(${n})))\n`,
+  },
+  {
+    name: "time per step of sum(n) written check(n, sum(n - 1)), where check claims b >= 0 before a + b",
+    sizes: [50, 100, 200, 350],
+    calls: "per step",
+    text: (n) => `capability output\ncheck(a, b) =>\n  claim(b >= 0)\n  a + b\nsum(n) => if n == 0 then 0 else check(n, sum(n - 1))\noutput.write(int.text(sum(${n})))\n`,
+  },
   {
     name: "one call that slices one character off a text of n characters",
     sizes: [10, 100, 1000, 10000, 100000],
@@ -422,11 +440,15 @@ async function whereTimeGoes(log: (line: string) => void): Promise<string[]> {
   for (const pr of probes) {
     const parts: string[] = [];
     for (const n of pr.sizes) {
-      if (pr.calls) {
+      if (pr.calls === "per step") {
+        const one = await time(pr.text(n, 0));
+        parts.push(`n ${n}: ${one.steps != null && one.end === "completed" ? ((one.ms * 1000) / one.steps).toFixed(1) : "-"} us (${one.steps} steps, ${one.end})`);
+      } else if (pr.calls) {
         const few = await time(pr.text(n, 6)), many = await time(pr.text(n, 60));
         const perCall = (many.ms - few.ms) / 54;
         const stepsPerCall = few.steps != null && many.steps != null ? (many.steps - few.steps) / 54 : NaN;
-        parts.push(`n ${n}: ${perCall < 0.01 ? perCall.toFixed(4) : ms(perCall)} ms (${stepsPerCall} steps)`);
+        const total = `6 calls ${ms(few.ms)} ms, 60 calls ${ms(many.ms)} ms`;
+        parts.push(perCall > 0 ? `n ${n}: ${ms(perCall)} ms per call of ${stepsPerCall} steps (${total})` : `n ${n}: under the noise (${total})`);
       } else {
         const one = await time(pr.text(n, 0));
         parts.push(`n ${n}: ${ms(one.ms)} ms (${one.steps} steps)`);
