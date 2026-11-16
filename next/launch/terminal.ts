@@ -1,9 +1,13 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
 // acceptance side), chunk Q7 (the minimal launcher), parts 1 and 2). The only
-// file of next/launch/ that touches process and fs.
+// file of next/launch/ that touches process and fs, with
+// next/launch/allegretto.ts.
 //
 //   npm run launch -- <saved-program.json> [--steps <n>]
 //   npx tsx next/launch/terminal.ts <saved-program.json> [--steps <n>]
+//
+// The command that runs an Allegretto text directly, next/launch/allegretto.ts,
+// uses `terminalArguments` and `runOnTerminal` of this file.
 //
 // It reads the saved program, runs it with the launcher of
 // next/launch/launcher.ts, writes each line the program prints to
@@ -48,7 +52,8 @@ async function kernelFactory(): Promise<CreateKernel2> {
   return mod.createKernel as CreateKernel2;
 }
 
-async function main(argv: readonly string[]): Promise<void> {
+/** Reads the arguments every terminal entry takes: one file, and `--steps <n>`. */
+export function terminalArguments(argv: readonly string[], usage: string): { file: string; steps: number | undefined } {
   let file: string | undefined;
   let steps: number | undefined;
   for (let i = 0; i < argv.length; i++) {
@@ -58,15 +63,16 @@ async function main(argv: readonly string[]): Promise<void> {
     } else if (file === undefined) file = argv[i];
     else fail(`unexpected argument ${argv[i]}`);
   }
-  if (file === undefined) fail("usage: npm run launch -- <saved-program.json> [--steps <n>]");
+  if (file === undefined) fail(usage);
+  return { file, steps };
+}
 
-  let program: unknown;
-  try {
-    program = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch (e) {
-    fail(`cannot read ${file} as JSON: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
+/**
+ * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
+ * the terminal's configuration and target. Writes each line to stdout; on
+ * any end but completed, writes the reason to stderr and exits 1.
+ */
+export async function runOnTerminal(program: unknown, steps: number | undefined): Promise<void> {
   const createKernel = await kernelFactory();
   const outcome = await launch({
     createKernel,
@@ -76,6 +82,17 @@ async function main(argv: readonly string[]): Promise<void> {
     onLine: (line) => process.stdout.write(line + "\n"),
   });
   if (outcome.end.kind !== "completed") fail(describe(outcome.end));
+}
+
+async function main(argv: readonly string[]): Promise<void> {
+  const { file, steps } = terminalArguments(argv, "usage: npm run launch -- <saved-program.json> [--steps <n>]");
+  let program: unknown;
+  try {
+    program = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (e) {
+    fail(`cannot read ${file} as JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  await runOnTerminal(program, steps);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname))

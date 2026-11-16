@@ -34,7 +34,8 @@
     "typecheck:next": "tsx next/tools/typecheck.ts",
     "harness:present": "tsx next/corpus/harness.ts --present",
     "emit": "tsx next/bootstrap/emit.ts",
-    "launch": "tsx next/launch/terminal.ts"
+    "launch": "tsx next/launch/terminal.ts",
+    "allegretto": "tsx next/launch/allegretto.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.0",
