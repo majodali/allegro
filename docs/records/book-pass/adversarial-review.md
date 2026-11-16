@@ -679,6 +679,24 @@ load the first extensions as saved programs. Ruled:
 Recorded in "Allegretto is a small language for the kernel and nothing else" and "The parser engine and the module loader are written in Allegretto". To design: the forms, and first what
 an operator stands for in a language without types.
 
+### Allegretto's forms (2026-11-16)
+
+Ruled before the draft: an operator stands for exactly one primitive
+function, and more may be added for readability; a block is bindings
+and statements, which may be mixed; a primitive outside its domain is
+a refutation ("I don't see an alternative"); the present parser reads
+it first ("I'm sure it's pretty close"). The draft,
+`next/ext/allegretto/forms.md`, was approved whole with one change:
+a capability is declared by the word `capability`, "the canonical
+term for what's being declared". With it are ruled the symbol
+literal, `++` for joining, the binding `x <- e` that happens at its
+place, and that milestone 3's programs are Allegretto texts.
+
+Issue 21 is ruled with it: the kernel joins two bits values, measures
+one and takes a part of one, beside telling two apart. The draft
+listed these among the shipped primitives; they are the kernel's,
+since a shipped primitive's reference definition is written in them.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
