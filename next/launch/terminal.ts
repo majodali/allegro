@@ -12,7 +12,8 @@
 //
 // The configuration, as far as milestone 2 needs it: the ceiling grants
 // `output`, the one capability the terminal supplies; `--steps` sets a
-// step budget, and without it there is none.
+// step budget, and without it there is none. The target's pure
+// primitives are the shipped ones, `shipped` of next/prims/index.ts.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
 // exporting `createKernel` of type `CreateKernel2`
@@ -24,6 +25,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import type { CreateKernel2 } from "../kernel/interface.js";
+import { shipped } from "../prims/index.js";
 import { describe, launch } from "./launcher.js";
 import { output } from "./output.js";
 
@@ -70,7 +72,7 @@ async function main(argv: readonly string[]): Promise<void> {
     createKernel,
     program,
     configuration: { ceiling: ["output"], steps },
-    target: { capabilities: [output] },
+    target: { capabilities: [output], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
   if (outcome.end.kind !== "completed") fail(describe(outcome.end));

@@ -1,5 +1,6 @@
 // Tests of the minimal launcher (B-196 (the rebuild's acceptance side),
-// chunk Q7 (the minimal launcher), parts 1 and 2): next/launch/launcher.ts
+// chunk Q7 (the minimal launcher), parts 1 and 2, and chunk Q5 (the first
+// notation and the bootstrap), part 3): next/launch/launcher.ts
 // and the output capability next/launch/output.ts, on the reference
 // kernel, `createKernel` of next/kernel/create.ts. Run by
 // `npm run test:next`.
@@ -9,174 +10,156 @@ import assert from "node:assert/strict";
 import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import type { Cell, Kernel2, PrimitiveDeclaration } from "../kernel/interface.js";
+import type { Cell, Kernel2, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/create.js";
-import { check, check2, encode, outcomeKeys, type SavedProgram } from "../kernel/saved-program.js";
+import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
+import { emit } from "../bootstrap/emit.js";
 import { describe, launch, type CapabilityImplementation, type Configuration, type Plain, type Target } from "./launcher.js";
 import { OUTPUT, output } from "./output.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
 const FIXTURE = path.join(here, "fixtures", "hello.json");
+const FIXTURE_TEXT = path.join(here, "fixtures", "hello.alg");
 const hex = (text: string) => Array.from(new TextEncoder().encode(text), (b) => b.toString(16).padStart(2, "0")).join("");
-const text = (t: string) => ({ k: "bits", hex: hex(t), bits: new TextEncoder().encode(t).length * 8 }) as const;
 
-/** module(out) => out("hello, world"): the fixture of next/launch/fixtures/hello.json. */
-const HELLO: SavedProgram = {
-  format: "allegro-saved-program",
-  version: 1,
-  needs: [],
-  nodes: [
-    { k: "param", name: "out" },
-    text("hello, world"),
-    { k: "expression", fn: 0, args: [1] },
-    { k: "function", params: [0], body: 2 },
-  ],
-  module: 3,
-  declares: [{ param: 0, role: "capability", name: "output" }],
-};
-
-/**
- * module(out) => [out("first"), out("second")]. The data form has no
- * sequencing form: sequence is a kernel primitive's. The body here is a
- * structure of two applications, which the reference kernel evaluates in
- * entry order; that order is the kernel's choice and awaits a ruling.
- */
-const TWO: SavedProgram = {
-  ...HELLO,
-  nodes: [
-    { k: "param", name: "out" },
-    text("first"),
-    { k: "expression", fn: 0, args: [1] },
-    text("second"),
-    { k: "expression", fn: 0, args: [3] },
-    { k: "structure", entries: [[null, 2], [null, 4]] },
-    { k: "function", params: [0], body: 5 },
-  ],
-  module: 6,
-};
-
-const ADD = "sha256:" + "ab".repeat(32);
-/** module(out) => out(echo("pure")), with echo a pure primitive named by hash. */
-const NEEDS_ECHO: SavedProgram = {
-  ...HELLO,
-  needs: [{ hash: ADD, name: "test.echo" }],
-  nodes: [
-    { k: "param", name: "out" },
-    { k: "primitive", hash: ADD },
-    text("pure"),
-    { k: "expression", fn: 1, args: [2] },
-    { k: "expression", fn: 0, args: [3] },
-    { k: "function", params: [0], body: 4 },
-  ],
-  module: 5,
-};
-const ECHO: PrimitiveDeclaration = { purity: "pure", hash: ADD, name: "test.echo", arity: 1, run: ([v]) => v };
-
-const TRUE_BIT = { k: "bits", hex: "01", bits: 1 } as const;
-const FALSE_BIT = { k: "bits", hex: "00", bits: 1 } as const;
-
-/** module(out) => [claim(false), out("after")]: the claim is refuted and the line is never written. */
-const FALSE_CLAIM: SavedProgram = {
-  ...HELLO,
-  nodes: [
-    { k: "param", name: "out" },
-    { k: "kernel", name: "claim" },
-    FALSE_BIT,
-    { k: "expression", fn: 1, args: [2] },
-    text("after"),
-    { k: "expression", fn: 0, args: [4] },
-    { k: "structure", entries: [[null, 3], [null, 5]] },
-    { k: "function", params: [0], body: 6 },
-  ],
-  module: 7,
-};
-
-/** module(out) => out(greeting), where nothing binds the name greeting. */
-const UNBOUND: SavedProgram = {
-  ...HELLO,
-  nodes: [
-    { k: "param", name: "out" },
-    { k: "symbol", fqn: "greeting" },
-    { k: "expression", fn: 0, args: [1] },
-    { k: "function", params: [0], body: 2 },
-  ],
-  module: 3,
-};
-
-/**
- * A record of the second version: module(key, out) =>
- * [claim(true), out("hello, world")], with one key slot and the claim's
- * outcome stored under `key`.
- */
-function withOutcome(key: string): SavedProgram {
-  return {
-    format: "allegro-saved-program",
-    version: 2,
-    needs: [],
-    nodes: [
-      { k: "param", name: "key" },
-      { k: "param", name: "out" },
-      { k: "kernel", name: "claim" },
-      TRUE_BIT,
-      { k: "expression", fn: 2, args: [3] },
-      text("hello, world"),
-      { k: "expression", fn: 1, args: [5] },
-      { k: "structure", entries: [[null, 4], [null, 6]] },
-      { k: "function", params: [0, 1], body: 7 },
-    ],
-    module: 8,
-    declares: [{ param: 1, role: "capability", name: "output" }],
-    keys: 1,
-    outcomes: [{ claim: 4, restsOn: [{ kind: "kernel", variant: "reference-k3" }], key }],
-  };
+/** Writes a record by hand, node by node, as the emitter would: of the second version, each part of a capability read as an entry. */
+class Record {
+  readonly nodes: Node[] = [];
+  readonly params: number[] = [];
+  readonly keySlots: number[] = [];
+  readonly declares: Array<{ param: number; role: "capability"; name: string }> = [];
+  add(n: Node): number {
+    this.nodes.push(n);
+    return this.nodes.length - 1;
+  }
+  param(name: string): number {
+    return this.add({ k: "param", name });
+  }
+  /** A key slot: one of the module function's first parameters. */
+  keySlot(name: string): number {
+    const p = this.param(name);
+    this.keySlots.push(p);
+    return p;
+  }
+  /** A capability the module declares: a parameter of the module function. */
+  capability(name: string): number {
+    const p = this.param(name);
+    this.params.push(p);
+    this.declares.push({ param: p, role: "capability", name });
+    return p;
+  }
+  text(t: string): number {
+    return this.add({ k: "bits", hex: hex(t), bits: new TextEncoder().encode(t).length * 8 });
+  }
+  kernel(name: string): number {
+    return this.add({ k: "kernel", name });
+  }
+  apply(fn: number, args: readonly number[]): number {
+    return this.add({ k: "expression", fn, args });
+  }
+  /** The part of a capability: get(capability, `part). */
+  part(capability: number, part: string): number {
+    return this.apply(this.kernel("get"), [capability, this.add({ k: "datum", fqn: part })]);
+  }
+  /** then(first, second). */
+  then(first: number, second: number): number {
+    return this.apply(this.kernel("then"), [first, second]);
+  }
+  done(body: number, more: Partial<SavedProgram> = {}): SavedProgram {
+    const module = this.add({ k: "function", params: [...this.keySlots, ...this.params], body });
+    return { format: "allegro-saved-program", version: 2, needs: [], nodes: this.nodes, module, declares: this.declares, keys: this.keySlots.length, outcomes: [], ...more };
+  }
 }
 
-/** module(later, out) => out(later.ask()): the line is written only once the answer arrives. */
-const LATER: SavedProgram = {
-  ...HELLO,
-  nodes: [
-    { k: "param", name: "later" },
-    { k: "param", name: "out" },
-    { k: "expression", fn: 0, args: [] },
-    { k: "expression", fn: 1, args: [2] },
-    { k: "function", params: [0, 1], body: 3 },
-  ],
-  module: 4,
-  declares: [
-    { param: 0, role: "capability", name: "later" },
-    { param: 1, role: "capability", name: "output" },
-  ],
-};
+/** The fixture of next/launch/fixtures/hello.json: then(output.write("hello, world"), {}), as the emitter writes it. */
+const HELLO = JSON.parse(fs.readFileSync(FIXTURE, "utf8")) as SavedProgram;
 
-/** module(later, out) => claim(later.ask()): the claim is decided only once the answer arrives. */
-const CLAIM_LATER: SavedProgram = {
-  ...LATER,
-  nodes: [
-    { k: "param", name: "later" },
-    { k: "param", name: "out" },
-    { k: "kernel", name: "claim" },
-    { k: "expression", fn: 0, args: [] },
-    { k: "expression", fn: 2, args: [3] },
-    { k: "function", params: [0, 1], body: 4 },
-  ],
-  module: 5,
-};
+/** module(output) => output.write("first") then output.write("second"). */
+const TWO: SavedProgram = (() => {
+  const r = new Record();
+  const out = r.capability("output");
+  const write = r.part(out, "write");
+  return r.done(r.then(r.apply(write, [r.text("first")]), r.apply(write, [r.text("second")])));
+})();
 
-/** module(later, out) => [later.ask(), out(greeting)]: it waits on a cell and on a name. */
-const BOTH: SavedProgram = {
-  ...LATER,
-  nodes: [
-    { k: "param", name: "later" },
-    { k: "param", name: "out" },
-    { k: "expression", fn: 0, args: [] },
-    { k: "symbol", fqn: "greeting" },
-    { k: "expression", fn: 1, args: [3] },
-    { k: "structure", entries: [[null, 2], [null, 4]] },
-    { k: "function", params: [0, 1], body: 5 },
-  ],
-  module: 6,
-};
+const ADD = "sha256:" + "ab".repeat(32);
+/** module(output) => output.write(echo("pure")), with echo a pure primitive named by hash. */
+const NEEDS_ECHO: SavedProgram = (() => {
+  const r = new Record();
+  const out = r.capability("output");
+  const echo = r.add({ k: "primitive", hash: ADD });
+  return r.done(r.apply(r.part(out, "write"), [r.apply(echo, [r.text("pure")])]), { needs: [{ hash: ADD, name: "test.echo" }] });
+})();
+const ECHO: PrimitiveDeclaration = { purity: "pure", hash: ADD, name: "test.echo", arity: 1, run: ([v]) => v };
+
+/** module(output) => claim(false) then output.write("after"): the claim is refuted and the line is never written. */
+const FALSE_CLAIM: SavedProgram = (() => {
+  const r = new Record();
+  const out = r.capability("output");
+  const claim = r.apply(r.kernel("claim"), [r.add({ k: "bits", hex: "00", bits: 1 })]);
+  return r.done(r.then(claim, r.apply(r.part(out, "write"), [r.text("after")])));
+})();
+
+/** module(output) => output.write(greeting), where nothing binds the name greeting. */
+const UNBOUND: SavedProgram = (() => {
+  const r = new Record();
+  const out = r.capability("output");
+  return r.done(r.apply(r.part(out, "write"), [r.add({ k: "symbol", fqn: "greeting" })]));
+})();
+
+/** module(output) => output.write(the given bits): for a value that is not text. */
+function writes(bits: { hex: string; bits: number }): SavedProgram {
+  const r = new Record();
+  const out = r.capability("output");
+  return r.done(r.apply(r.part(out, "write"), [r.add({ k: "bits", ...bits })]));
+}
+
+/**
+ * A record with a key slot: module(key, output) =>
+ * claim(true) then output.write("hello, world"), with the claim's outcome
+ * stored under `key`.
+ */
+function withOutcome(key: string): SavedProgram {
+  const r = new Record();
+  r.keySlot("key");
+  const out = r.capability("output");
+  const claim = r.apply(r.kernel("claim"), [r.add({ k: "bits", hex: "01", bits: 1 })]);
+  return r.done(r.then(claim, r.apply(r.part(out, "write"), [r.text("hello, world")])), { outcomes: [{ claim, restsOn: [{ kind: "kernel", variant: "reference-k3" }], key }] });
+}
+
+/** module(later, output) => output.write(later.ask()): the line is written only once the answer arrives. */
+const LATER: SavedProgram = (() => {
+  const r = new Record();
+  const later = r.capability("later");
+  const out = r.capability("output");
+  return r.done(r.apply(r.part(out, "write"), [r.apply(r.part(later, "ask"), [])]));
+})();
+
+/** module(later, output) => claim(later.ask()): the claim is decided only once the answer arrives. */
+const CLAIM_LATER: SavedProgram = (() => {
+  const r = new Record();
+  const later = r.capability("later");
+  r.capability("output");
+  return r.done(r.apply(r.kernel("claim"), [r.apply(r.part(later, "ask"), [])]));
+})();
+
+/** module(later, output) => [later.ask(), output.write(greeting)]: it waits on a cell and on a name. */
+const BOTH: SavedProgram = (() => {
+  const r = new Record();
+  const later = r.capability("later");
+  const out = r.capability("output");
+  const asked = r.apply(r.part(later, "ask"), []);
+  const wrote = r.apply(r.part(out, "write"), [r.add({ k: "symbol", fqn: "greeting" })]);
+  return r.done(r.add({ k: "structure", entries: [[null, asked], [null, wrote]] }));
+})();
+
+/** module(pair) => pair.left("one") then pair.right("two"): a capability of two parts. */
+const PAIR: SavedProgram = (() => {
+  const r = new Record();
+  const pair = r.capability("pair");
+  return r.done(r.then(r.apply(r.part(pair, "left"), [r.text("one")]), r.apply(r.part(pair, "right"), [r.text("two")])));
+})();
 
 /** A deterministic test capability: its one part returns a cell, answered when the test says. */
 function laterCapability(): { capability: CapabilityImplementation; answer: (text: string) => void; asked: () => number } {
@@ -228,18 +211,41 @@ const ONLY_OUTPUT: Configuration = { ceiling: ["output"] };
 const TERMINAL: Target = { capabilities: [output] };
 const evaluating = ["evaluate", "advance"];
 
-test("the fixture is HELLO, written with encode, and checks", () => {
-  assert.equal(fs.readFileSync(FIXTURE, "utf8"), encode(HELLO));
-  assert.deepEqual(check(JSON.parse(fs.readFileSync(FIXTURE, "utf8"))), []);
-  for (const p of [TWO, NEEDS_ECHO, LATER, FALSE_CLAIM, UNBOUND]) assert.deepEqual(check(p), []);
+test("the committed fixture is the record the emitter writes for hello.alg, and every record here checks", () => {
+  const r = emit(fs.readFileSync(FIXTURE_TEXT, "utf8"));
+  assert.ok(r.ok, r.ok ? "" : r.findings.map((f) => f.message).join("; "));
+  assert.equal(fs.readFileSync(FIXTURE, "utf8"), encode(r.program));
+  assert.equal(fs.readFileSync(FIXTURE_TEXT, "utf8"), 'capability output\noutput.write("hello, world")\n');
+  for (const p of [HELLO, TWO, NEEDS_ECHO, LATER, CLAIM_LATER, BOTH, PAIR, FALSE_CLAIM, UNBOUND, NEVER_ENDS, writes({ hex: "ff", bits: 8 })]) assert.deepEqual(check2(p), []);
   assert.deepEqual(check2(withOutcome("sha256:" + "00".repeat(32))), []);
+});
+
+test("a capability is handed as a structure of its parts, keyed by the symbols of the part names: one of two parts", async () => {
+  const said: string[] = [];
+  const pair: CapabilityImplementation = {
+    definition: { name: "pair", parts: ["left", "right"] },
+    create: (host) => ["left", "right"].map((part) => ({
+      purity: "effectful" as const, capability: "pair", part, arity: 1,
+      run: (args: readonly Value[], context: PrimitiveContext) => {
+        const { bytes } = context.bitsOf(args[0]);
+        said.push(part);
+        host.line(`${part}: ${new TextDecoder().decode(bytes)}`);
+        return context.structure([]);
+      },
+    })),
+  };
+  const outcome = await launch({ createKernel, program: PAIR, configuration: { ceiling: ["pair"] }, target: { capabilities: [pair] } });
+  assert.deepEqual(outcome.lines, ["left: one", "right: two"]);
+  assert.deepEqual(said, ["left", "right"]);
+  assert.equal(outcome.end.kind, "completed");
 });
 
 test("a module that applies output to a text prints that line once and completes", async () => {
   const r = recording();
   const outcome = await launch({ createKernel: r.createKernel, program: JSON.parse(fs.readFileSync(FIXTURE, "utf8")), configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.deepEqual(outcome.lines, ["hello, world"]);
-  assert.deepEqual(outcome.end, { kind: "completed", steps: 2 });
+  // The application of the module, `then`, the application of the part, and `get`.
+  assert.deepEqual(outcome.end, { kind: "completed", steps: 4 });
   assert.equal(r.calls.filter((c) => c === "evaluate").length, 1);
 });
 
@@ -263,7 +269,7 @@ test("a record that does not check is refused with its findings, and no kernel c
   assert.equal(outcome.end.kind === "refused" && outcome.end.reason, "the saved program does not check");
   assert.deepEqual(outcome.end.kind === "refused" && outcome.end.findings, check2(bad));
   assert.ok(check2(bad).some((f) => /version is not 1 or 2/.test(f)));
-  assert.ok(check2(bad).some((f) => /nodes\[4\] is not a node of a known kind/.test(f)));
+  assert.ok(check2(bad).some((f) => new RegExp(`nodes\\[${HELLO.nodes.length}\\] is not a node of a known kind`).test(f)));
   assert.equal(r.created(), 1);
   assert.deepEqual(r.calls, []);
   assert.deepEqual(outcome.lines, []);
@@ -284,11 +290,14 @@ test("a ceiling that names a capability the target does not supply is refused", 
 });
 
 test("inputs and module parameters are refused in this part, with a plain reason", async () => {
-  const withInput: SavedProgram = {
-    ...HELLO,
-    nodes: [{ k: "param", name: "out" }, { k: "param", name: "n" }, { k: "expression", fn: 0, args: [1] }, { k: "function", params: [0, 1], body: 2 }],
-    declares: [{ param: 0, role: "capability", name: "output" }, { param: 1, role: "input", name: "n" }],
-  };
+  const withInput: SavedProgram = (() => {
+    const r = new Record();
+    const out = r.capability("output");
+    const n = r.param("n");
+    r.params.push(n);
+    const doc = r.done(r.apply(r.part(out, "write"), [n]));
+    return { ...doc, declares: [...doc.declares, { param: n, role: "input", name: "n" }] };
+  })();
   assert.match(describe((await launch({ createKernel, program: withInput, configuration: ONLY_OUTPUT, target: TERMINAL })).end), /supplies no inputs yet/);
   const withModule = { ...withInput, declares: [withInput.declares[0], { param: 1, role: "module", name: "lib" }] };
   assert.match(describe((await launch({ createKernel, program: withModule, configuration: ONLY_OUTPUT, target: TERMINAL })).end), /supplies no modules yet/);
@@ -309,11 +318,14 @@ test("a step budget of zero, or too few, stops at the limit and says so", async 
   const zero = await launch({ createKernel, program: HELLO, configuration: { ceiling: ["output"], steps: 0 }, target: TERMINAL });
   assert.deepEqual(zero.end, { kind: "limit", steps: 0, reason: "the step budget of 0 ran out" });
   assert.deepEqual(zero.lines, []);
-  const few = await launch({ createKernel, program: TWO, configuration: { ceiling: ["output"], steps: 2 }, target: TERMINAL });
+  const full = await launch({ createKernel, program: TWO, configuration: ONLY_OUTPUT, target: TERMINAL });
+  const needed = full.end.kind === "completed" ? full.end.steps : -1;
+  assert.ok(needed > 0);
+  const few = await launch({ createKernel, program: TWO, configuration: { ceiling: ["output"], steps: needed - 1 }, target: TERMINAL });
   assert.equal(few.end.kind, "limit");
-  assert.match(describe(few.end), /^limit: the step budget of 2 ran out$/);
-  const enough = await launch({ createKernel, program: TWO, configuration: { ceiling: ["output"], steps: 3 }, target: TERMINAL });
-  assert.deepEqual(enough.end, { kind: "completed", steps: 3 });
+  assert.equal(describe(few.end), `limit: the step budget of ${needed - 1} ran out`);
+  const enough = await launch({ createKernel, program: TWO, configuration: { ceiling: ["output"], steps: needed }, target: TERMINAL });
+  assert.deepEqual(enough.end, { kind: "completed", steps: needed });
 });
 
 /**
@@ -321,21 +333,15 @@ test("a step budget of zero, or too few, stops at the limit and says so", async 
  * A hand-built record for the launcher's test; an emitted program never
  * applies a function to itself.
  */
-const NEVER_ENDS: SavedProgram = {
-  ...HELLO,
-  nodes: [
-    { k: "param", name: "out" },
-    { k: "param", name: "f" },
-    { k: "expression", fn: 1, args: [1] },
-    { k: "function", params: [1], body: 2 },
-    { k: "param", name: "g" },
-    { k: "expression", fn: 4, args: [4] },
-    { k: "function", params: [4], body: 5 },
-    { k: "expression", fn: 3, args: [6] },
-    { k: "function", params: [0], body: 7 },
-  ],
-  module: 8,
-};
+const NEVER_ENDS: SavedProgram = (() => {
+  const r = new Record();
+  r.capability("output");
+  const f = r.param("f");
+  const self = r.add({ k: "function", params: [f], body: r.apply(f, [f]) });
+  const g = r.param("g");
+  const other = r.add({ k: "function", params: [g], body: r.apply(g, [g]) });
+  return r.done(r.apply(self, [other]));
+})();
 
 test("with no step budget a run that ends at the kernel's own limit says that no budget was set", async () => {
   const outcome = await launch({ createKernel, program: NEVER_ENDS, configuration: ONLY_OUTPUT, target: TERMINAL });
@@ -471,8 +477,7 @@ test("the kernel is created once, and output's part is the only effectful primit
 });
 
 test("output's part refuses what is not UTF-8 text, and the launcher reports the fault", async () => {
-  const notText: SavedProgram = { ...HELLO, nodes: [HELLO.nodes[0], { k: "bits", hex: "ff", bits: 8 }, HELLO.nodes[2], HELLO.nodes[3]] };
-  const outcome = await launch({ createKernel, program: notText, configuration: ONLY_OUTPUT, target: TERMINAL });
+  const outcome = await launch({ createKernel, program: writes({ hex: "ff", bits: 8 }), configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.equal(outcome.end.kind, "fault");
   assert.deepEqual(outcome.lines, []);
 });

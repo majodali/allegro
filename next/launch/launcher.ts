@@ -1,5 +1,7 @@
 // The minimal launcher (B-196 (the rebuild's acceptance side), chunk Q7
-// (the minimal launcher), parts 1 and 2, docs/plans/rebuild-acceptance.md §5).
+// (the minimal launcher), parts 1 and 2, docs/plans/rebuild-acceptance.md §5;
+// chunk Q5 (the first notation and the bootstrap), part 3, for the
+// capability as a structure of its parts).
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -23,10 +25,13 @@
 //      it; the stored outcomes of a record of the second version are
 //      restored only when the configuration names the builder it accepts
 //      them from (`restoreAs`), and are not looked at otherwise;
-//   4  creates the capabilities of the ceiling as effectful primitive
-//      functions, and hands the module function exactly those its
-//      `declares` names with role `capability`, in the function's order;
-//      a declared capability the ceiling does not grant is refused before
+//   4  creates the capabilities of the ceiling, each part an effectful
+//      primitive function, and hands the module function exactly those
+//      its `declares` names with role `capability`, in the function's
+//      order. A capability is handed as a structure of its parts, keyed by
+//      the symbols of the part names, so a program reads a part as an
+//      entry (next/ext/allegretto/forms.md §2: `output.write("hello")`).
+//      A declared capability the ceiling does not grant is refused before
 //      anything is evaluated;
 //   5  builds the application of the module function to those arguments
 //      and has the kernel evaluate it in a fresh scope, under the step
@@ -40,12 +45,13 @@
 // Step 1 is the caller's: it passes the configuration. Step 3 loads one
 // saved program; the first extensions are a later part.
 //
-// Left out, each refused with a plain reason:
-//   - a module parameter with role `input` or `module`;
-//   - a declared capability with more than one part: handing one needs a
-//     way to select a part inside the module, which is a kernel
-//     primitive's job, and the kernel has none yet.
-// A capability with one part is handed as that part's primitive function.
+// Left out, refused with a plain reason: a module parameter with role
+// `input` or `module`.
+//
+// The pure primitives a record needs come from the target, found by hash
+// (`Target.primitives`); the terminal's entry supplies the shipped ones of
+// next/prims/index.ts. A record that needs a hash the target lacks is
+// refused, naming it.
 //
 // A key slot of a record of the second version is not the launcher's:
 // `load` has the kernel make the keys, and `declares` lists only the
@@ -213,8 +219,6 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     if (d.role === "input") problems.push(`the module declares the input ${d.name}; this launcher supplies no inputs yet`);
     else if (d.role === "module") problems.push(`the module imports the module ${d.name}; this launcher supplies no modules yet`);
     else if (!configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
-    else if ((supplied.get(d.name)?.definition.parts.length ?? 0) !== 1)
-      problems.push(`the module declares the capability ${d.name}, which has more than one part; this launcher hands only a capability of one part`);
   }
   if (problems.length > 0) return refused(lines, problems[0], problems);
 
@@ -231,16 +235,17 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       return refused(lines, "the kernel refused to load the saved program", [message]);
     }
 
-    // Step 4: the capabilities of the ceiling, as effectful primitive functions.
-    const granted = new Map<string, Value[]>();
+    // Step 4: the capabilities of the ceiling, each a structure of its parts keyed by the symbols of their names.
+    const granted = new Map<string, Value>();
     for (const name of configuration.ceiling) {
       const implementation = supplied.get(name)!;
       const parts = implementation.create(host);
       if (parts.length !== implementation.definition.parts.length || parts.some((p) => p.purity !== "effectful"))
         return { lines, end: { kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` } };
-      granted.set(name, parts.map((p) => kernel.primitiveFunction(p)));
+      const names = implementation.definition.parts;
+      granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
     }
-    const args = program.declares.map((d) => granted.get(d.name)![0]);
+    const args = program.declares.map((d) => granted.get(d.name)!);
 
     // Step 5: instantiate the module, in a fresh scope, under the budget.
     const budget = configuration.steps;

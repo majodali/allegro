@@ -23,6 +23,8 @@ import { spawnSync } from "child_process";
 import type { Cell, Kernel2, Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/create.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
+import { launch } from "../launch/launcher.js";
+import { output } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { emit, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, type Finding, type FormId } from "./emit.js";
 
@@ -477,4 +479,37 @@ test("npm run emit writes the record; a text it refuses prints each finding and 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── Through the launcher ──────────────────────────────────────────────
+
+/** Emits a text and runs it through the launcher with the output capability and the shipped primitives. */
+async function launched(text: string): Promise<{ lines: string[]; end: string }> {
+  const r = emitTracked(text);
+  if (!r.ok) throw new Error(r.findings.map((f) => f.message).join("; "));
+  const o = await launch({ createKernel, program: JSON.parse(encode(r.program)), configuration: { ceiling: ["output"], steps: 100_000 }, target: { capabilities: [output], primitives: [...shippedByName.values()] } });
+  return { lines: o.lines, end: o.end.kind };
+}
+
+test("hello, world through the output capability's part", async () => {
+  assert.deepEqual(await launched('capability output\noutput.write("hello, world")\n'), { lines: ["hello, world"], end: "completed" });
+});
+
+test("a block of bindings, order-free, through the launcher", async () => {
+  const text = 'capability output\ngreeting = join(hello, "world")\njoin(a, b) => a ++ ", " ++ b\nhello = "hello"\noutput.write(greeting)\n';
+  assert.deepEqual(await launched(text), { lines: ["hello, world"], end: "completed" });
+});
+
+test("recursion, one value with one identity, through the launcher", async () => {
+  const text = [
+    "capability output",
+    "count(n) => if n == 0 then \"done\" else count(n - 1)",
+    "even(n) => if n == 0 then true else odd(n - 1)",
+    "odd(n) => if n == 0 then false else even(n - 1)",
+    "output.write(count(3))",
+    "output.write(if even(10) then \"even\" else \"odd\")",
+    "output.write(int.text(fact(5)))",
+    "fact(n) => if n == 0 then 1 else n * fact(n - 1)",
+  ].join("\n");
+  assert.deepEqual(await launched(text), { lines: ["done", "even", "120"], end: "completed" });
 });
