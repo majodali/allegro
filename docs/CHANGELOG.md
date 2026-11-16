@@ -1178,6 +1178,16 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The corpus follows the retitle of PR #220 (B-196)
+
+B-196 (the rebuild's acceptance side). "An effect consumes only values
+whose claims are decided" is now "A refuted value never reaches an
+effect": 4 cases moved, and three scenarios cite the title now. The
+plan's record says what the rulings of 2026-11-16 change for this
+stream: the first notation is Allegretto, as
+`next/ext/allegretto/forms.md` rules it. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The corpus and the specifications follow the kernel stream's K4 (B-196)
 
 B-196 (the rebuild's acceptance side). The corpus follows the seven
