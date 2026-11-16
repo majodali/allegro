@@ -83,8 +83,11 @@ export function yieldedKeys(program: SavedProgram): { keys: (string | null)[] } 
   const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
   const primitives = new Map(program.needs.map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
   const fn = load(k, program, primitives);
-  const capability = k.structure([[k.symbol("write"), k.primitiveFunction(outputWrite(() => {}))]]);
-  const r = k.evaluate(k.expression(fn, [capability]), k.scope(), { steps: STEPS });
+  // One argument for each header line: the output capability, and nothing else yet.
+  const other = program.declares.find((d) => d.role !== "capability" || d.name !== "output");
+  if (other !== undefined) return { problem: `the module declares the ${other.role} ${other.name}, which this reading of a yield cannot supply` };
+  const args = program.declares.map(() => k.structure([[k.symbol("write"), k.primitiveFunction(outputWrite(() => {}))]]));
+  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: STEPS });
   if (r.refuted) return { problem: "the module was refuted when instantiated by hand" };
   if (k.kind(r.value) !== "structure") return { problem: `the module yields a value of kind ${k.kind(r.value)}, not a structure` };
   return { keys: k.entriesOf(r.value).map(([key]) => (key === null ? null : k.symbolName(key))) };

@@ -1109,3 +1109,96 @@ policy is the gate ruled there.
     "extension:" tests on extensions, which the launcher does not load
     before a later part. Neither is a program of the first notation
     running. `next/corpus/cases.json` is unchanged.
+- **2026-11-16 — Q6, part 3: the rest of milestone 3's present cases, realised or left with a reason.**
+  Built on `origin/main` at `d0b7955`. The present tree is not changed.
+  `next/corpus/cases.json` is unchanged.
+  - **The counts.** Of the 80 cases of milestone 3 outside
+    `src/test/base.ts`, 49 are realised and 31 are left. The kinds of a
+    case left: (a) it needs a type or another part of the standard
+    language; (b) a name a test's host extension or another module
+    supplied; (c) a host API of the present tree; (d) an expected
+    refusal of a text; (e) something else.
+
+    | Module | Realised | (a) | (b) | (c) | (d) | (e) |
+    |---|---|---|---|---|---|---|
+    | `src/test/grammar2-language.ts` | 19 | 1 | 0 | 0 | 0 | 1 |
+    | `src/test/modules.ts` | 0 | 0 | 0 | 14 | 0 | 0 |
+    | `src/test/types-core.ts` | 10 | 3 | 0 | 0 | 0 | 0 |
+    | `src/test/language.ts` | 9 | 0 | 0 | 2 | 0 | 0 |
+    | `src/test/types-battery.ts` | 3 | 0 | 0 | 2 | 0 | 1 |
+    | `src/test/grammar-legacy.ts` | 4 | 0 | 1 | 0 | 0 | 0 |
+    | `src/boundary-tests.ts` | 0 | 0 | 1 | 2 | 0 | 0 |
+    | `src/test/refinements.ts` | 2 | 0 | 0 | 0 | 0 | 0 |
+    | `src/test/types-construction.ts` | 2 | 0 | 0 | 0 | 0 | 0 |
+    | `src/test/equality-laws.ts` | 0 | 0 | 1 | 0 | 0 | 0 |
+    | `src/test/evaluator.ts` | 0 | 1 | 0 | 0 | 0 | 0 |
+    | `src/test/pcp.ts` | 0 | 0 | 0 | 1 | 0 | 0 |
+    | Total | 49 | 5 | 3 | 21 | 0 | 2 |
+
+  - **The programs.** Six are new under `next/corpus/allegretto/m3/`:
+    `multiline.alg` 9, `logical.alg` 11, `logical-demo.alg` 1,
+    `pipe.alg` 3, `dot-access.alg` 3 and `plain-text.alg` 1. Eight
+    older programs name 21 more cases of their topic:
+    `arithmetic.alg` 6, `bindings.alg` 3, `calls.alg` 3,
+    `comparisons.alg` 2, `conditionals.alg` 4, `block-body.alg` 1,
+    `factorial.alg` 1 and `recursion.alg` 1. Where a present text is
+    the text a program already held, the program names the case
+    beside the older one. `logical-demo.alg` restates the present
+    `tests/logical.alg` line by line. `dot-access.alg` binds the
+    structures that the present tests hand in through a host
+    `Extension`.
+  - **The harness's line for milestone 3:**
+    `milestone 3: programs 27 (passing 27, failing 0) · cases due 138 · realised 94, named only by a failing program 0, not yet named 44 · up to 3: 94 of 175 realised`.
+  - **The cases of kind (a)**, candidates for milestone 4:
+    - `test:grammar2-language:grammar2/std: types.alg runs end-to-end`:
+      `tests/types.alg` joins texts with `+` and prints `1.5 + 2.5` as
+      `4`, a number printed by its type;
+    - `test:types-core:type system: formatValue shows string without quotes for typed string`:
+      the present printer `formatValue` chooses the rendering by the
+      value's `String` type;
+    - `test:types-core:type system: formatValue shows int for typed int`:
+      the same, by the `Int` type;
+    - `test:types-core:type system: basics.alg works in typed mode`:
+      the assertion is that the text evaluates under the standard
+      language's type system;
+    - the case of B-172 (the partial-evaluation rules as implemented
+      against the spine),
+      `test:evaluator:B-172 C3 evaluator: Rule 2 — a when inside an unfolded callee chain stays bounded (RR9, option C)`:
+      the text is `when` arms with `Int` annotations, and the bound is
+      the present evaluator's call count.
+  - **The other cases left**, by kind:
+    - (b), 3: `hybrid parser: dot access with function call` of
+      `src/test/grammar-legacy.ts` calls a doubling host primitive the
+      test's `Extension` supplies, and no shipped primitive doubles;
+      `import satisfied by an extension (C2.3b)` of
+      `src/boundary-tests.ts` reads `cfg` from an `Extension`, and the
+      launcher supplies no input; `D47 chunk 2: explain` of
+      `src/test/equality-laws.ts` calls the library function `explain`,
+      which reads origins;
+    - (c), 21: the 14 cases of `src/test/modules.ts` assert through
+      `ModuleLoader`, and two of them also through `exportedSymbols`,
+      `symbolFromWire` and `libExtensions`; the launcher supplies no
+      imported module yet, so no program can restate them. The
+      `reactive:` cases of `src/test/language.ts` read the host registry
+      and call `applyPhase`. `UntypedFunction` and
+      `compile: report lists unresolved imports` of `src/test/types-battery.ts` read
+      `getTypeName` and the `compilationReport`. `REPL persistence` and
+      `fqn symbols (C5.1)` of `src/boundary-tests.ts` hand an
+      `evalCtx` on and call `registerScopeSymbol`. `Phase A: summarizeValue` of `src/test/pcp.ts` calls `summarizeValue`;
+    - (e), 2: `grammar2/base: if-then-else selects branch` is
+      `if 1 then 42 else 0`, and the kernel's conditional refutes a
+      64-bit 1 with "a condition that is neither true nor false", as
+      the forms rule; `partial eval: eval_if with unresolved condition propagates type from matching branches`
+      asserts only that a
+      function value is not null, which no program can print.
+  - **Added in review.** The five cases of kind (a) moved from
+    milestone 3 to milestone 4 in `next/corpus/cases.json`; no class
+    changed. Milestone 3 then holds 133 present cases, 94 realised and
+    39 not yet named: 13 of `src/test/base.ts`, and the 26 of kinds
+    (b), (c) and (e) above. `yieldedKeys` in `next/corpus/allegretto.ts`
+    handed every module one capability; it now hands a module what its
+    header declares, so a module with no capability can state
+    `// yields:`. Open for the maintainer: `if 1 then 42 else 0` is 42
+    in the present tree and a refutation on the new kernel, and no
+    ruled decision's title says which, so the case is neither realised
+    nor reclassed.
