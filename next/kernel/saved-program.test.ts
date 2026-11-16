@@ -193,7 +193,8 @@ function loaded(restoreAs?: string) {
   let ran = 0;
   const isZero = k.primitiveFunction({ purity: "pure", hash: EQ0, name: "isZero", arity: 1, run: (a, c) => (ran++, c.bits(Uint8Array.of(c.bitsOf(a[0]).bytes[0] === 0 ? 1 : 0), 1)) });
   const moduleFn = load(k, second, new Map([[EQ0, isZero]]), restoreAs === undefined ? {} : { restoreAs });
-  const result = k.evaluate(k.expression(moduleFn, [k.bits(Uint8Array.of(7))]), k.scope());
+  // The record's body is a structure, and the caller asks for it in full.
+  const result = k.evaluateInFull(k.expression(moduleFn, [k.bits(Uint8Array.of(7))]), k.scope());
   return { k, moduleFn, result, ran: () => ran };
 }
 

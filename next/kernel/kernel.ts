@@ -40,10 +40,12 @@
 // function can look into.
 //
 // An effect happens when its value is needed. The statements of a body
-// are a chain of `then`. A primitive function needs its arguments left to
-// right. This kernel still evaluates a structure's entries in order when
-// the structure is built; by ruling they are to be evaluated when needed,
-// so nothing may rest on that order. A function's free names are tied to the
+// are a chain of `then`. A structure does not need its entries: each is
+// evaluated when something reads it, at most once. A primitive function
+// needs its arguments in full, left to right, so a structure handed to
+// one has every entry evaluated first, in order. A caller of `evaluate`
+// is given the value it asked for and no more: an entry of a structure
+// in the result is evaluated when the caller evaluates it. A function's free names are tied to the
 // scope in which the function value is first evaluated, so a function
 // means the same wherever it is later called.
 //
@@ -225,6 +227,8 @@ interface Root {
   readonly scope: ScopeV;
   value: V;
   done: boolean;
+  /** True where the caller asked for the value in full: every entry of every structure in it. */
+  readonly full: boolean;
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
@@ -240,6 +244,8 @@ export const createKernel: CreateKernel2 = () => {
   const kernelPrims = new Map(KERNEL_PRIMITIVES.map(([name, arity]) => [name, new KernelPrim(name, arity)] as const));
   /** Structures and functions known to need no further evaluation. */
   const settled = new WeakSet<object>();
+  /** Structures that have been evaluated: complete in shape, each entry a value or an entry not yet needed. */
+  const built = new WeakSet<object>();
   /** A function with its free names tied to a scope, by function and scope. */
   const closed = new WeakMap<Fn, Map<ScopeV, Fn>>();
   const roots: Root[] = [];
@@ -337,12 +343,27 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof Lazy) return v.done && known(v.value);
     if (v instanceof CellV) return v.filled && known(v.value as V);
     if (v instanceof Struct) {
-      if (settled.has(v)) return true;
+      // An evaluated structure is known: its shape is complete, whatever its entries still need.
+      if (settled.has(v) || built.has(v)) return true;
       if (!v.entries.every(([, e]) => known(e))) return false;
       settled.add(v);
       return true;
     }
     return false; // a symbol, a name, a parameter, an expression
+  };
+
+  /** True when nothing in the value waits and no entry is left unevaluated: what a primitive function needs. */
+  const knownInFull = (v: V): boolean => {
+    if (v instanceof Decided) return knownInFull(v.inner);
+    if (v instanceof Lazy) return v.done && knownInFull(v.value);
+    if (v instanceof CellV) return v.filled && knownInFull(v.value as V);
+    if (v instanceof Struct) {
+      if (settled.has(v)) return true;
+      if (!built.has(v) || !v.entries.every(([, e]) => knownInFull(e))) return false;
+      settled.add(v);
+      return true;
+    }
+    return known(v);
   };
 
   /** Plain data from the host or a primitive, made safe to hand on: its symbols are data, not names. */
@@ -497,17 +518,11 @@ export const createKernel: CreateKernel2 = () => {
       return v; // It still waits. It stays one thing, so whatever is left in it is done once.
     }
     if (v instanceof Struct) {
-      if (settled.has(v)) return v;
-      const entries: (readonly [V | null, V])[] = [];
-      let changed = false;
-      for (const [k, e] of v.entries) {
-        const r = evaluate(e, scope);
-        if (r instanceof Refuted) return r;
-        if (r !== e) changed = true;
-        entries.push([k, r]);
-      }
-      const r = changed ? new Struct(entries) : v;
-      known(r);
+      // A structure does not need its entries. Each is kept as written, tied to this scope,
+      // and is evaluated when something reads it, at most once.
+      if (settled.has(v) || built.has(v)) return v;
+      const r = new Struct(v.entries.map(([k, e]) => [k, later(e, scope)] as const));
+      built.add(r);
       return r;
     }
     if (!(v instanceof Expr)) return v; // bits, a parameter, a primitive, a quotation, an outcome, a refutation
@@ -655,11 +670,11 @@ export const createKernel: CreateKernel2 = () => {
         const key = seen(args[1]);
         if (key instanceof Sym) {
           const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
-          return entry !== undefined ? entry[1] : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
+          return entry !== undefined ? evaluate(entry[1], scope) : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
         }
         const place = key instanceof Bits ? countOf(key) : undefined;
         if (place === undefined) return new Refuted("an entry is read by a symbol or by a place", args[1]);
-        return place < s.entries.length ? s.entries[place][1] : new Refuted(`place ${place} is outside a structure of ${s.entries.length} entr${s.entries.length === 1 ? "y" : "ies"}`, undefined);
+        return place < s.entries.length ? evaluate(s.entries[place][1], scope) : new Refuted(`place ${place} is outside a structure of ${s.entries.length} entr${s.entries.length === 1 ? "y" : "ies"}`, undefined);
       }
       throw new KernelFault(`the kernel primitive "${fn.name}" has no evaluation`);
     }
@@ -686,17 +701,18 @@ export const createKernel: CreateKernel2 = () => {
       if (known(fn)) return new Refuted("a call on something that is not a function", fn);
       return new Expr(fn, v.args.map((a) => later(a, scope)));
     }
-    // A primitive function needs every argument.
+    // A primitive function needs every argument, in full and left to right: its host code
+    // cannot evaluate, so a structure it is handed has every entry evaluated first.
     const args: V[] = [];
     for (const a of v.args) {
-      const r = evaluate(a, scope);
+      const r = inFull(a, scope);
       if (r instanceof Refuted) return r;
       args.push(r);
     }
     {
       if (fn.declaration.arity !== args.length)
         return new Refuted(`a primitive of ${fn.declaration.arity} parameter(s) was given ${args.length} argument(s)`, undefined);
-      if (!args.every(known)) return new Expr(fn, args);
+      if (!args.every(knownInFull)) return new Expr(fn, args);
       const d = fn.declaration;
       if (ahead && d.purity === "effectful") return new Expr(fn, args);
       const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
@@ -716,6 +732,20 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
+  /** A value with every entry of every structure in it evaluated, in order. A refutation inside is the whole's. */
+  const inFull = (v: V, scope: ScopeV): V => {
+    const r = evaluate(v, scope);
+    if (r instanceof Refuted) return r;
+    const s = seen(r);
+    if (s instanceof Struct && !settled.has(s)) {
+      for (const [, e] of s.entries) {
+        const x = inFull(e, scope);
+        if (x instanceof Refuted) return x;
+      }
+    }
+    return r;
+  };
+
   /**
    * An argument as it is handed on without being evaluated: tied to the
    * scope it was written in, and shared, so it is evaluated at most once
@@ -724,7 +754,7 @@ export const createKernel: CreateKernel2 = () => {
    */
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
-    return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied)) ? new Lazy(tied, scope) : tied;
+    return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)) ? new Lazy(tied, scope) : tied;
   };
 
   /** True where two arguments carry the same information: the same thing, or the same known bits. */
@@ -1038,6 +1068,20 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
+  /** One evaluation a caller asked for: the value and no more, or the value in full. */
+  const asked = (expression: Value, scope: Scope, limits: Limits | undefined, full: boolean): Result => {
+    const e = into(expression, "the expression");
+    const s = scopeIn(scope, "the scope");
+    const r = within(limits, () => (full ? inFull(e, s) : evaluate(e, s)));
+    const value = r.value ?? e;
+    if (r.ended === "complete" && !(full ? knownInFull(value) : known(value))) {
+      const root: Root = { scope: s, value, done: false, full };
+      roots.push(root);
+      rootOf.set(value, root);
+    }
+    return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted };
+  };
+
   const kernel: Kernel2 = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -1104,18 +1148,8 @@ export const createKernel: CreateKernel2 = () => {
       return [...found].map((v) => out(v) as Cell);
     },
 
-    evaluate: (expression, scope, limits): Result => {
-      const e = into(expression, "the expression");
-      const s = scopeIn(scope, "the scope");
-      const r = within(limits, () => evaluate(e, s));
-      const value = r.value ?? e;
-      if (r.ended === "complete" && !known(value)) {
-        const root: Root = { scope: s, value, done: false };
-        roots.push(root);
-        rootOf.set(value, root);
-      }
-      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted };
-    },
+    evaluate: (expression, scope, limits): Result => asked(expression, scope, limits, false),
+    evaluateInFull: (expression, scope, limits): Result => asked(expression, scope, limits, true),
     advance: (limits): Advance => {
       if (!dirty) return { ended: "complete", steps: 0, refuted: [] };
       dirty = false;
@@ -1123,11 +1157,11 @@ export const createKernel: CreateKernel2 = () => {
       const r = within(limits, () => {
         for (const root of roots) {
           if (root.done) continue;
-          const next = evaluate(root.value, root.scope);
+          const next = root.full ? inFull(root.value, root.scope) : evaluate(root.value, root.scope);
           root.value = next;
           rootOf.set(next, root);
           if (next instanceof Refuted) refuted.push(out(next));
-          if (known(next)) root.done = true;
+          if (root.full ? knownInFull(next) : known(next)) root.done = true;
         }
       });
       if (r.ended === "limit") dirty = true;

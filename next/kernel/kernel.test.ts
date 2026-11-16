@@ -98,12 +98,36 @@ test("functions are values: one can be passed and returned", () => {
   assert.equal(num(k, r.value), 11);
 });
 
-test("a structure's entries are evaluated, in order", () => {
+test("a structure asked for in full has its entries evaluated, in order", () => {
+  // Until the ruling of 2026-11-16 a structure's entries were evaluated when it was built.
   const { k, add, call } = setup();
-  const r = k.evaluate(k.structure([[null, call(add, byte(k, 1), byte(k, 2))], [k.symbol("m.b"), byte(k, 9)]]), k.scope());
+  const s = k.structure([[null, call(add, byte(k, 1), byte(k, 2))], [k.symbol("m.b"), byte(k, 9)]]);
+  const r = k.evaluateInFull(s, k.scope());
   const entries = k.entriesOf(r.value);
   assert.equal(num(k, entries[0][1]), 3);
   assert.equal(k.symbolName(entries[1][0] as Value), "m.b");
+  // Asked for and no more, the structure is complete in shape and its first entry is not yet evaluated.
+  const weak = k.evaluate(s, k.scope());
+  assert.equal(k.entriesOf(weak.value).length, 2);
+  assert.equal(k.kind(k.entriesOf(weak.value)[0][1]), "expression");
+  // The caller evaluates the entry it wants.
+  assert.equal(num(k, k.evaluate(k.entriesOf(weak.value)[0][1], k.scope()).value), 3);
+  // Reading an entry gives its value, not the entry as written.
+  const read = k.evaluate(call(k.kernelPrimitive("get"), s, byte(k, 0)), k.scope());
+  assert.equal(k.kind(read.value), "bits");
+  assert.equal(num(k, read.value), 3);
+  const keyed = k.evaluate(call(k.kernelPrimitive("get"), k.structure([[k.symbol("m.sum"), call(add, byte(k, 3), byte(k, 4))]]), k.symbolData("m.sum")), k.scope());
+  assert.equal(k.kind(keyed.value), "bits");
+  assert.equal(num(k, keyed.value), 7);
+  // A value asked for in full that waits is taken up again in full.
+  const c = k.cell();
+  const scope = k.scope();
+  const waits = k.evaluateInFull(k.structure([[null, call(add, c, byte(k, 1))], [null, call(add, byte(k, 2), byte(k, 2))]]), scope);
+  assert.equal(k.waiting().length, 1);
+  k.fill(c, byte(k, 5));
+  k.advance({ steps: 100 });
+  assert.deepEqual(k.entriesOf(k.current(waits.value)).map(([, v]) => k.kind(v) === "bits" ? num(k, v) : -1), [6, 4]);
+  assert.deepEqual(k.waiting(), []);
 });
 
 test("recursion on known arguments runs to its end", () => {
@@ -263,17 +287,35 @@ test("an argument is evaluated in the scope where it was written, wherever it en
   assert.equal(num(k, k.evaluate(call(kept, byte(k, 1)), elsewhere).value), 2, "the `a` of where it was written");
 });
 
-test("an effect happens when its value is needed, and a structure needs its entries in order", () => {
-  const { k, call } = setup();
+test("an effect happens when its value is needed, and a structure does not need its entries", () => {
+  // Until the ruling of 2026-11-16 this test held that a structure needs its entries in order.
+  const { k, call, kp } = setup();
   const said: number[] = [];
-  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), c.structure([])) });
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
   const [first, second] = [k.param("first"), k.param("second")];
-  const swap = k.composedFunction([first, second], k.structure([[null, second], [null, first]]));
+  const swap = k.composedFunction([first, second], call(kp("then"), second, first));
   k.evaluate(call(swap, call(say, byte(k, 1)), call(say, byte(k, 2))), k.scope());
   assert.deepEqual(said, [2, 1], "in the order the body needs them, not the order the call wrote them");
+  // Building a structure performs nothing.
   said.length = 0;
-  k.evaluate(k.structure([[null, call(say, byte(k, 1))], [null, call(say, byte(k, 2))]]), k.scope());
-  assert.deepEqual(said, [1, 2], "the statements of a body, in the order written");
+  const pair = k.structure([[null, call(say, byte(k, 1))], [null, call(say, byte(k, 2))], [null, call(say, byte(k, 3))]]);
+  const built = k.evaluate(pair, k.scope());
+  assert.deepEqual(said, []);
+  // Reading an entry performs that entry's effect, once, however often it is read.
+  const s = k.symbol("t.s");
+  const twice = call(kp("block"), k.structure([[s, pair]]), call(kp("then"), call(kp("get"), s, byte(k, 2)), call(kp("then"), call(kp("get"), s, byte(k, 0)), call(kp("get"), s, byte(k, 2)))));
+  assert.equal(num(k, k.evaluate(twice, k.scope()).value), 3);
+  assert.deepEqual(said, [3, 1], "in the order read; the second entry is never read and never happens");
+  // A primitive function needs its argument in full: every entry, in order.
+  said.length = 0;
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(50), name: "size", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.entriesOf(a[0]).length)) });
+  assert.equal(num(k, k.evaluate(call(size, pair), k.scope()).value), 3);
+  assert.deepEqual(said, [1, 2, 3]);
+  // A caller that asks in full gets every entry, in order.
+  said.length = 0;
+  assert.equal(k.entriesOf(built.value).length, 3);
+  k.evaluateInFull(pair, k.scope());
+  assert.deepEqual(said, [1, 2, 3]);
 });
 
 test("then: the first is done, and then the second; a text's order becomes an order of effects", () => {
@@ -407,8 +449,8 @@ test("a block of bindings: each may use any other and itself, so a recursive fun
   assert.deepEqual(k.bitsOf(both(6).value), k.bitsOf(truth(k, true)));
   assert.deepEqual(k.bitsOf(both(7).value), k.bitsOf(truth(k, false)));
   // The function is one value: what the name gives inside is what it gives outside.
-  const same = k.evaluate(call(kp("block"), k.structure([[fact, factFn], [base, byte(k, 1)]]), k.structure([[null, fact], [null, fact]])), k.scope());
-  const [first, second] = k.entriesOf(same.value).map(([, v]) => v);
+  const same = k.evaluateInFull(call(kp("block"), k.structure([[fact, factFn], [base, byte(k, 1)]]), k.structure([[null, fact], [null, fact]])), k.scope());
+  const [first, second] = k.entriesOf(same.value).map(([, v]) => k.current(v));
   assert.equal(first, second);
   assert.equal(k.kind(first), "composed-function");
 });
@@ -431,7 +473,7 @@ test("a block of bindings: a value is evaluated when needed, at most once, and a
   // An inner block binds the name again; the outer binding is untouched, and reaches inner code that does not rebind it.
   const nested = call(kp("block"), k.structure([[a, byte(k, 1)], [b, byte(k, 10)]]),
     k.structure([[null, call(kp("block"), k.structure([[a, byte(k, 2)]]), call(add, a, b))], [null, a]]));
-  assert.deepEqual(k.entriesOf(k.evaluate(nested, k.scope()).value).map(([, v]) => num(k, v)), [12, 1]);
+  assert.deepEqual(k.entriesOf(k.evaluateInFull(nested, k.scope()).value).map(([, v]) => num(k, v)), [12, 1]);
   // A block written inside a function, and one handed on as an argument, keep their own names.
   const p = k.param("p");
   const inFn = k.composedFunction([p], call(kp("block"), k.structure([[a, call(add, p, byte(k, 1))]]), call(add, a, a)));
@@ -511,9 +553,12 @@ test("a refutation marks everything computed from it", () => {
   const { k, add, isZero, call, kp } = setup();
   const x = k.param("x");
   const f = k.composedFunction([x], call(add, x, byte(k, 1)));
-  const r = k.evaluate(k.structure([[null, call(f, call(kp("claim"), call(isZero, byte(k, 1))))]]), k.scope());
+  const wrong = k.structure([[null, call(f, call(kp("claim"), call(isZero, byte(k, 1))))]]);
+  const r = k.evaluateInFull(wrong, k.scope());
   assert.equal(r.refuted, true);
   assert.match(k.reasonOf(r.value) ?? "", /claim that is not true/);
+  // A refutation stays where it arose: an entry nothing reads refutes nothing.
+  assert.equal(k.evaluate(wrong, k.scope()).refuted, false);
 });
 
 test("a call on something that is not a function, or with the wrong number of arguments, is a refutation", () => {

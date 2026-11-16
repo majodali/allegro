@@ -165,9 +165,9 @@ is not a number.
    a definition is written in (issue 21 of the adversarial review).
    *Built.*
 3. **Reading a structure**: `get` reads an entry by key or by place, and
-   `count` gives the number of entries. *Built.* Entries evaluated when
-   read are not built: the kernel still evaluates them when the
-   structure is built.
+   `count` gives the number of entries. An entry is evaluated when it is
+   read, at most once; a primitive function is handed a structure with
+   every entry evaluated. *Built.*
 4. **The shipped primitives** of section 3, in `next/prims/index.ts`.
    *Built.* Each is named by a hash over its host code, by ruling: the
    helpers all share and its own entry, comments left out. The hashes
