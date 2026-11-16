@@ -1,11 +1,12 @@
 // The census of milestone 3 (B-196 (the rebuild's acceptance side), chunk
-// Q5 (the first notation and the bootstrap), part 2): which of the
+// Q5 (the first notation and the bootstrap), parts 2 and 3): which of the
 // corpus's milestone 3 cases read as Allegretto unchanged, and of those,
-// which forms of next/ext/allegretto/forms.md they use and which wait on
-// the kernel stream. It measures; it changes no case.
+// which forms of next/ext/allegretto/forms.md they use, which emit, and
+// why the others do not. It measures; it changes no case.
 //
 //   npx tsx next/bootstrap/census.ts            the tables, as Markdown
 //   npx tsx next/bootstrap/census.ts --cases    and one line for each case
+//   npx tsx next/bootstrap/census.ts --moves    and the cases that need types
 //
 // forms.md §6, answer 5: milestone 3's programs become Allegretto texts
 // written for the purpose, and a present-surface case that needs types
@@ -20,8 +21,8 @@
 //     why: the forms of forms.md §5 the present parse of the text shows
 //     (`presentTags` of next/bootstrap/allegretto-grammar.ts), or the
 //     reader's refusal;
-//   - "reads" where every text reads, with the forms they use, the items
-//     of forms.md §4 those forms wait on, and the names nothing binds.
+//   - "reads" where every text reads, with the forms they use, the names
+//     nothing binds, and what else the emitter refuses.
 //
 // Where the texts come from (carried over from part 1 of this chunk):
 //   - a pin case: its program, the whole file;
@@ -38,7 +39,7 @@ import * as fs from "fs";
 import * as path from "path";
 import ts from "ts-compiler";
 import { presentTags } from "./allegretto-grammar.js";
-import { emit, FORMS, ITEMS, type FormId, type ItemNumber } from "./emit.js";
+import { emit, type FormId } from "./emit.js";
 import { read, type Expr, type Item } from "./reader.js";
 import { CASES_PATH, type Corpus, type PinCase, type TestCase } from "../tools/corpus.js";
 
@@ -81,10 +82,10 @@ export interface CaseRead {
   readonly reasons: readonly string[];
   /** For "reads": the forms its texts use. */
   readonly forms: readonly FormId[];
-  /** For "reads": the items of forms.md §4 its waiting forms wait on; "unlisted" for a wait §4 does not list. */
-  readonly items: ReadonlyArray<ItemNumber | "unlisted">;
   /** For "reads": the names its texts use and nothing binds. */
   readonly unbound: readonly string[];
+  /** For "reads": what else the emitter refuses in its texts, one finding's kind and form each. */
+  readonly refused: readonly string[];
   /** For "reads": every text is emitted today. */
   readonly emits: boolean;
   /**
@@ -99,8 +100,8 @@ interface Taken {
   readonly reads: boolean;
   readonly reasons: string[];
   readonly forms: FormId[];
-  readonly items: Array<ItemNumber | "unlisted">;
   readonly unbound: string[];
+  readonly refused: string[];
   readonly emits: boolean;
   readonly typed: string[];
 }
@@ -177,21 +178,21 @@ function reasonsOf(text: string, findings: readonly string[]): string[] {
 
 function take(text: string): Taken {
   const r = read(text);
-  if (!r.ok) return { reads: false, reasons: reasonsOf(text, r.findings.map((f) => f.message)), forms: [], items: [], unbound: [], emits: false, typed: [] };
+  if (!r.ok) return { reads: false, reasons: reasonsOf(text, r.findings.map((f) => f.message)), forms: [], unbound: [], refused: [], emits: false, typed: [] };
   const e = emit(text);
-  const items = new Set<ItemNumber | "unlisted">();
   const unbound = new Set<string>();
+  const refused = new Set<string>();
   if (!e.ok)
     for (const f of e.findings) {
-      if (f.kind === "waits") {
-        if ((f.items ?? []).length === 0) items.add("unlisted");
-        for (const i of f.items ?? []) items.add(i);
-      } else if (f.kind === "unbound") unbound.add(f.message.replace(/^the name (\S+) .*$/, "$1"));
+      if (f.kind === "unbound") unbound.add(f.message.replace(/^the name (\S+) .*$/, "$1"));
+      else if (f.kind === "rebound") refused.add("a name bound twice in one block");
+      else if (f.kind === "refused") refused.add("a block with no statement");
+      else if (f.kind === "waits") refused.add(`waits: ${f.form ?? "a form"}`);
     }
   const typed = typedUses(r.module.items);
   // `print` is the present tree's: it renders its argument by its type.
   if (unbound.has("print")) typed.push("`print`, which renders a value by its type");
-  return { reads: true, reasons: [], forms: [...e.forms], items: [...items], unbound: [...unbound], emits: e.ok, typed };
+  return { reads: true, reasons: [], forms: [...e.forms], unbound: [...unbound], refused: [...refused], emits: e.ok, typed };
 }
 
 // ── Finding the texts of a test (carried over from part 1) ─────────────
@@ -274,14 +275,14 @@ function textsOf(body: ts.Node, local: ReadonlyMap<string, ts.Node>, depth = 0):
 // ── The census ─────────────────────────────────────────────────────────
 
 function combine(c: { id: string; kind: "pin" | "test"; where: string }, texts: readonly string[]): CaseRead {
-  if (texts.length === 0) return { ...c, texts: 0, status: "host", reasons: [], forms: [], items: [], unbound: [], emits: false, typed: [] };
+  if (texts.length === 0) return { ...c, texts: 0, status: "host", reasons: [], forms: [], unbound: [], refused: [], emits: false, typed: [] };
   const all = texts.map(take);
   const sorted = <T>(xs: Iterable<T>): T[] => [...new Set(xs)].sort((a, b) => String(a).localeCompare(String(b)));
   if (all.some((t) => !t.reads))
-    return { ...c, texts: texts.length, status: "does not read", reasons: sorted(all.flatMap((t) => t.reasons)), forms: [], items: [], unbound: [], emits: false, typed: [] };
+    return { ...c, texts: texts.length, status: "does not read", reasons: sorted(all.flatMap((t) => t.reasons)), forms: [], unbound: [], refused: [], emits: false, typed: [] };
   return {
     ...c, texts: texts.length, status: "reads", reasons: [],
-    forms: sorted(all.flatMap((t) => t.forms)), items: sorted(all.flatMap((t) => t.items)), unbound: sorted(all.flatMap((t) => t.unbound)),
+    forms: sorted(all.flatMap((t) => t.forms)), unbound: sorted(all.flatMap((t) => t.unbound)), refused: sorted(all.flatMap((t) => t.refused)),
     emits: all.every((t) => t.emits),
     typed: sorted(all.flatMap((t) => t.typed)),
   };
@@ -364,17 +365,18 @@ export function report(cases: readonly CaseRead[]): string[] {
   for (const c of cases) for (const r of c.reasons) reasons.set(r, (reasons.get(r) ?? 0) + 1);
   lines.push("", "| Why a case does not read (a case may have several reasons) | Cases |", "|---|---|");
   for (const [r, n] of [...reasons].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) lines.push(`| ${r} | ${n} |`);
-  lines.push("", "| Form, in the cases that read | Cases using it | Waits on |", "|---|---|---|");
+  const failing = reads.filter((c) => !c.emits);
+  lines.push("", `Of the ${reads.length} that read, ${reads.length - failing.length} emit; of the ${failing.length} that do not, ` +
+    `${failing.filter((c) => c.unbound.length > 0).length} use a name nothing binds and ${failing.filter((c) => c.refused.length > 0).length} a form the emitter refuses.`);
+  lines.push("", "| Form, in the cases that read | Cases using it |", "|---|---|");
   const forms = new Map<FormId, number>();
   for (const c of reads) for (const f of c.forms) forms.set(f, (forms.get(f) ?? 0) + 1);
-  for (const [f, n] of [...forms].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
-    const w = FORMS[f].waits;
-    lines.push(`| \`${f.replace(/\|/g, "\\|")}\` | ${n} | ${w === null ? "nothing forms.md §4 lists" : w.length === 0 ? "nothing: emitted today" : w.map((i) => `item ${i}`).join(", ")} |`);
-  }
-  lines.push("", "| Item of forms.md §4, in the cases that read | Cases waiting on it |", "|---|---|");
-  for (const i of [1, 2, 3, 4, 5, "unlisted"] as const) {
-    const n = reads.filter((c) => c.items.includes(i)).length;
-    lines.push(`| ${i === "unlisted" ? "none listed (the symbol literal)" : `${i}: ${ITEMS[i]}`} | ${n} |`);
+  for (const [f, n] of [...forms].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) lines.push(`| \`${f.replace(/\|/g, "\\|")}\` | ${n} |`);
+  const refusals = new Map<string, number>();
+  for (const c of reads) for (const r of c.refused) refusals.set(r, (refusals.get(r) ?? 0) + 1);
+  if (refusals.size > 0) {
+    lines.push("", "| What the emitter refuses, in the cases that read | Cases |", "|---|---|");
+    for (const [r, n] of [...refusals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) lines.push(`| ${r} | ${n} |`);
   }
   const unbound = new Map<string, number>();
   for (const c of reads) for (const u of c.unbound) unbound.set(u, (unbound.get(u) ?? 0) + 1);
@@ -402,7 +404,7 @@ function main(): void {
     console.log("");
     for (const c of cases) {
       const detail = c.status === "does not read" ? c.reasons.join("; ")
-        : c.status === "reads" ? `${c.emits ? "emits today" : `waits: ${c.items.join(", ") || "none"}`}${c.unbound.length > 0 ? ` · unbound: ${c.unbound.join(", ")}` : ""} · forms: ${c.forms.join(", ")}`
+        : c.status === "reads" ? `${c.emits ? "emits today" : "does not emit"}${c.unbound.length > 0 ? ` · unbound: ${c.unbound.join(", ")}` : ""}${c.refused.length > 0 ? ` · refused: ${c.refused.join(", ")}` : ""} · forms: ${c.forms.join(", ")}`
         : "";
       console.log(`${c.id} · ${c.status} · texts ${c.texts}${detail === "" ? "" : ` · ${detail}`}`);
     }

@@ -18,7 +18,7 @@ test("the census has one row for each case of milestone 3, and the pins of a pro
   assert.deepEqual(cases.map((c) => c.id).sort(), due.map((c) => c.id).sort());
   const byProgram = new Map<string, string>();
   for (const c of cases.filter((x) => x.kind === "pin")) {
-    const key = JSON.stringify([c.status, c.forms, c.items, c.unbound]);
+    const key = JSON.stringify([c.status, c.forms, c.unbound, c.refused]);
     assert.equal(byProgram.get(c.where) ?? key, key, c.id);
     byProgram.set(c.where, key);
   }
@@ -29,7 +29,7 @@ test("a case that reads lists its forms; one that does not lists why; a host cas
     if (c.status === "reads") assert.equal(c.reasons.length, 0, c.id);
     if (c.status === "does not read") assert.ok(c.reasons.length > 0 && c.forms.length === 0, c.id);
     if (c.status === "host") assert.equal(c.texts, 0, c.id);
-    if (c.emits) assert.ok(c.status === "reads" && c.items.length === 0 && c.unbound.length === 0, c.id);
+    if (c.emits) assert.ok(c.status === "reads" && c.refused.length === 0 && c.unbound.length === 0, c.id);
   }
 });
 

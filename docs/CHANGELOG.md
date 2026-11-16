@@ -1198,6 +1198,22 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The emitter writes every form of Allegretto, and the launcher runs one (B-196, chunk Q5 (the first notation and the bootstrap), part 3)
+
+B-196 (the rebuild's acceptance side). `next/bootstrap/emit.ts` writes
+each form of `next/ext/allegretto/forms.md` §2 as what it stands for:
+a block is the kernel's `block`, `x <- e` is
+`block({x: e}, then(x, rest))`, `p.a` is `get` of a symbol as data,
+and each operator is one shipped primitive named in `needs` by its
+hash. Every record is of the second version. The launcher hands a
+capability as a structure of its parts, and the terminal supplies the
+shipped primitives. `next/launch/fixtures/hello.json` is the emitted
+record of `next/launch/fixtures/hello.alg`. Thirteen programs of
+milestone 3 under `next/bootstrap/fixtures/` run through the emitter
+and the launcher, and `npm run allegretto` runs a text in one step.
+Of the 134 cases of milestone 3 that read, 108 emit. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The emitter's test follows the kernel without failing (B-196)
 
 B-196 (the rebuild's acceptance side). One test of

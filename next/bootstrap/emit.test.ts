@@ -1,17 +1,18 @@
 // Tests of the emitter of Allegretto (next/bootstrap/emit.ts). Each form
-// emitted today is emitted, its record passes `check2`, and the record is
-// loaded into the reference kernel (`createKernel` of
-// next/kernel/create.ts) and evaluated through the kernel's interface.
-// Each form that waits on the kernel stream gives its finding and no
-// record. Run by `npm run test:next`.
+// is emitted, its record passes `check2`, and the record is loaded into
+// the reference kernel (`createKernel` of next/kernel/create.ts), with the
+// shipped primitives its `needs` names, and evaluated through the kernel's
+// interface. What the emitter refuses gives its finding and no record.
+// Run by `npm run test:next`.
 //
-// How a text is given an effect. A capability's part cannot be read yet
-// (forms.md §4 item 3), so the texts here declare inputs, `input see` and
-// its kin, and the test hands each input an effectful primitive function
-// it makes through the kernel's interface. `see` records the value it is
-// given, in the order the kernel performs it; `tick` records that it ran
-// and answers the next whole number; `ask` answers with a cell the test
-// fills later.
+// How a text is given an effect. The texts here declare inputs, `input see`
+// and its kin, and the test hands each input an effectful primitive
+// function it makes through the kernel's interface. `see` records the
+// value it is given, in the order the kernel performs it; `tick` records
+// that it ran and answers the next whole number; `ask` answers with a cell
+// the test fills later. The programs of milestone 3, run through the
+// launcher with the output capability, are next/bootstrap/fixtures/ and
+// their test next/bootstrap/fixtures.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +25,8 @@ import { createKernel } from "../kernel/create.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
-import { emit, FORMS, ITEMS, type Finding, type FormId } from "./emit.js";
+import { shippedByName } from "../prims/index.js";
+import { emit, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, type Finding, type FormId } from "./emit.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
@@ -32,7 +34,7 @@ const utf8 = new TextEncoder();
 
 /** Emits a text that must emit, and checks its record. */
 function emitted(text: string): SavedProgram {
-  const r = emit(text);
+  const r = emitTracked(text);
   assert.ok(r.ok, `${JSON.stringify(text)} is not emitted: ${r.ok ? "" : r.findings.map((f) => f.message).join("; ")}`);
   const doc = JSON.parse(encode(r.program)) as SavedProgram;
   assert.deepEqual(check2(doc), []);
@@ -54,6 +56,12 @@ interface Run {
   readonly cells: Cell[];
   readonly value: Value;
   readonly refuted: boolean;
+}
+
+/** The shipped primitives a record needs, made in a kernel, by hash. */
+function primitivesFor(k: Kernel2, doc: SavedProgram): Map<string, Value> {
+  const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
+  return new Map(doc.needs.map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
 }
 
 /** Emits a text, loads its record into a new reference kernel, and instantiates the module with the test's inputs. */
@@ -82,13 +90,13 @@ function run(text: string): Run {
     }),
     right: () => k.inspectionRight(),
   };
-  const fn = load(k, doc, new Map());
+  const fn = load(k, doc, primitivesFor(k, doc));
   const args = doc.declares.map((d) => {
     const make = inputs[d.name];
     assert.ok(make !== undefined, `the test supplies no input ${d.name}`);
     return make();
   });
-  const r = k.evaluate(k.expression(fn, args), k.scope());
+  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: 100_000 });
   assert.equal(r.ended, "complete");
   return { k, events, cells, value: r.value, refuted: r.refuted };
 }
@@ -101,6 +109,18 @@ const bitsOf = (k: Kernel2, v: Value | undefined): string => {
 };
 const seen = (r: Run): Value[] => r.events.filter((e) => e.part === "see").map((e) => e.value as Value);
 const seenTexts = (r: Run): string[] => seen(r).map((v) => textOf(r.k, v));
+/** A whole number of 64 bits, read as two's complement. */
+const intOf = (k: Kernel2, v: Value | undefined): bigint => {
+  const { bytes } = k.bitsOf(v as Value);
+  return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0);
+};
+const seenInts = (r: Run): bigint[] => seen(r).map((v) => intOf(r.k, v));
+/** The texts the emitter is run on in this file, for the test that every form is written. */
+const TEXTS: string[] = [];
+const emitTracked = (text: string) => {
+  TEXTS.push(text);
+  return emit(text);
+};
 
 // ── Values ─────────────────────────────────────────────────────────────
 
@@ -210,6 +230,15 @@ test("the header lines are the module function's parameters, in order, and decla
   assert.deepEqual(doc.declares.map((d) => d.param), fn.k === "function" ? fn.params : []);
 });
 
+test("a capability's part is read as an entry: output.write is get(output, `write)", () => {
+  const doc = emitted('capability output\noutput.write("hello, world")');
+  const get = doc.nodes.findIndex((n) => n.k === "kernel" && n.name === "get");
+  const write = doc.nodes.findIndex((n) => n.k === "datum" && n.fqn === "write");
+  const fn = doc.nodes[doc.module];
+  assert.ok(fn.k === "function");
+  assert.ok(doc.nodes.some((n) => n.k === "expression" && n.fn === get && n.args[0] === fn.params[0] && n.args[1] === write));
+});
+
 test("the module yields the structure of its bindings: with none, an empty structure, after its statements", () => {
   const r = run('input see\nsee("done")');
   assert.equal(r.k.kind(r.value), "structure");
@@ -246,80 +275,186 @@ test("a name bound twice in one block is refused; a parameter or an inner block 
   assert.deepEqual(seenTexts(run('input see\nsee((see => see)("shadowed"))')), ["shadowed"]);
 });
 
-// ── What waits ────────────────────────────────────────────────────────
+// ── Bindings and blocks ───────────────────────────────────────────────
 
-/** Each form that waits, a text that uses it, and the items of forms.md §4 its finding names. */
-const WAITING: ReadonlyArray<readonly [FormId, string, readonly number[]]> = [
-  ["binding", "x = 1", [1]],
-  ["function binding", "f(x) => x", [1]],
-  ["export", "export x = 1", [1]],
-  ["== !=", "input see\nsee(1 == 1)", [2]],
-  ["== !=", "input see\nsee(1 != 1)", [2]],
-  ["++", 'input see\nsee("a" ++ "b")', [2]],
-  ["bits name", "input see\nsee(bits.length(1))", [2]],
-  ["entry by key", "input see\nsee({a: 1}.a)", [3]],
-  ["entry at place", "input see\nsee([1][0])", [3]],
-  ["capability part", 'capability output\noutput.write("hello, world")', [3]],
-  ["integer operator", "input see\nsee(1 + 2)", [4]],
-  ["integer operator", "input see\nsee(-1)", [4]],
-  ["integer operator", "input see\nsee(1 < 2)", [4]],
-  ["integer operator", "input see\nsee(7 / 2)", [4, 5]],
-  ["shipped name", "input see\nsee(int.text(1))", [4]],
-  ["shipped name", "input see\nsee(float.add(1.5, 2.5))", [4]],
-  ["shipped name", 'input see\nsee(text.int("1"))', [4, 5]],
-  ["symbol", "input see\nsee(`name)", []],
-];
-
-test("each form that waits gives its finding, naming the item of forms.md §4, and no record", () => {
-  for (const [form, text, items] of WAITING) {
-    const r = emit(text);
-    assert.equal(r.ok, false, `${form}: ${JSON.stringify(text)} is emitted`);
-    if (r.ok) continue;
-    const f = r.findings.filter((x) => x.kind === "waits" && x.form === form);
-    assert.equal(f.length, 1, `${form}: ${JSON.stringify(text)}: ${r.findings.map((x) => x.message).join("; ")}`);
-    assert.deepEqual(f[0].items, items, form);
-    for (const i of items) assert.ok(f[0].message.includes(`forms.md §4 item ${i} (${ITEMS[i as keyof typeof ITEMS]})`), f[0].message);
-    if (items.length === 0) assert.match(f[0].message, /which forms\.md §4 does not list/);
-    assert.ok(!("program" in r));
-  }
+test("a block's bindings are one group: a binding may be used before its line, and the record is the kernel's block", () => {
+  const text = 'input see\ngreeting = join(hello, "world")\njoin(a, b) => a ++ ", " ++ b\nhello = "hello"\nsee(greeting)';
+  const doc = emitted(text);
+  assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === "block"));
+  assert.ok(!doc.nodes.some((n) => (n.k as string) === "bindings"));
+  assert.deepEqual(seenTexts(run(text)), ["hello, world"]);
 });
 
-test("every form of the table is tested, and the table says the same as the tests about what waits", () => {
-  const waiting = new Set(WAITING.map(([form]) => form));
-  for (const [form, info] of Object.entries(FORMS) as Array<[FormId, (typeof FORMS)[FormId]]>) {
-    const waits = info.waits === null || info.waits.length > 0;
-    assert.equal(waiting.has(form), waits, `${form}: the table says it ${waits ? "waits" : "is emitted"}`);
-  }
+test("a block's name is a symbol the kernel looks up, and a function's parameter is its param node", () => {
+  const doc = emitted("input see\nf(x) => x\nsee(f(1))");
+  const fn = doc.nodes.find((n) => n.k === "function" && n.params.length === 1 && doc.nodes[n.params[0]].k === "param" && (doc.nodes[n.params[0]] as { name: string }).name === "x");
+  assert.ok(fn !== undefined && fn.k === "function");
+  assert.deepEqual(doc.nodes[fn.body], { k: "param", name: "x" }, "the parameter x is its param node");
+  assert.ok(doc.nodes.some((n) => n.k === "symbol" && n.fqn === "f"), "the name f is a symbol");
+  assert.ok(!doc.nodes.some((n) => n.k === "symbol" && n.fqn === "x"));
+  assert.ok(!doc.nodes.some((n) => n.k === "symbol" && n.fqn === "see"), "a header line is a parameter of the module function");
 });
 
-// What the emitter refuses as waiting is checked against the kernel of this
-// base, without failing when the kernel stream supplies more: the kernel is
-// lane R's, and a new primitive there must not fail this stream's test. The
-// test turns to a todo and names what the emitter can now stop refusing.
+test("a binding is evaluated when first needed and once; a binding nothing needs is never evaluated when it is not yielded", () => {
+  const r = run('input see\nlater = see("needed")\nunused = see("never")\nexport shown = "x"\nsee("first")\nlater\nlater\nsee("last")');
+  assert.deepEqual(seenTexts(r), ["first", "needed", "last"]);
+});
+
+test("recursion is one value with one identity, and two functions may call each other", () => {
+  const text = [
+    "input see",
+    'count(n) => if n == 0 then "done" else count(n - 1)',
+    "even(n) => if n == 0 then true else odd(n - 1)",
+    "odd(n) => if n == 0 then false else even(n - 1)",
+    "see(count(3))",
+    'see(if even(10) then "even" else "odd")',
+    "see(int.text(fact(5)))",
+    "fact(n) => if n == 0 then 1 else n * fact(n - 1)",
+  ].join("\n");
+  assert.deepEqual(seenTexts(run(text)), ["done", "even", "120"]);
+});
+
+test("an inner block binds its own names; a name there means the innermost block's binding", () => {
+  const r = run('input see\na = "outer"\nb <-\n  a = "inner"\n  a\nsee(b)\nsee(a)');
+  assert.deepEqual(seenTexts(r), ["inner", "outer"]);
+});
+
+test("x <- e whose e reads an enclosing block's x reads that x, not itself", () => {
+  const r = run("input see\nn <- 1\nm <-\n  n <- n + 1\n  n\nsee(n)\nsee(m)");
+  assert.deepEqual(seenInts(r), [1n, 2n]);
+  // Written as forms.md has it where e does not read x.
+  const doc = emitted("input see\nn <- 1\nsee(n)");
+  const block = doc.nodes.findIndex((n) => n.k === "kernel" && n.name === "block");
+  assert.ok(doc.nodes.some((n) => n.k === "expression" && n.fn === block));
+  assert.ok(!doc.nodes.some((n) => n.k === "function" && n.params.length > 0 && doc.nodes[n.params[0]].k === "param" && (doc.nodes[n.params[0]] as { name: string }).name === "n"));
+});
+
+// ── Operators, bits and reading a structure ───────────────────────────
+
+test("the integer operators are the shipped primitives, at their precedence, grouping to the left", () => {
+  const r = run("input see\nsee(1 + 2 * 3)\nsee(10 - 3 - 2)\nsee(7 / 2)\nsee(-7 % 3)\nsee(-(2 + 3))\nsee(9223372036854775807 + 1)");
+  assert.deepEqual(seenInts(r), [7n, 5n, 3n, -1n, -5n, -(2n ** 63n)]);
+  const t = run("input see\nsee(1 < 2)\nsee(2 > 2)\nsee(2 <= 2)\nsee(1 >= 2)\nsee(1 + 1 == 2 && 3 < 4)");
+  assert.deepEqual(seen(t).map((v) => bitsOf(t.k, v)), ["1:01", "1:00", "1:01", "1:00", "1:01"]);
+});
+
+test("the record's needs are exactly the shipped primitives the text uses, each by the hash shippedByName gives", () => {
+  const doc = emitted("input see\nsee(int.text(1 + 2 * -3))\nsee(1 + 1)");
+  assert.deepEqual(doc.needs, ["int.add", "int.mul", "int.neg", "int.text"].map((n) => ({ hash: shippedByName.get(n)!.hash, name: n })));
+  assert.deepEqual(emitted('input see\nsee("no arithmetic")').needs, []);
+  for (const name of SHIPPED_NAMES) assert.ok(shippedByName.has(name), `forms.md §3 names ${name}, and next/prims ships it`);
+});
+
+test("every name of forms.md §3 is the shipped primitive of that name", () => {
+  const r = run([
+    "input see",
+    'see(int.text(int.add(1, 2)))', 'see(int.text(int.sub(1, 2)))', 'see(int.text(int.mul(3, 2)))', 'see(int.text(int.neg(4)))',
+    'see(int.text(int.div(9, 2)))', 'see(int.text(int.mod(9, 2)))', 'see(int.text(text.int("-12")))',
+    'see(float.text(float.add(1.5, 2.25)))', 'see(float.text(float.sub(1.5, 2.0)))', 'see(float.text(float.mul(1.5, 2.0)))',
+    'see(float.text(float.div(1.0, 4.0)))', 'see(float.text(float.neg(1.5)))', 'see(float.text(int.float(3)))', 'see(int.text(float.int(2.75)))',
+  ].join("\n"));
+  assert.deepEqual(seenTexts(r), ["3", "-1", "6", "-4", "4", "1", "-12", "3.75", "-0.5", "3", "0.25", "-1.5", "3", "2"]);
+  const c = run("input see\nsee(int.lt(1, 2))\nsee(int.gt(1, 2))\nsee(int.le(2, 2))\nsee(int.ge(1, 2))\nsee(float.lt(1.0, 2.0))\nsee(float.le(2.5, 2.0))");
+  assert.deepEqual(seen(c).map((v) => bitsOf(c.k, v)), ["1:01", "1:00", "1:01", "1:00", "1:01", "1:00"]);
+});
+
+test("== is same, != its negation, and ++ joins: on texts and on numbers", () => {
+  const r = run('input see\nsee("ab" == "ab")\nsee("ab" == "abc")\nsee(2 == 2)\nsee(1 == 1.0)\nsee(2 != 3)\nsee("a" != "a")');
+  assert.deepEqual(seen(r).map((v) => bitsOf(r.k, v)), ["1:01", "1:00", "1:01", "1:00", "1:01", "1:00"]);
+  assert.deepEqual(seenTexts(run('input see\nsee("hello" ++ ", " ++ "world")')), ["hello, world"]);
+  const s = run("input see\nsee({a: 1} == {a: 1})");
+  assert.equal(s.refuted, true, "two structures are not compared: a refutation");
+});
+
+test("bits.join, bits.length and bits.slice are the kernel's join, length and slice", () => {
+  const r = run('input see\nsee(bits.join("ab", "c"))\nsee(bits.slice("abc", 8, 16))');
+  assert.deepEqual(seenTexts(r), ["abc", "bc"]);
+  const l = run('input see\nsee(bits.length("abc"))');
+  assert.deepEqual(seenInts(l), [24n]);
+});
+
+test("p.a reads the entry keyed by the symbol a, p[i] the entry at place i, and get and count are the kernel's", () => {
+  const r = run('input see\np = {a: "first", b: "second"}\nsee(p.b)\nsee(p[0])\nsee(get(p, `a))\nsee(["x", "y", "z"][2])');
+  assert.deepEqual(seenTexts(r), ["second", "first", "first", "z"]);
+  assert.deepEqual(seenInts(run("input see\nsee(count([1, 2, 3]))")), [3n]);
+  const out = run("input see\nsee([1][1])");
+  assert.equal(out.refuted, true);
+  assert.equal(out.k.reasonOf(out.value), "place 1 is outside a structure of 1 entry");
+});
+
+test("the symbol literal is the symbol as data, in a record of the second version", () => {
+  const doc = emitted("input see\nsee(`name)");
+  assert.equal(doc.version, 2);
+  assert.ok(doc.nodes.some((n) => n.k === "datum" && n.fqn === "name"));
+  const r = run("input see\nsee(`name)\nsee(`a == `a)\nsee(`a == `b)");
+  assert.equal(r.k.kind(seen(r)[0]), "symbol");
+  assert.equal(r.k.symbolName(seen(r)[0]), "name");
+  assert.deepEqual(seen(r).slice(1).map((v) => bitsOf(r.k, v)), ["1:01", "1:00"]);
+});
+
+test("every record is of the second version, with no key slots and no stored outcomes", () => {
+  const doc = emitted('input see\nsee("no key read")');
+  assert.equal(doc.version, 2);
+  assert.equal(doc.keys, 0);
+  assert.deepEqual(doc.outcomes, []);
+});
+
+test("a primitive outside its domain is a refutation with its reason", () => {
+  const r = run('input see\nsee("before")\nsee(1 / 0)\nsee("after")');
+  assert.deepEqual(seenTexts(r), ["before"]);
+  assert.equal(r.refuted, true);
+  assert.equal(r.k.reasonOf(r.value), "division by zero");
+});
+
+// ── What the module yields ────────────────────────────────────────────
+
+test("a module with no export yields all its bindings, keyed by the symbols of their names; with export, those marked", () => {
+  const all = run('input see\nf(x) => x\nn = 1\nm <- 2\nsee("ran")');
+  assert.deepEqual(all.k.entriesOf(all.value).map(([key]) => all.k.symbolName(key as Value)), ["f", "n"]);
+  assert.equal(all.k.kind(all.k.entriesOf(all.value)[0][1]), "composed-function");
+  const some = run('input see\nexport f(x) => x\nn = 1\nsee("ran")');
+  assert.deepEqual(some.k.entriesOf(some.value).map(([key]) => some.k.symbolName(key as Value)), ["f"]);
+});
+
+// What the emitter writes is checked against the kernel of this base,
+// without failing when the kernel stream supplies more: the kernel is lane
+// R's, and a new primitive there must not fail this stream's test. The test
+// turns to a todo and names what the emitter does not write yet.
 test("what waits, against the kernel on this base: a thing the kernel now has is named as work for the emitter", (t) => {
   const k = createKernel();
   const owed: string[] = [];
-  // Items 2 and 3: the kernel's primitives the emitter writes today.
-  const written = ["attempt", "build", "claim", "describe", "if", "then"];
-  const more = [...k.kernelPrimitiveNames()].filter((n) => !written.includes(n)).sort();
-  if (more.length > 0) owed.push(`the kernel has the primitives ${more.join(", ")}, which the emitter does not write yet`);
-  // Item 1: a node of the data form for a block of bindings.
-  const withBindings = { format: "allegro-saved-program", version: 1, needs: [], nodes: [{ k: "bindings" }], module: 0, declares: [] };
-  if (!check2(withBindings).includes("nodes[0] is not a node of a known kind")) owed.push("the data form takes a node of kind bindings");
-  // Item 4: the shipped primitives.
-  if (fs.existsSync(path.join(ROOT, "next/prims"))) owed.push("next/prims exists: shipped primitives can be named");
-  // What is emitted today must be in the kernel: the conditional, the claim, sequence and the three bound names.
-  for (const name of written) assert.doesNotThrow(() => k.kernelPrimitive(name));
+  const more = [...k.kernelPrimitiveNames()].filter((n) => !KERNEL_WRITTEN.includes(n)).sort();
+  if (more.length > 0) owed.push(`the kernel has the primitives ${more.join(", ")}, which the emitter does not write`);
+  const unshipped = SHIPPED_NAMES.filter((n) => !shippedByName.has(n));
+  if (unshipped.length > 0) owed.push(`next/prims does not ship ${unshipped.join(", ")}`);
+  // What the emitter writes must be in the kernel and the data form.
+  for (const name of KERNEL_WRITTEN) assert.doesNotThrow(() => k.kernelPrimitive(name), name);
+  assert.equal(typeof k.symbolData, "function");
+  assert.deepEqual(check2({ format: "allegro-saved-program", version: 2, needs: [], nodes: [{ k: "datum", fqn: "a" }, { k: "function", params: [], body: 0 }], module: 1, declares: [] }), []);
   for (const o of owed) t.diagnostic(o);
-  if (owed.length > 0) t.todo(`the emitter can stop refusing: ${owed.join("; ")}`);
+  if (owed.length > 0) t.todo(`the emitter can write more: ${owed.join("; ")}`);
+});
+
+test("every form of the table is written by some text of this file", () => {
+  const used = new Set<FormId>();
+  for (const text of TEXTS) {
+    const r = emit(text);
+    if (r.ok) for (const f of r.forms) used.add(f);
+  }
+  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f));
+  assert.deepEqual(missing, []);
 });
 
 test("every finding of a text is given, each at its place, and the forms it uses are listed", () => {
-  const r = emit('capability output\nx = 1\noutput.write(x + 1 == 2)');
+  const r = emit("capability output\nx = 1\nx = 2\noutput.write(y + 1 == 2)");
   assert.equal(r.ok, false);
   if (r.ok) return;
-  assert.deepEqual(r.findings.map((f) => [f.at.line, f.form]), [[2, "binding"], [3, "capability part"], [3, "integer operator"], [3, "== !="]]);
+  assert.deepEqual(r.findings.map((f) => [f.at.line, f.kind]), [[3, "rebound"], [4, "unbound"]]);
   assert.deepEqual(r.forms, ["== !=", "application", "binding", "capability", "capability part", "integer operator", "name", "whole number"]);
+  // A binding cannot read a name bound at a place: the group is bound before any statement.
+  assert.deepEqual(findings("input see\nn <- 1\nm = n\nsee(m)").map((x) => [x.kind, x.message]), [["unbound", "the name n is bound nowhere in the text"]]);
+  // An inner block with bindings and no statement has no value.
+  assert.deepEqual(findings("input see\nb <-\n  a = 1\nsee(b)").map((x) => x.kind), ["refused"]);
 });
 
 // ── The command ───────────────────────────────────────────────────────
@@ -338,7 +473,6 @@ test("npm run emit writes the record; a text it refuses prints each finding and 
     const no = spawnSync(process.execPath, ["--import", "tsx", "next/bootstrap/emit.ts", bad], { cwd: ROOT, encoding: "utf-8" });
     assert.equal(no.status, 1);
     assert.deepEqual(no.stderr.trim().split("\n").map((l) => l.replace(bad, "bad.alg")), [
-      "bad.alg:1:1: the binding x = … waits on forms.md §4 item 1 (the block of bindings)",
       "bad.alg:2:1: the name see is bound nowhere in the text",
       "bad.alg:2:5: the name y is bound nowhere in the text",
     ]);
@@ -347,26 +481,26 @@ test("npm run emit writes the record; a text it refuses prints each finding and 
   }
 });
 
-// ── Waiting: the texts that run when the kernel stream supplies forms.md §4 ──
+// ── Through the launcher ──────────────────────────────────────────────
 
-/** Emits a text and runs it through the launcher with the output capability. */
+/** Emits a text and runs it through the launcher with the output capability and the shipped primitives. */
 async function launched(text: string): Promise<{ lines: string[]; end: string }> {
-  const r = emit(text);
+  const r = emitTracked(text);
   if (!r.ok) throw new Error(r.findings.map((f) => f.message).join("; "));
-  const o = await launch({ createKernel, program: JSON.parse(encode(r.program)), configuration: { ceiling: ["output"], steps: 100_000 }, target: { capabilities: [output] } });
+  const o = await launch({ createKernel, program: JSON.parse(encode(r.program)), configuration: { ceiling: ["output"], steps: 100_000 }, target: { capabilities: [output], primitives: [...shippedByName.values()] } });
   return { lines: o.lines, end: o.end.kind };
 }
 
-test("waiting on forms.md §4 items 3 and the launcher: hello, world through the output capability's part", { todo: "waits on forms.md §4 item 3 (reading a structure) and the launcher's change" }, async () => {
+test("hello, world through the output capability's part", async () => {
   assert.deepEqual(await launched('capability output\noutput.write("hello, world")\n'), { lines: ["hello, world"], end: "completed" });
 });
 
-test("waiting on forms.md §4 item 1: a block of bindings, order-free", { todo: "waits on forms.md §4 item 1 (the block of bindings)" }, async () => {
+test("a block of bindings, order-free, through the launcher", async () => {
   const text = 'capability output\ngreeting = join(hello, "world")\njoin(a, b) => a ++ ", " ++ b\nhello = "hello"\noutput.write(greeting)\n';
   assert.deepEqual(await launched(text), { lines: ["hello, world"], end: "completed" });
 });
 
-test("waiting on forms.md §4 items 1 to 4: recursion, one value with one identity", { todo: "waits on forms.md §4 items 1, 2, 3 and 4" }, async () => {
+test("recursion, one value with one identity, through the launcher", async () => {
   const text = [
     "capability output",
     "count(n) => if n == 0 then \"done\" else count(n - 1)",
