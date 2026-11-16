@@ -22,7 +22,7 @@ Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer ga
 1. **Why a new language** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
    - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
 2. **Keep it simple** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
-   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as primitive functions; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
+   - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; A refuted value never reaches an effect; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as primitive functions; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
 Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded into chapters 1 and 2. Chapters are numbered as phase 1 left them, 2026-11-13.
 
 **Part II: The kernel**
@@ -464,9 +464,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
 - Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
 
-#### An effect consumes only values whose claims are decided
-- Decides: an effect is performed only on values that have passed every claim made about them. A value carrying a refuted claim never reaches an effect. A value carrying an undecided claim has that claim evaluated first. After a phase has refuted a claim, it performs no further effect, though it may go on evaluating to report every refutation.
-- Status: partly built; ruled 2026-11-11 (DR1)
+#### A refuted value never reaches an effect
+- Decides: a value carrying a refuted claim never reaches an effect. A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it. A value carries only what was claimed of it and what its computation used, never its type's laws wholesale. After a phase has refuted a claim, it performs no further effect, though it goes on evaluating to report every refutation that does not rest on an earlier one. The result holds every undecided claim; whether a tool shows them is configuration.
+- Status: partly built; ruled 2026-11-11 (DR1); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Claims are evaluated like everything else; Phases are configuration
@@ -477,6 +477,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: a failed claim might not apply to an effect, though no example is known; the rule stands until a valid counter-example is found. A single phase with both the information and an output capability (a script run, the REPL) may perform an effect before it reaches a later false claim.
 - Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
+- Notes (2026-11-16, hand-off from the acceptance stream): reworded and retitled from "An effect consumes only values whose claims are decided", by the maintainer's ruling of 2026-11-15 in the acceptance stream's session (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 1 and ruling D): "In general the decision strength doesn't prevent effects, without some policy/configuration to require it." This settles issues 17 and 19 of the adversarial review: an effect no longer waits for a claim a run can never decide, and which effects precede a refutation is fixed by the check that runs before them.
 - Chapter: Keep it simple
 
 #### Correctness and safety are one kind of claim
@@ -936,7 +937,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Authority
 
 #### A capability is granted, never acquired
-- Decides: host code enters only through the configuration of a phase. An extension receives a capability only when the code using that extension passes it one. An extension cannot bring host code of its own, and cannot obtain a capability it was not handed.
+- Decides: host code enters only through the configuration of a phase, which may name host code to load from a pinned list. An extension receives a capability only when the code using that extension passes it one. An extension cannot bring host code of its own, and cannot obtain a capability it was not handed.
 - Status: open; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -946,6 +947,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: capabilities available to any code by name (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling; the first of the maintainer's two questions on making capability extensions trustworthy.
+- Notes (2026-11-16, the adversarial review's remaining issues): a stale wording corrected (issue 30).
 - Chapter: Authority
 
 #### What code may do is bounded by the capabilities it is given, and that bound is a claim
@@ -1257,8 +1259,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### The same program and the same information give the same result
-- Decides: neither the order in which information arrives nor the order in which independent parts are evaluated can change the outcome of an evaluation.
-- Status: to prove; ruled 2026-11-11 (DR2)
+- Decides: neither the order in which information arrives nor the order in which independent parts are evaluated can change the outcome of an evaluation. A claim is never decided one way in one evaluation and the other way in another; a limit can only leave it not yet decided.
+- Status: to prove; ruled 2026-11-11 (DR2); extended 2026-11-16
 - Type: capability
 - Rationale kind: technical
 - Depends on: When information arrives, what waited on it is evaluated again; Order of definition carries no meaning
@@ -1267,6 +1269,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: leaving it open (rejected: determinism is built in)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Determinism and confluence of evaluation", which was open. It holds only if every cell is filled exactly once.
+- Notes (2026-11-16, the adversarial review's remaining issues): the second sentence is added by the maintainer's ruling of 2026-11-16 on issue 20.
 - Chapter: Evaluation
 
 #### Scopes layer by parent chain
@@ -1382,7 +1385,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Only the kernel records the outcome of a claim; A field's rule is a pure, bounded function; An effect consumes only values whose claims are decided
+- Depends on: Only the kernel records the outcome of a claim; A field's rule is a pure, bounded function; A refuted value never reaches an effect
 - Significance: 5 — the one mechanism behind halting, effect gating and reporting every failure
 - Label: foundational — every phase's result and every effect rest on it
 - Options recorded: an abort at the first failure (rejected: a phase reports every refutation); a program-visible error value for a program's own mistakes (rejected: it could be forged, tested and laundered)
@@ -1394,8 +1397,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Correctness
 
 #### A refutation on a path that may be taken refutes the program
-- Decides: if a claim is refuted in a branch whose condition cannot be decided, the program is wrong, unless what is known already rules that branch out. A program that means to handle the bad case uses a handled failure.
-- Status: partly built; ruled 2026-11-11 (DR2)
+- Decides: the kernel keeps a refutation in the branch where it arose. That no branch which may be taken is refuted is a claim the check phase makes of a program: refuted where a refuted branch cannot be ruled out by what is known, and undecided where the branch's condition met a limit. A program that means to handle the bad case uses a handled failure.
+- Status: partly built; ruled 2026-11-11 (DR2); reworded 2026-11-16
 - Type: capability
 - Rationale kind: technical
 - Depends on: A branch that may not be taken is evaluated without capabilities; A refutation marks everything computed from it
@@ -1404,6 +1407,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: leaving the refutation conditional until the condition is known (rejected: a function with a failing path would pass until run on the bad input)
 - Sources: docs/book/concepts.md §25; docs/plans/pe-rules.md §6; the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling.
+- Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 18: the entry made the kernel refute the program, which a limit or an undecidable condition must never do. The kernel's part now agrees with specialization, which keeps a refutation in its branch.
 - Chapter: Correctness
 
 #### An evaluation can be returned as data
@@ -1696,8 +1700,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Changing the grammar
 
 #### A grammar change reaches to the end of its block
-- Decides: a change made inside a block ends with the block; a change at the top of a text ends with the text. It never reaches another text: importing a module's bindings does not bring its notation, and a module does not pass a notation on to those that import it.
-- Status: partly built (a change holds for one file and is not passed on; a change local to a block is not built); ruled 2026-11-12 (DR3)
+- Decides: a change made inside a block ends with the block; a change at the top of a text ends with the text. It never reaches another text. Two acts have two words: `import` brings a module's bindings only; `use` brings the bindings and the notation, to the end of the block it is written in, because the text asks for it. A module does not pass a notation on to those that import it.
+- Status: partly built (a change holds for one file and is not passed on; a change local to a block is not built); ruled 2026-11-12 (DR3); extended 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: A text can change the grammar it is read in
@@ -1707,6 +1711,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a change reaching always to the end of the text; modules passing a grammar on explicitly
 - Sources: docs/book/grammar-formalism.md §6.2, §6.3; docs/book/extension/grammar.md §4; docs/book/extension/modules.md "Known limit"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Activation by a `use` header, per file and not transitive".
+- Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling Q). With rulings R and S: nobody has to claim a combined grammar unambiguous, and a text with two parses is always refuted, with both readings named.
 - Chapter: Changing the grammar
 
 ### The parser engine
@@ -1936,7 +1941,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Types as values
 
 #### The core types are built over bits
-- Decides: the standard language ships Int, Float, String, Bool, Array, Object, Function, None, Any, a type for functions from outside the language, and the exception type. Integers and floats compute through the machine arithmetic capability; a string is bits with a type; Bool is the kernel's two truth values with a type. Array's map, filter and reduce are written in the language, so partial evaluation sees through them. An operator is a method of its operand's type.
+- Decides: the standard language ships Int, Float, String, Bool, Array, Object, Function, None, Any, a type for functions from outside the language, and the exception type. Integers and floats compute through the machine arithmetic primitives the platform ships; a string is bits with a type; Bool is the kernel's two truth values with a type. Array's map, filter and reduce are written in the language, so partial evaluation sees through them. An operator is a method of its operand's type.
 - Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
@@ -1947,6 +1952,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: host-loop HOFs (rejected: effect and type inference must see through them)
 - Sources: docs/book/standard/core-types.md; docs/book/standard/type-system.md §7; D18 (docs/decisions.md); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: replaces "The core type roster". The source says "ten core types" and lists eleven.
+- Notes (2026-11-16, the adversarial review's remaining issues): a stale wording corrected (issue 30).
 - Chapter: Types as values
 
 #### Generics are memoized type constructors
@@ -1979,8 +1985,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Types as values
 
 #### A typed function claims its parameter types on entry and its return type on exit
-- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there.
-- Status: open (the evaluator checks a typed call itself); ruled 2026-11-12 (DR4)
+- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there. A parameter claim means the same at every phase. A failed one is a refutation and cannot be caught; a program that takes outside values guards them with the same predicate. The policy "every parameter claim is decided before the run begins" is on by default, and a user may turn it off for a script.
+- Status: open (the evaluator checks a typed call itself); ruled 2026-11-12 (DR4); extended 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Function types with bidirectional call-site unification; Claims are evaluated like everything else; A call is evaluated by evaluating the function's body; An extension is made of functions and metadata fields
@@ -1991,6 +1997,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling.
 - Held finding (2026-11-12, DR4): the evaluator checks a typed call before substitution (`applyComposed`, `src/evaluator.ts`), through an installed host function.
 - Notes (2026-11-15, arguments are evaluated when needed): a consequence to test: evaluating the claim on a parameter needs the argument, so a typed function evaluates its arguments on entry. Typed code is strict in practice and long chains of pending arguments arise only in untyped code.
+- Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 3): "one of Allegro's goals is that the same type checking happens at compile time as run time".
 - Chapter: Types as values
 
 #### `distinct` mints a fresh-symbol newtype
@@ -2151,7 +2158,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open, a design to prove; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A private member is one whose key not all code holds; A value's origin is a description; Claims are evaluated like everything else; An effect consumes only values whose claims are decided; No argument can be inspected
+- Depends on: A private member is one whose key not all code holds; A value's origin is a description; Claims are evaluated like everything else; A refuted value never reaches an effect; No argument can be inspected
 - Significance: 3 — interfaces and design discipline, checked
 - Label: swappable — the access rules a language offers
 - Options recorded: access decided by who is asking at the moment of access (rejected in Part II with authority by identity); a third mechanism for caller-based control (not needed: a key and a claim about origins combine)
@@ -2373,8 +2380,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Claims and proofs
 
 #### A proof term is a proposal
-- Decides: a theorem is a named claim, and `verify` makes an anonymous one. `by <term>` offers an expression whose evaluation decides the claim; the kernel checks that it establishes exactly what was stated. Rules such as reflexivity, symmetry, transitivity and congruence are functions of the standard extension, and a result decided with their help names that extension.
-- Status: settled; reworded 2026-11-12 (DR4)
+- Decides: a theorem is a named claim, and `verify` makes an anonymous one. `by <term>` offers an expression whose evaluation decides the claim; the kernel checks that it establishes exactly what was stated. A refused proposal never refutes its claim: the claim's outcome is what evaluation gives, and the refusal is recorded with the proposal and the rule's explanation. Binding a proof value makes no claim. Rules such as reflexivity, symmetry, transitivity and congruence are functions of the standard extension, and a result decided with their help names that extension.
+- Status: settled; reworded 2026-11-12 (DR4); extended 2026-11-15
 - Type: capability
 - Rationale kind: mixed
 - Depends on: A claim about every value is decided by evaluating it with the value unknown; Anyone may propose, and the record shows who; Every result says how strongly it holds
@@ -2386,11 +2393,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): Proving in Allegro
 - Notes (2026-11-12, DR4): was "Theorems as statements, proved `by` a term". The alternative weighed 2026-11-12: a kernel primitive that rewrites by a decided equation, which enlarges the kernel. The cost accepted: a result that used transitivity is trusted as far as the standard extension is.
 - Held finding (2026-11-12, DR4): the proof rules are kernel primitives (`proof_by_eval`, `proof_refl`, `proof_sym`, `proof_trans`, `proof_cong`, `proof_refines` in `src/primitives.ts`).
+- Notes (2026-11-16, hand-off from the acceptance stream): the sentences on a refused proposal and on binding a proof value are added by the maintainer's rulings of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", rulings 2 and G). A policy "no proposal in the source is refused" exists and is off by default.
 - Chapter: Claims and proofs
 
 #### Discharge mechanisms without search
-- Decides: the standard extension decides claims without search, in order of preference: evaluation; entailment from a refinement's domain; equational rules through `by`; enumeration of a finite type. Bounded sampling gives the strength sampled, not decided. A library of tactics composes them, and there is no outside solver.
-- Status: partly built; reworded 2026-11-12 (DR4)
+- Decides: the standard extension decides claims without search, in order of preference: evaluation; entailment from a refinement's domain; equational rules through `by`; enumeration of a finite type. Search belongs to a proposer. The platform ships one, the standard deriver, which a build runs on each claim still undecided after evaluation: it evaluates with the value unknown, then samples, then derives, within budgets counted in steps that the build configures. A counterexample refutes; none found leaves the claim sampled; a derivation decides it, as strongly as what it rests on. The kernel checks every proposal. Found proofs are stored where the configuration says and checked again at every build. The deriver holds no capability.
+- Status: partly built; reworded 2026-11-12 (DR4); extended 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Abstract domains as sound approximations
@@ -2401,11 +2409,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md (four strategies, tactics, proven); docs/book/proving-in-allegro.md (The four discharge strategies)
 - Book home (fragments' proposal): proposed standard/proofs / Proving in Allegro
 - Notes: Merged from fragment B ("Discharge strategies without search"), fragment C ("Four discharge mechanisms in order of preference"). B: bounded sampling is recorded as survival, not proof, in the law tiers; the `proven` clause's tier visibility in the ledger is not stated in the primer. C: the primer's "four strategies" and the vision's "three legs" are different lists (mechanisms inside leg 1 versus strategy legs); the book should name both distinctly.
+- Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 5, with rulings N and O): "So it needs a budget, it needs to be configurable." The budget is a count of samples and a number of derivation steps for a claim, under a total for the build. Only what the kernel can check again is stored: a proof or a counterexample. The deriver does not attempt a law its author has assumed. The entry said there is no outside solver; the deriver is a proposer like any other.
 - Chapter: Claims and proofs
 
 #### Bounded sampling for universal claims
-- Decides: induction is checked at the base and four inductive steps, and a function's `proven` clause at four sampled inputs of its parameter type; a failure halts with the counterexample. The result's strength is sampled. Full symbolic induction is a follow-on.
-- Status: partly built; reworded 2026-11-12 (DR4)
+- Decides: sampling has a configurable allowance: a count of samples with a cap of steps for each, over a fixed sequence that takes small values first. A failure is a refutation with the counterexample. The result's strength is sampled. Full symbolic induction is a follow-on.
+- Status: partly built; reworded 2026-11-12 (DR4); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Discharge mechanisms without search; Every result says how strongly it holds
@@ -2416,6 +2425,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md (F5, F7); docs/book/platform/build-pipeline.ir.md C74
 - Book home (fragments' proposal): Proving in Allegro
 - Notes: `prove_induction` returns an ordinary discharged Proof (`src/primitives.ts:4377`, `makeProof` in `src/types-std.ts:4681` writes `discharged` 1 and no tier); the sampled strength appears only in the proposition text "[verified base + 4 inductive steps]". That seems to fall short of principle 9 (a sampled check must not borrow a stronger vocabulary). `proven` is limited to one Int, NonNeg, PositiveInt or Bool parameter.
+- Notes (2026-11-16, hand-off from the acceptance stream): reworded by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 5): the entry fixed the base and four inductive steps, and four sampled inputs.
 - Chapter: Claims and proofs
 
 #### Four strengths, one vocabulary
@@ -2478,8 +2488,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Equality and laws
 
 #### Default equality belongs to the standard extension
-- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Its laws are decided once for all types. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int.
-- Status: settled; reworded 2026-11-12 (DR4)
+- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Bool's equality laws are decided by enumeration. Those of Int, Float and String are assumed, and named with the platform, until proved against the primitives' reference definitions. A law derived from the laws of a type's fields carries their strength. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int.
+- Status: settled; reworded 2026-11-12 (DR4); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Equality dispatches on shape, then coerces, else not-equal
@@ -2490,6 +2500,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: E-R1 (docs/plans/equality-and-laws.md §3, §6 items 1–2, 7–8)
 - Book home (fragments' proposal): proposed "Equality and laws"
 - Notes (2026-11-12, DR4): was "Kernel structural equality is the default"; the kernel has no part in equality beyond telling bits apart.
+- Notes (2026-11-16, hand-off from the acceptance stream): reworded by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", rulings 5 and M): the entry said the laws are decided once for all types. `3 == 3` uses the primitive and rests on no law; only a proof step or a rewrite that uses a law rests on it. The coercion claims are as the laws.
 - Chapter: Equality and laws
 
 #### Law strengths and the transitivity gate
@@ -3232,8 +3243,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The kernel's interface
 
 #### Limits are step budgets
-- Decides: a caller limits an evaluation by a budget of steps, which is deterministic. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided.
-- Status: open (a depth bound exists); ruled 2026-11-13 (DR6)
+- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant.
+- Status: open (a depth bound exists); ruled 2026-11-13 (DR6); reworded 2026-11-16
 - Type: capability
 - Rationale kind: technical
 - Depends on: What the kernel's interface offers; Evaluation stops early for two reasons only; The same program and the same information give the same result
@@ -3243,6 +3254,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a solver gives each candidate ten thousand steps; a candidate that runs out is undecided, and is so on every machine.
 - Notes: new, by ruling.
+- Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 20: the entry called a step budget deterministic.
 - Chapter: The kernel's interface
 
 ### Configuration
@@ -3262,8 +3274,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Configuration
 
 #### Configuration sources have a priority, and a result says which supplied each value
-- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. The result of an execution records which source supplied each value.
-- Status: open; ruled 2026-11-13 (DR6)
+- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. Each value has a rule for which sources may set it, and the launcher holds those rules: the kernel, the accepted keys and the ceiling of capabilities are set only by the launcher and the command line; a project's file may choose its parser and its loader. The result of an execution records which source supplied each value.
+- Status: open; ruled 2026-11-13 (DR6); extended 2026-11-16
 - Type: capability
 - Rationale kind: technical
 - Depends on: Configuration is all the information that determines an execution; Every result says how strongly it holds
@@ -3273,6 +3285,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a flag on the command line replaces a value from the project's file, and the report shows that it did.
 - Notes: new, by ruling. An environment variable that redirects a capability to another implementation is a risk the chapter on trust takes up.
+- Notes (2026-11-16, the adversarial review's remaining issues): the sentence on which source may set which value is added by the maintainer's ruling of 2026-11-16 on issue 26. A project that defines a language must be able to choose its parser and loader.
 - Chapter: Configuration
 
 #### A full configuration is a model, evaluated in a first phase
@@ -3422,12 +3435,13 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: integer addition is defined on bits in Allegro; the machine's adder is used, and a doubtful result can be recomputed without it.
 - Notes: new, by ruling: the maintainer holds it a worthwhile goal. Takes the item the Part I review deferred, capability bodies written as Allegro expressions.
+- Notes (2026-11-16, hand-off from the acceptance stream): a goal the maintainer stated on 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 5), not yet a decision of its own: every law of a shipped module is to have reference definitions and proofs, and until then a law of a primitive is assumed: "`assumed` will do for now".
 - Chapter: Capabilities and primitive functions
 
 ### Phases
 
 #### The platform ships three phases: check, run and export
-- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability to act and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
+- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability but the loader's, to read the modules the program names, and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
 - Status: open (the pipeline's stages are fixed in host code); ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3441,6 +3455,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Multi-phase build as successive partial evaluation" and the build pipeline's entries. What those entries described is ruled elsewhere: precompile by "A claim about every value is decided by evaluating it with the value unknown"; effects deferred by "Phases are configuration"; the cutoff for recursion and the precompile context's entries by "A recursive call is evaluated once for each state of knowledge"; soft failure by Part I's rule that a phase reports every refutation in its result. The diagnostic switches are housekeeping.
 - Held finding (2026-11-13, DR6): phases are hard-coded: `evalSource` runs a fixed list of stages, with precompile, the post-passes and soft failure among them (carried over from the Part I review).
 - Held finding (2026-11-13, DR6): the soundness review of the cutoff for recursive bindings is pending.
+- Notes (2026-11-16, the adversarial review's remaining issues): a stale wording corrected (issue 30).
 - Chapter: Phases
 
 #### A phase hands its residual to the next
@@ -3448,7 +3463,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: The platform ships three phases: check, run and export; Evaluation is total over unresolved information; An effect consumes only values whose claims are decided
+- Depends on: The platform ships three phases: check, run and export; Evaluation is total over unresolved information; A refuted value never reaches an effect
 - Significance: 4 — building is evaluating in steps
 - Label: foundational — pipelines, saved programs and export
 - Options recorded: phases that each start from source
@@ -3725,8 +3740,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Tools
 
 #### Open obligations are listed for any proposer
-- Decides: a tool lists every claim that waits for a value: a theorem without a proof, a gap in a model, a law not yet decided. The list has a form for programs and a form for people, with the last failure and what is in scope.
-- Status: settled for proofs; reworded 2026-11-13 (DR6)
+- Decides: a tool lists every claim that waits for a value: a theorem without a proof, a gap in a model, a law not yet decided. An obligation is named by its module and the claim's name. The default list shows the project's own claims, and the libraries' when asked. The list has a form for programs and a form for people, with the last failure and what is in scope.
+- Status: settled for proofs; reworded 2026-11-13 (DR6); extended 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Anyone may propose, and the record shows who; Solving is proposing a value for an unknown, and the kernel checks it; A tool reads a phase's result and adds no analysis of its own
@@ -3738,6 +3753,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: an agent reads the list, proposes a catalog entry for a plan's gap, and check is run again.
 - Notes: was "Obligations and proposals as machine and human views", generalised from proofs as the planning-loop stream generalised its worker.
 - Held finding (2026-11-13, DR6): authorship is not kept in the result (carried over from the Part I review).
+- Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's rulings of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", rulings H, T and U): the hash over the proposition's text goes; a proposal for a library's law is kept in the project's proof store, never the library's source; after a refutation a tool still lists the obligations that do not rest on the refuted value.
 - Chapter: Tools
 
 #### One primer for every proposer

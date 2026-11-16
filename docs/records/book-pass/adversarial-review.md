@@ -590,6 +590,41 @@ value, since a key is a structure; the kernel registers three fields.
 Titles that are accurate and only awkward in form are left for the
 style pass.
 
+### The remaining issues, and the acceptance stream's rulings (2026-11-16)
+
+The maintainer asked for the remaining issues before a second review.
+The acceptance stream's session had meanwhile taken rulings from the
+maintainer on 2026-11-15, recorded in
+`next/corpus/scenarios/README.md` and handed over as nine lines under
+B-197 (evidence against a ruled decision). All nine are now recorded
+in the inventory, each in a note dated 2026-11-16.
+
+- **Issues 17 and 19 are settled by those rulings.** A strength short
+  of decided prevents no effect unless a policy requires it; a refuted
+  value never reaches an effect; a build reports every refutation
+  that does not rest on an earlier one and performs no effect after
+  the first. The entry is retitled "A refuted value never reaches an effect", from "An effect consumes only values whose claims are decided".
+- **Issue 18, ruled.** The kernel keeps a refutation in its branch.
+  That no branch which may be taken is refuted is the check phase's
+  claim, undecided where the condition met a limit.
+- **Issue 20, ruled.** A claim is never decided two ways; a limit
+  only leaves it not yet decided. A step budget is no longer called
+  deterministic.
+- **Issue 26, ruled.** Each configuration value has a rule for which
+  sources may set it. A project's file may choose its parser and
+  loader.
+- **Issue 30, done.** Three stale wordings corrected.
+- **Issue 31.** Two of the notes are filed in the backlog: a claim
+  decided wrongly at the largest machine integer, and what a module's
+  one-word summary says when most laws are assumed.
+- **The reader who does not know the project.** The 67 flagged terms
+  go to the pass on wording, with the titles' style.
+
+Open after this: issues 5 and 6 (recursion, by building); 7, 21, 22
+and 28, which the maintainer set for discussion; 13, 16, 24 and 27,
+which the first notation's questions touch; and the requirements of
+the first notation itself.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
