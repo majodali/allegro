@@ -991,6 +991,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. Two costs, stated: determinism rests on the assumption that a capability declared pure is pure; and optimizing arithmetic needs the capability's declared laws, so whether declared laws may license rewrites is no longer a detail of Part VI.
 - Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
 - Notes (2026-11-16, Allegretto's forms): a primitive function applied outside its domain gives a refutation, by ruling: division by zero, a place outside a structure. A handled failure does not exist below the standard language, whose operators may wrap a primitive to raise an exception.
+- Notes (2026-11-16, the shipped primitives built): 22 primitives in `next/prims/index.ts`: signed 64-bit integer arithmetic, wrapping, with division truncated toward zero; the signed orderings; an integer's decimal text and back; binary64 float arithmetic, two orderings and text; the two conversions. Integer division by zero refuses; float division by zero follows IEEE 754.
 - Chapter: Authority
 
 ### Metadata
@@ -3302,6 +3303,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): there is no stated interface: the CLI, the browser bundle and the tests call `evalSource` and the evaluator's internals.
 - Notes (2026-11-13, with the first version of the interface): filling a cell records the value and evaluates nothing. A kernel-wide call evaluates again everything that waited on cells filled since, under a step budget: the kernel tracks what waits on what, and the host says when the work happens. Ruled against the host asking for each result it kept (it cannot know every waiter) and against evaluation inside the fill (no budget, and effects in arrival order).
 - Notes (2026-11-15, the rulings on strength and on identity): the second version, `Kernel2` in `next/kernel/interface.ts`, adds: making a module, with its keys; reading a key; what a result rests on; the reason for a refutation; restore; and whether a value is a cell.
+- Notes (2026-11-16, the block of bindings): by ruling, `scope` and `bind` may leave the interface ("Scope and bind may leave the interface"). A block of bindings gives an expression its names, and a name whose value arrives later is bound to a cell. The host then cannot put a name into a program from outside, and two evaluations share nothing. They leave when the interface's two versions are made one.
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome
@@ -3592,6 +3594,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a saved library built against one arithmetic implementation refuses to load beside another.
 - Notes: new, by ruling. The maintainer: this "is inviting dependency hell, but every modular programming platform that's successful goes to dependency hell as punishment. I think hash checks will work for now." A checked mapping between two versions of a model might later serve as a compatibility claim; the maintainer is sceptical on grounds of combinatorial complexity.
+- Notes (2026-11-16, the shipped primitives built): by the maintainer's ruling a shipped primitive's hash is taken over its host code: the helpers every primitive shares and its own entry, with comments left out. The review session had proposed hashing a sentence that states the primitive's meaning. The hashes are committed, since a browser cannot read the source, and a test computes them again.
 - Chapter: Saved programs and export
 
 #### A stored outcome is restored with its builder's name

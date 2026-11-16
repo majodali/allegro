@@ -725,6 +725,23 @@ on a call left in the residual is undecided. The standard language's
 part, assuming a function's claims at its own inner call only under a
 decided decrease, is for the maintainer to rule when Part IV is built.
 
+### Smaller rulings while the kernel was built (2026-11-16)
+
+- `same` tells two symbols apart as well as two bits values; a
+  primitive refuses by throwing `Refusal`; a symbol is written as
+  data; bits of a length that is not whole bytes are the last bits of
+  their bytes. Approved on PR #224.
+- The data form's second version has the node `datum`; a recursion
+  whose argument changes with known values, evaluated ahead, is left
+  for specialization. Merged with PR #226.
+- A shipped primitive's hash is taken over its host code ("hash over
+  the host code"), where the review session proposed a sentence
+  stating its meaning. Integer arithmetic wraps; integer division by
+  zero refuses and float division by zero follows IEEE 754; a whole
+  float's text has no point.
+- `scope` and `bind` may leave the interface: a block of bindings and
+  cells cover what they did.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

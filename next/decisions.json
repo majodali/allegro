@@ -48,7 +48,7 @@
     {"title":"A capability is granted, never acquired","part":"II","chapter":"Authority","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"What code may do is bounded by the capabilities it is given, and that bound is a claim","part":"II","chapter":"Authority","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A capability is supplied per target","part":"II","chapter":"Authority","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
-    {"title":"Machine arithmetic is a set of pure primitives that ships with the platform","part":"II","chapter":"Authority","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"Machine arithmetic is a set of pure primitives that ships with the platform","part":"II","chapter":"Authority","type":"capability","present":"open","owner":"R","state":"written","unit":"next/prims/index.ts","cases":[]},
     {"title":"Metadata fields are independent","part":"II","chapter":"Metadata","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Metadata is a field on every value","part":"II","chapter":"Metadata","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"An extension registers its own fields","part":"II","chapter":"Metadata","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[],"was":["An extension registers its own fields; the kernel has two"]},

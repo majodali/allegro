@@ -574,6 +574,11 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — The shipped primitives.** `next/prims/index.ts`
+  holds the 22 pure primitives Allegretto's forms name: integer and
+  float arithmetic, orderings, texts and conversions over 64 bits.
+  Outside its domain a primitive refuses. Each has a content hash
+  over its host code, committed in `next/prims/hashes.ts`.
 - **2026-11-16 — The block of bindings, and recursion.** In
   `next/kernel/kernel.ts`: the kernel primitive `block(bindings,
   body)`, whose bindings may use each other and themselves, so a
