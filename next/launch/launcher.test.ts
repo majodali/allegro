@@ -316,6 +316,33 @@ test("a step budget of zero, or too few, stops at the limit and says so", async 
   assert.deepEqual(enough.end, { kind: "completed", steps: 3 });
 });
 
+/**
+ * module(out) => (f => f(f))(f => f(f)): an application that never ends.
+ * A hand-built record for the launcher's test; an emitted program never
+ * applies a function to itself.
+ */
+const NEVER_ENDS: SavedProgram = {
+  ...HELLO,
+  nodes: [
+    { k: "param", name: "out" },
+    { k: "param", name: "f" },
+    { k: "expression", fn: 1, args: [1] },
+    { k: "function", params: [1], body: 2 },
+    { k: "param", name: "g" },
+    { k: "expression", fn: 4, args: [4] },
+    { k: "function", params: [4], body: 5 },
+    { k: "expression", fn: 3, args: [6] },
+    { k: "function", params: [0], body: 7 },
+  ],
+  module: 8,
+};
+
+test("with no step budget a run that ends at the kernel's own limit says that no budget was set", async () => {
+  const outcome = await launch({ createKernel, program: NEVER_ENDS, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(outcome.end.kind, "limit");
+  assert.equal(describe(outcome.end), "limit: the kernel reached its own limit; no step budget was set");
+});
+
 test("an answer that arrives later is filled and advanced, and the run completes only then", async () => {
   const later = laterCapability();
   const r = recording();

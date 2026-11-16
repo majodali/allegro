@@ -55,7 +55,7 @@ or a break-it case.
   every plan rests on fixtures. A proof that uses an equality law of
   Int, Float or String rests on an assumption the platform makes
   (ruling 5): rung 1, scenes 1 and 4.
-- **"An effect consumes only values whose claims are decided".** A
+- **"A refuted value never reaches an effect".** A
   refutation is found while the program is checked, before any effect,
   and the run prints nothing. A strength (assumed, sampled, undecided)
   prevents no effect unless a policy or configuration requires it
