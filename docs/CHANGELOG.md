@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — A structure's entries are evaluated when read.** In
+  `next/kernel/kernel.ts`: building a structure evaluates nothing;
+  `get` evaluates the entry it reads, at most once; a primitive
+  function is handed its arguments in full. `Kernel2.evaluateInFull`
+  is the call for a caller that wants a whole value. With this the
+  reference kernel has everything Allegretto's forms ask of it.
 - **2026-11-16 — The shipped primitives.** `next/prims/index.ts`
   holds the 22 pure primitives Allegretto's forms name: integer and
   float arithmetic, orderings, texts and conversions over 64 bits.

@@ -1557,6 +1557,11 @@ its approval.
 - **2026-11-16 — the shipped primitives** (the review session): 22
   pure primitives in `next/prims/index.ts`. Still owed to Allegretto:
   a structure's entries evaluated when read.
+- **2026-11-16 — entries evaluated when read** (the review session).
+  Built, with a second interface call for a value in full. The
+  reference kernel has what Allegretto's forms ask of it. The
+  launcher's records that write statements as a structure's entries
+  have to move to sequence before it can merge.
 
 ## 8. Sessions
 
