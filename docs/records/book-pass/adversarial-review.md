@@ -742,6 +742,27 @@ decided decrease, is for the maintainer to rule when Part IV is built.
 - `scope` and `bind` may leave the interface: a block of bindings and
   cells cover what they did.
 
+### Entries evaluated when read: what was ruled in building it (2026-11-16)
+
+- A primitive function needs its arguments in full, and the evaluator
+  sees to it for every argument of every primitive function: its host
+  code cannot evaluate. The maintainer confirmed it for primitive
+  functions and asked that it not apply to the kernel's own
+  primitives. It does not: each needs what it says, so `get`
+  evaluates the one entry it reads and `count` none. `build` reads its
+  description whole and needs it in full.
+- Where an entry or an argument waits, those after it perform no
+  effect until it is done. Found when the maintainer asked how a
+  value in full treats a cell that waits: two effects came out in the
+  reverse of the order written.
+- No call for a whole value. The review session added
+  `evaluateInFull` to the interface; the maintainer was "hesitant to
+  add a method to the API that isn't 100% necessary", and preferred a
+  primitive if anything. On a second look no user strictly needs one:
+  a tool that prints or saves reads each entry. Ruled: neither a call
+  nor a primitive for now. PR #229 had merged with the call in it;
+  it is removed.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
