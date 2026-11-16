@@ -1,4 +1,6 @@
-// Recursion on a known argument, printed through int.text.
+// Recursion on a known argument, printed through int.text. fact is the
+// present tree's factorial of src/test/base.ts, renamed.
+// realises: test:base:factorial
 capability output
 fact(n) => if n == 0 then 1 else n * fact(n - 1)
 sum(n) => if n == 0 then 0 else n + sum(n - 1)

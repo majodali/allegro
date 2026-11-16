@@ -1016,3 +1016,95 @@ policy is the gate ruled there.
     on a number is `int.neg` applied to it; a capability's parts are
     keyed by `kernel.symbol` of the part names. Part 2's readings stand
     where this part does not change them.
+- **2026-11-16 — Q6, part 2: Allegretto programs in the corpus; the harness counts the cases they realise.**
+  Built on `origin/main` at `f55148c`. The present tree is not changed.
+  - **The rulings**, by the maintainer that day. An Allegretto program
+    may hand a text of the standard language to the parser engine: "Yes
+    an Allegretto test can hand a standard language text to the parser
+    engine." The engine is to be written in Allegretto by the kernel
+    stream, and does not exist yet. The tests and other code of
+    milestones 4 to 7 are written in "the Allegretto language", the
+    first notation; milestone 3's programs already are. The programs
+    live under `next/corpus/allegretto/`, by milestone: the location
+    "works". So a case of `next/corpus/cases.json` is shown on the new
+    kernel by an Allegretto program that exercises what the case tests
+    and passes, not by running the present program there. The corpus
+    stays the list of what must be shown.
+  - **The convention**, in `next/corpus/allegretto/README.md`. A program
+    is a `.alg` file in a directory `m<milestone>` directly under
+    `next/corpus/allegretto/`, and its milestone is its directory's. It
+    names each case it shows in a line `// realises: <case id>`, the id
+    exactly as in the corpus. Its `// expect:`, `// end:` and
+    `// yields:` lines are read as part 3 of Q5 read them. A case is
+    realised when a program that names it passes: its printed lines and
+    its end are the expected ones. A program names a case only if it
+    shows what the case asserts, by the case's text or a faithful
+    restatement, printing the value the present test compares, with the
+    present expectation as its `// expect:` lines. For a case of class
+    `changes` the expectation is the case's `becomes`.
+  - **The move.** The thirteen programs moved from
+    `next/bootstrap/fixtures/` to `next/corpus/allegretto/m3/` with
+    `git mv`, and their test to `next/corpus/allegretto.test.ts`.
+    `runProgram` of `next/corpus/allegretto.ts` reads a program's
+    lines, emits it, launches it on the reference kernel and compares.
+    The test and the harness both use it.
+  - **The harness.** `npm run harness:next`, the mode `--next` of
+    `next/corpus/harness.ts`, runs every program under
+    `next/corpus/allegretto/` in process. It reports per milestone the
+    programs passing and failing and, of the cases due there, those
+    realised, those named only by a failing program and those not yet
+    named. It exits 1 on a failing program, a `// realises:` line that
+    names no case, one case named twice by a program, and a program
+    outside a directory `m<milestone>`. A case named from another
+    milestone's directory is reported and does not fail. A test in
+    `next/corpus/harness.test.ts` runs the mode over the committed
+    programs. It prints, for milestones 3 and 4 and in summary:
+    `milestone 3: programs 21 (passing 21, failing 0) · cases due 138 · realised 45, named only by a failing program 0, not yet named 93 · up to 3: 45 of 175 realised`;
+    `milestone 4: programs 0 (passing 0, failing 0) · cases due 643 · realised 0, named only by a failing program 0, not yet named 643 · up to 4: 45 of 818 realised`;
+    `harness: new tree · programs 21 run (passing 21, failing 0) · cases due 1846 (realised 45, named only by a failing program 0, not yet named 1801) · realises lines 45 (no case 0, twice in one program 0, of another milestone's directory 0, due at no milestone 0) — no failing program`.
+  - **The first batch**, from the 58 cases of milestone 3 in
+    `src/test/base.ts`. 45 are realised. Eight new programs realise 43:
+    `arithmetic.alg` 14, `calls.alg` 9, `comparisons.alg` 7,
+    `conditionals.alg` 5, `bindings.alg` 4, `recursion.alg` 2,
+    `block-body.alg` 1 and `modulo-by-zero.alg` 1. Two of the thirteen
+    older programs gain a line: `factorial.alg` realises
+    `test:base:factorial` with the present definition renamed, and
+    `divide-by-zero.alg` realises `test:base:division by zero`, with
+    `7 / 0` for the present `1 / 0`. The other eleven show no present
+    case. Where present texts bind one name again, each is an inner
+    block `name <-` of the present text unchanged. The present tree
+    gives a comparison as 1 or 0; the programs print the truth value
+    as "true" or "false". `int.mod` refuses with "division by zero", as
+    the present test expects.
+  - **The 13 left**, by kind:
+    - a name a test's host extension supplied, 8: the `abs`, `max` and
+      `min` of `mathExtension` in 7, and the `pi` and `tau` of two
+      `Extension` values in 1. Two of the 8 are of class `changes`. The
+      `becomes` of each is a conflict between two definitions of one
+      name, and a text alone holds only one of them;
+    - a host API of the present tree, 3: the three "persistent context"
+      tests hand one `evalCtx` from one evaluation to the next, as the
+      REPL does;
+    - a refusal of a text, 2: "parse error on invalid syntax", whose
+      text `+ +` no reader takes, and "extension: not available without
+      being provided", where `abs(5)` must fail. The emitter refuses a
+      name nothing binds before anything runs, so no program that holds
+      either text passes. Both wait for a program that hands the text
+      to the parser engine and reads its refusal as a value.
+  - **What a text alone cannot realise**, the calibration for the
+    chunks that realise the rest. A test that evaluates one closed text
+    and compares its value is realised by that text: all 45 such tests
+    of `src/test/base.ts` were, changed only by the printing and, where
+    two texts bind one name, by an inner block. A text
+    alone cannot realise a test whose assertion is made in its host
+    code: the names it hands in, the context it carries between
+    evaluations, or the refusal it expects. The first needs an `input`
+    or an `import` the launcher supplies, which it refuses today. The
+    second needs a host that runs one kernel over several texts. The
+    third needs the parser engine.
+  - **Cases that look misplaced**: none misclassed. The milestone of 12
+    is in question: the three "persistent context" tests rest on "One
+    kernel serves many invocations" and the REPL, and the nine
+    "extension:" tests on extensions, which the launcher does not load
+    before a later part. Neither is a program of the first notation
+    running. `next/corpus/cases.json` is unchanged.
