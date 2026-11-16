@@ -59,7 +59,7 @@
     {"title":"Metadata slot mixed in from the metadata unit","part":"II","chapter":"Metadata","type":"implementation","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Evaluation is total over unresolved information","part":"II","chapter":"Evaluation","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"The environment is not a value","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
-    {"title":"An expression is evaluated when its value is needed","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"An expression is evaluated when its value is needed","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
     {"title":"Sequence is one kernel primitive","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
     {"title":"A block of bindings is one kernel primitive","part":"II","chapter":"Evaluation","type":"capability","present":"partly built","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
     {"title":"Effects on one capability keep their order","part":"II","chapter":"Evaluation","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
