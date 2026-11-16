@@ -69,7 +69,7 @@ after the first (ruling D).
   idiom the three pins use.
 - Ruling C: "expected ≥ 1 (got -5)" becomes the clause as written with
   the value, "`_ > 0` does not hold of -5". No bound is derived.
-- "An effect consumes only values whose claims are decided" and "The
+- "A refuted value never reaches an effect" and "The
   platform ships three phases: check, run and export": with the break-it
   line uncommented the program prints six lines and then halts. The
   refutation is found in the check, and the run prints nothing. The
