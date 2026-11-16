@@ -1525,6 +1525,26 @@ its approval.
   added, 239 decisions. Open: whether a structure needs its entries,
   and how the order of effects is determined. The table is in the
   record of the adversarial review, "Titles made accurate".
+- **2026-11-16 — the acceptance stream's rulings recorded** (the
+  review session). The nine hand-off lines are in the inventory, and
+  the maintainer ruled issues 18, 20 and 26 of the adversarial
+  review. Open: issues 5 and 6 by building; 7, 21, 22 and 28 for
+  discussion; the first notation's requirements.
+- **2026-11-16 — the order of effects ruled** (the review session).
+  Sequence is a kernel primitive, built; effects on one capability
+  keep their order; a structure's entries are evaluated when needed,
+  not yet built. 241 decisions.
+- **2026-11-16 — Allegretto ruled** (the review session). The first
+  notation is Allegretto, a usable language for the bare kernel; the
+  parser engine and the module loader are written in it. 243
+  decisions. To design: its forms.
+- **2026-11-16 — Allegretto's forms proposed** (the review session),
+  after the maintainer ruled four points: an operator stands for one
+  primitive function; a block is bindings and statements, which may be
+  mixed; a primitive outside its domain is a refutation; the present
+  parser engine reads it first. The proposal is
+  `next/ext/allegretto/forms.md`. The maintainer approved it the
+  same day, with `capability` as the word that declares one.
 
 ## 8. Sessions
 

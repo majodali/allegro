@@ -590,6 +590,113 @@ value, since a key is a structure; the kernel registers three fields.
 Titles that are accurate and only awkward in form are left for the
 style pass.
 
+### The remaining issues, and the acceptance stream's rulings (2026-11-16)
+
+The maintainer asked for the remaining issues before a second review.
+The acceptance stream's session had meanwhile taken rulings from the
+maintainer on 2026-11-15, recorded in
+`next/corpus/scenarios/README.md` and handed over as nine lines under
+B-197 (evidence against a ruled decision). All nine are now recorded
+in the inventory, each in a note dated 2026-11-16.
+
+- **Issues 17 and 19 are settled by those rulings.** A strength short
+  of decided prevents no effect unless a policy requires it; a refuted
+  value never reaches an effect; a build reports every refutation
+  that does not rest on an earlier one and performs no effect after
+  the first. The entry is retitled "A refuted value never reaches an effect", from "An effect consumes only values whose claims are decided".
+- **Issue 18, ruled.** The kernel keeps a refutation in its branch.
+  That no branch which may be taken is refuted is the check phase's
+  claim, undecided where the condition met a limit.
+- **Issue 20, ruled.** A claim is never decided two ways; a limit
+  only leaves it not yet decided. A step budget is no longer called
+  deterministic.
+- **Issue 26, ruled.** Each configuration value has a rule for which
+  sources may set it. A project's file may choose its parser and
+  loader.
+- **Issue 30, done.** Three stale wordings corrected.
+- **Issue 31.** Two of the notes are filed in the backlog: a claim
+  decided wrongly at the largest machine integer, and what a module's
+  one-word summary says when most laws are assumed.
+- **The reader who does not know the project.** The 67 flagged terms
+  go to the pass on wording, with the titles' style.
+
+Open after this: issues 5 and 6 (recursion, by building); 7, 21, 22
+and 28, which the maintainer set for discussion; 13, 16, 24 and 27,
+which the first notation's questions touch; and the requirements of
+the first notation itself.
+
+### The order of effects (2026-11-16)
+
+The first of the discussions the maintainer set. Three gaps: the
+kernel could not say "this, then that"; need alone would let a rewrite
+swap two reads; and a phase holding one capability could perform half
+of an order. Ruled ("Yes, this meets the need"; "I agree with this
+approach and your recommendations"):
+
+- One kernel primitive for sequence, `then(first, second)`. A body of
+  statements is a chain of it.
+- A primitive function needs its arguments left to right.
+- Effects on one capability keep their order, and no rewrite changes
+  it.
+- Effects on different capabilities are unordered unless an order is
+  declared. A capability's definition may declare parts of itself
+  unordered.
+- An effect is performed only when every effect ordered before it has
+  been performed; otherwise it stays in the residual.
+- The order is read from the residual of a phase that holds no
+  capability.
+- A structure's entries are evaluated when needed. A statement needs
+  its value and no more; the standard language's check reports an
+  effect that nothing needs.
+- Late answers: the order of arrival is information, and a program
+  that needs an order declares it.
+
+Recorded in "Sequence is one kernel primitive", "Effects on one capability keep their order" and "An expression is evaluated when its value is needed". Built in the reference
+kernel: `then`, which evaluates what follows a waiting statement
+ahead with no effect performed. Not built: entries evaluated when
+needed, and declared orders.
+
+### Allegretto (2026-11-16)
+
+The acceptance stream proposed a first notation: a subset of the
+standard language's surface, read through the present tree's parser.
+The maintainer judged it "far from complete, or even sound". The
+review session's reading: it cannot write an extension, its statements
+run only by the order of a structure's entries, its recursion is a
+workaround, and its emitter guesses an operator's meaning from what it
+can see of an operand. The maintainer asked whether the first notation
+is Allegretto, and what a text form is worth when a host loader can
+load the first extensions as saved programs. Ruled:
+
+- The first notation is Allegretto: a small language for the bare
+  kernel and nothing else, usable, with blocks, bindings, operator
+  expressions and function definitions. It ships with the platform.
+- The parser engine and the module loader are written in Allegretto,
+  test first, with their checks written out as calls. Writing them in
+  the standard language and compiling with the previous build, which
+  the review session recommended, is rejected as too risky.
+
+Recorded in "Allegretto is a small language for the kernel and nothing else" and "The parser engine and the module loader are written in Allegretto". To design: the forms, and first what
+an operator stands for in a language without types.
+
+### Allegretto's forms (2026-11-16)
+
+Ruled before the draft: an operator stands for exactly one primitive
+function, and more may be added for readability; a block is bindings
+and statements, which may be mixed; a primitive outside its domain is
+a refutation ("I don't see an alternative"); the present parser reads
+it first ("I'm sure it's pretty close"). The draft,
+`next/ext/allegretto/forms.md`, was approved whole with one change:
+a capability is declared by the word `capability`, "the canonical
+term for what's being declared". With it are ruled the symbol
+literal, `++` for joining, the binding `x <- e` that happens at its
+place, and that milestone 3's programs are Allegretto texts.
+
+Issue 21 is ruled with it: the kernel joins two bits values, measures
+one and takes a part of one, beside telling two apart. The draft
+listed these among the shipped primitives; they are the kernel's,
+since a shipped primitive's reference definition is written in them.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

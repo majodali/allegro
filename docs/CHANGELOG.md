@@ -574,6 +574,35 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — Allegretto's forms ruled.**
+  `next/ext/allegretto/forms.md` states the forms of the first
+  notation, each with what it stands for in the kernel, the shipped
+  primitives it names, what the kernel stream owes for it, and how it
+  differs from the present tree's base grammar. The maintainer
+  approved it with one change: a capability is declared by the word
+  `capability`.
+- **2026-11-16 — Allegretto ruled.** The first notation is
+  Allegretto: a small, usable language for the bare kernel and
+  nothing else, shipped with the platform. The parser engine and the
+  module loader are written in it. The inventory holds 243 decisions.
+- **2026-11-16 — The order of effects ruled; sequence built.** The
+  kernel gains the primitive `then(first, second)`: the one way a
+  text's order becomes an order of effects. Effects on one capability
+  keep their order; effects on different capabilities are unordered
+  unless an order is declared; a structure's entries are evaluated
+  when needed. In `next/kernel/kernel.ts`: `then`, with what follows
+  a waiting statement evaluated ahead and no effect performed.
+  Entries evaluated when needed and declared orders are not built.
+  The inventory holds 241 decisions.
+- **2026-11-16 — The acceptance stream's rulings recorded; five
+  findings of the adversarial review closed.** The nine lines handed
+  over under B-197 (evidence against a ruled decision) are in the
+  inventory: effects and strength, a refused proposal, parameter
+  claims, the laws of the core types, the standard deriver, sampling,
+  how an obligation is named, and `import` against `use`. One entry
+  is retitled "A refuted value never reaches an effect". Issues 17
+  to 20, 26 and 30 of the adversarial review are closed, and two of
+  its notes are filed in the backlog.
 - **2026-11-15 — Decision titles made accurate.** Seven entries are
   retitled, and two are new: the general rule that an expression is
   evaluated when its value is needed, and "Describing a function
@@ -1161,6 +1190,16 @@ changed.
 Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
+
+### 2026-11 — The corpus follows the retitle of PR #220 (B-196)
+
+B-196 (the rebuild's acceptance side). "An effect consumes only values
+whose claims are decided" is now "A refuted value never reaches an
+effect": 4 cases moved, and three scenarios cite the title now. The
+plan's record says what the rulings of 2026-11-16 change for this
+stream: the first notation is Allegretto, as
+`next/ext/allegretto/forms.md` rules it. Record:
+`docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — The corpus and the specifications follow the kernel stream's K4 (B-196)
 

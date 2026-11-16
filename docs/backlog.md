@@ -3708,7 +3708,7 @@ table and the stream plans.
   other session does. Filed 2026-11-13 by the rebuild program's plan
   (`docs/plans/rebuild.md` §8). The lines below are rulings to record
   in the inventory, not evidence to bring.
-  1. "An effect consumes only values whose claims are decided"; the maintainer's ruling of 2026-11-15 in the acceptance stream's session.
+  1. "An effect consumes only values whose claims are decided" (now "A refuted value never reaches an effect"); the maintainer's ruling of 2026-11-15 in the acceptance stream's session.
      A strength (assumed, sampled, undecided) prevents no effect unless
      a policy or configuration requires it, a refuted claim never
      reaches an effect, and the result holds every undecided claim,
@@ -3753,6 +3753,8 @@ table and the stream plans.
      only, and `use` brings the bindings and the notation, to the end of
      the block it is written in, since the text asks for it. Recorded
      in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
+  Lines 1 to 9 were recorded in `docs/plans/book-pass-inventory.md` on
+  2026-11-16 by the review session, each in a note of that date.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under
@@ -3761,6 +3763,22 @@ table and the stream plans.
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under
   `npm run lint:streams`.
+- [ ] **B-200** (a claim decided wrongly at the largest machine integer) ·
+  L2 · Evaluating a claim with the value unknown can decide a
+  statement such as `x + 1 > x` that is false at the largest machine
+  integer, unless the unknown's domain knows the type's bounds. Noted
+  by the adversarial review of the book pass's phase 1
+  (`docs/records/book-pass/adversarial-review.md`, issue 31). To do
+  when the standard language's integer type is rebuilt: a test that
+  the claim is not decided, and the domain that makes it so.
+- [ ] **B-201** (what a module's one-word summary says) · L2 · "A
+  module's summary is the weakest strength among its claims" gives
+  "assumed" for every module that uses a law of Int, Float or String,
+  until those laws are proved against reference definitions. Noted by
+  the adversarial review of the book pass's phase 1
+  (`docs/records/book-pass/adversarial-review.md`, issue 31). To
+  decide when the tools are rebuilt: whether the summary sets the
+  platform's own assumptions apart from a project's.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

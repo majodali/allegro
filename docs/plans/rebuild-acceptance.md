@@ -779,3 +779,32 @@ policy is the gate ruled there.
     ruled. Left as written, for the maintainer: §2's "a choice is an
     unknown, one of a stated set of options", since unknowns that carry
     facts wait for metadata fields.
+- **2026-11-16 — The corpus follows the retitle of PR #220, and what the rulings of 2026-11-16 change here.**
+  PR #220 (the acceptance stream's rulings recorded) retitled "An
+  effect consumes only values whose claims are decided" to "A refuted
+  value never reaches an effect"; `npx tsx next/tools/corpus.ts
+  --follow-renames` moved 4 cases, and three scenarios cite the title
+  now. The nine lines of B-197 (evidence against a ruled decision) are
+  recorded in the inventory by that PR.
+  - **The first notation is Allegretto**, ruled at PR #222 in
+    `next/ext/allegretto/forms.md`, which replaces the proposal of PR
+    #218 as the basis. An operator stands for exactly one primitive
+    function. A block is order-free bindings and statements in written
+    order. A statement is a link of the kernel primitive `then` (PR
+    #221). A capability is declared by a header line and its part is
+    read as an entry, `output.write("hello")`; there is no `print`.
+  - **What that settles of PR #218's eleven questions**: the claim form,
+    the bits of a text and a number, an unbound name, bindings and
+    order, a module's parameters, printing, what a module yields, a
+    body's statements and what an operator stands for. Division by zero
+    is a refutation, where question 9 recommended a named failure.
+  - **This stream's part**, by that document's section 5: a grammar for
+    Allegretto made from the present base grammar, a reader of the
+    engine's parse tree that does not use the present tree builder, and
+    the emitter. Three things of PR #218's emitter go: the choice of a
+    primitive by an operand's sort, self-application for recursion, and
+    statements as a structure's entries.
+  - **Milestone 3's cases.** Its programs become Allegretto texts
+    written for the purpose; a present-surface case that needs types
+    moves to milestone 4. The census of chunk Q5 (the first notation
+    and the bootstrap) is redone on that rule once the reader exists.
