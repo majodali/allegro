@@ -1381,6 +1381,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, solving): nine, with specializing a function ("A function can be specialized with its parameters unknown").
 - Notes (2026-11-16, the order of effects): ten, with sequence ("Sequence is one kernel primitive").
 - Notes (2026-11-16, Allegretto's forms): joining, measuring and taking apart a bits value are added to the first of the ten, by the maintainer's ruling on issue 21 of the adversarial review: a reference definition of arithmetic is written in them, so they cannot themselves be shipped primitives with reference definitions.
+- Notes (2026-11-16, built): the reference kernel has the primitives on bits (`same`, `join`, `length`, `slice`) and on structures (`get`, `count`). `same` also tells two symbols apart: a grammar is keyed and tagged by symbols, and nothing else could compare them. A symbol is written as data through the interface, for a notation's symbol literal; quotation of an expression stays removed.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension

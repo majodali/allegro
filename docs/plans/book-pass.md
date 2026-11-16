@@ -1545,6 +1545,11 @@ its approval.
   parser engine reads it first. The proposal is
   `next/ext/allegretto/forms.md`. The maintainer approved it the
   same day, with `capability` as the word that declares one.
+- **2026-11-16 — the kernel reads structures and works on bits** (the
+  review session): the primitives on bits and structures, a primitive
+  that refuses, and a symbol as data. Still owed to Allegretto: the
+  block of bindings, entries evaluated when read, the shipped
+  primitives.
 
 ## 8. Sessions
 

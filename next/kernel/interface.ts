@@ -214,6 +214,18 @@ export class KernelFault extends Error {
  */
 export class InterfaceError extends Error {}
 
+/**
+ * What a primitive function's host code throws when it is applied outside
+ * its domain: division by zero, a text that is not a number. The kernel
+ * turns it into a refutation with this reason. Any other error a primitive
+ * throws is a fault of the primitive and is not caught.
+ */
+export class Refusal extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
 /** The kernel, as host code sees it. */
 export interface Kernel {
   readonly interfaceVersion: typeof INTERFACE_VERSION;
@@ -222,7 +234,12 @@ export interface Kernel {
 
   // ---- Constructing values -------------------------------------------
 
-  /** A sequence of bits. `bitLength` defaults to eight times the byte count. */
+  /**
+   * A sequence of bits. `bitLength` defaults to eight times the byte count.
+   * Where it is not a multiple of eight, the bits are the last `bitLength`
+   * bits of the bytes, and the bits before them are ignored: the truth
+   * value true is the byte 1 with `bitLength` 1.
+   */
   bits(bytes: Uint8Array, bitLength?: number): Value;
   /** The symbol with this fully-qualified name. The same name gives the same symbol. */
   symbol(fqn: string): Value;
@@ -328,6 +345,13 @@ export interface KeyDescription {
  * result rests on, and restore.
  */
 export interface Kernel2 extends Kernel {
+  /**
+   * A symbol as data. Evaluating it gives the symbol itself, where the
+   * value `symbol` makes is a name and is looked up. It is what a
+   * notation's symbol literal stands for.
+   */
+  symbolData(fqn: string): Value;
+
   // ---- Modules and keys -----------------------------------------------
 
   /**
