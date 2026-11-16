@@ -912,3 +912,15 @@ policy is the gate ruled there.
     a name is not judged, so a case that reads may still rest on a type
     the text does not show; such a case shows when its Allegretto text
     is run.
+- **2026-11-16 — The emitter's test no longer fails when the kernel gains a primitive.**
+  PR #224 (the kernel reads structures and works on bits) failed one
+  test in CI, and the test was this stream's: in
+  `next/bootstrap/emit.test.ts`, the check of what the emitter refuses
+  as waiting held the kernel's list of primitives at six names, and
+  that PR adds six. The same test would have failed again when the
+  data form gains a node for the block of bindings and when
+  `next/prims/` appears. A test of lane Q must not fail on a change
+  that lane R alone can make. The test now passes in each case and
+  turns to a todo that names what the emitter can stop refusing. It
+  still fails if a kernel primitive the emitter writes is missing.
+

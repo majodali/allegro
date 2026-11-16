@@ -1178,6 +1178,15 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The emitter's test follows the kernel without failing (B-196)
+
+B-196 (the rebuild's acceptance side). One test of
+`next/bootstrap/emit.test.ts` held the kernel's list of primitives at
+six names, so the kernel stream's PR #224, which adds six, failed in
+CI on a file it may not edit. The test now turns to a todo that names
+what the emitter can stop refusing. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The Allegretto grammar, reader and emitter (B-196, chunk Q5 (the first notation and the bootstrap), part 2)
 
 B-196 (the rebuild's acceptance side). Allegretto's grammar is the
