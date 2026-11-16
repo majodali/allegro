@@ -1204,6 +1204,49 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The rest of milestone 3's present cases, realised in Allegretto (B-196, chunk Q6 (the comparison harness), part 3)
+
+B-196 (the rebuild's acceptance side). Forty-nine more cases of milestone
+3 are realised by programs under `next/corpus/allegretto/m3/`. Six programs
+are new, and eight older ones name more cases of their topic. The other 31
+cases of the 80 outside `src/test/base.ts` are left with a reason: 21 assert
+through a host API of the present tree, 14 of them through `ModuleLoader`;
+5 need the standard language and are candidates for milestone 4; 3 read a
+name a host extension or a library supplied; 2 are said plainly.
+`npm run harness:next` counts 94 of milestone 3's 138 cases realised. The record is
+`docs/plans/rebuild-acceptance.md` §7.
+
+### 2026-11 — Allegretto programs in the corpus, and the harness counts the cases they realise (B-196, chunk Q6 (the comparison harness), part 2)
+
+B-196 (the rebuild's acceptance side). A case is now shown on the new
+kernel by an Allegretto program under `next/corpus/allegretto/m<milestone>/`
+that names it in a `// realises:` line and passes. The thirteen programs
+of milestone 3 moved there from `next/bootstrap/fixtures/`, and the
+convention is `next/corpus/allegretto/README.md`. `npm run harness:next`
+runs every program on the reference kernel and reports, per milestone,
+the programs passing and failing and the cases realised, named only by a
+failing program, and not yet named. Eight new programs and two
+`// realises:` lines on the old ones realise 45 of the 58 milestone 3
+cases of `src/test/base.ts`; the other 13 rest on the present host's
+evaluation context, a host extension's names, or a refused text. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
+### 2026-11 — The emitter writes every form of Allegretto, and the launcher runs one (B-196, chunk Q5 (the first notation and the bootstrap), part 3)
+
+B-196 (the rebuild's acceptance side). `next/bootstrap/emit.ts` writes
+each form of `next/ext/allegretto/forms.md` §2 as what it stands for:
+a block is the kernel's `block`, `x <- e` is
+`block({x: e}, then(x, rest))`, `p.a` is `get` of a symbol as data,
+and each operator is one shipped primitive named in `needs` by its
+hash. Every record is of the second version. The launcher hands a
+capability as a structure of its parts, and the terminal supplies the
+shipped primitives. `next/launch/fixtures/hello.json` is the emitted
+record of `next/launch/fixtures/hello.alg`. Thirteen programs of
+milestone 3 under `next/bootstrap/fixtures/` run through the emitter
+and the launcher, and `npm run allegretto` runs a text in one step.
+Of the 134 cases of milestone 3 that read, 108 emit. Record:
+`docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The emitter's test follows the kernel without failing (B-196)
 
 B-196 (the rebuild's acceptance side). One test of

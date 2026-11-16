@@ -15,6 +15,7 @@ oracle:
   - npm run typecheck:next
   - npm run lint:corpus
   - npm run harness:present
+  - npm run harness:next
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
@@ -924,3 +925,280 @@ policy is the gate ruled there.
   turns to a todo that names what the emitter can stop refusing. It
   still fails if a kernel primitive the emitter writes is missing.
 
+- **2026-11-16 — Q5, part 3: the emitter writes every form; the launcher runs an Allegretto program.**
+  Built on `origin/main` at `d2500b5`, after the kernel stream's PRs
+  #224 (the kernel reads structures and works on bits), #226 (the
+  block of bindings) and #228 (the shipped primitives). The present
+  tree is not changed.
+  - **The forms, each written.** `next/bootstrap/emit.ts`, checked by
+    `next/bootstrap/emit.test.ts` on the reference kernel:
+
+    | Form of forms.md §2 | Written as |
+    |---|---|
+    | literals, `{a: e}`, `[e, f]` | a bits node; a structure node |
+    | `` `name `` | the node `datum` |
+    | a name a block binds | a symbol node the kernel looks up |
+    | a parameter, a header line | its param node |
+    | `x => e`, `f(a, b)`, `a \|> f` | a function node; an expression node |
+    | `p.a`, `output.write`, `p[i]` | ``get(p, `a)``, `get(p, i)` |
+    | `if`, `&&`, `\|\|`, `!`, `claim` | the kernel's `if` and `claim` |
+    | `==`, `!=`, `++`, `bits.*` | `same`; `if(same(a, b), false, true)`; `join`; `join`, `length`, `slice` |
+    | the integer operators, prefix `-`, the names of §3 | the shipped primitive, listed in `needs` with the hash `shippedByName` gives |
+    | `x = e`, `f(x) => e` | an entry of the block's bindings |
+    | `x <- e` | `block({x: e}, then(x, rest))` |
+    | a block, the module | `block(bindings, chain of then)`; the module ends with the structure of what it yields |
+    | `export` | the module yields the bindings marked, or all |
+
+    Nothing waits on the forms. One thing waits on the kernel: entries
+    evaluated when read, the open part of forms.md §4 item 3. The
+    structure a module yields is built at the module's end, so the
+    kernel evaluates every binding it holds there. The smallest text:
+    `capability output` and `unused = output.write("x")` writes `x`
+    after the module's statements, and `bad = 1 / 0`, needed by
+    nothing, refutes the run. A binding left out by `export` is never
+    evaluated. No test of this stream pins the present order.
+  - **The record.** Every record is of the second version, with no key
+    slots and no outcomes. A text needs the node `datum` as soon as it
+    reads a key with `.`, which every text that prints does. One rule
+    for every text keeps a text's record from changing version when the
+    text gains a `.`, and `load` makes each record a module with its
+    identity.
+  - **The launcher.** Step 4 of `next/launch/launcher.ts` hands a
+    capability as a structure of its parts keyed by the symbols of the
+    part names; the refusal of a capability of more than one part is
+    gone, and a test runs one of two parts. The terminal's entry
+    supplies `shipped` of `next/prims/index.ts` as the target's
+    primitives; a record that needs a hash the target lacks is still
+    refused, naming it. `next/launch/fixtures/hello.json` is the record
+    the emitter writes for `next/launch/fixtures/hello.alg`, and a test
+    holds the two equal. The hand-built records of
+    `next/launch/launcher.test.ts` read the part, and the record of two
+    lines uses `then`. The kernel stream's two tests in
+    `next/kernel/kernel.test.ts` that run the fixture through `launch`
+    pass with no change to that file. `npm run allegretto -- <file.alg>
+    [--steps <n>]` (`next/launch/allegretto.ts`) emits and launches in
+    one step.
+  - **The programs of milestone 3.** Thirteen texts under
+    `next/bootstrap/fixtures/`, each with its lines as `// expect:`
+    comments and its end as `// end:`: hello world; a function and its
+    application; order-free bindings; `=` and `<-` side by side;
+    factorial and a sum through `int.text`; two functions that call
+    each other; a recursion over a structure with `get` and `count`; a
+    claim that holds; a claim refuted after a line is printed, ending
+    refuted; `7 / 0`, refuted with "division by zero"; the operators at
+    each precedence level; a module open and one with exports, whose
+    yielded keys (`// yields:`) are read through the kernel's
+    interface. `next/bootstrap/fixtures.test.ts` runs every one through
+    the emitter and the launcher. The three tests part 2 marked as
+    waiting are ordinary tests, and the test "what waits, against the
+    kernel on this base" ends with nothing owed.
+  - **For the kernel stream: recursion depth.** A recursion of a few
+    hundred calls ends at the kernel's own limit with no step budget
+    set: the host's stack runs out. The smallest text: `capability
+    output`, `loop(n) => if n == 0 then 0 else loop(n - 1)`,
+    `output.write(int.text(loop(2000)))`. A sum to 400 completes; a sum
+    to 450 does not. The fixtures stay below it.
+  - **The census.** `npx tsx next/bootstrap/census.ts` over the 138
+    cases of milestone 3: 3 host, 1 does not read, 134 read. Of the
+    134, 108 emit; the 26 that do not each use a name nothing binds
+    (`abs` in 4, `double`, `math` and `max` in 3 each), and none uses a
+    form the emitter refuses. Its `--moves` list is empty: no case newly
+    shows that it needs types. `next/corpus/cases.json` is unchanged.
+  - **Read narrowly where forms.md is silent**, each a question for the
+    kernel stream: a name a block binds is the symbol of the name as
+    written; `get` and `count` are names Allegretto binds, and `same`,
+    `join`, `length`, `slice`, `block` and `if` are not, since each has
+    a form; where `e` of `x <- e` reads an enclosing block's `x`, it is
+    handed in as an argument, `((t) => block({x: t}, then(x, r)))(e)`,
+    so it does not read itself; a binding written with `=` cannot read
+    a name bound by `<-`, since the group is bound before any
+    statement, and the name is refused as unbound; a yielded entry's
+    value is its name, looked up; `needs` is in name order; prefix `-`
+    on a number is `int.neg` applied to it; a capability's parts are
+    keyed by `kernel.symbol` of the part names. Part 2's readings stand
+    where this part does not change them.
+- **2026-11-16 — Q6, part 2: Allegretto programs in the corpus; the harness counts the cases they realise.**
+  Built on `origin/main` at `f55148c`. The present tree is not changed.
+  - **The rulings**, by the maintainer that day. An Allegretto program
+    may hand a text of the standard language to the parser engine: "Yes
+    an Allegretto test can hand a standard language text to the parser
+    engine." The engine is to be written in Allegretto by the kernel
+    stream, and does not exist yet. The tests and other code of
+    milestones 4 to 7 are written in "the Allegretto language", the
+    first notation; milestone 3's programs already are. The programs
+    live under `next/corpus/allegretto/`, by milestone: the location
+    "works". So a case of `next/corpus/cases.json` is shown on the new
+    kernel by an Allegretto program that exercises what the case tests
+    and passes, not by running the present program there. The corpus
+    stays the list of what must be shown.
+  - **The convention**, in `next/corpus/allegretto/README.md`. A program
+    is a `.alg` file in a directory `m<milestone>` directly under
+    `next/corpus/allegretto/`, and its milestone is its directory's. It
+    names each case it shows in a line `// realises: <case id>`, the id
+    exactly as in the corpus. Its `// expect:`, `// end:` and
+    `// yields:` lines are read as part 3 of Q5 read them. A case is
+    realised when a program that names it passes: its printed lines and
+    its end are the expected ones. A program names a case only if it
+    shows what the case asserts, by the case's text or a faithful
+    restatement, printing the value the present test compares, with the
+    present expectation as its `// expect:` lines. For a case of class
+    `changes` the expectation is the case's `becomes`.
+  - **The move.** The thirteen programs moved from
+    `next/bootstrap/fixtures/` to `next/corpus/allegretto/m3/` with
+    `git mv`, and their test to `next/corpus/allegretto.test.ts`.
+    `runProgram` of `next/corpus/allegretto.ts` reads a program's
+    lines, emits it, launches it on the reference kernel and compares.
+    The test and the harness both use it.
+  - **The harness.** `npm run harness:next`, the mode `--next` of
+    `next/corpus/harness.ts`, runs every program under
+    `next/corpus/allegretto/` in process. It reports per milestone the
+    programs passing and failing and, of the cases due there, those
+    realised, those named only by a failing program and those not yet
+    named. It exits 1 on a failing program, a `// realises:` line that
+    names no case, one case named twice by a program, and a program
+    outside a directory `m<milestone>`. A case named from another
+    milestone's directory is reported and does not fail. A test in
+    `next/corpus/harness.test.ts` runs the mode over the committed
+    programs. It prints, for milestones 3 and 4 and in summary:
+    `milestone 3: programs 21 (passing 21, failing 0) · cases due 138 · realised 45, named only by a failing program 0, not yet named 93 · up to 3: 45 of 175 realised`;
+    `milestone 4: programs 0 (passing 0, failing 0) · cases due 643 · realised 0, named only by a failing program 0, not yet named 643 · up to 4: 45 of 818 realised`;
+    `harness: new tree · programs 21 run (passing 21, failing 0) · cases due 1846 (realised 45, named only by a failing program 0, not yet named 1801) · realises lines 45 (no case 0, twice in one program 0, of another milestone's directory 0, due at no milestone 0) — no failing program`.
+  - **The first batch**, from the 58 cases of milestone 3 in
+    `src/test/base.ts`. 45 are realised. Eight new programs realise 43:
+    `arithmetic.alg` 14, `calls.alg` 9, `comparisons.alg` 7,
+    `conditionals.alg` 5, `bindings.alg` 4, `recursion.alg` 2,
+    `block-body.alg` 1 and `modulo-by-zero.alg` 1. Two of the thirteen
+    older programs gain a line: `factorial.alg` realises
+    `test:base:factorial` with the present definition renamed, and
+    `divide-by-zero.alg` realises `test:base:division by zero`, with
+    `7 / 0` for the present `1 / 0`. The other eleven show no present
+    case. Where present texts bind one name again, each is an inner
+    block `name <-` of the present text unchanged. The present tree
+    gives a comparison as 1 or 0; the programs print the truth value
+    as "true" or "false". `int.mod` refuses with "division by zero", as
+    the present test expects.
+  - **The 13 left**, by kind:
+    - a name a test's host extension supplied, 8: the `abs`, `max` and
+      `min` of `mathExtension` in 7, and the `pi` and `tau` of two
+      `Extension` values in 1. Two of the 8 are of class `changes`. The
+      `becomes` of each is a conflict between two definitions of one
+      name, and a text alone holds only one of them;
+    - a host API of the present tree, 3: the three "persistent context"
+      tests hand one `evalCtx` from one evaluation to the next, as the
+      REPL does;
+    - a refusal of a text, 2: "parse error on invalid syntax", whose
+      text `+ +` no reader takes, and "extension: not available without
+      being provided", where `abs(5)` must fail. The emitter refuses a
+      name nothing binds before anything runs, so no program that holds
+      either text passes. Both wait for a program that hands the text
+      to the parser engine and reads its refusal as a value.
+  - **What a text alone cannot realise**, the calibration for the
+    chunks that realise the rest. A test that evaluates one closed text
+    and compares its value is realised by that text: all 45 such tests
+    of `src/test/base.ts` were, changed only by the printing and, where
+    two texts bind one name, by an inner block. A text
+    alone cannot realise a test whose assertion is made in its host
+    code: the names it hands in, the context it carries between
+    evaluations, or the refusal it expects. The first needs an `input`
+    or an `import` the launcher supplies, which it refuses today. The
+    second needs a host that runs one kernel over several texts. The
+    third needs the parser engine.
+  - **Cases that look misplaced**: none misclassed. The milestone of 12
+    is in question: the three "persistent context" tests rest on "One
+    kernel serves many invocations" and the REPL, and the nine
+    "extension:" tests on extensions, which the launcher does not load
+    before a later part. Neither is a program of the first notation
+    running. `next/corpus/cases.json` is unchanged.
+- **2026-11-16 — Q6, part 3: the rest of milestone 3's present cases, realised or left with a reason.**
+  Built on `origin/main` at `d0b7955`. The present tree is not changed.
+  `next/corpus/cases.json` is unchanged.
+  - **The counts.** Of the 80 cases of milestone 3 outside
+    `src/test/base.ts`, 49 are realised and 31 are left. The kinds of a
+    case left: (a) it needs a type or another part of the standard
+    language; (b) a name a test's host extension or another module
+    supplied; (c) a host API of the present tree; (d) an expected
+    refusal of a text; (e) something else.
+
+    | Module | Realised | (a) | (b) | (c) | (d) | (e) |
+    |---|---|---|---|---|---|---|
+    | `src/test/grammar2-language.ts` | 19 | 1 | 0 | 0 | 0 | 1 |
+    | `src/test/modules.ts` | 0 | 0 | 0 | 14 | 0 | 0 |
+    | `src/test/types-core.ts` | 10 | 3 | 0 | 0 | 0 | 0 |
+    | `src/test/language.ts` | 9 | 0 | 0 | 2 | 0 | 0 |
+    | `src/test/types-battery.ts` | 3 | 0 | 0 | 2 | 0 | 1 |
+    | `src/test/grammar-legacy.ts` | 4 | 0 | 1 | 0 | 0 | 0 |
+    | `src/boundary-tests.ts` | 0 | 0 | 1 | 2 | 0 | 0 |
+    | `src/test/refinements.ts` | 2 | 0 | 0 | 0 | 0 | 0 |
+    | `src/test/types-construction.ts` | 2 | 0 | 0 | 0 | 0 | 0 |
+    | `src/test/equality-laws.ts` | 0 | 0 | 1 | 0 | 0 | 0 |
+    | `src/test/evaluator.ts` | 0 | 1 | 0 | 0 | 0 | 0 |
+    | `src/test/pcp.ts` | 0 | 0 | 0 | 1 | 0 | 0 |
+    | Total | 49 | 5 | 3 | 21 | 0 | 2 |
+
+  - **The programs.** Six are new under `next/corpus/allegretto/m3/`:
+    `multiline.alg` 9, `logical.alg` 11, `logical-demo.alg` 1,
+    `pipe.alg` 3, `dot-access.alg` 3 and `plain-text.alg` 1. Eight
+    older programs name 21 more cases of their topic:
+    `arithmetic.alg` 6, `bindings.alg` 3, `calls.alg` 3,
+    `comparisons.alg` 2, `conditionals.alg` 4, `block-body.alg` 1,
+    `factorial.alg` 1 and `recursion.alg` 1. Where a present text is
+    the text a program already held, the program names the case
+    beside the older one. `logical-demo.alg` restates the present
+    `tests/logical.alg` line by line. `dot-access.alg` binds the
+    structures that the present tests hand in through a host
+    `Extension`.
+  - **The harness's line for milestone 3:**
+    `milestone 3: programs 27 (passing 27, failing 0) · cases due 138 · realised 94, named only by a failing program 0, not yet named 44 · up to 3: 94 of 175 realised`.
+  - **The cases of kind (a)**, candidates for milestone 4:
+    - `test:grammar2-language:grammar2/std: types.alg runs end-to-end`:
+      `tests/types.alg` joins texts with `+` and prints `1.5 + 2.5` as
+      `4`, a number printed by its type;
+    - `test:types-core:type system: formatValue shows string without quotes for typed string`:
+      the present printer `formatValue` chooses the rendering by the
+      value's `String` type;
+    - `test:types-core:type system: formatValue shows int for typed int`:
+      the same, by the `Int` type;
+    - `test:types-core:type system: basics.alg works in typed mode`:
+      the assertion is that the text evaluates under the standard
+      language's type system;
+    - the case of B-172 (the partial-evaluation rules as implemented
+      against the spine),
+      `test:evaluator:B-172 C3 evaluator: Rule 2 — a when inside an unfolded callee chain stays bounded (RR9, option C)`:
+      the text is `when` arms with `Int` annotations, and the bound is
+      the present evaluator's call count.
+  - **The other cases left**, by kind:
+    - (b), 3: `hybrid parser: dot access with function call` of
+      `src/test/grammar-legacy.ts` calls a doubling host primitive the
+      test's `Extension` supplies, and no shipped primitive doubles;
+      `import satisfied by an extension (C2.3b)` of
+      `src/boundary-tests.ts` reads `cfg` from an `Extension`, and the
+      launcher supplies no input; `D47 chunk 2: explain` of
+      `src/test/equality-laws.ts` calls the library function `explain`,
+      which reads origins;
+    - (c), 21: the 14 cases of `src/test/modules.ts` assert through
+      `ModuleLoader`, and two of them also through `exportedSymbols`,
+      `symbolFromWire` and `libExtensions`; the launcher supplies no
+      imported module yet, so no program can restate them. The
+      `reactive:` cases of `src/test/language.ts` read the host registry
+      and call `applyPhase`. `UntypedFunction` and
+      `compile: report lists unresolved imports` of `src/test/types-battery.ts` read
+      `getTypeName` and the `compilationReport`. `REPL persistence` and
+      `fqn symbols (C5.1)` of `src/boundary-tests.ts` hand an
+      `evalCtx` on and call `registerScopeSymbol`. `Phase A: summarizeValue` of `src/test/pcp.ts` calls `summarizeValue`;
+    - (e), 2: `grammar2/base: if-then-else selects branch` is
+      `if 1 then 42 else 0`, and the kernel's conditional refutes a
+      64-bit 1 with "a condition that is neither true nor false", as
+      the forms rule; `partial eval: eval_if with unresolved condition propagates type from matching branches`
+      asserts only that a
+      function value is not null, which no program can print.
+  - **Added in review.** The five cases of kind (a) moved from
+    milestone 3 to milestone 4 in `next/corpus/cases.json`; no class
+    changed. Milestone 3 then holds 133 present cases, 94 realised and
+    39 not yet named: 13 of `src/test/base.ts`, and the 26 of kinds
+    (b), (c) and (e) above. `yieldedKeys` in `next/corpus/allegretto.ts`
+    handed every module one capability; it now hands a module what its
+    header declares, so a module with no capability can state
+    `// yields:`. Open for the maintainer: `if 1 then 42 else 0` is 42
+    in the present tree and a refutation on the new kernel, and no
+    ruled decision's title says which, so the case is neither realised
+    nor reclassed.
