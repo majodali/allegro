@@ -39,9 +39,11 @@
 // be inspected: there is no value of an expression's kind that a
 // function can look into.
 //
-// An effect happens when its value is needed. A structure needs its
-// entries in order, so the statements of a body written as a structure
-// happen in the order written. A function's free names are tied to the
+// An effect happens when its value is needed. The statements of a body
+// are a chain of `then`. A primitive function needs its arguments left to
+// right. This kernel still evaluates a structure's entries in order when
+// the structure is built; by ruling they are to be evaluated when needed,
+// so nothing may rest on that order. A function's free names are tied to the
 // scope in which the function value is first evaluated, so a function
 // means the same wherever it is later called.
 //
@@ -64,6 +66,11 @@
 //   "build"     build(description). The function a description describes.
 //               A refutation where the description holds the identity of
 //               an unforgeable value: nothing makes authority from data.
+//   "then"      then(first, second). It needs its first argument, and then
+//               its value is the second. This is the one way a text's
+//               order becomes an order of effects. While the first
+//               waits, the second is evaluated ahead with no effect
+//               performed, so a refutation in it is found at once.
 //   "attempt"   attempt(x, budget). Evaluates its first argument under a
 //               budget of steps and answers how that ended, as data: a
 //               value, a refutation with its reason, or the limit
@@ -203,7 +210,7 @@ interface Root {
   done: boolean;
 }
 
-const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [["attempt", 2], ["build", 1], ["claim", 1], ["describe", 2], ["if", 3]];
+const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [["attempt", 2], ["build", 1], ["claim", 1], ["describe", 2], ["if", 3], ["then", 2]];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
 const INSPECT = "kernel:inspect";
 
@@ -233,6 +240,8 @@ export const createKernel: CreateKernel2 = () => {
   const collectors: Map<string, Rest>[] = [];
   /** The capability part now running, so a cell it makes knows where its answer comes from. */
   let running: Rest | undefined;
+  /** True while evaluating what follows something not yet done: no effect is performed there. */
+  let ahead = false;
 
   const restKey = (r: Rest): string =>
     r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : `builder ${r.builder}`;
@@ -498,6 +507,23 @@ export const createKernel: CreateKernel2 = () => {
         if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
         return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
       }
+      if (fn.name === "then") {
+        // The first is needed, and only then the second. While the first waits, the second
+        // is evaluated ahead with no effect performed, so a refutation in it is found now.
+        const first = evaluate(v.args[0], scope);
+        if (first instanceof Refuted) return first;
+        if (known(first)) return evaluate(v.args[1], scope);
+        const before = ahead;
+        ahead = true;
+        let second: V;
+        try {
+          second = evaluate(v.args[1], scope);
+        } finally {
+          ahead = before;
+        }
+        if (second instanceof Refuted) return second;
+        return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+      }
       if (fn.name === "attempt") {
         // The budget is needed; what is attempted is evaluated inside the attempt.
         const steps = evaluate(v.args[1], scope);
@@ -570,6 +596,7 @@ export const createKernel: CreateKernel2 = () => {
         return new Refuted(`a primitive of ${fn.declaration.arity} parameter(s) was given ${args.length} argument(s)`, undefined);
       if (!args.every(known)) return new Expr(fn, args);
       const d = fn.declaration;
+      if (ahead && d.purity === "effectful") return new Expr(fn, args);
       const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
       rest(what);
       const before = running;

@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 239 decisions in 6 parts and 38 chapters (231 when the phase closed; eight added by rulings since) after the preface and the tour. Part I: 23; Part II: 54; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 241 decisions in 6 parts and 38 chapters (231 when the phase closed; ten added by rulings since) after the preface and the tour. Part I: 23; Part II: 56; Part III: 23; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -38,7 +38,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -370,6 +370,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Language extensions are declarative". Supersedes the standing ruling that an `add` over an existing production only warns.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
 - Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
+- Notes (2026-11-16, the order of effects): the order of a body's statements is carried by sequence ("Sequence is one kernel primitive"); bindings stay order-free.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
@@ -1150,8 +1151,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### An expression is evaluated when its value is needed
-- Decides: an expression is evaluated when something needs its value. A primitive function needs its arguments, a conditional its condition, a claim its expression, a body its statements in written order, and a caller the result it asked for. The kernel may evaluate more than is needed only where no one can tell: it performs no effect there, and a refutation stays where it arose.
-- Status: partly built (the reference kernel; it evaluates a structure's entries when the structure is built); ruled 2026-11-15
+- Decides: an expression is evaluated when something needs its value. A primitive function needs its arguments, left to right; a conditional needs its condition; a claim its expression; a sequence its first part and then its second; a caller the result it asked for. A structure does not need its entries: each is evaluated when something reads it. A statement needs its value and no more, so an effect inside an entry nothing reads does not happen. The kernel may evaluate more than is needed only where no one can tell: it performs no effect there, and a refutation stays where it arose.
+- Status: partly built (the reference kernel; it evaluates a structure's entries when the structure is built); ruled 2026-11-15; the open point ruled 2026-11-16
 - Type: capability
 - Rationale kind: technical
 - Depends on: One operation: partial evaluation; Evaluation is total over unresolved information
@@ -1160,6 +1161,33 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: evaluating whatever the available information determines, needed or not (what "One operation: partial evaluation" could be read to say: it would perform effects nobody asked for)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. The maintainer asked whether "an argument is evaluated when it is needed" is a corollary of a broader rule, and the inventory had none. Open: whether a structure needs its entries. The maintainer prefers that entries are evaluated when needed too, and holds that the order of effects is to be settled another way: a way to determine the order of effects, and optionally to declare an order for particular effects, which is a topic of its own. Until then the reference kernel evaluates a structure's entries in order.
+- Notes (2026-11-16, the order of effects): the question this entry left open is ruled: a structure's entries are evaluated when needed, and the order of effects is settled by "Sequence is one kernel primitive" and "Effects on one capability keep their order". The alternative, a statement that needs its value in full, entries included, was set aside: it forces work nobody asked for and never returns for a structure without end. The standard language's check at the end of a text reports an effect that nothing needs, as it reports a name nothing binds. The reference kernel still evaluates a structure's entries when the structure is built; it changes with the primitive that reads an entry.
+- Chapter: Evaluation
+
+#### Sequence is one kernel primitive
+- Decides: the kernel primitive `then(first, second)` needs its first argument, and then its value is the second. It is the one way the order of a text becomes an order of evaluation: a body of statements is a chain of it. While the first waits, the second is evaluated ahead with no effect performed, so a refutation in it is found at once.
+- Status: partly built (the reference kernel); ruled 2026-11-16
+- Type: capability
+- Rationale kind: technical
+- Depends on: An expression is evaluated when its value is needed; The kernel contains only what no extension could supply
+- Significance: 4 — without it nothing can say "this, then that"
+- Label: foundational — every body of statements, in every notation
+- Options recorded: a body written as a structure, relying on the order of its entries (what the reference kernel did; it stops working when entries are evaluated when needed); a function of one unused parameter applied to the first statement (an unused argument is never evaluated); a shipped pure primitive that returns its second argument (its reference definition, a composed function, would not need the first)
+- Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. A function has one body expression, so "a body needs its statements in written order" had nothing to stand on; the acceptance stream's first-notation proposal met the gap and wrote statements as a structure's entries.
+- Chapter: Evaluation
+
+#### Effects on one capability keep their order
+- Decides: where need alone orders two effects, the order is fixed: a primitive function needs its arguments left to right. Effects on one capability keep the order that sequence and need give them, and no rewrite may change it. Effects on different capabilities are unordered unless an order between the two is declared; a capability's definition may also declare parts of itself unordered. An effect is performed only when every effect ordered before it has been performed, and otherwise stays in the residual, so a phase that holds one capability and lacks another cannot perform an order in part. The order is read from the residual of a phase that holds no capability, and a claim about it is stated over that residual's description. Two chains that each wait on a different late answer are not ordered: they act in the order the answers arrive, which is information like any other, unless an order is declared.
+- Status: open (the reference kernel performs nothing after a statement that waits, whatever the capability; declared orders are not built); ruled 2026-11-16
+- Type: capability
+- Rationale kind: technical
+- Depends on: Sequence is one kernel primitive; An expression is evaluated when its value is needed; Authority is an unforgeable value; Phases are configuration
+- Significance: 4 — what an author, an optimiser and a pipeline of phases can each rely on
+- Label: foundational — every program that acts, every rewrite and every phase
+- Options recorded: need alone as the order (a rewrite by commutativity would swap two reads); one total order over all effects (no phase could perform some and leave others, and nothing could run in parallel); holding back every chain behind the first late answer (one slow answer blocks everything)
+- Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling. The maintainer on 2026-11-15: "we need a way to determine effect ordering, and optionally declare ordering for specific effects". This settles what remained of issue 17 of the adversarial review.
 - Chapter: Evaluation
 
 #### No argument can be inspected
@@ -1270,6 +1298,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Determinism and confluence of evaluation", which was open. It holds only if every cell is filled exactly once.
 - Notes (2026-11-16, the adversarial review's remaining issues): the second sentence is added by the maintainer's ruling of 2026-11-16 on issue 20.
+- Notes (2026-11-16, the order of effects): the order in which late answers arrive is information: two chains of effects that wait on different answers act in the order of arrival unless an order is declared ("Effects on one capability keep their order").
 - Chapter: Evaluation
 
 #### Scopes layer by parent chain
@@ -1332,7 +1361,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover nine things: telling bits apart; making and reading structures; one conditional; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover ten things: telling bits apart; making and reading structures; one conditional; one sequence; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1348,6 +1377,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-13, DR6): terms. A kernel primitive is one of these; a primitive function is any function whose body is host code. The primitive for evaluating an expression with names rebound can supply the complete set of names, so that Allegro code, the module loader first, can evaluate a module in a scope that holds only what it is given.
 - Notes (2026-11-15, values and descriptions): the list is fixed by the rulings on values and descriptions. "Evaluating an expression with names rebound" goes: a loader builds a function from a description and calls it, so no primitive inside the language makes or reads a scope (issue 23 of the adversarial review). Quotation goes: a quoted symbol is a description. The title says six in its history and eight now.
 - Notes (2026-11-15, solving): nine, with specializing a function ("A function can be specialized with its parameters unknown").
+- Notes (2026-11-16, the order of effects): ten, with sequence ("Sequence is one kernel primitive").
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -3587,6 +3617,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/plans/release-track.md §3 D5; B-063; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a library proves that mapping twice equals mapping once with the composed function; the optimiser fuses the two loops.
 - Notes: replaces "Laws licence rewrites"; answers the question two earlier reviews sent here, whether a capability's declared laws may license rewrites around its body.
+- Notes (2026-11-16, the order of effects): a rewrite never changes the order of effects on one capability ("Effects on one capability keep their order").
 - Chapter: Saved programs and export
 
 #### How extensions are distributed
