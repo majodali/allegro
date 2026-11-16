@@ -578,7 +578,7 @@ name.
   holds the 22 pure primitives Allegretto's forms name: integer and
   float arithmetic, orderings, texts and conversions over 64 bits.
   Outside its domain a primitive refuses. Each has a content hash
-  over its stated meaning, until its reference definition exists.
+  over its host code, committed in `next/prims/hashes.ts`.
 - **2026-11-16 — The block of bindings, and recursion.** In
   `next/kernel/kernel.ts`: the kernel primitive `block(bindings,
   body)`, whose bindings may use each other and themselves, so a

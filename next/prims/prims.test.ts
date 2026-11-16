@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import type { Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/kernel.js";
 import { shipped, shippedByName } from "./index.js";
+import { HASHES } from "./hashes.js";
+import { readSource, sourceHashes } from "./hash-source.js";
 
 const k = createKernel();
 const fns = new Map([...shippedByName].map(([name, d]) => [name, k.primitiveFunction(d)]));
@@ -42,8 +44,23 @@ test("the shipped primitives are listed in name order, each with its own content
     "float.add", "float.div", "float.int", "float.le", "float.lt", "float.mul", "float.neg", "float.sub", "float.text",
     "int.add", "int.div", "int.float", "int.ge", "int.gt", "int.le", "int.lt", "int.mod", "int.mul", "int.neg", "int.sub", "int.text", "text.int",
   ]);
-  // A hash is pinned: it changes only when the stated meaning does.
-  assert.equal(shippedByName.get("int.add")!.hash, "sha256:c337be8620b45444c34709f80ba990d83661ed671ac8f0663d5a94dcd8f651f2");
+});
+
+test("each hash is taken over the primitive's host code, and the committed hashes are the source's", () => {
+  const source = readSource();
+  assert.deepEqual({ ...HASHES }, sourceHashes(source), "run: npx tsx next/prims/hash-source.ts --write");
+  for (const p of shipped) assert.equal(p.hash, HASHES[p.name]);
+  const changed = (edit: (s: string) => string) => {
+    const [before, after] = [sourceHashes(source), sourceHashes(edit(source))];
+    return Object.keys(before).filter((n) => before[n] !== after[n]);
+  };
+  const once = (s: string, a: string, b: string) => { assert.equal(s.split(a).length, 2, a); return s.replace(a, b); };
+  // A change to one primitive's code changes that primitive's hash and no other.
+  assert.deepEqual(changed((s) => once(s, "(a, b) => a + b),\n  int2(\"int.div\"", "(a, b) => a - b),\n  int2(\"int.div\"")), ["int.add"]);
+  // A change to code every primitive shares changes every hash.
+  assert.equal(changed((s) => once(s, "new DataView(bytes.buffer).setFloat64(0, x);", "new DataView(bytes.buffer).setFloat64(0, -x);")).length, shipped.length);
+  // A comment and a blank line change none.
+  assert.deepEqual(changed((s) => "// a new comment\n\n" + s), []);
 });
 
 test("integer arithmetic is 64-bit and wraps", () => {

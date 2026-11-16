@@ -21,15 +21,15 @@
 // or remainder by zero, a text that is not a number.
 //
 // The content hash. A saved program names a primitive by the hash of its
-// content. The content of a primitive is its meaning, which is to be its
-// reference definition. Until those are written, the hash is taken over
-// the primitive's name, its arity and the sentence below that states what
-// it computes. Changing the sentence changes the hash, so a record built
-// against one meaning does not load against another. The host code is not
-// hashed: it is an implementation claimed equal to the meaning.
+// content, which by ruling is its host code: the helpers below, shared by
+// every primitive, and the primitive's own entry in the list. The hashes
+// are computed by hash-source.ts and committed in hashes.ts; a test
+// computes them again. After changing this file, run
+//   npx tsx next/prims/hash-source.ts --write
+// A record built against a primitive does not load once its code changes.
 
 import { Refusal, type PrimitiveContext, type PrimitiveDeclaration, type Value } from "../kernel/interface.js";
-import { sha256Text } from "../kernel/hash.js";
+import { HASHES } from "./hashes.js";
 
 type Pure = Extract<PrimitiveDeclaration, { purity: "pure" }>;
 
@@ -61,8 +61,10 @@ function fromFloat(x: number, c: PrimitiveContext): Value {
 const truth = (b: boolean, c: PrimitiveContext): Value => c.bits(Uint8Array.of(b ? 1 : 0), 1);
 const text = (t: string, c: PrimitiveContext): Value => c.bits(utf8.encode(t));
 
-function primitive(name: string, arity: number, meaning: string, run: (args: readonly Value[], c: PrimitiveContext) => Value): Pure {
-  return { purity: "pure", hash: `sha256:${sha256Text(`allegro primitive\n${name}\n${arity}\n${meaning}`)}`, name, arity, run };
+function primitive(name: string, arity: number, _meaning: string, run: (args: readonly Value[], c: PrimitiveContext) => Value): Pure {
+  const hash = HASHES[name];
+  if (hash === undefined) throw new Error(`the shipped primitive ${name} has no committed hash: run next/prims/hash-source.ts --write`);
+  return { purity: "pure", hash, name, arity, run };
 }
 const int2 = (name: string, meaning: string, f: (a: bigint, b: bigint) => bigint): Pure =>
   primitive(name, 2, meaning, (a, c) => fromInt(f(int(name, a[0], c), int(name, a[1], c)), c));

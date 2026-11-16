@@ -169,9 +169,10 @@ is not a number.
    read are not built: the kernel still evaluates them when the
    structure is built.
 4. **The shipped primitives** of section 3, in `next/prims/index.ts`.
-   *Built.* Each is named by a hash of its name, its arity and a
-   sentence stating what it computes, until its reference definition
-   is written and hashed in its place.
+   *Built.* Each is named by a hash over its host code, by ruling: the
+   helpers all share and its own entry, comments left out. The hashes
+   are committed in `next/prims/hashes.ts` and a test computes them
+   again.
 5. **A primitive function that refuses**: its host code throws
    `Refusal` with a reason, and the kernel answers a refutation.
    *Built.*
