@@ -1538,6 +1538,12 @@ its approval.
   notation is Allegretto, a usable language for the bare kernel; the
   parser engine and the module loader are written in it. 243
   decisions. To design: its forms.
+- **2026-11-16 — Allegretto's forms proposed** (the review session),
+  after the maintainer ruled four points: an operator stands for one
+  primitive function; a block is bindings and statements, which may be
+  mixed; a primitive outside its domain is a refutation; the present
+  parser engine reads it first. The proposal is
+  `next/ext/allegretto/forms.md`.
 
 ## 8. Sessions
 
