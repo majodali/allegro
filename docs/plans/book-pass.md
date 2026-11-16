@@ -1543,7 +1543,8 @@ its approval.
   primitive function; a block is bindings and statements, which may be
   mixed; a primitive outside its domain is a refutation; the present
   parser engine reads it first. The proposal is
-  `next/ext/allegretto/forms.md`.
+  `next/ext/allegretto/forms.md`. The maintainer approved it the
+  same day, with `capability` as the word that declares one.
 
 ## 8. Sessions
 

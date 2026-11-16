@@ -1,8 +1,10 @@
-# Allegretto: the forms — a proposal
+# Allegretto: the forms
 
-> **Status: proposed 2026-11-16, for the maintainer to rule.** Allegretto
+> **Status: ruled 2026-11-16.** The maintainer approved the forms, the
+> shipped primitives and the five answers of section 6, with one change:
+> a capability is declared by the word `capability`. Allegretto
 > is the rebuild's first notation, one of the three contracts between
-> the streams (`docs/plans/rebuild.md`). This document proposes its
+> the streams (`docs/plans/rebuild.md`). This document states its
 > forms. It replaces the proposal on the branch
 > `majodali/q5-first-notation` as the basis.
 >
@@ -98,6 +100,7 @@ language's.
 |---|---|
 | `x = e` | a binding of `x` in the enclosing block |
 | `f(x, y) => e` | the binding `f = (x, y) => e` |
+| `x <- e` | a statement: `e` happens here, and `x` is bound to its value for the rest of the block |
 | an indented block | a block of bindings around a chain of `then` |
 
 A block's bindings are one group, whatever lines they are written on.
@@ -119,7 +122,7 @@ header lines, before anything else:
 
 | Form | Declares |
 |---|---|
-| `uses output` | a capability the module is handed, bound to the name `output` |
+| `capability output` | a capability the module is handed, bound to the name `output` |
 | `input name` | an input, bound to `name` |
 | `import name` | another module's bindings, bound to `name`; one is read as `name.f` |
 
@@ -175,32 +178,28 @@ each a part of the standard language: type annotations and type
 expressions, typed parameters, generics, `when` and patterns, `theorem`
 and `verify`, the `grammar` block and its declarations, `&` on types,
 `instanceof` and `subtypeof`, `Y of x`, `error`, `none`, and text
-interpolation. It adds four: the symbol literal, `++`, and the header
-lines `uses` and `input`.
+interpolation. It adds five: the symbol literal, `++`, the binding `<-`, and the header
+lines `capability` and `input`.
 
 The reader takes the engine's parse tree. It does not use the present
 tree builder, which rewrites what it reads: it puts a block binding's
 value at each use, wraps branches in functions, and wraps literals in
 calls of the type system.
 
-## 6. Questions for the maintainer
+## 6. The questions, as ruled
 
-1. **The symbol literal.** A grammar is a structure keyed and tagged by
-   symbols, so the parser engine needs symbols as data. Proposed:
-   `` `name ``. The alternative is a call, `symbol("name")`, which needs
-   a primitive from text to symbol.
-2. **`++` for joining.** The first operator added for readability; the
-   engine joins texts constantly. Say if it should be a name instead.
-3. **A binding is never where an effect happens.** It follows from the
-   rulings, and it will surprise: `line = read()` followed by a `print`
-   reads after the print if `line` is used later. The alternative is a
-   second form that binds a statement's value at its place, such as
-   `line <- read()`. Proposed: add that form.
-4. **The header words** `uses`, `input` and `import`. The standard
-   language has `use` for notation and `import` for bindings (ruling Q
-   of the scenarios); `uses` here declares a capability. Say if another
-   word reads better.
-5. **Milestone 3's programs** become Allegretto texts written for the
-   purpose, with the kernel's tests among them, and the present-surface
-   cases that need types move to milestone 4. This changes the
-   acceptance stream's census, so it is theirs to carry out.
+The maintainer approved each proposal on 2026-11-16, with one change.
+
+1. **The symbol literal** is `` `name ``.
+2. **`++` joins bits.** It is the first operator added for readability.
+3. **A binding that happens at its place** is written `line <- read()`.
+   It is a statement: it happens in written order, and the name is
+   bound to its value for the rest of the block. A binding written with
+   `=` is never where an effect happens.
+4. **The header words** are `capability`, `input` and `import`. The
+   proposal had `uses`; the maintainer: "we should use `capability`
+   since it's the canonical term for what's being declared".
+5. **Milestone 3's programs** are Allegretto texts written for the
+   purpose, with the kernel's tests among them. The present-surface
+   cases that need types move to milestone 4. The acceptance stream
+   carries this out in its census.

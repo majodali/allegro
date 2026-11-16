@@ -574,12 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
-- **2026-11-16 — Allegretto's forms proposed.**
-  `next/ext/allegretto/forms.md` proposes the forms of the first
+- **2026-11-16 — Allegretto's forms ruled.**
+  `next/ext/allegretto/forms.md` states the forms of the first
   notation, each with what it stands for in the kernel, the shipped
   primitives it names, what the kernel stream owes for it, and how it
-  differs from the present tree's base grammar. For the maintainer to
-  rule; five questions.
+  differs from the present tree's base grammar. The maintainer
+  approved it with one change: a capability is declared by the word
+  `capability`.
 - **2026-11-16 — Allegretto ruled.** The first notation is
   Allegretto: a small, usable language for the bare kernel and
   nothing else, shipped with the platform. The parser engine and the
