@@ -94,6 +94,12 @@ test("what a module yields, read through the kernel's interface: all its binding
   }
 });
 
+test("a module that declares no capability still yields: it is handed only what it declares", async () => {
+  const run = await runProgram("double(n) => n * 2\ndouble(2)\n// yields: double\n// end: completed\n");
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.yields, ["double"]);
+});
+
 test("the programs write every form of forms.md §2 that the launcher can run: all but input and import", () => {
   const used = new Set<FormId>();
   for (const file of FILES) {
