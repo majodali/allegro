@@ -697,6 +697,34 @@ one and takes a part of one, beside telling two apart. The draft
 listed these among the shipped primitives; they are the kernel's,
 since a shipped primitive's reference definition is written in them.
 
+### Recursion, by building (2026-11-16)
+
+Issues 5 and 6 were left to be settled by building. The block of
+bindings makes a recursive function one value, and the reference
+kernel then showed three things:
+
+- In ordinary evaluation no rule is needed. An undecided conditional's
+  branches stay unevaluated, so a recursion on an unknown argument
+  ends with the inner call unopened. The reviewers' picture of calls
+  opened without end assumed both branches are evaluated.
+- Where effects are performed the rule must not apply. A function
+  that prints and calls itself with the same argument is a program
+  that prints for ever.
+- The rule is needed where the kernel evaluates ahead of what is
+  done. A check phase holds no capability, so a program's first
+  effect waits and everything after it is evaluated ahead. There a
+  call to a function already being opened with the same information
+  stays in the residual. Built, and tested on a loop that prints for
+  ever: checked, it ends.
+
+Open: a recursion whose argument changes with known values, evaluated
+ahead, runs to its budget. A counter that prints from a known start
+with no end is the case. It needs a rule for generalising, and is
+taken with specialization. On issue 5 the kernel's part holds: a claim
+on a call left in the residual is undecided. The standard language's
+part, assuming a function's claims at its own inner call only under a
+decided decrease, is for the maintainer to rule when Part IV is built.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
