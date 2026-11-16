@@ -515,6 +515,46 @@ test("ahead of what is done, a call with the same information is not opened agai
   assert.ok(said.length > 10 && said.every((n) => n === 1));
 });
 
+test("once an entry or an argument waits, what follows it performs no effect until it is done", () => {
+  const { k, add, call } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  // A value asked for in full, whose first entry waits on a cell.
+  const c = k.cell();
+  const scope = k.scope();
+  const waits = k.evaluateInFull(k.structure([[null, call(say, c)], [null, call(say, byte(k, 2))]]), scope);
+  assert.equal(waits.ended, "complete", "a value that waits is not a limit and not a refutation");
+  assert.equal(waits.refuted, false);
+  assert.equal(k.waiting().length, 1, "the caller is told what it waits on");
+  assert.deepEqual(said, [], "the second entry's effect does not overtake the first's");
+  k.fill(c, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2]);
+  assert.deepEqual(k.entriesOf(k.current(waits.value)).map(([, v]) => num(k, v)), [1, 2]);
+  // The arguments of a primitive function, the same way.
+  said.length = 0;
+  const d = k.cell();
+  const sum = k.evaluate(call(add, call(say, d), call(say, byte(k, 4))), scope);
+  assert.deepEqual(said, []);
+  k.fill(d, byte(k, 3));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [3, 4]);
+  assert.equal(num(k, k.current(sum.value)), 7);
+});
+
+test("a description made by code is read in full when it is built", () => {
+  const { k, add, call, kp } = setup();
+  const x = k.param("x");
+  const f = k.composedFunction([x], call(add, x, byte(k, 1)));
+  const scope = k.scope();
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), f), scope).value;
+  // The same description, put together entry by entry: each entry is an expression until it is read.
+  const pieces = k.structure(k.entriesOf(d).map((_, i) => [null, call(kp("get"), d, byte(k, i))] as const));
+  const built = k.evaluate(call(kp("build"), pieces), scope);
+  assert.equal(built.refuted, false);
+  assert.equal(num(k, k.evaluate(call(built.value, byte(k, 6)), scope).value), 7);
+});
+
 test("a branch gets more knowledge as an argument: it is a function of the name its condition tested", () => {
   // What a language's `if` form builds for:  if isZero(x) then use(x) else use(x)
   // where `use` wants to know which branch it is in. Nothing is rebound: the

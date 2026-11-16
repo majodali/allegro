@@ -628,8 +628,11 @@ export const createKernel: CreateKernel2 = () => {
         return describe(f, [], all ? undefined : right.module);
       }
       if (fn.name === "build") {
-        if (!known(args[0])) return waits();
-        const built = build(args[0], []);
+        // A description is read whole, so it is needed in full.
+        const description = inFull(args[0], scope);
+        if (description instanceof Refuted) return description;
+        if (!knownInFull(description)) return waits();
+        const built = build(description, []);
         return built instanceof Fn ? close(built, scope) : built instanceof Refuted ? built : new Refuted("only the description of a function can be built", args[0]);
       }
       if (fn.name === "same") {
@@ -703,11 +706,19 @@ export const createKernel: CreateKernel2 = () => {
     }
     // A primitive function needs every argument, in full and left to right: its host code
     // cannot evaluate, so a structure it is handed has every entry evaluated first.
+    // Once one argument waits, those after it are evaluated ahead with no effect performed,
+    // so the effects of two arguments never happen out of the order written.
     const args: V[] = [];
-    for (const a of v.args) {
-      const r = inFull(a, scope);
-      if (r instanceof Refuted) return r;
-      args.push(r);
+    const before = ahead;
+    try {
+      for (const a of v.args) {
+        const r = inFull(a, scope);
+        if (r instanceof Refuted) return r;
+        if (!knownInFull(r)) ahead = true;
+        args.push(r);
+      }
+    } finally {
+      ahead = before;
     }
     {
       if (fn.declaration.arity !== args.length)
@@ -738,9 +749,16 @@ export const createKernel: CreateKernel2 = () => {
     if (r instanceof Refuted) return r;
     const s = seen(r);
     if (s instanceof Struct && !settled.has(s)) {
-      for (const [, e] of s.entries) {
-        const x = inFull(e, scope);
-        if (x instanceof Refuted) return x;
+      // Once one entry waits, those after it are evaluated ahead with no effect performed.
+      const before = ahead;
+      try {
+        for (const [, e] of s.entries) {
+          const x = inFull(e, scope);
+          if (x instanceof Refuted) return x;
+          if (!knownInFull(x)) ahead = true;
+        }
+      } finally {
+        ahead = before;
       }
     }
     return r;
@@ -998,9 +1016,10 @@ export const createKernel: CreateKernel2 = () => {
     const malformed = (): V => new Refuted("not a description", d);
     const s = seen(d);
     if (!(s instanceof Struct) || s.entries.length === 0) return malformed();
-    const head = s.entries[0][1];
+    // An entry may be one that was evaluated when read: what it came to is what is read.
+    const head = through(s.entries[0][1]);
     const form = head instanceof Quoted && head.inner instanceof Sym ? head.inner.fqn : "";
-    const parts = s.entries.slice(1).map(([, e]) => e);
+    const parts = s.entries.slice(1).map(([, e]) => through(e));
     const bitsAt = (i: number): Bits | undefined => {
       const p = parts[i] === undefined ? undefined : seen(parts[i]);
       return p instanceof Bits ? p : undefined;
