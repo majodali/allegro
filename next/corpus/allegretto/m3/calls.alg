@@ -1,6 +1,8 @@
 // The functions, lambdas and closures of the present tree's
-// src/test/base.ts. Each present text is an inner block, so each may bind
-// its function again; its value is printed.
+// src/test/base.ts, src/test/grammar2-language.ts and
+// src/test/types-battery.ts. Each present text is an inner block, so each
+// may bind its function again; its value is printed. The text of the case
+// grammar2/base: function definition and call is the block simple.
 // realises: test:base:simple function
 // realises: test:base:two-param function
 // realises: test:base:function call as argument
@@ -10,6 +12,9 @@
 // realises: test:base:higher-order function
 // realises: test:base:function returning value used in expression
 // realises: test:base:function shadowing binding
+// realises: test:grammar2-language:grammar2/base: function definition and call
+// realises: test:grammar2-language:grammar2/base: lambda
+// realises: test:types-battery:type annotation: untyped function still works
 capability output
 show(n) => output.write(int.text(n))
 simple <-
@@ -57,5 +62,15 @@ shadowing <-
   f(x) => x + 1
   f(5)
 show(shadowing)
+// expect: 6
+lambda <-
+  apply(f, x) => f(x)
+  apply(n => n + 10, 32)
+show(lambda)
+// expect: 42
+untyped <-
+  f(x) => x + 1
+  f(5)
+show(untyped)
 // expect: 6
 // end: completed
