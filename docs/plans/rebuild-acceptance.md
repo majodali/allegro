@@ -1416,3 +1416,29 @@ policy is the gate ruled there.
   - **The oracle.** `npm run bench:next` is added to the oracle list of
     this plan's header; `npm run lint:streams` accepts it. It gates
     nothing and runs in no suite or CI step.
+  - **Measured again in review, on the kernel after PR #229** (a
+    structure's entries are evaluated when read), which merged after
+    the run above: `npm run bench:next` on this branch merged with
+    main at `57b6612`, the same machine. The new kernel is faster on
+    every test and the findings stand.
+
+    | Test, size | New kernel before | New kernel after | Present twin | After / twin | After / native |
+    |---|---|---|---|---|---|
+    | parser, 1 term | 112 ms | 94.7 ms | 68.7 ms | 1.4x | 1,607x |
+    | parser, 16 terms | 3,915 ms | 1,848 ms | 528 ms | 3.5x | 2,361x |
+    | parser, 32 terms | 11,946 ms | 4,714 ms | 1,047 ms | 4.5x | 2,719x |
+    | parser, 64 terms | not run | 14,823 ms | 2,057 ms | 7.2x | 5,146x |
+    | typed loop, 256 | 887 ms | 575 ms | 51.1 ms | 11.3x | 22.7x |
+    | typed halving, 1,024 | 337 ms | 303 ms | 130 ms | 2.3x | 6.6x |
+    | typed halving, 65,536 | 28,415 ms | 23,466 ms | 7,692 ms | 3.1x | 8.6x |
+
+    The parser takes about nine steps in a hundred fewer (300,856 at 32
+    terms, where it took 330,611), and its time per step at 32 terms
+    is 15.7 microseconds, where it was 36.1. Time still grows faster
+    than steps: the fitted exponent is 1.22 for the parser and 1.88
+    for the typed loop. The ceilings: a plain sum completes to 394 in a
+    fresh process and the parser to 41 nested parentheses, as before;
+    the typed loop still reaches the kernel's limit at 512. A step still
+    slows with nested arguments (16.0 microseconds at n 50, 54.8 at
+    n 350), `==` on two texts of 1,600 characters still takes 771 ms,
+    and one slice of a text of 100,000 characters 17.3 ms.
