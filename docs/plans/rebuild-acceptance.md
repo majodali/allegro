@@ -1503,9 +1503,13 @@ policy is the gate ruled there.
     add. No scene of rung 2 relies on a library replacing a form: the
     grammar block of every present library only adds forms, the units
     library included, so the scenarios stand. PR #238: it retitles no
-    decision and rules inputs, which this part builds. PR #240, open:
-    it adds the sentence on conditions to "The kernel's primitives are
-    pure and few", which the condition case already cites.
+    decision and rules inputs, which this part builds. PR #240: it adds
+    the sentence on conditions to "The kernel's primitives are pure and
+    few", which the condition case already cites; the case's note now
+    says so. PR #242, the second adversarial review: nothing in it is
+    ruled yet. Its first cluster says `scope` and `bind` are to leave
+    the kernel's interface; the launcher calls `scope` once and follows
+    when the kernel stream changes the interface.
   - **The five answers to the open question.** These are recommendations;
     the maintainer ratifies them at the PR.
     1. An input is found in a configuration by its declared name.
