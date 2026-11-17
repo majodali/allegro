@@ -328,6 +328,21 @@ the key.
 
 Built in the reference kernel. Allegretto has no form for a key yet.
 
+### A form for keys in Allegretto (2026-11-17)
+
+The maintainer, on PR #247's gap: "in general Allegretto has forms
+corresponding to all kernel functionality". Ruled ("Let's go with this
+approach"):
+
+- A header line `key name` declares one of the module's keys.
+- A structure literal writes a private entry as `[name]: e`. The
+  brackets hold only a key's name for now.
+- Reading needs no form: `p[name]` is `get(p, name)`.
+- A module may hand a key out by exporting a binding of it.
+
+Recorded in `next/ext/allegretto/forms.md`. The grammar, reader and
+emitter are the acceptance stream's.
+
 ## Terms introduced
 
 No terms introduced.

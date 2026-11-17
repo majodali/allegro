@@ -579,6 +579,10 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — Allegretto's forms for keys.** A header line
+  `key name` and a private entry `[name]: e` in a structure literal,
+  read as `p[name]`. Ruled and written into
+  `next/ext/allegretto/forms.md`; the reader and emitter follow.
 - **2026-11-17 — A private member is an entry keyed by a key (the
   second review's cluster 3).** In `next/kernel/kernel.ts`: `get`
   with the key reads the entry; a place and `count` pass over it; a
