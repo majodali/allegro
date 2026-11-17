@@ -358,7 +358,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language
 
 #### Order of definition carries no meaning
-- Decides: the order in which definitions and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Only effects have an order: plain effects are not declarations, and happen in the order the program writes them.
+- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body happen in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -371,6 +371,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
 - Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
 - Notes (2026-11-16, the order of effects): the order of a body's statements is carried by sequence ("Sequence is one kernel primitive"); bindings stay order-free.
+- Notes (2026-11-17, the adversarial review's issue 16): reworded by ruling. The entry said only effects have an order, and later decisions made two more exceptions it did not state. The first is carried by sequence, the second by "A text can change the grammar it is read in", the third by "Running a program is evaluating its main module with a configuration's capabilities". Knowledge from an `assert` holds for the statements after it, which is the first exception again.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on

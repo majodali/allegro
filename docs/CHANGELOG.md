@@ -579,6 +579,10 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — The order of definition reworded.** "Order of
+  definition carries no meaning" holds for bindings and names its
+  three exceptions: a body's statements, a grammar change, a prompt's
+  entries. The second adversarial review starts.
 - **2026-11-17 — Inputs ruled.** An input is plain data the
   configuration supplies to the module being run, a cell until it is
   supplied; an imported module declares none.

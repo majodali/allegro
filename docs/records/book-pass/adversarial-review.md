@@ -826,6 +826,14 @@ header line `input name` in Allegretto's forms. Ruled now, narrowly
 Open: who supplies an imported module's inputs, and how an input's
 name is found in a configuration.
 
+### Issue 16 (2026-11-17)
+
+Ruled: "Order of definition carries no meaning" holds for bindings,
+and states its three exceptions: a body's statements, a grammar
+change, and a prompt's entries. With it 29 of the 31 issues are ruled
+or done, and the two left are settled by building. The maintainer
+asked for the second review round to start.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
