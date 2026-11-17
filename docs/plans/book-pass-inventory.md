@@ -3355,7 +3355,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a solver gives each candidate ten thousand steps; a candidate that runs out is undecided, and is so on every machine.
 - Notes: new, by ruling.
 - Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 20: the entry called a step budget deterministic.
-- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 on the speed tests of milestone 3 (docs/plans/rebuild-acceptance.md §7, chunk Q8): "no depth limit". The reference kernel ended a recursion of about 400 calls at the host's stack, at a depth that differed from run to run. That limit goes; how is the kernel stream's to choose.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 on the speed tests of milestone 3 (docs/plans/rebuild-acceptance.md §7, the entry on the speed tests): "no depth limit". The reference kernel ended a recursion of about 400 calls at the host's stack, at a depth that differed from run to run. That limit goes; how is the kernel stream's to choose.
 - Chapter: The kernel's interface
 
 ### Configuration
