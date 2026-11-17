@@ -352,16 +352,6 @@ export interface Kernel2 extends Kernel {
    */
   symbolData(fqn: string): Value;
 
-  /**
-   * As `evaluate`, and then every entry of every structure in the value
-   * is evaluated too, in order. `evaluate` gives the value asked for and
-   * no more: a structure in its result is complete in shape, and an entry
-   * is evaluated when something reads it, so `entriesOf` may hand back an
-   * entry that is still an expression. A host that shows or stores a whole
-   * value asks for it in full. A refutation in any entry is the result's.
-   */
-  evaluateInFull(expression: Value, scope: Scope, limits?: Limits): Result;
-
   // ---- Modules and keys -----------------------------------------------
 
   /**
