@@ -1,5 +1,5 @@
 // The minimal launcher (B-196 (the rebuild's acceptance side), chunk Q7
-// (the minimal launcher), parts 1 and 2, docs/plans/rebuild-acceptance.md §5;
+// (the minimal launcher), parts 1 to 3, docs/plans/rebuild-acceptance.md §5;
 // chunk Q5 (the first notation and the bootstrap), part 3, for the
 // capability as a structure of its parts).
 //
@@ -10,6 +10,9 @@
 //   "A module is a function of its capabilities, inputs and imports"
 //   "A late answer or its failure fills a cell as plain data": the
 //    launcher fills a cell with plain data
+//   "Phases are configuration", "When information arrives, what waited on
+//    it is evaluated again": a later phase of the configuration supplies
+//    an input, and what waited on it is evaluated again in the same launch
 //
 // It is a library and host-neutral: no process, no fs, no Buffer. It is
 // built against the second version of the kernel's interface (`Kernel2`
@@ -32,21 +35,32 @@
 //      the symbols of the part names, so a program reads a part as an
 //      entry (next/ext/allegretto/forms.md §2: `output.write("hello")`).
 //      A declared capability the ceiling does not grant is refused before
+//      anything is evaluated. Each parameter with role `input` is handed the
+//      plain data the configuration supplies for it at the start (`inputs`),
+//      found by its declared name, or else a fresh cell. An input the module
+//      does not declare, or one supplied more than once, is refused before
 //      anything is evaluated;
 //   5  builds the application of the module function to those arguments
 //      and has the kernel evaluate it in a fresh scope, under the step
 //      budget;
 //   6  while the kernel waits on cells, fills those whose answers have
-//      arrived and calls `advance`;
+//      arrived and calls `advance`. When it waits and no capability's
+//      answer is due, it applies the next later phase of the configuration
+//      (`later`): it fills the cells of the inputs that phase supplies and
+//      calls `advance`. Phases are applied in order, one at a time; when
+//      nothing waits, the phases left are not applied;
 //   7  returns how the run ended, and the lines the output capability
-//      wrote. A refuted run carries the reason the kernel gives for each
+//      wrote, with the number of lines printed before each later phase was
+//      applied. A refuted run carries the reason the kernel gives for each
 //      refutation it reported (`reasonOf`). A run left waiting names the
-//      names nothing binds, apart from the cells no capability will answer.
+//      inputs no phase supplied and the names nothing binds, apart from the
+//      cells no capability will answer.
 // Step 1 is the caller's: it passes the configuration. Step 3 loads one
 // saved program; the first extensions are a later part.
 //
 // Left out, refused with a plain reason: a module parameter with role
-// `input` or `module`.
+// `module`. Inputs are supplied; imports are still refused, since the
+// module loader is the kernel stream's and does not exist yet.
 //
 // The pure primitives a record needs come from the target, found by hash
 // (`Target.primitives`); the terminal's entry supplies the shipped ones of
@@ -106,7 +120,10 @@ export interface Target {
   readonly primitives?: readonly PrimitiveDeclaration[];
 }
 
-/** The configuration, as far as milestone 2 needs it. */
+/** The inputs a configuration supplies in one phase: plain data, by the input's declared name. */
+export type Inputs = Readonly<Record<string, Plain>>;
+
+/** The configuration, as far as milestone 2 needs it, and the inputs of the module being run. */
 export interface Configuration {
   /** The names of the capabilities the ceiling grants. */
   readonly ceiling: readonly string[];
@@ -118,6 +135,10 @@ export interface Configuration {
    * outcomes are not looked at, and every claim is decided again.
    */
   readonly restoreAs?: string;
+  /** The inputs supplied at the start. An input not supplied is a cell. */
+  readonly inputs?: Inputs;
+  /** Each later phase, in order: the inputs it supplies, each filling the cell of that input. */
+  readonly later?: readonly Inputs[];
 }
 
 export interface Launch {
@@ -144,10 +165,18 @@ export type LaunchEnd =
   | { readonly kind: "limit"; readonly steps: number; readonly reason: string }
   /**
    * The kernel waits on what nothing will supply: `unanswered` counts the
-   * cells no capability will answer, and `unbound` names the names that
-   * nothing binds.
+   * cells no capability will answer, `inputs` names the declared inputs
+   * that no phase of the configuration supplied, and `unbound` names the
+   * names that nothing binds.
    */
-  | { readonly kind: "waiting"; readonly steps: number; readonly reason: string; readonly unanswered: number; readonly unbound: readonly string[] }
+  | {
+      readonly kind: "waiting";
+      readonly steps: number;
+      readonly reason: string;
+      readonly unanswered: number;
+      readonly inputs: readonly string[];
+      readonly unbound: readonly string[];
+    }
   /** Refused before anything was evaluated. */
   | { readonly kind: "refused"; readonly reason: string; readonly findings: readonly string[] }
   /** The kernel or a capability threw. */
@@ -156,6 +185,11 @@ export type LaunchEnd =
 export interface LaunchOutcome {
   /** The lines printed, in order. */
   readonly lines: string[];
+  /**
+   * For each later phase applied, in order, the number of lines printed
+   * before it was applied. Empty when none was.
+   */
+  readonly linesBeforePhase: number[];
   readonly end: LaunchEnd;
 }
 
@@ -163,19 +197,32 @@ export interface LaunchOutcome {
 const SECOND_VERSION_CALLS = ["module", "restore", "reasonOf"] as const;
 
 function refused(lines: string[], reason: string, findings: readonly string[] = []): LaunchOutcome {
-  return { lines, end: { kind: "refused", reason, findings } };
+  return { lines, linesBeforePhase: [], end: { kind: "refused", reason, findings } };
 }
 
-function plainValue(kernel: Kernel2, plain: Plain): Value {
+/**
+ * Plain data as a value of the kernel. A symbol is a symbol as data
+ * (`symbolData`), never a name to look up, since an input handed as an
+ * argument is not filled and so is not made data by `fill`. A key stays
+ * the symbol itself, as a structure's keys are.
+ */
+export function plainValue(kernel: Kernel2, plain: Plain): Value {
   if ("bits" in plain) return kernel.bits(plain.bits, plain.bitLength);
-  if ("symbol" in plain) return kernel.symbol(plain.symbol);
-  return kernel.structure(plain.entries.map(([k, v]) => [k === null ? null : plainValue(kernel, k), plainValue(kernel, v)] as const));
+  if ("symbol" in plain) return kernel.symbolData(plain.symbol);
+  return kernel.structure(plain.entries.map(([k, v]) => [k === null ? null : plainKey(kernel, k), plainValue(kernel, v)] as const));
+}
+function plainKey(kernel: Kernel2, plain: Plain): Value {
+  return "symbol" in plain ? kernel.symbol(plain.symbol) : plainValue(kernel, plain);
 }
 
-/** Runs one saved program as "Startup, step by step" has it, as far as milestone 2 needs. */
+/** The names a phase's inputs give, own keys only. */
+const namesOf = (inputs: Inputs | undefined): string[] => (inputs === undefined ? [] : Object.keys(inputs));
+
+/** Runs one saved program as "Startup, step by step" has it, as far as milestone 2 needs, with the inputs of the module being run. */
 export async function launch(request: Launch): Promise<LaunchOutcome> {
   const { configuration, target } = request;
   const lines: string[] = [];
+  const linesBeforePhase: number[] = [];
   const answers = new Map<Cell, Promise<void>>();
   const arrived = new Map<Cell, Plain>();
   let capabilityFault: string | null = null;
@@ -216,10 +263,22 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   for (const name of configuration.ceiling)
     if (!supplied.has(name)) problems.push(`the ceiling grants ${name}, which this target does not supply`);
   for (const d of program.declares) {
-    if (d.role === "input") problems.push(`the module declares the input ${d.name}; this launcher supplies no inputs yet`);
-    else if (d.role === "module") problems.push(`the module imports the module ${d.name}; this launcher supplies no modules yet`);
-    else if (!configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
+    if (d.role === "module") problems.push(`the module imports the module ${d.name}; this launcher supplies no modules yet`);
+    else if (d.role === "capability" && !configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
   }
+  // The inputs, by declared name: each declared, and each supplied once.
+  const declaredInputs = new Set(program.declares.filter((d) => d.role === "input").map((d) => d.name));
+  const phases = configuration.later ?? [];
+  const suppliedIn = new Map<string, number>();
+  [configuration.inputs, ...phases].forEach((inputs, phase) => {
+    for (const name of namesOf(inputs)) {
+      const where = phase === 0 ? "at the start" : `in later phase ${phase}`;
+      if (!declaredInputs.has(name)) problems.push(`the configuration supplies the input ${name} ${where}, which the module does not declare`);
+      const first = suppliedIn.get(name);
+      if (first !== undefined) problems.push(`the configuration supplies the input ${name} ${first === 0 ? "at the start" : `in later phase ${first}`} and again ${where}`);
+      else suppliedIn.set(name, phase);
+    }
+  });
   if (problems.length > 0) return refused(lines, problems[0], problems);
 
   try {
@@ -241,11 +300,20 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const implementation = supplied.get(name)!;
       const parts = implementation.create(host);
       if (parts.length !== implementation.definition.parts.length || parts.some((p) => p.purity !== "effectful"))
-        return { lines, end: { kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` } };
+        return { lines, linesBeforePhase, end: { kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` } };
       const names = implementation.definition.parts;
       granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
     }
-    const args = program.declares.map((d) => granted.get(d.name)!);
+    // Each input: the plain data supplied at the start, or else a fresh cell that a later phase may fill.
+    const inputCells = new Map<string, Cell>();
+    const atStart = configuration.inputs ?? {};
+    const args = program.declares.map((d) => {
+      if (d.role !== "input") return granted.get(d.name)!;
+      if (Object.hasOwn(atStart, d.name)) return plainValue(kernel, atStart[d.name]);
+      const cell = kernel.cell();
+      inputCells.set(d.name, cell);
+      return cell;
+    });
 
     // Step 5: instantiate the module, in a fresh scope, under the budget.
     const budget = configuration.steps;
@@ -255,18 +323,27 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // A kernel may end at a limit of its own with no budget set (its stack runs out).
     const atLimit = (): LaunchOutcome => ({
       lines,
+      linesBeforePhase,
       end: { kind: "limit", steps, reason: budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out` },
     });
     const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
       const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
-      return { lines, end: { kind: "refuted", steps, reason: reasons.join("; "), reasons } };
+      return { lines, linesBeforePhase, end: { kind: "refuted", steps, reason: reasons.join("; "), reasons } };
     };
     if (result.refuted) return refutedEnd([result.value]);
     if (result.ended === "limit") return atLimit();
 
-    // Step 6: deliver the values that arrive later.
+    // Step 6: deliver the values that arrive later, and apply the later phases.
+    let nextPhase = 0;
+    const advanceOnce = (): LaunchOutcome | undefined => {
+      const advanced = kernel.advance(left(steps));
+      steps += advanced.steps;
+      if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
+      if (advanced.ended === "limit") return atLimit();
+      return undefined;
+    };
     for (;;) {
-      if (capabilityFault !== null) return { lines, end: { kind: "fault", reason: capabilityFault } };
+      if (capabilityFault !== null) return { lines, linesBeforePhase, end: { kind: "fault", reason: capabilityFault } };
       const waiting = kernel.waiting();
       if (waiting.length === 0) break;
       let filled = 0;
@@ -279,30 +356,47 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         answers.delete(cell);
       }
       if (filled > 0) {
-        const advanced = kernel.advance(left(steps));
-        steps += advanced.steps;
-        if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
-        if (advanced.ended === "limit") return atLimit();
+        const ended = advanceOnce();
+        if (ended !== undefined) return ended;
         continue;
       }
       const due = waiting.filter((c) => answers.has(c)).map((c) => answers.get(c)!);
-      if (due.length === 0) {
-        // A name nothing binds is listed as a cell handle of kind symbol.
-        const unbound = waiting.filter((c) => kernel.kind(c) === "symbol").map((c) => kernel.symbolName(c));
-        const unanswered = waiting.length - unbound.length;
-        const parts = [
-          ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
-          ...(unbound.length > 0 ? [`the name(s) ${unbound.join(", ")}, which nothing binds`] : []),
-        ];
-        return { lines, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, unbound } };
+      if (due.length > 0) {
+        await Promise.race(due);
+        continue;
       }
-      await Promise.race(due);
+      // The kernel waits and no capability's answer is due: the next later phase, if there is one.
+      if (nextPhase < phases.length) {
+        linesBeforePhase.push(lines.length);
+        const inputs = phases[nextPhase++];
+        for (const name of namesOf(inputs)) {
+          const cell = inputCells.get(name)!;
+          kernel.fill(cell, plainValue(kernel, inputs[name]));
+          inputCells.delete(name);
+        }
+        const ended = advanceOnce();
+        if (ended !== undefined) return ended;
+        continue;
+      }
+      // The cells of inputs no phase supplied are named by the input's declared name.
+      const inputOf = new Map([...inputCells].map(([name, cell]) => [cell as Value, name] as const));
+      const inputs = [...inputCells.keys()].filter((name) => waiting.includes(inputCells.get(name)!));
+      const rest = waiting.filter((c) => !inputOf.has(c));
+      // A name nothing binds is listed as a cell handle of kind symbol.
+      const unbound = rest.filter((c) => kernel.kind(c) === "symbol").map((c) => kernel.symbolName(c));
+      const unanswered = rest.length - unbound.length;
+      const parts = [
+        ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
+        ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
+        ...(unbound.length > 0 ? [`the name(s) ${unbound.join(", ")}, which nothing binds`] : []),
+      ];
+      return { lines, linesBeforePhase, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs, unbound } };
     }
 
     // Step 7.
-    return { lines, end: { kind: "completed", steps } };
+    return { lines, linesBeforePhase, end: { kind: "completed", steps } };
   } catch (e) {
-    return { lines, end: { kind: "fault", reason: e instanceof Error ? e.message : String(e) } };
+    return { lines, linesBeforePhase, end: { kind: "fault", reason: e instanceof Error ? e.message : String(e) } };
   }
 }
 

@@ -1,5 +1,5 @@
 // Tests of the minimal launcher (B-196 (the rebuild's acceptance side),
-// chunk Q7 (the minimal launcher), parts 1 and 2, and chunk Q5 (the first
+// chunk Q7 (the minimal launcher), parts 1 to 3, and chunk Q5 (the first
 // notation and the bootstrap), part 3): next/launch/launcher.ts
 // and the output capability next/launch/output.ts, on the reference
 // kernel, `createKernel` of next/kernel/create.ts. Run by
@@ -16,6 +16,7 @@ import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../ke
 import { emit } from "../bootstrap/emit.js";
 import { describe, launch, type CapabilityImplementation, type Configuration, type Plain, type Target } from "./launcher.js";
 import { OUTPUT, output } from "./output.js";
+import { shipped } from "../prims/index.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
@@ -295,18 +296,20 @@ test("a ceiling that names a capability the target does not supply is refused", 
   assert.match(describe(outcome.end), /grants files, which this target does not supply/);
 });
 
-test("inputs and module parameters are refused in this part, with a plain reason", async () => {
-  const withInput: SavedProgram = (() => {
+test("a module that imports is still refused, with a plain reason, before anything is evaluated", async () => {
+  const withModule: SavedProgram = (() => {
     const r = new Record();
     const out = r.capability("output");
-    const n = r.param("n");
-    r.params.push(n);
-    const doc = r.done(r.apply(r.part(out, "write"), [n]));
-    return { ...doc, declares: [...doc.declares, { param: n, role: "input", name: "n" }] };
+    const lib = r.param("lib");
+    r.params.push(lib);
+    const doc = r.done(r.apply(r.part(out, "write"), [r.text("never")]));
+    return { ...doc, declares: [...doc.declares, { param: lib, role: "module", name: "lib" }] };
   })();
-  assert.match(describe((await launch({ createKernel, program: withInput, configuration: ONLY_OUTPUT, target: TERMINAL })).end), /supplies no inputs yet/);
-  const withModule = { ...withInput, declares: [withInput.declares[0], { param: 1, role: "module", name: "lib" }] };
-  assert.match(describe((await launch({ createKernel, program: withModule, configuration: ONLY_OUTPUT, target: TERMINAL })).end), /supplies no modules yet/);
+  assert.deepEqual(check2(withModule), []);
+  const r = recording();
+  const outcome = await launch({ createKernel: r.createKernel, program: withModule, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(describe(outcome.end), "refused: the module imports the module lib; this launcher supplies no modules yet");
+  assert.ok(!r.calls.includes("evaluate"));
 });
 
 test("a record that needs a primitive hash the target lacks is refused, before any kernel call", async () => {
@@ -383,6 +386,7 @@ test("a cell that no capability will answer ends the run as waiting, not complet
     steps: outcome.end.kind === "waiting" ? outcome.end.steps : -1,
     reason: "the program waits on 1 cell(s) that no capability will answer",
     unanswered: 1,
+    inputs: [],
     unbound: [],
   });
   assert.deepEqual(outcome.lines, []);
@@ -506,4 +510,182 @@ test("the launcher and the output capability reach no host API", () => {
     const source = fs.readFileSync(path.join(here, file), "utf8").replace(/^\s*\/\/.*$/gm, "");
     assert.doesNotMatch(source, /\bprocess\.|from "fs"|from "path"|\bBuffer\b/, file);
   }
+});
+
+
+// ── Inputs (chunk Q7, part 3) ─────────────────────────────────────────
+
+/** The record the emitter writes for an Allegretto text, as JSON round-trips it. */
+function emitted(text: string): SavedProgram {
+  const r = emit(text);
+  assert.ok(r.ok, r.ok ? "" : r.findings.map((f) => f.message).join("; "));
+  return JSON.parse(encode(r.program)) as SavedProgram;
+}
+const textData = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
+const SHIPPED_TARGET: Target = { capabilities: [output], primitives: shipped };
+
+/** input n: it prints a line, then n, then a line. */
+const PRINTS_N = emitted('capability output\ninput n\noutput.write("before")\noutput.write(n)\noutput.write("after")\n');
+/** inputs a and b, each printed in turn. */
+const PRINTS_A_B = emitted('capability output\ninput a\ninput b\noutput.write("start")\noutput.write(a)\noutput.write(b)\n');
+
+test("an input the configuration supplies at the start is handed as its plain data, by its declared name", async () => {
+  const r = recording();
+  const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration: { ceiling: ["output"], inputs: { n: textData("supplied") } }, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["before", "supplied", "after"]);
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(outcome.linesBeforePhase, []);
+  assert.ok(!r.calls.includes("fill"), "an input supplied at the start fills no cell");
+});
+
+test("an input not supplied is a cell: the run evaluates what does not depend on it, and ends waiting on the input, by name", async () => {
+  const outcome = await launch({ createKernel, program: PRINTS_N, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["before"]);
+  assert.equal(outcome.end.kind, "waiting");
+  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs, outcome.end.unbound], [0, ["n"], []]);
+  assert.equal(describe(outcome.end), "waiting: the program waits on the input(s) n, which the configuration does not supply");
+});
+
+test("an input the module does not declare is refused, by name, before anything is evaluated: at the start and in a later phase", async () => {
+  const configurations: Configuration[] = [
+    { ceiling: ["output"], inputs: { n: textData("x"), m: textData("y") } },
+    { ceiling: ["output"], later: [{ n: textData("x") }, { m: textData("y") }] },
+  ];
+  for (const configuration of configurations) {
+    const r = recording();
+    const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration, target: TERMINAL });
+    assert.equal(outcome.end.kind, "refused");
+    assert.match(describe(outcome.end), /^refused: the configuration supplies the input m (at the start|in later phase 2), which the module does not declare$/);
+    assert.ok(!r.calls.includes("evaluate"));
+    assert.deepEqual(outcome.lines, []);
+  }
+});
+
+test("an input supplied more than once is refused, by name, before anything is evaluated: at the start and later, or in two later phases", async () => {
+  const cases: Array<[Configuration, string]> = [
+    [{ ceiling: ["output"], inputs: { n: textData("x") }, later: [{ n: textData("y") }] }, "the configuration supplies the input n at the start and again in later phase 1"],
+    [{ ceiling: ["output"], later: [{ n: textData("x") }, { n: textData("y") }] }, "the configuration supplies the input n in later phase 1 and again in later phase 2"],
+  ];
+  for (const [configuration, reason] of cases) {
+    const r = recording();
+    const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration, target: TERMINAL });
+    assert.equal(outcome.end.kind === "refused" && outcome.end.reason, reason);
+    assert.ok(!r.calls.includes("evaluate"));
+  }
+});
+
+test("a later phase is applied when the kernel waits: its inputs are filled, advance runs, and the lines printed before it are counted", async () => {
+  const r = recording();
+  const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration: { ceiling: ["output"], later: [{ n: textData("late") }] }, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["before", "late", "after"]);
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(outcome.linesBeforePhase, [1]);
+  assert.deepEqual(r.calls.filter((c) => evaluating.includes(c) || c === "fill"), ["evaluate", "fill", "advance"]);
+});
+
+test("later phases are applied in order, one at a time", async () => {
+  const r = recording();
+  const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_A_B, configuration: { ceiling: ["output"], later: [{ a: textData("one") }, { b: textData("two") }] }, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["start", "one", "two"]);
+  assert.deepEqual(outcome.linesBeforePhase, [1, 2]);
+  assert.deepEqual(r.calls.filter((c) => evaluating.includes(c) || c === "fill"), ["evaluate", "fill", "advance", "fill", "advance"]);
+  // Supplied in the other order, a phase fills b first; a waits until the second, and output keeps its written order.
+  const swapped = await launch({ createKernel, program: PRINTS_A_B, configuration: { ceiling: ["output"], later: [{ b: textData("two") }, { a: textData("one") }] }, target: TERMINAL });
+  assert.deepEqual(swapped.lines, ["start", "one", "two"]);
+  assert.deepEqual(swapped.linesBeforePhase, [1, 1]);
+});
+
+test("a later phase waits while a capability's answer is due, and is applied only once nothing is due", async () => {
+  const later = laterCapability();
+  const program = emitted("capability later\ncapability output\ninput n\noutput.write(later.ask())\noutput.write(n)\n");
+  const run = launch({ createKernel, program, configuration: { ceiling: ["later", "output"], later: [{ n: textData("from the phase") }] }, target: { capabilities: [output, later.capability] } });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  later.answer("from the capability");
+  const outcome = await run;
+  assert.deepEqual(outcome.lines, ["from the capability", "from the phase"]);
+  assert.deepEqual(outcome.linesBeforePhase, [1]);
+  assert.equal(outcome.end.kind, "completed");
+});
+
+test("when nothing waits the run has completed, and the phases left are not applied", async () => {
+  const r = recording();
+  const unused = emitted('capability output\ninput n\noutput.write("done")\n');
+  const outcome = await launch({ createKernel: r.createKernel, program: unused, configuration: { ceiling: ["output"], later: [{ n: textData("x") }] }, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["done"]);
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(outcome.linesBeforePhase, []);
+  assert.ok(!r.calls.includes("fill"));
+  const once = emitted("capability output\ninput a\ninput b\noutput.write(a)\n");
+  const left = await launch({ createKernel, program: once, configuration: { ceiling: ["output"], later: [{ a: textData("one") }, { b: textData("two") }] }, target: TERMINAL });
+  assert.deepEqual(left.lines, ["one"]);
+  assert.equal(left.end.kind, "completed");
+  assert.deepEqual(left.linesBeforePhase, [0]);
+});
+
+test("a run left waiting after its phases names the inputs no phase supplied", async () => {
+  const outcome = await launch({ createKernel, program: PRINTS_A_B, configuration: { ceiling: ["output"], later: [{ a: textData("one") }] }, target: TERMINAL });
+  assert.deepEqual(outcome.lines, ["start", "one"]);
+  assert.deepEqual(outcome.linesBeforePhase, [1]);
+  assert.deepEqual(outcome.end.kind === "waiting" && outcome.end.inputs, ["b"]);
+  assert.equal(describe(outcome.end), "waiting: the program waits on the input(s) b, which the configuration does not supply");
+});
+
+test("the end names the inputs beside the unanswered cells and the unbound names, and the cells of inputs are not counted as unanswered", async () => {
+  // module(later, output, n) => then(later.ask(), then(output.write(n), output.write(greeting))).
+  const program: SavedProgram = (() => {
+    const r = new Record();
+    const later = r.capability("later");
+    const out = r.capability("output");
+    const n = r.param("n");
+    r.params.push(n);
+    const write = (v: number) => r.apply(r.part(out, "write"), [v]);
+    const doc = r.done(r.then(r.apply(r.part(later, "ask"), []), r.then(write(n), write(r.add({ k: "symbol", fqn: "greeting" })))));
+    return { ...doc, declares: [...doc.declares, { param: n, role: "input", name: "n" }] };
+  })();
+  assert.deepEqual(check2(program), []);
+  const stuck: CapabilityImplementation = {
+    definition: { name: "later", parts: ["ask"] },
+    create: () => [{ purity: "effectful", capability: "later", part: "ask", arity: 0, run: (_a, context) => context.cell() as Cell }],
+  };
+  const outcome = await launch({ createKernel, program, configuration: { ceiling: ["later", "output"] }, target: { capabilities: [output, stuck] } });
+  assert.equal(outcome.end.kind, "waiting");
+  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs, outcome.end.unbound], [1, ["n"], ["greeting"]]);
+  assert.equal(
+    describe(outcome.end),
+    "waiting: the program waits on 1 cell(s) that no capability will answer and on the input(s) n, which the configuration does not supply and on the name(s) greeting, which nothing binds",
+  );
+});
+
+test("a later phase advances under the same step budget as the evaluation before it", async () => {
+  const configuration = (steps?: number): Configuration => ({ ceiling: ["output"], steps, later: [{ n: textData("late") }] });
+  const full = await launch({ createKernel, program: PRINTS_N, configuration: configuration(), target: TERMINAL });
+  const needed = full.end.kind === "completed" ? full.end.steps : -1;
+  const first = await launch({ createKernel, program: PRINTS_N, configuration: { ceiling: ["output"] }, target: TERMINAL });
+  const before = first.end.kind === "waiting" ? first.end.steps : -1;
+  assert.ok(before > 0 && needed > before, "the phase spends steps of its own");
+  const few = await launch({ createKernel, program: PRINTS_N, configuration: configuration(needed - 1), target: TERMINAL });
+  assert.deepEqual(few.end, { kind: "limit", steps: needed - 1, reason: `the step budget of ${needed - 1} ran out` });
+  assert.deepEqual(few.linesBeforePhase, [1]);
+  const enough = await launch({ createKernel, program: PRINTS_N, configuration: configuration(needed), target: TERMINAL });
+  assert.deepEqual(enough.end, { kind: "completed", steps: needed });
+});
+
+test("an input of each kind of plain data is handed as data: bits, a symbol, a structure", async () => {
+  const program = emitted('capability output\ninput t\ninput s\ninput p\noutput.write(t)\noutput.write(if s == `a then "true" else "false")\noutput.write(int.text(p.x + p.y[0]))\n');
+  const seven = { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 7), bitLength: 64 };
+  const p: Plain = { entries: [[{ symbol: "x" }, seven], [{ symbol: "y" }, { entries: [[null, seven]] }]] };
+  const configurations: Configuration[] = [
+    { ceiling: ["output"], inputs: { t: textData("text"), s: { symbol: "a" }, p } },
+    { ceiling: ["output"], later: [{ t: textData("text") }, { s: { symbol: "a" } }, { p }] },
+  ];
+  for (const configuration of configurations) {
+    const outcome = await launch({ createKernel, program, configuration, target: SHIPPED_TARGET });
+    assert.deepEqual(outcome.lines, ["text", "true", "14"]);
+    assert.equal(outcome.end.kind, "completed");
+  }
+});
+
+test("the launcher does not import the bootstrap", () => {
+  const source = fs.readFileSync(path.join(here, "launcher.ts"), "utf8").replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(source, /from "\.\.\/bootstrap\//);
 });
