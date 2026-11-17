@@ -1499,6 +1499,13 @@ policy is the gate ruled there.
   (`next/corpus/allegretto/README.md`) gains `// input:`, `// later:`
   and `// end: waiting:` lines. The test that asserted an input is
   refused is replaced by twelve tests of the new behaviour.
+  - **Read before this part.** PR #237: a notation a text uses can only
+    add. No scene of rung 2 relies on a library replacing a form: the
+    grammar block of every present library only adds forms, the units
+    library included, so the scenarios stand. PR #238: it retitles no
+    decision and rules inputs, which this part builds. PR #240, open:
+    it adds the sentence on conditions to "The kernel's primitives are
+    pure and few", which the condition case already cites.
   - **The five answers to the open question.** These are recommendations;
     the maintainer ratifies them at the PR.
     1. An input is found in a configuration by its declared name.
@@ -1531,7 +1538,11 @@ policy is the gate ruled there.
     undeclared name is no cell, is not something a program can show.
     The emitter refuses the name, and in the kernel a name nothing binds
     is a cell, by the ruling of 2026-11-14 on "A missing value is a cell
-    that is filled once". The case may need class changes.
+    that is filled once". The case is class changes now, by that
+    decision: a declared input not supplied and a name nothing binds are
+    both cells, and a run that needs either ends waiting on it. A test
+    of `next/launch/launcher.test.ts` shows both on a record written by
+    hand.
     The B-172 C1 cases of Rule 1 at milestone 1, and Rule 2's "eval_if
     with an unresolved condition evaluates both branches": each compares
     the shape of a residual, which only the kernel primitive `describe`

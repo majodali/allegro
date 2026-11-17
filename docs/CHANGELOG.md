@@ -1263,7 +1263,9 @@ An undeclared or twice-supplied input is refused. `npm run allegretto`
 takes `--input` and `--later`, each value one Allegretto literal read by
 `next/bootstrap/literal.ts`. Seven programs under
 `next/corpus/allegretto/m1/` and `m3/` realise four cases of milestone 1
-and three of milestone 3. Record: `docs/plans/rebuild-acceptance.md` §7.
+and three of milestone 3. One case of milestone 1, on a name nothing
+binds, is class changes now: such a name is a cell, by "A missing value
+is a cell that is filled once". Record: `docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — The condition case changes, as ruled (B-196)
 

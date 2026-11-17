@@ -18,8 +18,7 @@ Each statement is a comment line of its own:
 |---|---|
 | `// realises: <case id>` | the program shows this case; one line per case, the id exactly as in `next/corpus/cases.json` |
 | `// expect: <line>` | a line the program prints; the lines in order, each compared exactly |
-| `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, or `waiting: <reason>`; every program has one |
-| `// end: waiting: <reason>` | the run ends waiting, with the launcher's reason |
+| `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, or `waiting: <the reason the launcher gives>`; every program has one |
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
