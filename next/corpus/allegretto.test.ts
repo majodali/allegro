@@ -8,12 +8,16 @@
 // run: functions, recursion, claims". By the fifth answer of
 // next/ext/allegretto/forms.md §6 they are Allegretto texts written for the
 // purpose. Chunk Q6 (the comparison harness), part 2, moved them here from
-// next/bootstrap/fixtures/.
+// next/bootstrap/fixtures/. Chunk Q7 (the minimal launcher and the output
+// capability), part 3, added the `// input:`, `// later:` and
+// `// end: waiting:` lines and the programs that use them, under m1/ and
+// m3/.
 //
 // Each program is emitted and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
 // `--next` uses too, and its lines, end and yielded keys are compared with
-// its `// expect:`, `// end:` and `// yields:` lines.
+// its `// expect:`, `// end:` and `// yields:` lines, and the lines printed
+// before each later phase with the place of its `// later:` line.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -41,6 +45,77 @@ test("the programs written for milestone 3 are there, each in its milestone's di
   for (const f of FILES) assert.notEqual(milestoneOf(f), null, `${f} is not under a directory m<milestone>`);
 });
 
+test("the programs that use inputs are there, in milestone 1's directory and milestone 3's", () => {
+  for (const name of ["m1/phase-fills-input", "m1/phase-re-evaluates", "m1/input-filled-once", "m1/unknown-condition", "m3/input-at-start", "m3/input-not-supplied", "m3/input-later-binding"])
+    assert.ok(FILES.includes(`${PROGRAMS_DIR}/${name}.alg`), name);
+  assert.equal(milestoneOf(`${PROGRAMS_DIR}/m1/a.alg`), 1);
+});
+
+test("the input lines are read as the convention states: at the start, and each later phase with the expect lines above it", () => {
+  const pins = readPins([
+    "capability output",
+    "// input: a = 1",
+    "//input:b=`x",
+    "// expect: one",
+    "// later: c = {k: [1, 2]}",
+    "// expect: two",
+    "// expect: three",
+    "// later: d = \"t\"",
+    "// later: nothing here",
+    "// end: waiting: the program waits on the input(s) e, which the configuration does not supply",
+  ].join("\n"));
+  assert.deepEqual(pins.inputs, [{ name: "a", literal: "1" }, { name: "b", literal: "`x" }]);
+  assert.deepEqual(pins.later, [{ name: "c", literal: "{k: [1, 2]}", expectsAbove: 1 }, { name: "d", literal: '"t"', expectsAbove: 3 }]);
+  assert.deepEqual(pins.malformed, ["// later: nothing here"]);
+  assert.equal(pins.end, "waiting: the program waits on the input(s) e, which the configuration does not supply");
+});
+
+test("a program that waits on an input it is not given passes with its end: waiting line, and fails with another", async () => {
+  const program = "capability output\ninput n\noutput.write(\"before\")\n// expect: before\noutput.write(n)\n";
+  const end = "// end: waiting: the program waits on the input(s) n, which the configuration does not supply\n";
+  const run = await runProgram(program + end);
+  assert.deepEqual(run.problems, []);
+  assert.equal(run.end, "waiting: the program waits on the input(s) n, which the configuration does not supply");
+  const wrong = await runProgram(program + "// end: completed\n");
+  assert.deepEqual(wrong.problems, ['ended "waiting: the program waits on the input(s) n, which the configuration does not supply", expected "completed"']);
+});
+
+test("an input line supplies the input at the start, and each later line one phase, in order", async () => {
+  const program = "capability output\ninput a\ninput b\noutput.write(\"start\")\n// expect: start\noutput.write(a)\n// later: a = \"one\"\n// expect: one\noutput.write(int.text(b.n))\n// input: b = {n: -3}\n// expect: -3\n// end: completed\n";
+  const run = await runProgram(program);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.lines, ["start", "one", "-3"]);
+});
+
+test("an expect line on the wrong side of a later line fails the program", async () => {
+  // "one" is printed only once the phase supplies a, so its expect line belongs below the later line.
+  const above = "capability output\ninput a\noutput.write(a)\n// expect: one\n// later: a = \"one\"\n// end: completed\n";
+  const run = await runProgram(above);
+  assert.deepEqual(run.lines, ["one"]);
+  assert.deepEqual(run.problems, ["0 line(s) were printed before the later phase that supplies a (phase 1), and 1 `// expect:` line(s) are above it"]);
+  // "start" is printed before the phase, so its expect line belongs above it.
+  const below = "capability output\ninput a\noutput.write(\"start\")\noutput.write(a)\n// later: a = \"one\"\n// expect: start\n// expect: one\n// end: completed\n";
+  assert.deepEqual((await runProgram(below)).problems, ["1 line(s) were printed before the later phase that supplies a (phase 1), and 0 `// expect:` line(s) are above it"]);
+});
+
+test("a later line whose phase is never applied, a value that is not a literal, and a malformed line each fail the program", async () => {
+  const unused = await runProgram("capability output\ninput a\noutput.write(\"done\")\n// expect: done\n// later: a = 1\n// end: completed\n");
+  assert.deepEqual(unused.problems, ["the later phase that supplies a (phase 1) was not applied"]);
+  const notLiteral = await runProgram("capability output\ninput a\noutput.write(a)\n// input: a = x\n// end: completed\n");
+  assert.equal(notLiteral.problems.length, 1);
+  assert.match(notLiteral.problems[0], /^an input's value is a literal: .*; "x" holds the name x$/);
+  const malformed = await runProgram("capability output\ninput a\noutput.write(a)\n// input: a\n// end: completed\n");
+  assert.deepEqual(malformed.problems, ['the line "// input: a" is not of the form name = <literal>']);
+  const twice = await runProgram("capability output\ninput a\noutput.write(a)\n// input: a = \"x\"\n// input: a = \"y\"\n// end: completed\n");
+  assert.deepEqual(twice.problems, ["the input a has two `// input:` lines"]);
+});
+
+test("what a module yields is read with its inputs handed in: at the start, and filled by its later phases", async () => {
+  const run = await runProgram("capability output\ninput a\ninput b\nsum = a + b\noutput.write(int.text(sum))\n// input: a = 1\n// later: b = 2\n// expect: 3\n// yields: sum\n// end: completed\n");
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.yields, ["sum"]);
+});
+
 test("a program's comments are read as the convention states", () => {
   const pins = readPins([
     "// realises: test:base:addition",
@@ -51,7 +126,15 @@ test("a program's comments are read as the convention states", () => {
     "// yields: a, b",
     "// end: refuted: division by zero",
   ].join("\n"));
-  assert.deepEqual(pins, { lines: ["7", ""], end: "refuted: division by zero", yields: ["a", "b"], realises: ["test:base:addition", "test:base:precedence: * before +"] });
+  assert.deepEqual(pins, {
+    lines: ["7", ""],
+    end: "refuted: division by zero",
+    yields: ["a", "b"],
+    realises: ["test:base:addition", "test:base:precedence: * before +"],
+    inputs: [],
+    later: [],
+    malformed: [],
+  });
   assert.equal(milestoneOf(`${PROGRAMS_DIR}/m3/a.alg`), 3);
   assert.equal(milestoneOf(`${PROGRAMS_DIR}/a.alg`), null);
   assert.equal(milestoneOf(`${PROGRAMS_DIR}/m3/x/a.alg`), null);
@@ -100,13 +183,13 @@ test("a module that declares no capability still yields: it is handed only what 
   assert.deepEqual(run.yields, ["double"]);
 });
 
-test("the programs write every form of forms.md §2 that the launcher can run: all but input and import", () => {
+test("the programs write every form of forms.md §2 that the launcher can run: all but import", () => {
   const used = new Set<FormId>();
   for (const file of FILES) {
     const r = emit(text(file));
     if (r.ok) for (const f of r.forms) used.add(f);
   }
-  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f) && f !== "input" && f !== "import");
+  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f) && f !== "import");
   assert.deepEqual(missing, []);
 });
 

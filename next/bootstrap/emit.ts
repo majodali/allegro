@@ -245,6 +245,27 @@ function floatBytes(x: number): Uint8Array {
   return out;
 }
 
+/** A literal of forms.md §2 that stands for bits: a text, a whole number, a fraction, a truth value. */
+export type BitsLiteral = Extract<Expr, { k: "text" | "int" | "float" | "truth" }>;
+
+/**
+ * The bits a literal stands for, as this emitter writes them. The one
+ * encoding of each literal: the emitter writes it, and the reader of an
+ * input's value (next/bootstrap/literal.ts) reads it.
+ */
+export function literalBits(e: BitsLiteral): { readonly bytes: Uint8Array; readonly bitLength: number } {
+  switch (e.k) {
+    case "text":
+      return { bytes: e.bytes, bitLength: e.bytes.length * 8 };
+    case "int":
+      return { bytes: intBytes(e.value), bitLength: 64 };
+    case "float":
+      return { bytes: floatBytes(e.value), bitLength: 64 };
+    case "truth":
+      return { bytes: Uint8Array.of(e.value ? 1 : 0), bitLength: 1 };
+  }
+}
+
 /** No node: a text with a finding writes no record. */
 const NONE: Ref = -1;
 
@@ -307,8 +328,12 @@ export function emitModule(module: Module): EmitResult {
   const allegretto = new Scope(undefined);
   for (const name of KERNEL_NAMES) allegretto.names.set(name, { k: "kernel", name });
 
-  const FALSE = (): Ref => b.bits(Uint8Array.of(0), 1);
-  const TRUE = (): Ref => b.bits(Uint8Array.of(1), 1);
+  const truth = (value: boolean): Ref => {
+    const { bytes, bitLength } = literalBits({ k: "truth", value, at: { start: 0, end: 0, line: 1, column: 1 } });
+    return b.bits(bytes, bitLength);
+  };
+  const FALSE = (): Ref => truth(false);
+  const TRUE = (): Ref => truth(true);
   const cond = (c: Ref, a: Ref, e: Ref): Ref => b.apply(b.kernel("if"), [c, a, e]);
   const shipped = (name: string, at: Place, form: FormId): Ref => {
     forms.add(form);
@@ -325,17 +350,13 @@ export function emitModule(module: Module): EmitResult {
   const expr = (e: Expr, scope: Scope): Ref => {
     switch (e.k) {
       case "text":
-        forms.add("text");
-        return b.bits(e.bytes, e.bytes.length * 8);
       case "int":
-        forms.add("whole number");
-        return b.bits(intBytes(e.value), 64);
       case "float":
-        forms.add("fraction");
-        return b.bits(floatBytes(e.value), 64);
-      case "truth":
-        forms.add("truth");
-        return e.value ? TRUE() : FALSE();
+      case "truth": {
+        forms.add(e.k === "text" ? "text" : e.k === "int" ? "whole number" : e.k === "float" ? "fraction" : "truth");
+        const { bytes, bitLength } = literalBits(e);
+        return b.bits(bytes, bitLength);
+      }
       case "symbol":
         forms.add("symbol");
         return b.datum(e.name);
