@@ -101,6 +101,7 @@
     {"title":"Every production can be extended","part":"III","chapter":"Changing the grammar","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Grammars combine without regard to order","part":"III","chapter":"Changing the grammar","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A grammar change reaches to the end of its block","part":"III","chapter":"Changing the grammar","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"A notation a text uses can only add","part":"III","chapter":"Changing the grammar","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Any parsing algorithm will do that meets five conditions","part":"III","chapter":"The parser engine","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"The platform's parser engine ships already built","part":"III","chapter":"The parser engine","type":"implementation","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A module is an extension that arrives as a file","part":"III","chapter":"Modules and programs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},

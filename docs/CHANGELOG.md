@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-17 — Three more findings of the adversarial review
+  ruled.** A notation a text uses can only add, and changes a
+  production it does not own only where the using text names it. A
+  grammar change is a statement, with exactly one parse before it.
+  Where an access was written is read from a mark the kernel keeps on
+  each part of an expression, naming its function. The inventory
+  holds 245 decisions.
 - **2026-11-16 — No interface call for a whole value.**
   `Kernel2.evaluateInFull`, which merged with the entry below, is
   removed by ruling: the kernel stays minimal, and a caller that wants

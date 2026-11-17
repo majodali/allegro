@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 244 decisions in 6 parts and 38 chapters (231 when the phase closed; thirteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 57; Part III: 25; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 245 decisions in 6 parts and 38 chapters (231 when the phase closed; fourteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 57; Part III: 26; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -51,7 +51,7 @@ As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed o
 10. **Parsing** (14 decisions). A parser is a function, a grammar is a value, and a notation stands for an expression; how grammars read characters, layout and precedence, and what ambiguity is.
    - Decisions: Parsing is evaluation; No parser is privileged; Grammars are values; Every notation stands for an expression; A language checks the names it cares about; The `grammar { … }` block; A parser records where each expression came from in its text; Scannerless parsing; A terminal is a function, so a grammar can define its own; Offside rule through stateful indent terminals; Guards and reserved words separate keywords from identifiers; Named, partially ordered precedence levels; Ambiguity is a claim; Parse failure reporting and recovery.
 11. **Changing the grammar** (4 decisions). How a text changes the language it is written in, how changes combine, and how far one reaches.
-   - Decisions: A text can change the grammar it is read in; Every production can be extended; Grammars combine without regard to order; A grammar change reaches to the end of its block.
+   - Decisions: A text can change the grammar it is read in; Every production can be extended; Grammars combine without regard to order; A grammar change reaches to the end of its block; A notation a text uses can only add.
 12. **The parser engine** (2 decisions). What any parsing algorithm must do, and how the first engine arrives.
    - Decisions: Any parsing algorithm will do that meets five conditions; The platform's parser engine ships already built.
 13. **Modules and programs** (5 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
@@ -923,6 +923,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new as an entry of its own; ruled with values and descriptions and first written into "Reading an expression never yields authority". The maintainer's wording of the title.
 - Notes (2026-11-15, solving): the sentence on residuals is added by ruling. Without it, wrapping any function, specializing the wrapper and describing the result would read that function's body. A part the right does not cover is described as opaque.
+- Notes (2026-11-17, the adversarial review's last issues): the mark on each part names the function it was written in, and through it the module; the rule for describing still asks for the module. See "Who may use a member is a claim about where the access was written".
 - Chapter: Authority
 
 #### A live expression is built only from live values
@@ -1706,8 +1707,8 @@ They came together over years of exploration into most of what Allegro is today.
 ### Changing the grammar
 
 #### A text can change the grammar it is read in
-- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
-- Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file); ruled 2026-11-12 (DR3)
+- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. Such a form is a statement of a block, never part of an expression, and the text before it in the block must have exactly one parse: more than one is a refutation that names both readings. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
+- Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file); ruled 2026-11-12 (DR3); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
 - Depends on: Parsing is evaluation; Every notation stands for an expression; Grammars are values; A system is described in the language of its domain, and that language grows with the understanding
@@ -1719,6 +1720,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling; replaces the header half of "`use` header for language extension, `import` for module values" and "Callers pre-scan and strip the `use` header". The maintainer: "our parser starts with an initial grammar and modifies it (augmenting or replacing) at a specific point in the parse, so all following text is parsed with the modified grammar"; it needs a custom engine, and there is prior art to lean on (Lean 4 and SugarJ read a text one item at a time and let an item extend the grammar). If the grammar is not yet available, the rest of the text stays unparsed, as a residual. A changed grammar is a new value; the grammar it came from is untouched (absorbs "Grammar extension never mutates the base").
 - Held finding (2026-11-12, DR3): every caller scans the header itself and strips it before the parse (`src/use-scanner.ts:47`; `src/index.ts:131`, `:385`, `:442`; `web/allegro-web.ts:38`), and the callers disagree: inspect and verify load no module for a member import or an inline grammar, `prove` leaves the header in place and fails, the sandbox has its own scanner.
 - Held finding (2026-11-12, DR3): an inline grammar inside a library is rejected.
+- Notes (2026-11-17, the adversarial review's last issues): the sentence on where a change may appear is added by ruling, for issue 22: the parse must be settled at a change and every parse must be reported, and the two conflict wherever two readings are alive at the change. At the end of a statement the readings that remain are those that would remain to the end, so nothing is refused that would have been accepted. A form that reads its inside in another grammar already loaded is not a change of grammar.
 - Chapter: Changing the grammar
 
 #### Every production can be extended
@@ -1764,6 +1766,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/grammar-formalism.md §6.2, §6.3; docs/book/extension/grammar.md §4; docs/book/extension/modules.md "Known limit"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Activation by a `use` header, per file and not transitive".
 - Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling Q). With rulings R and S: nobody has to claim a combined grammar unambiguous, and a text with two parses is always refuted, with both readings named.
+- Chapter: Changing the grammar
+
+#### A notation a text uses can only add
+- Decides: a notation that a text brings in with `use` may add productions and append alternatives. It replaces, removes or wraps a production it does not own only where the using text names that production. So bringing in a notation never changes the meaning of text that parsed before: it gives meaning only to text that did not parse, and an added alternative that matches what an existing form matches makes two parses, which is a refutation.
+- Status: open; ruled 2026-11-17
+- Type: capability
+- Rationale kind: technical
+- Depends on: A grammar change reaches to the end of its block; Grammars combine without regard to order; Every production can be extended; Ambiguity is a claim
+- Significance: 4 — a library cannot silently change the language a user writes in
+- Label: foundational — every text that uses a notation it did not write
+- Options recorded: using a notation as trust in its author, like any dependency, with a tool that shows the expression a text stands for (kept as a tool, not relied on); a change that is explicit only in the library's own grammar (the earlier wording: the user's text says only `use`, so a library could replace the form for `requires` with one that drops the claim, and nothing would be refuted)
+- Sources: the maintainer's rulings of 2026-11-17 (../records/book-pass/adversarial-review.md, Rulings taken)
+- Notes: new, by ruling, for issue 7 of the adversarial review. A form's mapping works on descriptions, so it reads and rearranges what the user wrote inside the form; that is what a notation is. What it cannot do is reach the user's names, or change a form it does not own without the user's word. An author who builds a variant of a language owns its grammar, or chooses it in the configuration.
 - Chapter: Changing the grammar
 
 ### The parser engine
@@ -2233,8 +2248,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written
-- Decides: private, protected, read-only and caller-based rules are claims over the origins of accesses. Only the kernel writes an origin, so it cannot be forged. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
-- Status: open, a design to prove; ruled 2026-11-12 (DR4)
+- Decides: private, protected, read-only and caller-based rules are claims about where an access was written. Each part of an expression carries a mark the kernel writes: the function it was written in, and through that the module. The mark stays with the part when a call is opened, and what a notation's form supplies carries the notation's mark while what the user wrote inside the form keeps the user's. No phase drops it and nothing can forge it. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
+- Status: open, a design to prove; ruled 2026-11-12 (DR4); reworded 2026-11-17
 - Type: capability
 - Rationale kind: technical
 - Depends on: A private member is one whose key not all code holds; A value's origin is a description; Claims are evaluated like everything else; A refuted value never reaches an effect; No argument can be inspected
@@ -2243,6 +2258,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: access decided by who is asking at the moment of access (rejected in Part II with authority by identity); a third mechanism for caller-based control (not needed: a key and a claim about origins combine)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: these access patterns "are not really privacy concerns", they are "about interface, encapsulation and design discipline". To prove: an accessor reading the origin of its call; the four access patterns restated as claims; the cost of deciding such claims on real programs. A trusted module can still be led to access on another's behalf, which is why the key stays the foundation.
+- Notes (2026-11-17, the adversarial review's last issues): reworded by ruling, for issue 28. The entry rested on origins, which a phase may now drop, and "where it was written" had several answers once a call is opened or a form expands. The mark is the one "Describing a function requires authority" keeps on each part of a residual, made finer: the function, not only the module, because a protected member asks whether the access was written inside a method of a conforming type.
 - Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
