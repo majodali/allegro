@@ -45,7 +45,9 @@
 // needs its arguments in full, left to right, so a structure handed to
 // one has every entry evaluated first, in order. A caller of `evaluate`
 // is given the value it asked for and no more: an entry of a structure
-// in the result is evaluated when the caller evaluates it. A function's free names are tied to the
+// in the result is evaluated when the caller evaluates it. There is no
+// call for a whole value: a host that wants one evaluates the entries it
+// reads. A function's free names are tied to the
 // scope in which the function value is first evaluated, so a function
 // means the same wherever it is later called.
 //
@@ -227,8 +229,6 @@ interface Root {
   readonly scope: ScopeV;
   value: V;
   done: boolean;
-  /** True where the caller asked for the value in full: every entry of every structure in it. */
-  readonly full: boolean;
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
@@ -1087,20 +1087,6 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
-  /** One evaluation a caller asked for: the value and no more, or the value in full. */
-  const asked = (expression: Value, scope: Scope, limits: Limits | undefined, full: boolean): Result => {
-    const e = into(expression, "the expression");
-    const s = scopeIn(scope, "the scope");
-    const r = within(limits, () => (full ? inFull(e, s) : evaluate(e, s)));
-    const value = r.value ?? e;
-    if (r.ended === "complete" && !(full ? knownInFull(value) : known(value))) {
-      const root: Root = { scope: s, value, done: false, full };
-      roots.push(root);
-      rootOf.set(value, root);
-    }
-    return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted };
-  };
-
   const kernel: Kernel2 = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -1167,8 +1153,18 @@ export const createKernel: CreateKernel2 = () => {
       return [...found].map((v) => out(v) as Cell);
     },
 
-    evaluate: (expression, scope, limits): Result => asked(expression, scope, limits, false),
-    evaluateInFull: (expression, scope, limits): Result => asked(expression, scope, limits, true),
+    evaluate: (expression, scope, limits): Result => {
+      const e = into(expression, "the expression");
+      const s = scopeIn(scope, "the scope");
+      const r = within(limits, () => evaluate(e, s));
+      const value = r.value ?? e;
+      if (r.ended === "complete" && !known(value)) {
+        const root: Root = { scope: s, value, done: false };
+        roots.push(root);
+        rootOf.set(value, root);
+      }
+      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted };
+    },
     advance: (limits): Advance => {
       if (!dirty) return { ended: "complete", steps: 0, refuted: [] };
       dirty = false;
@@ -1176,11 +1172,11 @@ export const createKernel: CreateKernel2 = () => {
       const r = within(limits, () => {
         for (const root of roots) {
           if (root.done) continue;
-          const next = root.full ? inFull(root.value, root.scope) : evaluate(root.value, root.scope);
+          const next = evaluate(root.value, root.scope);
           root.value = next;
           rootOf.set(next, root);
           if (next instanceof Refuted) refuted.push(out(next));
-          if (root.full ? knownInFull(next) : known(next)) root.done = true;
+          if (known(next)) root.done = true;
         }
       });
       if (r.ended === "limit") dirty = true;

@@ -574,11 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-16 — No interface call for a whole value.**
+  `Kernel2.evaluateInFull`, which merged with the entry below, is
+  removed by ruling: the kernel stays minimal, and a caller that wants
+  a whole value evaluates the entries it reads. The kernel still
+  evaluates in full what it hands a primitive function.
 - **2026-11-16 — A structure's entries are evaluated when read.** In
   `next/kernel/kernel.ts`: building a structure evaluates nothing;
   `get` evaluates the entry it reads, at most once; a primitive
-  function is handed its arguments in full. `Kernel2.evaluateInFull`
-  is the call for a caller that wants a whole value. With this the
+  function is handed its arguments in full. With this the
   reference kernel has everything Allegretto's forms ask of it.
 - **2026-11-16 — The shipped primitives.** `next/prims/index.ts`
   holds the 22 pure primitives Allegretto's forms name: integer and
