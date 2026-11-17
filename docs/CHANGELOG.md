@@ -1215,6 +1215,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The speed tests of milestone 3, measured (B-196, chunk Q8 (the speed tests of milestone 3), part 1)
+
+B-196 (the rebuild's acceptance side). A toy parser engine and a typed
+extension are written in Allegretto under `next/corpus/speed/`, with twins
+in the present tree's base language and the present tree's own engine and
+typed language as native baselines. `npm run bench:next` measures them;
+`npm run test:next` runs the programs at their pinned size only. On the
+new kernel the parser is 1.3 to 12.1 times slower than its twin and three
+to four orders of magnitude slower than the native engine; its steps grow
+linearly with the input and its time with exponent 1.35. The typed loop
+reaches the kernel's own limit at 128 to 512 iterations, varying between
+runs. Four findings go to the kernel stream: the own limit is not
+deterministic, a step costs more under nested arguments, `==` on texts
+is quadratic, and `bits.slice` costs time in the length of the whole
+value. The record is `docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — Two tests follow a structure's entries being evaluated when read (B-196)
 
