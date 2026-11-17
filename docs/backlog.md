@@ -3869,6 +3869,8 @@ table and the stream plans.
   13. "An interface is a type drawn from, not instantiated"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on B-116 (an interface's two guarantees).
       An interface refuses a method body, where the present tree
       discards it with no diagnostic. Recorded in the same entry.
+  Lines 12 and 13 were recorded in `docs/plans/book-pass-inventory.md`
+  on 2026-11-17 by the review session, each in a note of that date.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under

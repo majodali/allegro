@@ -1709,7 +1709,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Changing the grammar
 
 #### A text can change the grammar it is read in
-- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. Such a form is a statement of a block, never part of an expression, and the text before it in the block must have exactly one parse: more than one is a refutation that names both readings. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
+- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. Such a form is a statement of a block, never part of an expression, and the text before it in the block must have exactly one parse: more than one is a refutation that names both readings. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse. The parser engine does not change within a text; the grammar it reads the text in may change for each module and in mid-file.
 - Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file); ruled 2026-11-12 (DR3); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -1723,6 +1723,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR3): every caller scans the header itself and strips it before the parse (`src/use-scanner.ts:47`; `src/index.ts:131`, `:385`, `:442`; `web/allegro-web.ts:38`), and the callers disagree: inspect and verify load no module for a member import or an inline grammar, `prove` leaves the header in place and fails, the sandbox has its own scanner.
 - Held finding (2026-11-12, DR3): an inline grammar inside a library is rejected.
 - Notes (2026-11-17, the adversarial review's last issues): the sentence on where a change may appear is added by ruling, for issue 22: the parse must be settled at a change and every parse must be reported, and the two conflict wherever two readings are alive at the change. At the end of a statement the readings that remain are those that would remain to the end, so nothing is refused that would have been accepted. A form that reads its inside in another grammar already loaded is not a change of grammar.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on the backlog's item for embeddable grammars (docs/plans/rebuild.md §7).
 - Chapter: Changing the grammar
 
 #### Every production can be extended
@@ -2217,7 +2218,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Refinement types
 
 #### An interface is a type drawn from, not instantiated
-- Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types.
+- Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types. An interface refuses a method body.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
@@ -2229,6 +2230,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md §36; D45; B-104(g), B-116
 - Book home (fragments' proposal): standard/type-system
 - Notes: `Interface.define` silently discards a method body (B-116); the `__interface` marker and its deletion are open.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 in the acceptance stream's session: the present tree discards such a body with no diagnostic.
 - Chapter: Refinement types
 
 ### Reaching a member

@@ -1,0 +1,34 @@
+# Common brief for the second adversarial review of Allegro's design
+
+Allegro is a programmable language platform: a small kernel (values, expressions, one evaluator that partially evaluates), with everything else as extensions. Its design is stated as 245 decisions. A first adversarial review found 31 issues; the design was changed since. You are one of four independent reviewers of the design as it now stands. You have no access to the reasoning behind any decision, on purpose: judge what is written.
+
+## What to read (and nothing else of the project's documents)
+
+1. `/tmp/claude-0/-home-user-allegro/3772d497-a833-5650-956a-883ae5b890cd/scratchpad/adv2/decisions-extract.txt` — the 245 decisions, numbered D1..D245, in dependency order. Read all of it.
+2. In the repository worktree `/home/user/allegro/.claude/worktrees/f1` (read-only for you):
+   - `next/ext/allegretto/forms.md` — the forms of Allegretto, the language of the bare kernel.
+   - `next/kernel/interface.ts` — the kernel's interface, as host code sees it.
+   - `next/kernel/saved-program.ts` — the data form of a saved program (read the header comment and the types).
+   - `next/kernel/kernel.ts` lines 1–125 — what the reference kernel does and its primitives.
+   - `next/prims/index.ts` header comment and the list — the shipped primitives.
+
+Do NOT read anything under `docs/` (plans, records, the book, the inventory, the changelog), nor earlier review outputs, nor other files in the scratchpad. They hold the reasoning and the first review, and would anchor you. Do not edit any file in the repository. Do not use git to change anything.
+
+## What a finding is
+
+A concrete problem, shown by a specific scenario: a small program, a sequence of interface calls, or two decisions quoted side by side that cannot both hold. "This could be clearer" is not a finding unless a reader would act wrongly on it. Prefer few strong findings to many weak ones: at most 15, most severe first.
+
+For each finding give:
+- a number and a one-line title;
+- the decisions involved, by number and name (and the file and form or call, where it concerns the forms or the interface);
+- the scenario, concretely;
+- what breaks: a wrong result, a lost guarantee, an unimplementable rule, a contradiction;
+- severity: `blocks` (the design cannot be built or a core guarantee fails), `needs a ruling` (a real gap or contradiction with more than one reasonable answer), or `wording`;
+- your confidence (high / medium / low) and what would change your mind;
+- if you see one, the direction of a fix, in a sentence.
+
+Also say, at the end, what you looked for and did not find a problem with, in a few lines: it tells the reader what was covered.
+
+## Output
+
+Write your full report to the file named in your own brief, as Markdown. Then reply with a summary of at most 25 lines: each finding's number, title and severity. Your reply is read by another agent, not a person; keep it plain.
