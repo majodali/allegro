@@ -42,6 +42,7 @@ by its name in section 3.
 | `1.5` | bits: 64, IEEE 754 binary64 |
 | `true`, `false` | bits of length one: 1 and 0 |
 | `{a: e, b: f}` | a structure whose keys are the symbols `a` and `b` |
+| `{a: e, [k]: f}` | the same, with a private entry: `k` is a name a `key` header line declares, and the entry is keyed by that key |
 | `[e, f]` | a structure with no keys |
 | `` `name `` | the symbol `name`, as data |
 
@@ -58,7 +59,7 @@ text chosen by type.
 | `f(a, b)` | an application |
 | `a \|> f` | `f(a)` |
 | `p.a` | reading the entry of `p` keyed by the symbol `a` |
-| `p[i]` | reading the entry of `p` at place `i`, counted from 0 |
+| `p[i]` | `get(p, i)`: the entry of `p` at place `i`, counted from 0; or, where `i` is a key, the private entry keyed by it |
 
 ### Control and claims
 
@@ -125,6 +126,7 @@ header lines, before anything else:
 | `capability output` | a capability the module is handed, bound to the name `output` |
 | `input name` | an input, bound to `name`: plain data the configuration supplies to the module being run; a cell until it is supplied. A module that is imported declares none |
 | `import name` | another module's bindings, bound to `name`; one is read as `name.f` |
+| `key name` | one of the module's keys, bound to `name`. Several lines declare several keys, in written order |
 
 The rest of the text is the module's block. What the module yields is a
 structure of its bindings, keyed by symbols of their names: those marked
@@ -180,14 +182,31 @@ is not a number.
    *Built.* In the data form it is the node `datum`, in a record of the
    second version.
 
-### Not yet a form
+### Keys and private entries
 
-A module's keys have no form. The kernel has them: a private member is
-an entry of a structure keyed by one of the module's keys, read with
-`get` and that key, and passed over by a place, by `count` and by a
-primitive function. A text cannot yet name a key slot or write such an
-entry; the form waits for the standard language's types, which are what
-use it.
+Ruled 2026-11-17. A key is an ordinary name once declared: it is passed
+to `describe`, closed over by a function, and used to read. A private
+entry is passed over by a place, by `count` and by a primitive function;
+only `p[k]` with the key reads it.
+
+```
+capability output
+key secret
+
+make(n) => { shown: n, [secret]: n * 2 }
+hidden(p) => p[secret]
+
+box = make(21)
+output.write(int.text(count(box)))     // 1: the private entry is not counted
+output.write(int.text(hidden(box)))    // 42
+```
+
+The brackets of a literal hold only the name of a key for now: the
+kernel does not evaluate an entry's key. A module may hand a key out by
+binding it and exporting the binding; the header name itself is not a
+binding, so a module with no exports hands out no key. In the data form
+the keys are the module function's first parameters, counted by `keys`,
+and a private entry is a structure entry whose key is that parameter.
 
 ## 5. Against the present tree's base grammar
 
@@ -202,8 +221,9 @@ each a part of the standard language: type annotations and type
 expressions, typed parameters, generics, `when` and patterns, `theorem`
 and `verify`, the `grammar` block and its declarations, `&` on types,
 `instanceof` and `subtypeof`, `Y of x`, `error`, `none`, and text
-interpolation. It adds five: the symbol literal, `++`, the binding `<-`, and the header
-lines `capability` and `input`.
+interpolation. It adds seven: the symbol literal, `++`, the binding `<-`, the header
+lines `capability`, `input` and `key`, and a private entry in a
+structure literal.
 
 The reader takes the engine's parse tree. It does not use the present
 tree builder, which rewrites what it reads: it puts a block binding's
@@ -227,3 +247,7 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    purpose, with the kernel's tests among them. The present-surface
    cases that need types move to milestone 4. The acceptance stream
    carries this out in its census.
+6. **Keys** (2026-11-17). A header line `key name` declares a key; a
+   structure literal writes a private entry as `[name]: e`; `p[name]`
+   reads it, with no form of its own. The maintainer asked for a form
+   since Allegretto has one for everything the kernel does.
