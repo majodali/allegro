@@ -1421,6 +1421,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, the block of bindings): eleven, with the block of bindings ("A block of bindings is one kernel primitive").
 - Notes (2026-11-16, no way to ask for a whole value): the maintainer ruled against an interface call that evaluates a value in full, and against a kernel primitive for it for now: "it's best to add or update kernel primitives based on necessity as it arises". A tool that prints or saves a value reads each entry, and reading evaluates. A primitive for it is taken up again if Allegretto code shows a general need.
 - Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 (the same entry of the acceptance stream's record): `if 1 then 42 else 0` is a refutation, where the present tree takes 1 as true. The note of 2026-11-12 on truth already said so; the decision's text now does.
+- Notes (2026-11-17, the second adversarial review, cluster 3): reading a structure takes a key as well as a symbol or a place, and a place or a count passes over an entry keyed by a key ("A private member is one whose key not all code holds").
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -2257,7 +2258,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Reaching a member
 
 #### A private member is one whose key not all code holds
-- Decides: the key is one of the keys of the module that defines the type. Code that holds it can reach the member; no other code can, by any name. A saved program records key slots, never keys. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
+- Decides: a private member is an entry of a structure keyed by a key: one of the keys of the module that defines the type. Reading the structure with that key gives the member. No other code reaches it, by any name or place: such an entry has no place, is not counted among the structure's entries, and is not handed to a primitive function, so nothing without the key can tell that it is there. A saved program records key slots, never keys. Printing a value omits what the printer cannot reach, and conformance counts only the members the asking code can reach.
 - Status: open (the code mediates each access and asks whether the requesting scope holds a name); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
@@ -2270,6 +2271,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Mediated member access", "Access is what a type's member lookup returns, in two tiers", "Evidence is possession" and "Privacy across readers, reflection and mediation effects", and takes the rule on serialising symbols that the Part II review sent here. Every access pattern is a rule for who is handed the key and in what form: private, the defining module keeps it; shared within a group, the module hands it to the modules it names; read-only, the module hands out a function that reads; protected, the type hands it to any definition that refines or draws from it. Protected is a discipline unless the type also limits who may refine it.
 - Held finding (2026-11-12, DR4): member access runs through an installed mediation path with a policy hook (`type_dispatch`, `fallbackMember`), and privacy asks what the requesting scope can reach.
 - Notes (2026-11-15, the rulings on strength and on identity): the key is now made as "A key is made with the module that holds it" says. "Cannot be written out and read back into existence" is replaced: a record holds slots, and loading derives the keys again from the module's content (issue 12).
+- Notes (2026-11-17, the second adversarial review, cluster 3): reworded by ruling: the entry said who may reach a private member and not where it is stored. A structure is the only composite, and every entry was reachable by place, counted, and handed to every primitive function. Set aside: private data kept inside a function that checks the key, which needs a primitive to compare keys and makes every member a call. Three consequences. Equality from outside ignores private members, since the standard language's equality runs without the key; the type's module can define its own with the key. A copy made entry by entry from outside would drop private members, so a primitive that builds a structure from another, when one is added, carries them across. The host's `entriesOf` shows every entry: the host is trusted, and which host code holds what is settled with the interface (cluster 13 of the same review).
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written
@@ -2609,7 +2611,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Equality and laws
 
 #### Default equality belongs to the standard extension
-- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Bool's equality laws are decided by enumeration. Those of Int, Float and String are assumed, and named with the platform, until proved against the primitives' reference definitions. A law derived from the laws of a type's fields carries their strength. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int.
+- Decides: every structure-backed type gets the standard extension's structural equality: same shape, then field by field or element by element. Bool's equality laws are decided by enumeration. Those of Int, Float and String are assumed, and named with the platform, until proved against the primitives' reference definitions. A law derived from the laws of a type's fields carries their strength. An override carries the three law claims. None and exceptions compare by identity, and Bool is not equal to Int. It compares the members it can reach: two values that differ only in a private member are equal to code without the key.
 - Status: settled; reworded 2026-11-12 (DR4); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -2622,6 +2624,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): proposed "Equality and laws"
 - Notes (2026-11-12, DR4): was "Kernel structural equality is the default"; the kernel has no part in equality beyond telling bits apart.
 - Notes (2026-11-16, hand-off from the acceptance stream): reworded by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", rulings 5 and M): the entry said the laws are decided once for all types. `3 == 3` uses the primitive and rests on no law; only a proof step or a rewrite that uses a law rests on it. The coercion claims are as the laws.
+- Notes (2026-11-17, the second adversarial review, cluster 3): the last sentence is added by ruling; a type's own module may define its equality with its key.
 - Chapter: Equality and laws
 
 #### Law strengths and the transitivity gate
@@ -3350,6 +3353,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, the block of bindings): by ruling, `scope` and `bind` may leave the interface ("Scope and bind may leave the interface"). A block of bindings gives an expression its names, and a name whose value arrives later is bound to a cell. The host then cannot put a name into a program from outside, and two evaluations share nothing. They leave when the interface's two versions are made one.
 - Notes (2026-11-16, entries evaluated when read): a caller evaluates a value and is given no more. A structure in a result is complete in shape; an entry that nothing has read is handed back as an expression, which the caller may evaluate.
 - Notes (2026-11-17, the second adversarial review, cluster 1): `bind` is removed. `scope` stays as a token `evaluate` ignores until the interface's two versions are made one.
+- Notes (2026-11-17, the second adversarial review, cluster 3): a host reads every entry of a structure, private ones included: the host is trusted. A primitive function's host code is not handed them.
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome

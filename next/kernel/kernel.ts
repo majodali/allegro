@@ -94,9 +94,13 @@
 //   "slice"     slice(a, from, count). `count` bits of a from place
 //               `from`, the first bit being place 0.
 //   "get"       get(structure, key). The entry keyed by a symbol, or at a
-//               place counted from 0. The entry may itself still wait.
+//               place counted from 0, or keyed by a key. The entry may
+//               itself still wait.
 //   "count"     count(structure). The number of entries, as 64 bits.
 //               A place or a count outside the value is a refutation.
+//               An entry keyed by a key is private: only `get` with that
+//               key reads it. It has no place, is not counted, and is
+//               not handed to a primitive function.
 //   "attempt"   attempt(x, budget). Evaluates its first argument under a
 //               budget of steps and answers how that ended, as data: a
 //               value, a refutation with its reason, or the limit
@@ -362,6 +366,9 @@ export const createKernel: CreateKernel2 = () => {
     return false; // a symbol, a name, a parameter, an expression
   };
 
+  /** True for an entry keyed by a key: one only code that holds the key can reach. */
+  const hidden = (k: V | null): boolean => k !== null && seen(k) instanceof Key;
+
   /** True when nothing in the value waits and no entry is left unevaluated: what a primitive function needs. */
   const knownInFull = (v: V): boolean => {
     if (v instanceof Decided) return knownInFull(v.inner);
@@ -369,8 +376,9 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof CellV) return v.filled && knownInFull(v.value as V);
     if (v instanceof Struct) {
       if (settled.has(v)) return true;
-      if (!built.has(v) || !v.entries.every(([, e]) => knownInFull(e))) return false;
-      settled.add(v);
+      // An entry keyed by a key is not handed to a primitive function, so it is not needed.
+      if (!built.has(v) || !v.entries.every(([k, e]) => hidden(k) || knownInFull(e))) return false;
+      if (!v.entries.some(([k]) => hidden(k))) settled.add(v);
       return true;
     }
     return known(v);
@@ -504,8 +512,9 @@ export const createKernel: CreateKernel2 = () => {
       if (fn !== v.fn || args.some((a, i) => a !== v.args[i])) r = new Expr(fn, args);
     } else if (v instanceof Struct) {
       if (!settled.has(v)) {
-        const entries = v.entries.map(([k, e]) => [k, substitute(e, env, memo)] as const);
-        if (entries.some(([, e], i) => e !== v.entries[i][1])) r = new Struct(entries);
+        // A key slot written as an entry's key takes the module's key, as it does anywhere else.
+        const entries = v.entries.map(([k, e]) => [k instanceof Param ? (env.get(k) ?? k) : k, substitute(e, env, memo)] as const);
+        if (entries.some(([k, e], i) => e !== v.entries[i][1] || k !== v.entries[i][0])) r = new Struct(entries);
       }
     } else {
       const body = substitute(v.body, env, memo);
@@ -534,7 +543,7 @@ export const createKernel: CreateKernel2 = () => {
     kind: (v) => kindOf(into(v, "the value")),
     bitsOf: (v) => bitsOf(into(v, "the value")),
     symbolName: (v) => symbolName(into(v, "the value")),
-    entriesOf: (v) => entriesOf(into(v, "the value")),
+    entriesOf: (v) => entriesOf(into(v, "the value"), true),
     cell: () => out(new CellV(running)) as Cell,
   };
 
@@ -737,7 +746,8 @@ export const createKernel: CreateKernel2 = () => {
       }
       if (fn.name === "count") {
         const s = seen(args[0]);
-        if (s instanceof Struct) return count64(s.entries.length);
+        // An entry keyed by a key has no place and is not counted.
+        if (s instanceof Struct) return count64(s.entries.filter(([k]) => !hidden(k)).length);
         return known(args[0]) ? new Refuted("only a structure has a number of entries", args[0]) : waits();
       }
       if (fn.name === "get") {
@@ -749,9 +759,15 @@ export const createKernel: CreateKernel2 = () => {
           const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
           return entry !== undefined ? evaluate(entry[1], scope) : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
         }
+        if (key instanceof Key) {
+          // A private entry: only this key reads it, and without it nothing tells that it is there.
+          const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
+          return entry !== undefined ? evaluate(entry[1], scope) : new Refuted("the structure has no entry under that key", undefined);
+        }
         const place = key instanceof Bits ? countOf(key) : undefined;
-        if (place === undefined) return new Refuted("an entry is read by a symbol or by a place", args[1]);
-        return place < s.entries.length ? evaluate(s.entries[place][1], scope) : new Refuted(`place ${place} is outside a structure of ${s.entries.length} entr${s.entries.length === 1 ? "y" : "ies"}`, undefined);
+        if (place === undefined) return new Refuted("an entry is read by a symbol, by a place or by a key", args[1]);
+        const open = s.entries.filter(([k]) => !hidden(k));
+        return place < open.length ? evaluate(open[place][1], scope) : new Refuted(`place ${place} is outside a structure of ${open.length} entr${open.length === 1 ? "y" : "ies"}`, undefined);
       }
       throw new KernelFault(`the kernel primitive "${fn.name}" has no evaluation`);
     }
@@ -851,7 +867,8 @@ export const createKernel: CreateKernel2 = () => {
       // Once one entry waits, those after it are evaluated ahead with no effect performed.
       const before = ahead;
       try {
-        for (const [, e] of s.entries) {
+        for (const [k, e] of s.entries) {
+          if (hidden(k)) continue;
           const x = inFull(e, scope);
           if (x instanceof Refuted) return x;
           if (!knownInFull(x)) ahead = true;
@@ -944,14 +961,16 @@ export const createKernel: CreateKernel2 = () => {
     const s = seen(v);
     return s instanceof Sym ? s.fqn : s instanceof NameRef ? s.sym.fqn : wrong("symbolName", v);
   };
-  const entriesOf = (v: V): readonly Entry[] => {
+  const entriesOf = (v: V, forPrimitive = false): readonly Entry[] => {
     const s = seen(v);
     if (s instanceof Refuted) return [];
     if (s instanceof Key) {
       const slot = Uint8Array.of(s.slot >>> 24, (s.slot >>> 16) & 255, (s.slot >>> 8) & 255, s.slot & 255);
       return [[null, out(new Bits(utf8.encode(s.module), s.module.length * 8))], [null, out(new Bits(slot, 32))]];
     }
-    return s instanceof Struct ? s.entries.map(([k, e]) => [k === null ? null : out(k), out(e)] as const) : wrong("entriesOf", v);
+    if (!(s instanceof Struct)) return wrong("entriesOf", v);
+    // A primitive function's host code is not handed an entry keyed by a key.
+    return s.entries.filter(([k]) => !forPrimitive || !hidden(k)).map(([k, e]) => [k === null ? null : out(k), out(e)] as const);
   };
 
   // ---- Content ------------------------------------------------------------
@@ -1139,7 +1158,7 @@ export const createKernel: CreateKernel2 = () => {
     }
     if (v instanceof Expr) return data("apply", describe(v.fn, binders, own), list(v.args.map((a) => describe(a, binders, own))));
     if (v instanceof Struct) {
-      const entries = new Struct(v.entries.map(([k, e]) => [k === null ? null : asData(k, "a structure's key"), describe(e, binders, own)] as const));
+      const entries = new Struct(v.entries.map(([k, e]) => [k === null ? null : seen(k) instanceof Key ? describe(seen(k), binders, own) : asData(k, "a structure's key"), describe(e, binders, own)] as const));
       settled.add(entries);
       return data("structure", entries);
     }

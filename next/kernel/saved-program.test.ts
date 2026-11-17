@@ -301,3 +301,30 @@ test("two records with the same nodes and different declarations are different m
   assert.match(check2(record({ role: "capability", name: "sink", identity: "sha256:" + "ab".repeat(32) })).join(), /unknown key "identity"/);
   assert.match(check2(record({ role: "module", name: "m", identity: "abc" })).join(), /identity is not sha256/);
 });
+
+test("a record holds a private member as an entry keyed by a key slot", () => {
+  // module(key) => [ {<key>: 9}, o => get(o, key) ]
+  const doc = {
+    format: "allegro-saved-program", version: 2, needs: [],
+    nodes: [
+      { k: "param", name: "key" },
+      { k: "bits", hex: "09", bits: 8 },
+      { k: "structure", entries: [[0, 1]] },
+      { k: "param", name: "o" },
+      { k: "kernel", name: "get" },
+      { k: "expression", fn: 4, args: [3, 0] },
+      { k: "function", params: [3], body: 5 },
+      { k: "structure", entries: [[null, 2], [null, 6]] },
+      { k: "function", params: [0], body: 7 },
+    ],
+    module: 8, declares: [], keys: 1, outcomes: [],
+  };
+  assert.deepEqual(check2(doc), []);
+  const k = createKernel();
+  const m = load(k, doc as unknown as SavedProgram, new Map());
+  const scope = k.scope();
+  const [obj, read] = k.entriesOf(k.evaluate(k.expression(m, []), scope).value).map(([, v]) => k.evaluate(v, scope).value);
+  const count = k.evaluate(k.expression(k.kernelPrimitive("count"), [obj]), scope).value;
+  assert.equal(k.bitsOf(count).bytes[7], 0, "the private entry is not counted");
+  assert.equal(k.bitsOf(k.evaluate(k.expression(read, [obj]), scope).value).bytes[0], 9);
+});

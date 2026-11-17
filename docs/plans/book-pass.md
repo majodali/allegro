@@ -1579,6 +1579,8 @@ its approval.
   review session): a module's identity covers what it declares and
   imports; instantiating checks imports; only a claim with nothing
   unknown under it is restored.
+- **2026-11-17 — the second review's cluster 3 ruled and built** (the
+  review session): a private member is an entry keyed by a key.
 
 ## 8. Sessions
 
