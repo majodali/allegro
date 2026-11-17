@@ -789,6 +789,26 @@ half of issue 6, both to be settled by building, and issue 13, which
 stands as a reading. Issues 16, 24 and 27 were recommended on
 2026-11-16 and wait for the maintainer's word.
 
+### Issues 13, 24 and 27 (2026-11-17)
+
+The maintainer: "I agree with the recommendations on 13, 24, 27."
+
+- **Issue 13.** A module is instantiated once for each distinct set
+  of arguments, and every instance has the module's identity and keys.
+- **Issue 24.** A proposal is a description and holds no capability.
+  An obligation states what its unknown may be handed; by default,
+  nothing.
+- **Issue 27.** A module with no exports hands out its bindings. Its
+  keys and the capabilities it was given are parameters and are never
+  handed out.
+
+The first adversarial review is closed. Of its 31 issues, 28 are
+ruled or done. Left: issue 16, whose exceptions to "Order of
+definition carries no meaning" are now mostly stated by sequence and
+the block of bindings but not written into that entry; the standard
+language's part of issue 5; and the second half of issue 6. The last
+two are settled by building.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks

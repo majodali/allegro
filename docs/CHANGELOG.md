@@ -574,6 +574,11 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-17 — The first adversarial review closed.** Issues 13,
+  24 and 27 ruled: a module has one instance for each distinct set of
+  arguments; a proposal holds no capability; an open module hands out
+  its bindings and never its keys or capabilities. Of the review's 31
+  issues, three remain, two of them to be settled by building.
 - **2026-11-17 — Three more findings of the adversarial review
   ruled.** A notation a text uses can only add, and changes a
   production it does not own only where the using text names it. A
