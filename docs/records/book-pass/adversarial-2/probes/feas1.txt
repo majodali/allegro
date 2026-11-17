@@ -1,0 +1,146 @@
+import { createKernel } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/kernel.ts";
+import type { Kernel, PrimitiveDeclaration, Value } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/interface.ts";
+
+const hash = (n: number) => "sha256:" + n.toString(16).padStart(64, "0");
+const w = (k: Kernel, n: number) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, BigInt(n)); return k.bits(b); };
+const rd = (k: Kernel, v: Value) => { try { const { bytes } = k.bitsOf(v); return Number(new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0)); } catch { return `<${k.kind(v)}>`; } };
+function pure(name: string, n: number, arity: number, f: (...xs: bigint[]) => bigint | boolean): PrimitiveDeclaration {
+  return { purity: "pure", hash: hash(n), name, arity, run: (args, c) => {
+    const r = f(...args.map((a) => { const { bytes } = c.bitsOf(a); return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0); }));
+    if (typeof r === "boolean") return c.bits(Uint8Array.of(r ? 1 : 0), 1);
+    const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, r); return c.bits(b);
+  } };
+}
+function setup() {
+  const k = createKernel() as any as Kernel & Record<string, any>;
+  const add = k.primitiveFunction(pure("add", 1, 2, (a, b) => a + b));
+  const dec = k.primitiveFunction(pure("dec", 3, 1, (a) => a - 1n));
+  const isZero = k.primitiveFunction(pure("isZero", 4, 1, (a) => a === 0n));
+  const call = (fn: Value, ...args: Value[]) => k.expression(fn, args);
+  const kp = (name: string) => k.kernelPrimitive(name);
+  return { k, add, dec, isZero, call, kp };
+}
+const form = (k: Kernel, d: Value) => { const e = k.entriesOf(d); return { form: k.symbolName(e[0][1]).replace("description.", ""), parts: e.slice(1).map(([, v]) => v) }; };
+const steps = (k: Kernel, n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+const section = (name: string, f: () => void) => { console.log(`\n== ${name}`); try { f(); } catch (e: any) { console.log("THROWN:", e?.constructor?.name, String(e?.message).slice(0, 200)); } };
+
+section("P1 a loop with state, whose first statement waits, is unfolded ahead without end", () => {
+  for (const withState of [false, true]) {
+    const { k, add, call, kp } = setup();
+    let accepts = 0; const cells: any[] = [];
+    const accept = k.primitiveFunction({ purity: "effectful", capability: "net", part: "accept", arity: 0, run: (_a, c) => { accepts++; const x = c.cell(); cells.push(x); return x; } });
+    const serve = k.symbol("t.serve"); const i = k.param("i");
+    const fn = k.composedFunction([i], call(kp("then"), call(accept), call(serve, withState ? call(add, i, w(k, 1)) : i)));
+    const prog = call(kp("block"), k.structure([[serve, fn]]), call(serve, w(k, 0)));
+    for (const budget of [1000, 20000]) {
+      accepts = 0; cells.length = 0;
+      const t = Date.now();
+      const r = k.evaluate(prog, k.scope(), { steps: budget });
+      console.log(`state=${withState} budget=${budget}: ended=${r.ended} steps=${r.steps} accepts=${accepts} ms=${Date.now() - t}`);
+      if (cells[0]) { k.fill(cells[0], w(k, 7)); const a = k.advance({ steps: budget }); console.log(`   after the first answer: advance ended=${a.ended} steps=${a.steps} accepts=${accepts}`); }
+    }
+    accepts = 0; cells.length = 0;
+    try { const r = k.evaluate(prog, k.scope()); console.log(`state=${withState} no budget: ended=${r.ended} steps=${r.steps} accepts=${accepts}`); } catch (e: any) { console.log(`state=${withState} no budget THROWN ${e?.constructor?.name}: ${String(e.message).slice(0, 120)}`); }
+  }
+});
+
+section("P2 how deep a plain loop can go", () => {
+  for (const n of [1000, 5000, 20000, 100000]) {
+    const { k, add, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const down = k.symbol("m.down"); const [p, acc] = [k.param("n"), k.param("acc")];
+    k.bind(scope, down, k.composedFunction([p, acc], call(kp("if"), call(isZero, p), acc, call(down, call(dec, p), call(add, acc, w(k, 1))))));
+    try { const r = k.evaluate(call(down, w(k, n), w(k, 0)), scope); console.log(`n=${n}: ended=${r.ended} steps=${r.steps} value=${rd(k, r.value)} refuted=${r.refuted}`); }
+    catch (e: any) { console.log(`n=${n}: THROWN ${e?.constructor?.name}: ${String(e.message).slice(0, 100)}`); }
+  }
+});
+
+section("P3 a structure that holds itself, handed to a primitive, under a step budget", () => {
+  const { k, call, kp } = setup();
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(50), name: "size", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.entriesOf(a[0]).length)) });
+  const xs = k.symbol("t.xs");
+  const prog = call(kp("block"), k.structure([[xs, k.structure([[null, w(k, 1)], [null, xs]])]]), call(size, xs));
+  const r = k.evaluate(prog, k.scope(), { steps: 1000 });
+  console.log(`ended=${r.ended} steps=${r.steps} refuted=${r.refuted}`);
+});
+
+section("P4 `x <- e` followed by `y = x + 1`, as forms.md desugars it", () => {
+  for (const outer of [false, true]) {
+    const { k, add, call, kp } = setup();
+    const said: any[] = [];
+    const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(rd(k, a[0])), a[0]) });
+    const read = k.primitiveFunction({ purity: "effectful", capability: "input", part: "read", arity: 0, run: (_a, c) => w(c as any, 5) });
+    const [x, y] = [k.symbol("t.x"), k.symbol("t.y")];
+    // x <- read() ; y = x + 1 ; say(y)   ==>  block({y: x+1}, block({x: read()}, then(x, say(y))))
+    const inner = call(kp("block"), k.structure([[y, call(add, x, w(k, 1))]]), call(kp("block"), k.structure([[x, call(read)]]), call(kp("then"), x, call(say, y))));
+    const prog = outer ? call(kp("block"), k.structure([[x, w(k, 100)]]), inner) : inner;
+    const r = k.evaluate(prog, k.scope());
+    console.log(`an enclosing block binds x: ${outer}; said=${JSON.stringify(said)} kind=${k.kind(r.value)} waiting=${k.waiting().length} refuted=${r.refuted}`);
+  }
+});
+
+section("P5a a function made in a block, described and built again", () => {
+  const { k, add, call, kp } = setup();
+  const [kk, f] = [k.symbol("t.k"), k.symbol("t.f")]; const [key, n] = [k.param("key"), k.param("n")];
+  const m = (k as any).module(k.composedFunction([key], call(kp("block"), k.structure([[kk, w(k, 7)], [f, k.composedFunction([n], call(add, n, kk))]]), k.structure([[null, key], [null, f]]))), 1);
+  const scope = k.scope();
+  const inst = k.evaluate(call(m), scope).value;
+  const [ownKey, fv] = k.entriesOf(inst).map(([, v]) => k.evaluate(v, scope).value);
+  console.log("kind of f:", k.kind(fv), " f(1) =", rd(k, k.evaluate(call(fv, w(k, 1)), scope).value));
+  for (const [name, right] of [["own key", ownKey], ["inspection right", (k as any).inspectionRight()]] as const) {
+    const d = k.evaluate(call(kp("describe"), right, fv), scope);
+    if (d.refuted) { console.log(`describe with ${name}: refuted: ${(k as any).reasonOf(d.value)}`); continue; }
+    const body = form(k, form(k, d.value).parts[1]);
+    console.log(`describe with ${name}: body form=${body.form}, args forms=${k.entriesOf(body.parts[1]).map(([, a]) => form(k, a).form)}`);
+    const b = k.evaluate(call(kp("build"), d.value), k.scope());
+    const r = k.evaluate(call(b.value, w(k, 1)), k.scope());
+    console.log(`   built again and called on 1: kind=${k.kind(r.value)} value=${rd(k, r.value)} refuted=${r.refuted} waiting=${k.waiting().length}`);
+  }
+});
+
+section("P5b one argument used twice: its effect, before and after describe and build", () => {
+  const { k, add, call, kp } = setup();
+  let n = 0;
+  const cap = k.primitiveFunction({ purity: "effectful", capability: "c", part: "p", arity: 1, run: (a) => (n++, a[0]) });
+  const [x, c] = [k.param("x"), k.param("c")];
+  const twice = k.composedFunction([x], call(add, x, x));
+  const g = k.composedFunction([c], call(twice, call(c, w(k, 3))));
+  const scope = k.scope();
+  console.log("direct: value", rd(k, k.evaluate(call(g, cap), scope).value), "effects performed", n);
+  // the same function with the call of `twice` opened: the shared argument is one node of the DAG
+  const e = call(c, w(k, 3));
+  const c2 = k.param("c");
+  const e2 = call(c2, w(k, 3));
+  const opened = k.composedFunction([c2], call(add, e2, e2));
+  n = 0; console.log("opened, one shared node: value", rd(k, k.evaluate(call(opened, cap), scope).value), "effects performed", n);
+  const d = k.evaluate(call(kp("describe"), (k as any).inspectionRight(), opened), scope);
+  const b = k.evaluate(call(kp("build"), d.value), scope);
+  n = 0; const r = k.evaluate(call(b.value, cap), scope);
+  console.log("described and built: value", rd(k, r.value), "effects performed", n, "refuted", r.refuted);
+  void e;
+});
+
+section("P6 an attempt's answer and the order in which two answers arrive", () => {
+  for (const order of ["c1 then c2", "c2 then c1", "both, one advance"]) {
+    const { k, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const [down, x] = [k.symbol("m.down"), k.symbol("m.x")]; const p = k.param("n");
+    k.bind(scope, down, k.composedFunction([p], call(kp("if"), call(isZero, p), w(k, 0), call(down, call(dec, p)))));
+    const [c1, c2] = [k.cell(), k.cell()];
+    k.bind(scope, x, call(down, c1));
+    const A = k.evaluate(call(kp("then"), c2, call(kp("attempt"), x, steps(k, 30))), scope);
+    const B = k.evaluate(x, scope);
+    if (order === "c1 then c2") { k.fill(c1, w(k, 100)); k.advance(); k.fill(c2, w(k, 1)); k.advance(); }
+    else if (order === "c2 then c1") { k.fill(c2, w(k, 1)); k.advance(); k.fill(c1, w(k, 100)); k.advance(); }
+    else { k.fill(c1, w(k, 100)); k.fill(c2, w(k, 1)); k.advance(); }
+    const a = k.current(A.value);
+    console.log(`${order}: attempt answered ${k.kind(a) === "structure" ? form(k, a).form : k.kind(a)}; x = ${rd(k, k.current(B.value))}`);
+  }
+});
+
+section("P7 a claim nothing needs", () => {
+  const { k, isZero, call, kp } = setup();
+  const [a, b] = [k.symbol("t.a"), k.symbol("t.b")];
+  const r = k.evaluate(call(kp("block"), k.structure([[a, call(kp("claim"), call(isZero, w(k, 3)))], [b, w(k, 1)]]), b), k.scope());
+  console.log("block({a: claim(false), b: 1}, b): refuted =", r.refuted, "value =", rd(k, r.value));
+  const s = k.evaluate(k.structure([[a, call(kp("claim"), call(isZero, w(k, 3)))], [b, w(k, 1)]]), k.scope());
+  console.log("a module's structure of bindings {a: claim(false), b: 1}: refuted =", s.refuted, "outcome =", k.outcomeOf(s.value));
+});

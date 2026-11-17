@@ -1,0 +1,184 @@
+# Security review of Allegro's design (second adversarial review)
+
+Reviewer angle: security. Read: the 245 decisions, `next/ext/allegretto/forms.md`, `next/kernel/interface.ts`, `next/kernel/saved-program.ts`, `next/kernel/kernel.ts` lines 1–125, `next/prims/index.ts`, and the head and a few tests of `next/kernel/kernel.test.ts` for the probe pattern. Nothing under `docs/`.
+
+Probes are in `/tmp/claude-0/-home-user-allegro/3772d497-a833-5650-956a-883ae5b890cd/scratchpad/adv2/probes-security/` (`p1.test.ts` … `p6.test.ts`, shared helpers in `common.ts`). Run from the worktree: `npx tsx --test --test-reporter=spec <file>`. Each finding says whether it was run. "Ran" means against the reference kernel through its interface; where a decision is "open" and the kernel does not build it, the finding is from the text alone and says so.
+
+Summary of severities: 5 `blocks`, 9 `needs a ruling`, 1 `wording`.
+
+---
+
+## 1. A module's keys follow from its content alone, so anyone who has the content gets an instance with the same keys and chooses its arguments
+
+- **Decisions:** D107 "A key is made with the module that holds it"; D213 "A module is a function of its capabilities, inputs and imports"; D41 "Authority is an unforgeable value"; D132 "A private member is one whose key not all code holds"; D179 "A solver reads the residual of its problem". Interface: `Kernel2.module(fn, keys)`; saved program: `declares`, `keys`.
+- **Attacker:** controls a saved program (data form), or a text module. Needs nothing trusted.
+- **Scenario (ran, `p2.test.ts` PA).** Module M is `(key, dep) => [key, x => dep(x)]`. Two records hold the same `nodes`. One declares parameter 1 as `{role: "module", name: "trusted_solver"}`. The other declares it as `{role: "capability", name: "evil_sink"}`. `load` gives both the same `moduleOf` (`sha256:e635…`) and the two instances hold the identical key object. The key from the second instance describes the function of the first instance.
+- **Why:** `module` takes the function and a count. The `declares` table, which says which import or capability each parameter is, is not content. A parameter's name is not content either (the kernel's own test: "whatever its parameters are called"). So the attacker copies M's nodes, keeps every node, and rebinds M's imports to modules of the attacker's choosing. D213 then says "every instance has the module's identity and its keys".
+- **What breaks.** The attacker's instance is M's code with M's keys, running against the attacker's "imports". Everything M hands to an import goes to the attacker: a describing function that closes over the key (D179 prescribes exactly this pattern for a solver), a private member M passes to a helper, an internal closure M passes to `map`. Values made by the honest instance are open to the attacker's instance, because the key is the same key. Two unrelated modules with the same text (a copied "sealed box" template) also open each other's private members. D41's "cannot be forged or guessed" does not hold for a key whose derivation is a public function of public content.
+- **Severity:** blocks. Privacy of members (D132) and of function bodies (D43) both rest on the key.
+- **Confidence:** high for the interface as written. I would change my mind if the loader, not the kernel, were stated to bind identity to the import names and the instantiating arguments, and no path could call a module function with other arguments.
+- **Fix direction:** make a key belong to an instance (content plus the identities of the arguments it was instantiated with), or put the declared imports into the hashed content and let only the loader's capability instantiate.
+
+## 2. A restored outcome is keyed to a claim's place, not to an evaluation, so a claim over an input or a parameter is "decided" for every value
+
+- **Decisions:** D222 "A stored outcome is restored with its builder's name"; D14 "A refuted value never reaches an effect"; D16 "The kernel trusts only what it has evaluated"; D213 (an input is a cell a later phase supplies). Interface: `Kernel2.claimKey`, `Kernel2.restore`; saved program: `outcomes`.
+- **Attacker:** none needed. An honest builder produces it. A dishonest author of a record also can, wherever the loader passes `restoreAs`.
+- **Scenario (ran, `p2.test.ts` PE).** Record: `(n, out) => then(claim(isZero(n)), out(n))`, `n` declared an input, with one stored outcome for the claim, resting on the kernel and `isZero`. Loaded without `restoreAs` and called with `n = 5`: refuted, nothing written. Loaded with `restoreAs: "team-build"` and called with `n = 5`: not refuted, `out(5)` performed. The kernel never evaluated `isZero(5)`.
+- **Why:** the key is a hash of the claim's content, the function's content and `restsOn`. All three are in the record, so the key authenticates nothing; `outcomeKeys` computes it for any record. The claim is a node of the unevaluated module function. A node that mentions a parameter has one outcome per call, not one. D222's reason ("because evaluation is deterministic, a stored outcome is what the loading kernel would compute") holds only for a closed claim. D222 excludes outcomes that rest on a capability's answer. It does not exclude outcomes that rest on an input, an imported module, a module parameter or a function parameter, and `Rest` has no kind for any of them. The kernel's own test restores `claim(isZero(n))` with `n` a parameter and then asserts that `fn(5)` is "decided".
+- **What breaks.** D14 and D16. A value that fails its claim reaches an effect, and the report says "decided".
+- **Severity:** blocks, for restore as specified.
+- **Confidence:** high.
+- **Fix direction:** restore only a claim that is closed (no parameter, cell or name under it), or key the outcome on the claim with its arguments' content; add inputs to what a result rests on.
+
+## 3. A saved program can name any symbol, and a name is looked up in the scope where the module is instantiated
+
+- **Decisions:** D220 "A saved program is a recorded sequence of interface calls" ("cannot … reach any scope", "never names a capability"); D209 "Only the launcher sets the ceiling" ("by value or by being evaluated in a scope that holds it"); D58 "The environment is not a value"; D87 "A language checks the names it cares about"; D211. Saved program: node `symbol`; interface: `Kernel2.module` ("must be closed").
+- **Attacker:** controls a saved program.
+- **Scenario (ran, `p2.test.ts` PB).** A record with no parameters and no `declares`: `() => launcher.output(session.password)`, both written as `symbol` nodes. `check2` accepts it. `module` accepts it as closed. The host binds `launcher.output` to an effectful primitive in a scope and instantiates the module in a child scope. The evaluation waits on `session.password`. A later `bind` of `session.password` in that scope, as a prompt entry would make, and one `advance`: the capability is called with the value.
+- **What breaks.** D220: the record declared no capability and received none as an argument, and it used one. D209 makes binding a capability in a scope a sanctioned way to hand it over, and D211 gives each invocation "its own scope with its own capabilities". D87 puts the check of free names in the extension that reads a text; nothing reads a saved program, so nothing checks. The record also reads any binding a later prompt entry makes, by guessing its name.
+- **Severity:** blocks, for the claim that a saved program can only construct values.
+- **Confidence:** high for the kernel and the data form. It depends on a launcher evaluating in a scope that binds anything; D209 and D211 say it may.
+- **Fix direction:** `module` refuses a function with a free name; a module's free names are parameters, bound by the loader.
+
+## 4. A function made by `build` takes its free names from wherever it is first evaluated, which is the caller's block
+
+- **Decisions:** D44 "A live expression is built only from live values"; D58; D61 "A block of bindings is one kernel primitive"; D63 "No argument can be inspected" ("in the scope where it was written"). Kernel primitive `build`.
+- **Attacker:** a library the program imports.
+- **Scenario (ran, `p2.test.ts` PC and `p3.test.ts` PC2).** The library exports `mk = () => build(d)`, where `d` describes `() => v.out(v.secret)` with both as `name` forms. The victim's block binds `v.out` to a capability, `v.secret` to 78 and `v.run = f => f()`, and its body is `v.run(att.mk())`. Result: the capability is called with 78. The control, an ordinary function with the same free name made in the library's scope, does not see the victim's binding. When the library builds the function in its own scope first and hands over the value, there is also no capture. The capture happens when the call that builds is written in the victim's block, which is the ordinary way to call a library.
+- **What breaks.** D58: "a program reaches only what it can name" assumes the name is resolved where the code was written. A description is data and was written nowhere. The design does not say in which scope a built function's names resolve. In the reference kernel a library reads every binding of every block around the call, by its fully-qualified name, which is the module path and the base name (D30) and so is predictable.
+- **Severity:** blocks until ruled; a small ruling fixes it.
+- **Confidence:** high that the kernel does it. Medium that the design intends otherwise: `kernel.ts` lists "the block of bindings that lets a built function bind its own names" as left for later.
+- **Fix direction:** `build` yields a function with no free names (the builder supplies a value for each name, as D44 already says for unforgeable values), or the names resolve in an empty scope.
+
+## 5. A callee can read the caller's unevaluated argument by wrapping it in a function of its own and describing that
+
+- **Decisions:** D63 "No argument can be inspected"; D43 "Describing a function requires authority"; D133 "Who may use a member is a claim about where the access was written"; D72 "Substitution of params into bodies".
+- **Attacker:** a library the program imports.
+- **Scenario (ran, `p2.test.ts` PD).** Library module A exports `wrap = a => (() => a)` and uses its own key in `describe(key, f)`. Victim module V calls `wrap(add(helper(7), 1))`, where `helper` is V's private function. The thunk is a function of A. A describes it with A's key and reads `apply primitive add [apply opaque [bits 07], bits 01]`. A sees the constant 7, the constant 1 and which primitive is applied. The value alone would have been 50.
+- **What breaks.** D63 says a function never holds a value of an expression's kind that it can look into. Arguments go in "as written" (D63, D72), so the caller's expression sits inside any closure the callee makes around it, and the callee holds the right to describe its own closures. A program that passes `hash(password)` to a logger gives the logger `password`. D43 and D133 say each part of an expression keeps the mark of the module it was written in and a description shows a part only under a right for that module. That would close this. D133 is "open, a design to prove", D43 states the mark only for bodies copied by opening a call, and the reference kernel marks whole functions and not parts.
+- **Severity:** blocks until the mark on parts is built; then closed. State in D43 that an argument is a part with its writer's mark.
+- **Confidence:** high for the kernel; medium that the written design already covers it.
+- **Fix direction:** D43 names arguments explicitly, and a description shows a part of another module as `opaque` including its bits.
+
+## 6. A private member cannot be kept from `get` by place, `count`, a primitive function or a metadata read
+
+- **Decisions:** D132 "A private member is one whose key not all code holds"; D75 "The kernel's primitives are pure and few" (reading structures); D32; D51 ("any code can read it"); D140; D19; forms.md §4 item 3 ("a primitive function is handed a structure with every entry evaluated"). Interface: `PrimitiveContext.entriesOf`.
+- **Attacker:** any code that holds the object: a library handed a value.
+- **Scenario (ran, `p2.test.ts` PI).** A structure with one entry keyed by a symbol and one entry keyed by a module's key. `get(obj, 1)` returns the second entry's value to code that holds no key. `count(obj)` returns 2.
+- **What breaks.** D132 says no other code can reach the member "by any name". The kernel reads by place, and a place is not a name. A structure is the only composite (D27), every entry is reachable by place, every field is readable by all, and every primitive function is handed all entries. The design names no place where a private member can live. The only construction I can see is a function that closes over the data and checks a key, and D132 does not say so. "Conformance counts only the members the asking code can reach" and "printing omits what the printer cannot reach" need the same missing mechanism.
+- **Severity:** needs a ruling.
+- **Confidence:** high that the gap exists; D132 is open, so the answer may exist unwritten.
+- **Fix direction:** say where a private member is stored (a closure over the key), or make `get` by place and `count` skip entries keyed by a key the caller did not present.
+
+## 7. A proposal is a description, and a description holds names: placing one gives it everything in scope
+
+- **Decisions:** D239 "A proposer answers with only the missing value" ("A proposal is a description, so it holds no capability"); D44; D148 "A proof term is a proposal"; D178; D228 ("a proposal is never trusted").
+- **Attacker:** a proposer.
+- **Scenario (not run; rests on finding 4, which ran).** An obligation in a module whose block binds `log = output.write`, or any capability under a name. The proposer answers a gap in a model with the description of `x => then(log(x), real(x))`. It holds no unforgeable value, so D44 lets it be built. The tool places it and evaluates the claim again. A well-formedness claim does not call the entry, so the claim is decided and the proposal is kept. At run the program calls the entry, and it writes through `log`.
+- **What breaks.** "It holds no capability" is true of the data and false of the function built from it at the place of the obligation. Proof terms must name things in scope (lemmas, `same`, `flip`), so a proposal cannot simply be required closed. D239's "an obligation states what its unknown may be handed, … by default nothing" reads as a list of arguments and says nothing of names.
+- **Severity:** needs a ruling.
+- **Confidence:** medium. A stated rule that a proposal's free names are checked against a list the obligation gives would settle it.
+- **Fix direction:** the obligation lists the names a proposal may use; the tool refuses any other free name before building.
+
+## 8. The loader and the parser decide who gets which capability and what a text means, and a project's file may choose both
+
+- **Decisions:** D228 "Three things are trusted"; D206 ("a project's file may choose its parser and its loader"); D210 step 4; D213 ("Instantiating it is a call, made by whoever loaded it"); D87; D84; D217 (check gives the loader's capability).
+- **Attacker:** controls a low-priority configuration source, the project's file.
+- **Scenario (not run).** A project file names its own loader. Check is run on the project, which D217 calls safe: "no capability but the loader's". The loader is handed file reading. It reads a file outside the project and puts the content in a refutation's reason, which the report shows. In a run, every module is instantiated by the loader, so every capability a module receives passes through the loader; it can keep each one, or hand module X's capability to module Y. The name check of D87 is the loader's or parser's to make, so a chosen loader also decides whether finding 3's free names are refused.
+- **What breaks.** D228 lists three trusted things. The loader distributes authority and the parser assigns meaning; both are trusted in fact, and D206 lets the least trusted file choose them. D206 reserves "the kernel, the accepted keys and the ceiling" to the launcher and the command line. It does not reserve the inspection right (D43 "an inspection right that a configuration grants"), restore, whether origins are kept (D53), or the default-on policy of D122 that "a user may turn off".
+- **Severity:** needs a ruling.
+- **Confidence:** medium-high. D205 leaves the split between launcher and Allegro code "open on purpose"; the gap is that D228 and D206 already state a result.
+- **Fix direction:** name the loader and parser as trusted (by hash, in a result's "rests on"), reserve their choice and the inspection right to the launcher and command line, and narrow check's file capability to the project's and platform's directories.
+
+## 9. `attempt` turns step counts into data: a noise-free timing oracle, a view of what others have evaluated, and results that differ between kernels
+
+- **Decisions:** D80 "An evaluation can be returned as data"; D204 "Limits are step budgets"; D70 "The same program and the same information give the same result"; D43; D222; D232.
+- **Attacker:** a library the program imports, or any code that can call a function it cannot describe.
+- **Scenario A (ran, `p3.test.ts` PF1).** A function closes over three secret bytes and compares them in turn with an early exit. Code with no right over it calls `attempt(check(g0, g1, g2), n)` and searches for the smallest `n` that is not "limit". The cost is 3 or 5 steps at the first place. The first two bytes were recovered from step counts alone: 13, 200.
+- **Scenario B (ran, PF3).** A library's binding is evaluated at most once and shared (D61, D76). `attempt(use(lib.table), 20)` answers "limit" before any other module has needed `lib.table` and "value" after. One module learns what another has done.
+- **Scenario C (from the text).** `claim(attempt(f, 100) is a value)`. D204 says where the steps run out "may vary with the order in which values arrive, with sharing and with the kernel variant". So this claim is decided in one kernel and refuted in another. D204's "a limit … never decides one differently" and D70 are false once the limit is a value a program can branch on. D222's restore and D232's "agrees with the reference" both assume they hold.
+- **What breaks.** A function's privacy (D43) against its callers; D70; the determinism restore and reference checking rest on.
+- **Severity:** needs a ruling.
+- **Confidence:** high for A and B. High for C as a contradiction between D80 and D204.
+- **Fix direction:** make "limit" a result that carries the strength undecided and cannot decide a claim, and give `attempt` to code as a granted right, not as an ambient primitive.
+
+## 10. A notation brought in with `use` can change the meaning of text that parsed before
+
+- **Decisions:** D101 "A notation a text uses can only add"; D95 "Ambiguity is a claim" (longest match removes ambiguity); D93 (cumulative sets of reserved words); D91 "A terminal is a function"; D97.
+- **Attacker:** controls a notation a text uses.
+- **Scenario (not run; the parser of the decisions is not built).** (a) The notation appends to `statement` an alternative that matches an existing statement and the line after it. D95 makes longest match a way to remove ambiguity, so there is one parse, the new one, and no refutation. (b) The notation adds a word to a cumulative reserved set. An identifier the user already wrote stops being an identifier; the line then parses through another alternative or fails. (c) An added terminal is a function over the position and the parser's state (D91, D102). It may succeed with zero width and return a changed indent stack, which regroups the user's later lines.
+- **What breaks.** D101's sentence "bringing in a notation never changes the meaning of text that parsed before". Each of the three is an addition by D101's own list.
+- **Severity:** needs a ruling.
+- **Confidence:** medium. It depends on how longest match and added alternatives are ordered, which is not stated.
+- **Fix direction:** state the guarantee as a check: the text after `use` is parsed with and without the addition, and any span that parsed before and now parses otherwise is a refutation.
+
+## 11. "After a phase has refuted a claim, it performs no further effect" cannot be kept by a kernel that knows no phase
+
+- **Decisions:** D14; D201 "The kernel is passive" ("knows nothing of … phases"); D133 ("refuted like any other, before any effect"); D59; D60. Interface: `advance`, `Advance.refuted`.
+- **Attacker:** none needed. A library gains from it: its effect runs though the program is already known to be wrong.
+- **Scenario (ran, `p1.test.ts` L7 and `p3.test.ts` L7c).** Two evaluations in one kernel wait on two cells: `claim(isZero(c1))` and `write(c2)`. Fill both, call `advance` once: one refutation is reported and the write is performed, in the same call. Fill them one at a time: the first `advance` reports the refutation and the second performs the write.
+- **Also ran (L1b, L3, L5b), each as the decisions say:** `then(write(7), claim(false))` writes 7 and then refutes. A refuted binding nothing reads refutes nothing, and the effect beside it happens.
+- **What breaks.** Effects are performed inside `advance`, which covers "everything in this kernel". The launcher learns of the refutation when the call returns. So D14's sentence needs the kernel to group waiters by phase, which D201 rules out. D133's "before any effect" is true only when a check phase decided the claim earlier; in a run with late information an effect written earlier is performed first.
+- **Severity:** needs a ruling.
+- **Confidence:** high for the behaviour; medium that it matters once D62's ordering is built.
+- **Fix direction:** `advance` stops performing effects at the first refutation and reports what it held back, or an evaluation is a handle the launcher can close.
+
+## 12. A claim about a recursive function is "assumed at the inner call and decided on the body": D66 against D21
+
+- **Decisions:** D66 "A recursive call is evaluated once for each state of knowledge"; D21 "Every result says how strongly it holds"; D166 "Termination is a claim" (a function may make none); D160.
+- **Attacker:** a library author who wants a claim reported as decided.
+- **Scenario (from the text).** `f(x) => f(x)` with `ensures _ > 0`. The inner call is not opened. The claim is assumed there, so the body's result satisfies it, and D66 reports it "decided on the body". D21 says a claim resting on a weaker claim is reported at the weaker strength, which is "assumed". Nothing requires `f` to claim termination (`partial` makes none), and the function returns nothing. A caller's `claim(f(u) > 0)` is then decided from knowledge (D160), and under evaluation by need (D59) a binding `r = f(u)` that nothing forces never diverges at run, so the program goes on with a "decided" fact no evaluation established.
+- **What breaks.** Either D21 (the word is too strong) or D66 (the claim is only assumed, and then no recursive function's contract is ever decided).
+- **Severity:** needs a ruling.
+- **Confidence:** medium. A stated rule that the induction is allowed only under a decided termination claim would settle it.
+- **Fix direction:** D66 says "decided, resting on the termination claim of the function", and the strength follows that claim.
+
+## 13. A step budget bounds neither time nor memory, and a limit that is not the budget escapes `attempt`
+
+- **Decisions:** D204; D82 "Evaluation stops early for two reasons only"; D80; D97 (the parser evaluates a form "at once"); D59; forms.md §4 item 3.
+- **Attacker:** a library, a notation, a proposal, or the author of a text someone only parses.
+- **Scenario (ran, `p6.test.ts`, `p4.test.ts` DOS1b).** `x1 = join(x0, x0)`, …, `x13 = join(x12, x12)` from 1 KiB, under `attempt(…, 100)` and a limit of 200: 16 steps, 8.6 s, 8 MiB. Each further doubling is one step. At 14 doublings the evaluation ended "limit" after 17 steps and about 15 s; the result was the unfinished expression, and `attempt` gave no "limit" form. The same with `f(n) = add(1, f(n))` under `attempt(…, 50 000 000)`: the whole evaluation ended "limit" at 1184 steps and `attempt` reported nothing. So code evaluated "under a budget … for evaluating what it does not trust" (D204) can end its caller's evaluation.
+- **From the text.** D97 has the parser evaluate a grammar form while parsing, so opening or checking an untrusted text runs its code; no decision gives parsing a budget. A proposal is "evaluated again … for a bounded number of attempts" (D239) with no budget per attempt stated. A primitive function forces a structure in full, and its own cost is one step whatever the size.
+- **What breaks.** D204's budget as the one defence; D80's promise that a limit inside comes back as data.
+- **Severity:** needs a ruling.
+- **Confidence:** high for the measurements. I did not read the kernel past line 125, so I do not say which internal limit fired.
+- **Fix direction:** charge steps by size for the bits primitives and for forcing; give memory a budget; every limit inside `attempt` is `attempt`'s "limit"; parsing and proposals run under a configured budget.
+
+## 14. The interface gives every holder of the kernel what the decisions reserve, and "pure" is ambient
+
+- **Decisions:** D222 ("Restore is a capability narrowed to one builder"); D215 ("Data is confined to the kernel's interface"); D43; D53; D48; D233; D221. Interface: `Kernel2.restore`, `inspectionRight`, `originOf`, `composedFunctionOf`, `expressionOf`, `primitiveFunction`; `load(kernel, …)`.
+- **Attacker:** host code that is not the launcher but holds the kernel object (an embedding application's plugin, the host-code form of a saved program), or host code of a primitive declared pure. Both are trusted parties, so this is weaker; it shows the trusted set is wider than D228 says.
+- **Scenarios.**
+  - `restore(claim, within, builder, …)` takes any builder string from any caller. No call narrows it to one builder, and no call withholds it.
+  - `inspectionRight()` is a plain method. `composedFunctionOf`, `expressionOf` and `originOf` read any function and origin with no right at all.
+  - `primitiveFunction` takes the hash as a string the host states. The kernel does not compute it. So D221's "names by content hash" trusts whoever wrote the declaration, and results name a hash nobody checked.
+  - Ran (`p2.test.ts` PC): `build` of a description with `primitive <hash>` yields a primitive the builder was never handed, for any pure primitive registered in the kernel. That is D48 as written. It means one host function wrongly declared pure (a clock, a debug print) is reachable by every saved program and proposal that knows its hash.
+  - Ran (`p5.test.ts` PH5, `p4.test.ts` PH4): a primitive is handed effectful primitives, composed functions and keys as arguments. The kernel refuses to take them back from it ("what a primitive returned is not plain data"), and `fill` refuses them too. Both checks hold. Host code can still use what it was handed.
+- **What breaks.** Nothing if every host caller is the launcher. D215 and D222 describe narrower rights than the interface can express.
+- **Severity:** needs a ruling (a narrowed handle for loaders and tools), otherwise wording.
+- **Confidence:** high.
+- **Fix direction:** split the interface: a constructing handle for `load`, an inspecting handle, and `restore` obtained per builder from the launcher's handle; the kernel computes or verifies a primitive's hash.
+
+## 15. A symbol is any string a saved program writes, so what rests on a symbol being fresh or owned does not hold against one
+
+- **Decisions:** D30, D35; D114 "Members are keyed by symbol"; D123 "`distinct` mints a fresh-symbol newtype"; D51 ("a second registration is a conflict"); D7. Saved program: nodes `symbol`, `datum`.
+- **Attacker:** controls a saved program or a library.
+- **Scenario (from the text; the node kinds were exercised in PB).** A record writes the member symbols of a `distinct` type by their fully-qualified names and so conforms to it with no coercion declared. A library registers a metadata field under the name the standard extension uses; D51 makes that a conflict and D7 an error "before either is used", so one import stops the program.
+- **What breaks.** D123's "does not conform … unless a coercion is declared" holds against accident and not against intent. D41 does say nothing is granted by name, so this is consistent if no rule treats a symbol as authority. D123 and D114 read as if one does.
+- **Severity:** wording.
+- **Confidence:** medium.
+- **Fix direction:** say that symbols separate by accident only, and that a `distinct` type which must be unforgeable takes a key.
+
+---
+
+## What I looked for and found no problem with
+
+- **Primitive functions returning authority.** Ran: a pure primitive that returns an effectful primitive, the inspection right or a stashed key is refused; `fill` refuses a function and a key.
+- **Forging a key.** Ran and read: a structure with a key's entries is not a key; `build` refuses a `key` form and a `capability` form; a stray parameter in a description is refused.
+- **Describing another module's function.** The kernel's tests cover it; in my probes another module's function showed as `opaque` under the wrong key every time (the leak in finding 5 is of the argument, not of the callee).
+- **A refuted value reaching an effect directly.** Ran: through `then`, in function position, inside a structure handed to a primitive. Each was stopped. The paths that are open are findings 2 and 11 and the by-design cases listed there.
+- **Evaluation ahead.** Ran: ahead of a waiting first statement, no effect was performed through `attempt`, a call, `get`, a block binding or a conditional; after the fill each was performed once.
+- **Nested budgets.** Ran: an inner `attempt` with a large budget inside an outer one of 50 steps ends at the outer budget.
+- **A structure without end and unbounded recursion with no limit given.** Ran: both end as "limit"; neither faulted.
+- **The data form's own checks.** Read `check2`: references only go backwards, a parameter has one owner, a capability cannot be named as a node or as a ground of an outcome. The gaps are free symbols (finding 3) and the unhashed `declares` (finding 1).
+- **Minor, not listed as a finding.** `claim(true)` yields the bits value true carrying the outcome "decided" with nothing saying which claim (ran, `p1.test.ts` OUT). With origins dropped in a run (D53), a value that says "decided" does not say of what; D151 points to the origin for that.

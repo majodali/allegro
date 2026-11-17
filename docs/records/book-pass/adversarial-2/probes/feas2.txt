@@ -1,0 +1,108 @@
+import { createKernel } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/kernel.ts";
+import type { Kernel, PrimitiveDeclaration, Value } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/interface.ts";
+
+const hash = (n: number) => "sha256:" + n.toString(16).padStart(64, "0");
+const w = (k: Kernel, n: number) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, BigInt(n)); return k.bits(b); };
+const rd = (k: Kernel, v: Value) => { try { const { bytes } = k.bitsOf(v); return Number(new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0)); } catch { return `<${k.kind(v)}>`; } };
+function pure(name: string, n: number, arity: number, f: (...xs: bigint[]) => bigint | boolean): PrimitiveDeclaration {
+  return { purity: "pure", hash: hash(n), name, arity, run: (args, c) => {
+    const r = f(...args.map((a) => { const { bytes } = c.bitsOf(a); return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0); }));
+    if (typeof r === "boolean") return c.bits(Uint8Array.of(r ? 1 : 0), 1);
+    const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, r); return c.bits(b);
+  } };
+}
+function setup() {
+  const k = createKernel() as any as Kernel & Record<string, any>;
+  const add = k.primitiveFunction(pure("add", 1, 2, (a, b) => a + b));
+  const dec = k.primitiveFunction(pure("dec", 3, 1, (a) => a - 1n));
+  const isZero = k.primitiveFunction(pure("isZero", 4, 1, (a) => a === 0n));
+  const call = (fn: Value, ...args: Value[]) => k.expression(fn, args);
+  const kp = (name: string) => k.kernelPrimitive(name);
+  return { k, add, dec, isZero, call, kp };
+}
+const form = (k: Kernel, d: Value) => { const e = k.entriesOf(d); return { form: k.symbolName(e[0][1]).replace("description.", ""), parts: e.slice(1).map(([, v]) => v) }; };
+const steps = (k: Kernel, n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+const section = (name: string, f: () => void) => { console.log(`\n== ${name}`); try { f(); } catch (e: any) { console.log("THROWN:", e?.constructor?.name, String(e?.message).slice(0, 200)); } };
+
+
+section("P2b threshold of a plain loop", () => {
+  for (const n of [100, 300, 600, 900, 950]) {
+    const { k, add, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const down = k.symbol("m.down"); const [p, acc] = [k.param("n"), k.param("acc")];
+    k.bind(scope, down, k.composedFunction([p, acc], call(kp("if"), call(isZero, p), acc, call(down, call(dec, p), call(add, acc, w(k, 1))))));
+    const r = k.evaluate(call(down, w(k, n), w(k, 0)), scope); console.log(`n=${n}: ended=${r.ended} steps=${r.steps} value=${rd(k, r.value)}`);
+  }
+});
+
+section("P5a' a function made in a block, without a module", () => {
+  const { k, add, call, kp } = setup();
+  const [kk, f] = [k.symbol("t.k"), k.symbol("t.f")]; const n = k.param("n");
+  const blk = call(kp("block"), k.structure([[kk, w(k, 7)], [f, k.composedFunction([n], call(add, n, kk))]]), f);
+  const scope = k.scope();
+  const fv = k.evaluate(blk, scope).value;
+  console.log("kind:", k.kind(fv), "called in the same scope:", rd(k, k.evaluate(call(fv, w(k, 1)), scope).value), "in a fresh scope:", rd(k, k.evaluate(call(fv, w(k, 1)), k.scope()).value));
+  const got = k.composedFunctionOf(fv);
+  console.log("read through the interface: body kind", k.kind(got.body), "args", k.expressionOf(got.body).args.map((a) => k.kind(a) + (k.kind(a) === "symbol" ? ":" + k.symbolName(a) : "")));
+  // what a saver can do: rebuild it from what it read
+  const k2s = setup(); 
+  const d = k.evaluate(call(kp("describe"), (k as any).inspectionRight(), fv), scope);
+  console.log("describe: refuted", d.refuted, d.refuted ? (k as any).reasonOf(d.value) : k.entriesOf(form(k, form(k, d.value).parts[1]).parts[1]).map(([, a]) => form(k, a).form));
+  if (!d.refuted) { const b = k.evaluate(call(kp("build"), d.value), k.scope()); const r = k.evaluate(call(b.value, w(k, 1)), k.scope()); console.log("built again, called on 1:", rd(k, r.value), "waiting", k.waiting().length); }
+  void k2s;
+});
+
+section("P8 a residual, read through the interface and built again as a record would", () => {
+  const { k, add, call, kp } = setup();
+  let n = 0;
+  const cap = k.primitiveFunction({ purity: "effectful", capability: "c", part: "p", arity: 1, run: (a) => (n++, a[0]) });
+  const x = k.param("x"); const capName = k.symbol("t.cap");
+  const twice = k.composedFunction([x], call(add, x, x));
+  const scope = k.scope();
+  const res = k.evaluate(call(twice, call(capName, w(k, 3))), scope);   // the capability is not there: a residual
+  console.log("residual kind:", k.kind(res.value));
+  const show = (v: Value, d = 0): string => { const kd = k.kind(v); if (kd === "expression") { const e = k.expressionOf(v); return `(${show(e.fn, d + 1)} ${e.args.map((a) => show(a, d + 1)).join(" ")})`; } if (kd === "symbol") return k.symbolName(v); if (kd === "bits") return String(rd(k, v)); if (kd === "primitive-function") return "prim:" + (k.primitiveFunctionOf(v) as any).name; return kd + ((k as any).isCell(v) ? "(cell)" : ""); };
+  console.log("residual:", show(res.value));
+  const e = k.expressionOf(res.value);
+  console.log("the two arguments are one handle:", e.args[0] === e.args[1]);
+  // rebuild with the same sharing, in a scope that has the capability
+  const memo = new Map<Value, Value>();
+  const copy = (v: Value): Value => { if (memo.has(v)) return memo.get(v)!; let r = v; if (k.kind(v) === "expression") { const e = k.expressionOf(v); r = k.expression(copy(e.fn), e.args.map(copy)); } memo.set(v, r); return r; };
+  const rebuilt = copy(res.value);
+  const s2 = k.scope(); k.bind(s2, capName, cap);
+  n = 0; const r2 = k.evaluate(rebuilt, s2); console.log("rebuilt with sharing kept, run with the capability: value", rd(k, r2.value), "effects", n);
+  n = 0; const r1 = k.evaluate(call(twice, call(capName, w(k, 3))), s2); console.log("the original program run with the capability: value", rd(k, r1.value), "effects", n);
+});
+
+section("P6b an attempt's answer and the order in which two answers arrive", () => {
+  for (const order of ["c3 then c2", "c2 then c3"]) {
+    const { k, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const [down, x] = [k.symbol("m.down"), k.symbol("m.x")]; const p = k.param("n");
+    let reads = 0;
+    const read = k.primitiveFunction({ purity: "effectful", capability: "input", part: "read", arity: 0, run: (_a, c) => (reads++, w(c as any, 100)) });
+    k.bind(scope, down, k.composedFunction([p], call(kp("if"), call(isZero, p), w(k, 0), call(down, call(dec, p)))));
+    const [c2, c3] = [k.cell(), k.cell()];
+    k.bind(scope, x, call(down, call(read)));
+    // two statements chains of one program: [ then(c2, attempt(x, 30)), then(c3, x) ]
+    const A = k.evaluate(call(kp("then"), c2, call(kp("attempt"), x, steps(k, 30))), scope);
+    const B = k.evaluate(call(kp("then"), c3, x), scope);
+    const first = order === "c3 then c2" ? c3 : c2, second = first === c3 ? c2 : c3;
+    k.fill(first, w(k, 1)); k.advance(); k.fill(second, w(k, 1)); k.advance();
+    const a = k.current(A.value);
+    console.log(`${order}: attempt answered ${k.kind(a) === "structure" ? form(k, a).form : k.kind(a)}; x = ${rd(k, k.current(B.value))}; reads=${reads}`);
+  }
+});
+
+section("P9 a limit reached after an effect: going on", () => {
+  const { k, add, call, kp } = setup();
+  const said: any[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(rd(k, a[0])), c.structure([])) });
+  const loop = k.symbol("t.loop"); const i = k.param("i");
+  const fn = k.composedFunction([i], call(kp("then"), call(say, i), call(loop, call(add, i, w(k, 1)))));
+  const scope = k.scope(); k.bind(scope, loop, fn);
+  const prog = call(loop, w(k, 0));
+  const r = k.evaluate(prog, scope, { steps: 20 });
+  console.log(`first: ended=${r.ended} said=${JSON.stringify(said)} kind=${k.kind(r.value)}`);
+  const a = k.advance({ steps: 20 }); console.log(`advance: ended=${a.ended} steps=${a.steps} said=${JSON.stringify(said)}`);
+  const r2 = k.evaluate(r.value, scope, { steps: 20 }); console.log(`evaluate the returned value again: ended=${r2.ended} said=${JSON.stringify(said)}`);
+  const r3 = k.evaluate(prog, scope, { steps: 20 }); console.log(`evaluate the program again: ended=${r3.ended} said=${JSON.stringify(said)}`);
+});
