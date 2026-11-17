@@ -376,6 +376,17 @@ as it proposed them and put to the maintainer on the PR:
 
 Deferred to cluster 10: marks in the saved-program data form.
 
+Confirmed by the maintainer on PR #249: all three points, the term
+"mark", and the opaque part's list of parameters going untested until
+specialization is built. Two questions were answered first. A record
+of the second version is made a module when it loads, so its parts
+are marked; a record of the first version is not, and only the
+inspection right describes it. A part host code builds stays
+unmarked and closed: a host that wants a part to be a module's makes
+it one, and a rule that an unmarked part is open to all would fail
+open. The entry on reading a field with `Y of x` is reworded so that
+`source of x` reads an origin under a right.
+
 ## Terms introduced
 
 No terms introduced.

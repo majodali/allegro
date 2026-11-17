@@ -2388,11 +2388,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### The `Y of x` component-access form
-- Decides: a metadata field of a value is read by the expression form `Y of x` (`type of x`, `source of x`). Reading a field is free to any code.
-- Status: settled; reworded 2026-11-12 (DR4)
+- Decides: a metadata field of a value is read by the expression form `Y of x`, as in `type of x`. Reading a field an extension registered is free to any code. `source of x` reads a value's origin, which is a description: it is read under the right the reading code holds, shows only what that right covers, and gives nothing where the phase kept no origin.
+- Status: settled; reworded 2026-11-12 (DR4), reworded 2026-11-17
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Metadata is a field on every value; An extension registers its own fields
+- Depends on: Metadata is a field on every value; An extension registers its own fields; A value's origin is a description
 - Significance: 2 — the reader's view of the metadata plane at the surface
 - Label: swappable — a surface over channel reads
 - Units: base-grammar, metadata
@@ -2400,6 +2400,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/language-reference.md (MultiValue component access); docs/book/standard/pattern-matching.md §2; D47 (source of x surface)
 - Book home (fragments' proposal): Surface syntax of Allegro Standard (proposed)
 - Notes: the reference still calls it "MultiValue component access"; MultiValue is retired (D46), so the name is stale.
+- Notes (2026-11-17, the second adversarial review, cluster 4): reworded by ruling. The entry said `source of x` reads a field that any code reads freely, against the ruling of 2026-11-15 that an origin is a description read under a right and that a phase may drop it.
 - Chapter: The surface language
 
 #### Type annotations on parameters and returns
