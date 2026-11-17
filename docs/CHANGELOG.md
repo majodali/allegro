@@ -1191,6 +1191,20 @@ re-proposes C111 as C171 and C172 (ask A3).
 Plan `docs/plans/rebuild.md`; lane S; human-gated. Opened 2026-11-13
 with the plan; entries newest first, directly below this line.
 
+### 2026-11 — The backlog marked under the freeze (B-195, chunk G3 (the backlog marked under the freeze))
+
+B-195 (the rebuild program). The maintainer merged the record
+`docs/records/rebuild/backlog-under-the-freeze.md` at PR #201 and ruled
+its sixteen boundaries in session on 2026-11-17. `docs/backlog.md` now
+carries each disposition. 49 dissolved items close with the present
+title of each ruled decision the record names. 13 items stopped by the
+freeze close as not done. Each closed entry stays in place with its box
+checked. 17 items still needed in the kernel stream, 18 in the
+acceptance stream, 6 outside the rebuild and 6 corpus cases stay open
+with their class and chapter or milestone. The 7 items of another
+session are untouched. B-047 (sync and async modifiers) is left
+unmarked until the maintainer rules its boundary. No code changed.
+
 ### 2026-11 — The backlog classed under the freeze (B-195, chunk G2 (the backlog under the freeze))
 
 B-195 (the rebuild program). Every open item of the backlog carries a

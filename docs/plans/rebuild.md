@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npx tsx scripts/analyze/lane-lint.ts --check
   - npm test
-chunks: [G1, G2]
+chunks: [G1, G2, G3]
 reserves: []
 ---
 
@@ -232,6 +232,7 @@ the maintainer by a runnable command and signed in §7.
 |---|---|---|
 | G1 | This plan, the acceptance stream's plan, the lanes, the backlog items, the planning-loop stream closed | the maintainer |
 | G2 | **The backlog under the freeze.** Every open item of `docs/backlog.md` classed as dissolved by a ruled decision (named), kept as a corpus case, or still needed (with the stream that takes it) | the maintainer |
+| G3 | The backlog marked under the freeze, as the maintainer ruled it at PR #201 and in session on 2026-11-17 | the maintainer |
 
 **The kernel stream, as agreed.** Its chunk list is its own plan's. What
 the maintainer approved for it on 2026-11-13:
@@ -308,6 +309,42 @@ accepted".
   and 7 another session's, listed and not classed. No item is marked
   until the maintainer rules. The record is
   `docs/records/rebuild/backlog-under-the-freeze.md`.
+- **2026-11-17 — G3: the backlog marked under the freeze.** The
+  maintainer merged the record at PR #201, and each recommended class
+  became its item's disposition. The seven class names are ratified.
+  In `docs/backlog.md`, 49 dissolved items close with the present title
+  of each decision the record names, and 13 items stopped by the freeze
+  close as not done, with §4 as the reason. Each closed entry stays in
+  place with its box checked. 17 items still needed in the kernel
+  stream, 18 in the acceptance stream, 6 outside the rebuild and 6
+  corpus cases stay open with their class and chapter or milestone.
+  The 7 items of another session are untouched. The sixteen boundaries
+  were ruled in session on 2026-11-17:
+  - Groups A and B, "I agree with all eight". B-104 (retire the dunder
+    convention), B-030 (the sweep of the v1 inventory's open
+    dispositions), B-135 (a rule for the host plane) and B-161 (CLI
+    startup) are stopped by the freeze. B-074 (opt-in memoization) is
+    stopped: "B-074 is not necessary, since the kernel stream can
+    implement memoization as part of Milestone 3 without a backlog
+    item." B-124 (the guard-coverage audit) is dissolved by "Authority
+    is an unforgeable value". B-128 (layer separation policed) is
+    dissolved by "Each decision lives in one replaceable unit of code".
+    B-130 (the design corpus's editorial pass) is still needed, outside
+    the rebuild.
+  - Group C, as the record recommends, taken by the merge. B-029 (the
+    prover protocol revalidated) and B-098 (predicate propagation onto
+    residuals) are dissolved. B-083 (the AI iteration loop) is still
+    needed in the acceptance stream. B-037 (embeddable grammars) and
+    B-116 (an interface's two guarantees) are still needed in the
+    kernel stream. B-177 (the demo ladder chapter's findings) is a
+    corpus case of milestones 5 and 6, and B-190 (name capture) of
+    milestone 6.
+  - B-190's entry also cites "A block of bindings is one kernel
+    primitive", ruled after the record, which says a name means the
+    innermost block's binding.
+  - B-047 (sync and async modifiers) is not marked. The record classes
+    it still needed in the kernel stream. The orchestrating session has
+    since recommended dissolved, and the maintainer has not answered.
 
 ## 8. How the two sessions meet
 
