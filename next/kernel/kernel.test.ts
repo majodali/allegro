@@ -830,7 +830,8 @@ test("restore records an outcome under a builder's name, only where the kernel's
   const build = () => {
     const s = setup();
     const n = s.k.param("n");
-    const claim = s.call(s.kp("claim"), s.call(s.isZero, n));
+    // The claim has nothing unknown under it: it is false, whatever the function is called with.
+    const claim = s.call(s.kp("claim"), s.call(s.isZero, byte(s.k, 5)));
     const fn = s.k.composedFunction([n], claim);
     return { ...s, n, claim, fn };
   };
@@ -860,6 +861,23 @@ test("restore records an outcome under a builder's name, only where the kernel's
   assert.throws(() => k.restore(claim, fn, "b", [{ kind: "capability", capability: "http", part: "get" }], key), /never stored/);
   assert.throws(() => k.claimKey(call(isZero, byte(k, 0)), fn, []), /claim primitive/);
   assert.throws(() => k.claimKey(other, fn, []), /not inside that function/);
+
+  // Only a claim with nothing unknown under it is restored. A claim over a parameter has one
+  // outcome for each call, and a stored one would hold for every value.
+  const keyOther = k.claimKey(other, fn2, grounds);
+  assert.throws(() => k.restore(other, fn2, "team-build", grounds, keyOther), /depends on the parameter n/);
+  // A claim over an input is refused the same way; one over an import is not, since the
+  // module's identity fixes what the import is.
+  const [inp, lib] = [k.param("input"), k.param("lib")];
+  const overInput = call(kp("claim"), call(isZero, inp));
+  const overImport = call(kp("claim"), call(isZero, call(kp("get"), lib, byte(k, 0))));
+  const m = k.composedFunction([inp, lib], k.structure([[null, overInput], [null, overImport]]));
+  const declares = [{ role: "input", name: "n" }, { role: "module", name: "lib", identity: hash(77) }] as const;
+  assert.throws(() => k.restore(overInput, m, "team-build", grounds, k.claimKey(overInput, m, grounds, declares), declares), /depends on the parameter input/);
+  assert.doesNotThrow(() => k.restore(overImport, m, "team-build", grounds, k.claimKey(overImport, m, grounds, declares), declares));
+  // The key covers what the module declares: the same claim in the same code, declared otherwise, has another key.
+  const otherwise = [{ role: "input", name: "n" }, { role: "module", name: "lib", identity: hash(78) }] as const;
+  assert.notEqual(k.claimKey(overImport, m, grounds, otherwise), k.claimKey(overImport, m, grounds, declares));
 });
 
 test("isCell tells a cell from other values, and only a cell waits", () => {
@@ -870,6 +888,64 @@ test("isCell tells a cell from other values, and only a cell waits", () => {
   assert.equal(k.isCell(byte(k, 1)), false);
   k.evaluate(call(add, c, byte(k, 1)), k.scope());
   assert.deepEqual(k.waiting().map((w) => k.isCell(w)), [true]);
+});
+
+test("a module's identity covers what it declares, and through its imports what it depends on", () => {
+  const { k } = setup();
+  const make = (declares: Parameters<typeof k.module>[2]) => {
+    const [key, dep] = [k.param("key"), k.param("dep")];
+    return k.module(k.composedFunction([key, dep], k.structure([[null, key]])), 1, declares);
+  };
+  const asImport = make([{ role: "module", name: "solver", identity: hash(60) }]);
+  const again = make([{ role: "module", name: "solver", identity: hash(60) }]);
+  const otherModule = make([{ role: "module", name: "solver", identity: hash(61) }]);
+  const asCapability = make([{ role: "capability", name: "sink" }]);
+  assert.equal(k.moduleOf(asImport), k.moduleOf(again), "the same code declared the same way is the same module");
+  assert.notEqual(k.moduleOf(asImport), k.moduleOf(otherModule), "the same code importing another module is another module");
+  assert.notEqual(k.moduleOf(asImport), k.moduleOf(asCapability), "the same code with its parameter declared otherwise is another module");
+  // Its keys follow its identity.
+  const keyOfInstance = (m: Value, arg: Value) => k.keyOf(k.entriesOf(k.evaluate(k.expression(m, [arg]), k.scope()).value)[0][1]);
+  const sink = k.primitiveFunction({ purity: "effectful", capability: "sink", part: "write", arity: 1, run: (a) => a[0] });
+  const other = k.primitiveFunction({ purity: "effectful", capability: "sink", part: "other", arity: 1, run: (a) => a[0] });
+  // Two instances that differ only in the capability they were handed have the same key.
+  assert.deepEqual(keyOfInstance(asCapability, sink), keyOfInstance(asCapability, other));
+  assert.equal(keyOfInstance(asCapability, sink).module, k.moduleOf(asCapability));
+  assert.throws(() => make([{ role: "capability", name: "sink", identity: hash(60) }]), /only a module is declared with an identity/);
+  assert.throws(() => make([]), /not one declaration for each parameter/);
+});
+
+test("instantiating a module checks its imports: only an instance of the module declared is accepted", () => {
+  const { k, add, call, kp } = setup();
+  const f = k.symbol("lib.f");
+  const library = (n: number) => k.module(k.composedFunction([], k.structure([[f, byte(k, n)]])), 0, []);
+  const [lib, lookalike] = [library(1), library(2)];
+  const idLib = k.moduleOf(lib) as string;
+  const p = k.param("lib");
+  const user = k.module(k.composedFunction([p], k.structure([[null, call(add, call(kp("get"), p, k.symbolData("lib.f")), byte(k, 10))]])), 0, [{ role: "module", name: "lib", identity: idLib }]);
+  const scope = k.scope();
+  const first = (v: Value) => num(k, k.evaluate(k.entriesOf(v)[0][1], scope).value);
+  // An instance of the library declared.
+  const instance = k.evaluate(call(lib), scope).value;
+  assert.deepEqual(k.instanceOf(instance), [idLib]);
+  assert.deepEqual(k.instanceOf(byte(k, 1)), []);
+  assert.equal(first(k.evaluate(call(user, call(lib)), scope).value), 11);
+  // A structure of the same shape that no module yielded, and an instance of another module, are refused.
+  const fake = k.evaluate(call(user, k.structure([[f, byte(k, 1)]])), scope);
+  assert.match(k.reasonOf(fake.value) ?? "", /the import lib is not an instance of the module it is declared to be/);
+  assert.equal(k.evaluate(call(user, call(lookalike)), scope).refuted, true);
+  // A module that imports the library is not thereby an instance of it.
+  const wrapper = k.module(k.composedFunction([p], k.structure([[f, byte(k, 1)]])), 0, [{ role: "module", name: "lib", identity: idLib }]);
+  const wrapped = k.evaluate(call(wrapper, call(lib)), scope).value;
+  assert.deepEqual(k.instanceOf(wrapped), [k.moduleOf(wrapper)]);
+  assert.equal(k.evaluate(call(user, call(wrapper, call(lib))), scope).refuted, true);
+  // An import declared with no identity can never be satisfied.
+  const loose = k.module(k.composedFunction([p], k.structure([[null, p]])), 0, [{ role: "module", name: "lib" }]);
+  assert.equal(k.evaluate(call(loose, call(lib)), scope).refuted, true);
+  // An import that has not arrived leaves the call waiting, and it is taken up when it arrives.
+  const c = k.cell();
+  const waits = k.evaluate(call(user, c), scope);
+  assert.equal(waits.refuted, false);
+  assert.equal(k.waiting().length, 1);
 });
 
 test("a module names only what its blocks bind and what it is handed", () => {

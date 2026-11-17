@@ -120,7 +120,8 @@ test("load refuses a document that is not a saved program", () => {
 
 // ---- The second version: key slots and stored outcomes -------------------
 
-// module(key, n) => claim(n == 0)   — one key slot, one input, one stored outcome.
+// module(key, n) => [key, claim(7 == 0)]   — one key slot, one input, one stored outcome.
+// The claim has nothing unknown under it: an outcome is stored only for such a claim.
 const EQ0 = "sha256:" + "ee".repeat(32);
 const draft: SavedProgram = {
   format: "allegro-saved-program",
@@ -131,15 +132,16 @@ const draft: SavedProgram = {
     { k: "param", name: "n" },
     { k: "primitive", hash: EQ0 },
     { k: "kernel", name: "claim" },
-    { k: "expression", fn: 2, args: [1] },
-    { k: "expression", fn: 3, args: [4] },
-    { k: "structure", entries: [[null, 0], [null, 5]] },
-    { k: "function", params: [0, 1], body: 6 },
+    { k: "bits", hex: "07", bits: 8 },
+    { k: "expression", fn: 2, args: [4] },
+    { k: "expression", fn: 3, args: [5] },
+    { k: "structure", entries: [[null, 0], [null, 6]] },
+    { k: "function", params: [0, 1], body: 7 },
   ],
-  module: 7,
+  module: 8,
   declares: [{ param: 1, role: "input", name: "n" }],
   keys: 1,
-  outcomes: [{ claim: 5, restsOn: [{ kind: "primitive", hash: EQ0, name: "isZero" }], key: "sha256:" + "00".repeat(32) }],
+  outcomes: [{ claim: 6, restsOn: [{ kind: "primitive", hash: EQ0, name: "isZero" }], key: "sha256:" + "00".repeat(32) }],
 };
 /** The record as a builder writes it: the kernel computes each outcome's key. */
 const second: SavedProgram = (() => {
@@ -275,4 +277,27 @@ test("a record whose module holds a free name does not load", () => {
     module: 3, declares: [], keys: 0, outcomes: [],
   };
   assert.throws(() => load(createKernel(), doc as unknown as SavedProgram, new Map()), /free name\(s\) host\.output, session\.password/);
+});
+
+test("two records with the same nodes and different declarations are different modules", () => {
+  // module(key, dep) => [key]: the parameter is an import in one record and a capability in the other.
+  const nodes = [
+    { k: "param", name: "key" },
+    { k: "param", name: "dep" },
+    { k: "structure", entries: [[null, 0]] },
+    { k: "function", params: [0, 1], body: 2 },
+  ];
+  const record = (declared: object) => ({ format: "allegro-saved-program", version: 2, needs: [], nodes, module: 3, declares: [{ param: 1, ...declared }], keys: 1, outcomes: [] });
+  const asImport = record({ role: "module", name: "trusted_solver", identity: "sha256:" + "ab".repeat(32) });
+  const asCapability = record({ role: "capability", name: "evil_sink" });
+  const otherImport = record({ role: "module", name: "trusted_solver", identity: "sha256:" + "cd".repeat(32) });
+  assert.deepEqual(check2(asImport), []);
+  const k = createKernel();
+  const identity = (doc: object) => k.moduleOf(load(k, doc as unknown as SavedProgram, new Map()));
+  assert.equal(identity(asImport), identity(JSON.parse(JSON.stringify(asImport))));
+  assert.notEqual(identity(asImport), identity(asCapability));
+  assert.notEqual(identity(asImport), identity(otherImport));
+  // Only a module is declared with an identity, and only in the second version.
+  assert.match(check2(record({ role: "capability", name: "sink", identity: "sha256:" + "ab".repeat(32) })).join(), /unknown key "identity"/);
+  assert.match(check2(record({ role: "module", name: "m", identity: "abc" })).join(), /identity is not sha256/);
 });

@@ -137,6 +137,7 @@
 //     on its builder.
 
 import type {
+  Declaration,
   Advance, Cell, CreateKernel2, Entry, Kernel2, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
   Value,
 } from "./interface.js";
@@ -258,6 +259,10 @@ export const createKernel: CreateKernel2 = () => {
   /** Claims whose outcome was restored from a saved program, with what each rests on. */
   const restored = new WeakMap<Expr, readonly Rest[]>();
   const moduleIds = new WeakMap<Fn, string>();
+  /** What each parameter of a module function is declared to be. */
+  const moduleDeclares = new WeakMap<Fn, readonly Declaration[]>();
+  /** The modules a value is an instance of. */
+  const instances = new WeakMap<object, Set<string>>();
   /** The module a function was made in, for every function inside a module. */
   const madeBy = new WeakMap<Fn, string>();
   /** The pure primitive functions made in this kernel, by content hash. */
@@ -758,6 +763,31 @@ export const createKernel: CreateKernel2 = () => {
         return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
       const given = v.args.map((a) => later(a, scope));
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      const identity = moduleIds.get(fn);
+      if (identity !== undefined) {
+        // Calling a module function instantiates it. Each import must be an instance of the
+        // module declared, so the code cannot be connected to other imports and keep its keys.
+        const declares = moduleDeclares.get(fn) ?? [];
+        for (let i = 0; i < declares.length; i++) {
+          const d = declares[i];
+          if (d.role !== "module") continue;
+          const arg = evaluate(given[i], scope);
+          if (arg instanceof Refuted) return arg;
+          if (!known(arg)) return new Expr(fn, given);
+          const what = seen(arg);
+          const of = typeof what === "object" && what !== null ? instances.get(what) : undefined;
+          if (d.identity === undefined || of === undefined || !of.has(d.identity))
+            return new Refuted(`the import ${d.name} is not an instance of the module it is declared to be`, undefined);
+        }
+        const made = evaluate(substitute(fn.body, env, new Map()), scope);
+        const value = seen(made);
+        if (!(made instanceof Refuted) && known(made) && typeof value === "object" && value !== null) {
+          const of = instances.get(value) ?? new Set<string>();
+          of.add(identity);
+          instances.set(value, of);
+        }
+        return made;
+      }
       if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
       // Ahead of what is done, a call to a function already being opened with the same
       // information is not opened again: it stays in the residual.
@@ -987,16 +1017,58 @@ export const createKernel: CreateKernel2 = () => {
     return v instanceof Fn ? enclosing(target, v.body, [...binders, v], visited) : undefined;
   };
 
-  /** The key of a claim's outcome: its content, the content of the function it sits in, and what it rests on. */
-  const claimKey = (claim: V, within: V, restsOn: readonly Rest[]): string => {
+  /** A module's identity: its function's content and what each parameter after the key slots is declared to be. */
+  const identityOf = (f: Fn, declares: readonly Declaration[] | undefined): string => {
+    const declared = declares === undefined ? "undeclared" : declares.map((d) => `${d.role} ${JSON.stringify(d.name)} ${d.identity ?? "-"}`).join("|");
+    return `sha256:${sha256Text(`module ${contentOf(f, [], new Map()).digest} ${declared}`)}`;
+  };
+  const declarationsFor = (f: Fn, keyCount: number | undefined, declares: readonly Declaration[] | undefined, what: string): void => {
+    if (declares === undefined) return;
+    if (keyCount !== undefined && declares.length !== f.params.length - keyCount) throw new InterfaceError(`${what}: there is not one declaration for each parameter after the key slots`);
+    if (declares.length > f.params.length) throw new InterfaceError(`${what}: there are more declarations than parameters`);
+    for (const d of declares) {
+      if (!["capability", "input", "module"].includes(d.role) || typeof d.name !== "string") throw new InterfaceError(`${what}: a declaration is not {role, name}`);
+      if (d.identity !== undefined && (d.role !== "module" || !/^sha256:[0-9a-f]{64}$/.test(d.identity))) throw new InterfaceError(`${what}: only a module is declared with an identity, as sha256: and 64 hex digits`);
+    }
+  };
+
+  /**
+   * Refuses a claim that has something unknown under it: a stored outcome is what any kernel
+   * would compute only where the claim's value depends on nothing a call supplies.
+   */
+  const closedFor = (claim: Expr, within: Fn, declares: readonly Declaration[] | undefined): void => {
+    const fixed = new Set<Param>();
+    const keyCount = declares === undefined ? 0 : within.params.length - declares.length;
+    within.params.forEach((p, i) => {
+      if (declares !== undefined && (i < keyCount || declares[i - keyCount].role === "module")) fixed.add(p);
+    });
+    const walk = (v: V, own: ReadonlySet<Param>, visited: Set<V>): void => {
+      if (v instanceof Param) {
+        if (!own.has(v) && !fixed.has(v)) throw new InterfaceError(`restore: the claim depends on the parameter ${v.name}; only a claim with nothing unknown under it is restored`);
+        return;
+      }
+      if (v instanceof CellV) throw new InterfaceError("restore: the claim depends on a cell; only a claim with nothing unknown under it is restored");
+      if (visited.has(v)) return;
+      visited.add(v);
+      if (v instanceof Fn) walk(v.body, new Set([...own, ...v.params]), new Set());
+      else if (v instanceof Expr) [v.fn, ...v.args].forEach((x) => walk(x, own, visited));
+      else if (v instanceof Struct) v.entries.forEach(([, e]) => walk(e, own, visited));
+      else if (v instanceof Lazy) walk(v.value, own, visited);
+    };
+    walk(claim, new Set(), new Set());
+  };
+
+  /** The key of a claim's outcome: its content, the identity of the module it sits in, and what it rests on. */
+  const claimKey = (claim: V, within: V, restsOn: readonly Rest[], declares?: readonly Declaration[]): string => {
     if (!(claim instanceof Expr) || claim.fn !== kernelPrims.get("claim") || claim.args.length !== 1)
       throw new InterfaceError("not an application of the kernel's claim primitive");
     if (!(within instanceof Fn)) throw new InterfaceError("the claim's function is not a composed function");
     const binders = enclosing(claim, within, [], new Set());
     if (binders === undefined) throw new InterfaceError("the claim is not inside that function");
     const grounds = restsOn.filter((r) => r.kind !== "builder").map(restKey).sort();
+    declarationsFor(within, undefined, declares, "claimKey");
     const memo = new Map<V, string>();
-    return `sha256:${sha256Text(`outcome ${contentOf(within, [], memo).digest} ${contentOf(claim, binders, memo).digest} ${grounds.join("|")}`)}`;
+    return `sha256:${sha256Text(`outcome ${identityOf(within, declares)} ${contentOf(claim, binders, memo).digest} ${grounds.join("|")}`)}`;
   };
 
   // ---- Descriptions -------------------------------------------------------
@@ -1297,13 +1369,14 @@ export const createKernel: CreateKernel2 = () => {
       return undefined;
     },
 
-    module: (fn, count) => {
+    module: (fn, count, declares) => {
       const f = into(fn, "the function");
       if (!(f instanceof Fn)) throw new InterfaceError("module: not a composed function");
       if (!Number.isInteger(count) || count < 0 || count > f.params.length) throw new InterfaceError("module: the number of key slots does not fit the function's parameters");
       const free = freeNames(f, new Set(), [], new Map());
       if (free.length > 0) throw new InterfaceError(`module: the function has the free name(s) ${free.map((n) => n.fqn).join(", ")}; a module names only what its blocks bind and what it is handed`);
-      const identity = `sha256:${contentOf(f, [], new Map()).digest}`;
+      declarationsFor(f, count, declares, "module");
+      const identity = identityOf(f, declares);
       const env = new Map<Param, V>();
       for (let slot = 0; slot < count; slot++) {
         const name = `${identity} ${slot}`;
@@ -1313,6 +1386,7 @@ export const createKernel: CreateKernel2 = () => {
       }
       const made = new Fn(f.params.slice(count), substitute(f.body, env, new Map()));
       moduleIds.set(made, identity);
+      if (declares !== undefined) moduleDeclares.set(made, declares);
       // Every function inside the module is the module's: its keys describe them.
       const mark = (v: V, visited: Set<V>): void => {
         if (visited.has(v)) return;
@@ -1327,6 +1401,10 @@ export const createKernel: CreateKernel2 = () => {
       };
       mark(made, new Set());
       return out(made);
+    },
+    instanceOf: (value) => {
+      const v = seen(into(value, "the value"));
+      return typeof v === "object" && v !== null ? [...(instances.get(v) ?? [])] : [];
     },
     moduleOf: (value) => {
       const v = into(value, "the value");
@@ -1351,14 +1429,16 @@ export const createKernel: CreateKernel2 = () => {
       const v = through(into(value, "the value"));
       return v instanceof Refuted ? v.reason : undefined;
     },
-    claimKey: (claim, within, restsOn) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn),
-    restore: (claim, within, builder, restsOn, key) => {
+    claimKey: (claim, within, restsOn, declares) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn, declares),
+    restore: (claim, within, builder, restsOn, key, declares) => {
       const c = into(claim, "the claim");
       if (builder === "") throw new InterfaceError("restore: an outcome is restored under a builder's name");
       if (restsOn.some((r) => r.kind === "capability"))
         throw new InterfaceError("restore: an outcome that rests on a capability's answer is never stored");
-      if (claimKey(c, into(within, "the function"), restsOn) !== key)
+      const w = into(within, "the function");
+      if (claimKey(c, w, restsOn, declares) !== key)
         throw new InterfaceError("restore: the key does not match this claim, in this function, resting on these things");
+      closedFor(c as Expr, w as Fn, declares);
       const all = new Map<string, Rest>();
       for (const r of [{ kind: "builder", builder } as const, ...restsOn]) all.set(restKey(r), r);
       restored.set(c as Expr, [...all.values()]);

@@ -579,6 +579,13 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — A module's identity covers what it declares (the
+  second review's cluster 2).** In `next/kernel/kernel.ts`: `module`
+  takes the declarations, and an import's identity is part of the
+  module's own; calling a module function checks that each import is
+  an instance of the module declared; `restore` refuses a claim with
+  anything unknown under it. In the data form's second version an
+  import is declared with the identity of the module it names.
 - **2026-11-17 — A free name never gets a value (the second review's
   cluster 1).** A name means the innermost block's binding, and
   nothing binds a name from outside. In `next/kernel/kernel.ts`:

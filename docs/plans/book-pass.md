@@ -1575,6 +1575,10 @@ its approval.
   clusters, recorded and not yet ruled.
 - **2026-11-17 — the second review's cluster 1 ruled and built** (the
   review session): a free name never gets a value. 246 decisions.
+- **2026-11-17 — the second review's cluster 2 ruled and built** (the
+  review session): a module's identity covers what it declares and
+  imports; instantiating checks imports; only a claim with nothing
+  unknown under it is restored.
 
 ## 8. Sessions
 

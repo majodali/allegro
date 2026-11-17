@@ -226,6 +226,20 @@ export class Refusal extends Error {
   }
 }
 
+/**
+ * What one parameter of a module is declared to be. It is part of the
+ * module's content: the same code declared otherwise is another module.
+ * For an import, `identity` is the identity of the module imported, so a
+ * module's identity covers, through its imports, everything it depends on.
+ */
+export interface Declaration {
+  readonly role: "capability" | "input" | "module";
+  /** The capability's name, the input's name, or the name the module is imported under. */
+  readonly name: string;
+  /** For a module: the identity of the module imported, as `sha256:<hex>`. */
+  readonly identity?: string;
+}
+
 /** The kernel, as host code sees it. */
 export interface Kernel {
   readonly interfaceVersion: typeof INTERFACE_VERSION;
@@ -378,8 +392,18 @@ export interface Kernel2 extends Kernel {
    * The function must be closed: an InterfaceError where it holds a
    * cell, a parameter of no function in it, an effectful primitive, or
    * anything else that has no content to hash.
+   *
+   * `declares` says what each parameter after the key slots is, in
+   * order, and is part of the content. Calling the module function
+   * instantiates it. An argument for a parameter declared a module must
+   * be an instance of the module declared: anything else is a
+   * refutation, so the code cannot be connected to other imports and
+   * keep its keys. Instances that differ in their capabilities and
+   * inputs are the same module, with the same keys.
    */
-  module(fn: Value, keys: number): Value;
+  module(fn: Value, keys: number, declares?: readonly Declaration[]): Value;
+  /** The identities of the modules a value is an instance of: what calling a module function yields. Empty for any other value. */
+  instanceOf(value: Value): readonly string[];
   /** The identity of the module a module function was made as, or undefined for any other value. */
   moduleOf(value: Value): string | undefined;
   /**
@@ -418,7 +442,7 @@ export interface Kernel2 extends Kernel {
    * the three changes it. An InterfaceError where `claim` is not inside
    * `within`.
    */
-  claimKey(claim: Value, within: Value, restsOn: readonly Rest[]): string;
+  claimKey(claim: Value, within: Value, restsOn: readonly Rest[], declares?: readonly Declaration[]): string;
   /**
    * Records that a claim was decided by the kernel of whoever built the
    * saved program it came from. The kernel computes the claim's key
@@ -435,7 +459,7 @@ export interface Kernel2 extends Kernel {
    * where `restsOn` names a capability: an outcome that rests on a
    * capability's answer is never stored.
    */
-  restore(claim: Value, within: Value, builder: string, restsOn: readonly Rest[], key: string): void;
+  restore(claim: Value, within: Value, builder: string, restsOn: readonly Rest[], key: string, declares?: readonly Declaration[]): void;
 
   // ---- Cells --------------------------------------------------------------
 
