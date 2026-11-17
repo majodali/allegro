@@ -1,6 +1,6 @@
 ---
 type: stream-plan
-status: draft
+status: active
 backlog: B-195
 lane: S
 merge: human-gated
@@ -16,10 +16,10 @@ reserves: []
 
 # A kernel rebuilt beside the present code — the rebuild program
 
-> **Status: draft** — written 2026-11-13 by the orchestrating session
-> from the maintainer's rulings of that day (§6). It becomes active when
-> its PR merges; chunk G2's first commit flips the header. The status
-> line and the header's `status` say the same thing.
+> **Status: active** — written 2026-11-13 by the orchestrating session
+> from the maintainer's rulings of that day (§6). Active since the merge
+> of PR #197 on 2026-11-13; chunk G2's commit flips the header. The
+> status line and the header's `status` say the same thing.
 >
 > **Reader**: the maintainer, and the two sessions that each run one
 > stream of the program. Assumed known: the decision inventory
@@ -272,7 +272,9 @@ the maintainer approved for it on 2026-11-13:
   review of Part V "was directed only at the book pass". It does not
   hold this program.
 
-**Open at this plan's PR.** Each has a default, taken at the merge.
+**Taken at this plan's PR.** Each default below was taken at the merge
+of PR #197 on 2026-11-13, where the maintainer wrote "All defaults
+accepted".
 
 - **P1 — The new tree's root and directory names.** `next/` and the
   names of §4. Default: as written. A rename later is one commit per
@@ -298,6 +300,14 @@ the maintainer approved for it on 2026-11-13:
   the orchestrating session's review of both streams and the
   maintainer's rulings of the day (§6). Phase 1 of the book pass had
   closed at PR #195 the same day. No code changed.
+- **2026-11-13 — G2 drafted: the backlog classed under the freeze.**
+  All 117 open items of `docs/backlog.md` carry a recommended class:
+  49 dissolved by a named ruled decision, 6 corpus cases, 18 still
+  needed in the kernel stream, 18 still needed in the acceptance
+  stream, 6 still needed outside the rebuild, 13 stopped by the freeze,
+  and 7 another session's, listed and not classed. No item is marked
+  until the maintainer rules. The record is
+  `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 ## 8. How the two sessions meet
 
