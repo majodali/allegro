@@ -250,7 +250,35 @@ language's promises, and each has more than one reasonable answer.
 
 ## Rulings taken
 
-None yet.
+### Cluster 1: names (2026-11-17)
+
+The maintainer agreed the order of the clusters and took the first.
+Ruled ("I agree with the rule and with your recommendation on how to
+handle `bind` and `scope`"):
+
+- A name means the binding of the innermost enclosing block that
+  binds it. A name no block binds is free, and a free name never gets
+  a value.
+- A module's function has no free names; the kernel refuses one that
+  has.
+- `build` takes a value for each name a description leaves free, and
+  a built function reads nothing from where it is built. This is also
+  how a live value is supplied to a description.
+- A proposal uses only the names its obligation lists.
+- A capability is handed over by value only.
+- `bind` leaves the interface now. `scope` stays as a token until the
+  two versions of the interface are made one.
+
+The maintainer asked whether a free name can appear in a correct
+program. It cannot, except where it is never needed. So the ruling on
+issue 15 of the first review is revised, on the review session's
+recommendation: the kernel refuses a free name where a function is
+made, and refutes one that is needed in an expression handed to it.
+`waiting()` lists cells only.
+
+Built in the reference kernel with the ruling, and one fault a
+reviewer reported is fixed: a function made in a block inside a
+module lost the block's names.
 
 ## Terms introduced
 

@@ -53,7 +53,7 @@ text chosen by type.
 
 | Form | Stands for |
 |---|---|
-| `x` | what `x` is bound to; an unbound name is refused at the end of the text ("A language checks the names it cares about") |
+| `x` | what the innermost block around it binds `x` to; a name no block binds is refused at the end of the text ("A language checks the names it cares about"), and the kernel gives it no value |
 | `x => e`, `(x, y) => e`, `() => e` | a composed function |
 | `f(a, b)` | an application |
 | `a \|> f` | `f(a)` |
@@ -69,7 +69,7 @@ text chosen by type.
 | `claim(e)` | the kernel's claim |
 
 The kernel's other primitives are reached as names Allegretto binds:
-`then`, `attempt`, `describe`, `build`, and those ruled and not yet
+`then`, `attempt`, `describe`, `build(description, names)`, and those ruled and not yet
 built. A check the standard language writes as an annotation is written
 as a claim: `claim(is_int(x))`.
 
