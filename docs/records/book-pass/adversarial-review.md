@@ -763,6 +763,32 @@ decided decrease, is for the maintainer to rule when Part IV is built.
   nor a primitive for now. PR #229 had merged with the call in it;
   it is removed.
 
+### Issues 7, 22 and 28 (2026-11-17)
+
+The last three issues set for discussion. The maintainer: "I agree
+with all three recommendations - including marking to function
+granularity for issue 28."
+
+- **Issue 7.** A notation a text uses can only add. It replaces,
+  removes or wraps a production it does not own only where the using
+  text names that production. Bringing in a notation therefore never
+  changes the meaning of text that parsed before. The review session
+  had said the rulings on values and descriptions closed half of this
+  issue; they did not, since a form's mapping works on descriptions
+  and reads all that the user wrote inside the form.
+- **Issue 22.** A grammar change is a statement of a block, and the
+  text before it in the block must have exactly one parse.
+- **Issue 28.** Where an access was written is read from a mark the
+  kernel keeps on each part of an expression: the function it was
+  written in, and through that the module. It survives the opening of
+  a call, separates a notation from its user, and no phase drops it.
+
+With these, every issue of the adversarial review is ruled or closed
+but three: issue 5's part for the standard language and the second
+half of issue 6, both to be settled by building, and issue 13, which
+stands as a reading. Issues 16, 24 and 27 were recommended on
+2026-11-16 and wait for the maintainer's word.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
