@@ -3765,6 +3765,8 @@ table and the stream plans.
       nonzero number included, where the present tree takes it as true.
       The decision's text does not say so yet. Recorded in the same
       entry.
+  Lines 10 and 11 were recorded in `docs/plans/book-pass-inventory.md`
+  on 2026-11-17 by the review session, each in a note of that date.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under

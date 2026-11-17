@@ -1381,7 +1381,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability. A condition is one of the kernel's two truth values: the conditional refutes anything else, a number that is not zero included.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1402,6 +1402,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, built): the reference kernel has the primitives on bits (`same`, `join`, `length`, `slice`) and on structures (`get`, `count`). `same` also tells two symbols apart: a grammar is keyed and tagged by symbols, and nothing else could compare them. A symbol is written as data through the interface, for a notation's symbol literal; quotation of an expression stays removed.
 - Notes (2026-11-16, the block of bindings): eleven, with the block of bindings ("A block of bindings is one kernel primitive").
 - Notes (2026-11-16, no way to ask for a whole value): the maintainer ruled against an interface call that evaluates a value in full, and against a kernel primitive for it for now: "it's best to add or update kernel primitives based on necessity as it arises". A tool that prints or saves a value reads each entry, and reading evaluates. A primitive for it is taken up again if Allegretto code shows a general need.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 (the same entry of the acceptance stream's record): `if 1 then 42 else 0` is a refutation, where the present tree takes 1 as true. The note of 2026-11-12 on truth already said so; the decision's text now does.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -3342,7 +3343,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The kernel's interface
 
 #### Limits are step budgets
-- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant.
+- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant. Nothing else bounds an evaluation but memory: a recursion may be as deep as its budget allows.
 - Status: open (a depth bound exists); ruled 2026-11-13 (DR6); reworded 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -3354,6 +3355,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a solver gives each candidate ten thousand steps; a candidate that runs out is undecided, and is so on every machine.
 - Notes: new, by ruling.
 - Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 20: the entry called a step budget deterministic.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 on the speed tests of milestone 3 (docs/plans/rebuild-acceptance.md §7, chunk Q8): "no depth limit". The reference kernel ended a recursion of about 400 calls at the host's stack, at a depth that differed from run to run. That limit goes; how is the kernel stream's to choose.
 - Chapter: The kernel's interface
 
 ### Configuration

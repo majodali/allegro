@@ -579,6 +579,10 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — Two more rulings of the acceptance stream's session
+  recorded.** A recursion's depth is bounded by its step budget and
+  by memory only; a condition is a truth value, and anything else is
+  refuted. Both from the speed tests of milestone 3.
 - **2026-11-17 — The order of definition reworded.** "Order of
   definition carries no meaning" holds for bindings and names its
   three exceptions: a body's statements, a grammar change, a prompt's
