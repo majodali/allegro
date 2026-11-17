@@ -1510,20 +1510,49 @@ policy is the gate ruled there.
     ruled yet. Its first cluster says `scope` and `bind` are to leave
     the kernel's interface; the launcher calls `scope` once and follows
     when the kernel stream changes the interface.
-  - **The five answers to the open question.** These are recommendations;
-    the maintainer ratifies them at the PR.
-    1. An input is found in a configuration by its declared name.
+  - **The five answers to the open question, ratified by the maintainer
+    on 2026-11-17**: "I agree with all recommendations".
+    1. An input is found in a configuration by its declared name. A
+       module's input names are unique, and distinct from its
+       capabilities' names: the emitter refuses a name bound twice.
     2. An input the module does not declare, or one supplied more than
        once, is refused before anything is evaluated, naming the input.
-    3. A later phase runs in the same launch, on the same kernel.
-    4. A value on the command is one Allegretto literal.
+    3. A later phase runs in the same launch, on the same kernel, with
+       the same capabilities and under one step budget. It supplies
+       inputs and nothing else. The maintainer's note: "phases are not
+       formal elements of this system, a value arriving later during a
+       build process is the same as a phase. We use the term phase in a
+       general sense as it relates to the concept in other languages
+       and build systems." So `later` claims no more than inputs that
+       arrive later, and the launcher's header and the convention say
+       so.
+    4. A value on the command is one Allegretto literal. This fixes the
+       command's flags only: `Configuration.inputs` takes plain data,
+       however it was read, and the form of a configuration file stays
+       open.
     5. `npm run launch` takes no input flags: a saved program that
-       declares an input ends waiting on it.
+       declares an input ends waiting on it. Inputs as saved plain data
+       are taken up when a case appears.
+  - **Four tests follow "A free name never gets a value"** (the kernel
+    stream's PR #244, open, ruled 2026-11-17). On its kernel a module
+    with a free name is refused, `waiting` lists cells only, and
+    `build` takes the values for a description's free names. Three
+    tests of `next/launch/launcher.test.ts` asserted that a name
+    nothing binds leaves a run waiting; one of
+    `next/bootstrap/emit.test.ts` called `build` with one argument.
+    They now rest on the ruling alone: such a run does not complete,
+    writes nothing and is told the name; the emitter's test reads the
+    record and builds nothing. All four pass on the kernel of main and
+    on that PR's kernel. The launcher's `unbound` list is then always
+    empty; it is removed in a later part, after that PR merges.
   - **A negative fraction is not a literal.** Prefix `-` stands for
     `int.neg` (`next/ext/allegretto/forms.md` §2), so `-1.5` in a program
     is `int.neg` of the bits of 1.5, which is the fraction -3. The
     reader refuses it as an input's value, so an input and the same text
-    in a program never differ. A negative whole number is read.
+    in a program never differ. A negative whole number is read. Handed
+    to the kernel stream with the maintainer's agreement of 2026-11-17:
+    the forms refuse `-` directly on a fraction, so one operator still
+    stands for one primitive, and a program writes `float.neg(1.5)`.
   - **Cases realised.** Milestone 1, under the new directory
     `next/corpus/allegretto/m1/`: `boundary-tests:applyPhase (C2.3b)`
     (`phase-fills-input.alg`), `language:reactive: applyPhase triggers
@@ -1538,15 +1567,17 @@ policy is the gate ruled there.
     (`input-not-supplied.alg`), and `language:reactive: applyPhase
     provides binding and triggers re-eval` (`input-later-binding.alg`).
   - **Cases left, with the reason.**
-    `boundary-tests:absent vs unresolved (C2.3b)`: its second half, an
-    undeclared name is no cell, is not something a program can show.
-    The emitter refuses the name, and in the kernel a name nothing binds
-    is a cell, by the ruling of 2026-11-14 on "A missing value is a cell
-    that is filled once". The case is class changes now, by that
-    decision: a declared input not supplied and a name nothing binds are
-    both cells, and a run that needs either ends waiting on it. A test
-    of `next/launch/launcher.test.ts` shows both on a record written by
-    hand.
+    `boundary-tests:absent vs unresolved (C2.3b)`: the present test
+    asserts that a declared import nothing supplies is a pending cell
+    and that an undeclared name is absent. The maintainer ruled on
+    2026-11-17 that the case changes, stated at the notation's level: a
+    declared input not supplied is a cell, and a name bound nowhere is
+    refused by the notation before anything is evaluated ("A language
+    checks the names it cares about"). The kernel stream's PR #244
+    rules the kernel's side, "A free name never gets a value"; the case
+    cites that decision once it is on main. No program shows the second
+    half yet: the convention has no line for a text the emitter
+    refuses.
     The B-172 C1 cases of Rule 1 at milestone 1, and Rule 2's "eval_if
     with an unresolved condition evaluates both branches": each compares
     the shape of a residual, which only the kernel primitive `describe`

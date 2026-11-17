@@ -32,9 +32,12 @@ number, or a structure or array literal of these. `readLiteral` of
 `next/bootstrap/literal.ts` reads it. A module's input that no line
 supplies is a cell for the whole run.
 
-A `// later:` line is one later phase. The launcher applies it when the
+A `// later:` line is one later phase: an input that arrives later in
+the same run. The word phase is used in its general sense; a value that
+arrives later is the same event. The launcher applies the line when the
 kernel waits and no capability's answer is due, in the order of the
-lines. An `// expect:` line above a `// later:` line must be printed
+lines. A later phase supplies inputs and nothing else: the kernel, the
+capabilities and the step budget are the run's. An `// expect:` line above a `// later:` line must be printed
 before that phase is applied; one below it, in that phase or after. The
 launcher's count of the lines printed before each phase
 (`linesBeforePhase` of `next/launch/launcher.ts`) checks this, and a

@@ -48,7 +48,12 @@
 //      answer is due, it applies the next later phase of the configuration
 //      (`later`): it fills the cells of the inputs that phase supplies and
 //      calls `advance`. Phases are applied in order, one at a time; when
-//      nothing waits, the phases left are not applied;
+//      nothing waits, the phases left are not applied. A phase is no formal
+//      element of the system (the maintainer, 2026-11-17): the word is used
+//      in its general sense, and a value that arrives later is the same
+//      event. So a later phase here is a set of inputs that arrive later in
+//      one launch, and no more: the same kernel, the same capabilities, one
+//      step budget;
 //   7  returns how the run ended, and the lines the output capability
 //      wrote, with the number of lines printed before each later phase was
 //      applied. A refuted run carries the reason the kernel gives for each
@@ -137,7 +142,11 @@ export interface Configuration {
   readonly restoreAs?: string;
   /** The inputs supplied at the start. An input not supplied is a cell. */
   readonly inputs?: Inputs;
-  /** Each later phase, in order: the inputs it supplies, each filling the cell of that input. */
+  /**
+   * Each later phase, in order: the inputs it supplies, each filling the
+   * cell of that input. Inputs only: a later phase has the kernel, the
+   * capabilities and the step budget of the launch.
+   */
   readonly later?: readonly Inputs[];
 }
 

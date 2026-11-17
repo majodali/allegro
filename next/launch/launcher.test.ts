@@ -147,11 +147,10 @@ const CLAIM_LATER: SavedProgram = (() => {
 })();
 
 /**
- * module(later, output) => then(later.ask(), output.write(greeting)): it
- * waits on a cell and on a name. The two are statements, so they are a
- * link of `then`, never a structure's entries: an entry is evaluated only
- * when something reads it. While the first waits, the kernel evaluates the
- * second ahead and meets the name.
+ * module(later, output) => then(later.ask(), output.write(greeting)): a
+ * cell no capability answers, and a name nothing binds. The two are
+ * statements, so they are a link of `then`, never a structure's entries:
+ * an entry is evaluated only when something reads it.
  */
 const BOTH: SavedProgram = (() => {
   const r = new Record();
@@ -393,23 +392,27 @@ test("a cell that no capability will answer ends the run as waiting, not complet
   assert.deepEqual(outcome.lines, []);
 });
 
-test("a name nothing binds ends the run as waiting, and the end names the name", async () => {
+// "A free name never gets a value": ruled 2026-11-17. These two tests rest
+// on the ruling alone: a run whose record uses a name nothing binds never
+// completes, writes nothing through that name, and is told which name. How
+// the kernel says so is the kernel's: it left such a run waiting, and
+// refuses to make a module with a free name once the ruling is built.
+test("a name nothing binds never gets a value: the run does not complete, writes nothing, and its end names the name", async () => {
   const outcome = await launch({ createKernel, program: UNBOUND, configuration: ONLY_OUTPUT, target: TERMINAL });
-  assert.equal(outcome.end.kind, "waiting");
-  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.unbound], [0, ["greeting"]]);
-  assert.equal(describe(outcome.end), "waiting: the program waits on the name(s) greeting, which nothing binds");
+  assert.notEqual(outcome.end.kind, "completed");
+  assert.match(describe(outcome.end), /greeting/);
   assert.deepEqual(outcome.lines, []);
 });
 
-test("a run that waits on both is told apart: the unanswered cells are counted and the unbound names named", async () => {
+test("a free name beside a cell no capability answers: the run does not complete, and its end names the name", async () => {
   const stuck: CapabilityImplementation = {
     definition: { name: "later", parts: ["ask"] },
     create: () => [{ purity: "effectful", capability: "later", part: "ask", arity: 0, run: (_a, context) => context.cell() as Cell }],
   };
   const outcome = await launch({ createKernel, program: BOTH, configuration: { ceiling: ["later", "output"] }, target: { capabilities: [output, stuck] } });
-  assert.equal(outcome.end.kind, "waiting");
-  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.unbound], [1, ["greeting"]]);
-  assert.match(describe(outcome.end), /1 cell\(s\) that no capability will answer and on the name\(s\) greeting, which nothing binds/);
+  assert.notEqual(outcome.end.kind, "completed");
+  assert.match(describe(outcome.end), /greeting/);
+  assert.deepEqual(outcome.lines, []);
 });
 
 test("a claim that is false ends the run as refuted, with the reason the kernel gives", async () => {
@@ -631,16 +634,15 @@ test("a run left waiting after its phases names the inputs no phase supplied", a
   assert.equal(describe(outcome.end), "waiting: the program waits on the input(s) b, which the configuration does not supply");
 });
 
-test("the end names the inputs beside the unanswered cells and the unbound names, and the cells of inputs are not counted as unanswered", async () => {
-  // module(later, output, n) => then(later.ask(), then(output.write(n), output.write(greeting))).
+test("the end names the inputs beside the unanswered cells, and the cells of inputs are not counted as unanswered", async () => {
+  // module(later, output, n) => then(later.ask(), output.write(n)).
   const program: SavedProgram = (() => {
     const r = new Record();
     const later = r.capability("later");
     const out = r.capability("output");
     const n = r.param("n");
     r.params.push(n);
-    const write = (v: number) => r.apply(r.part(out, "write"), [v]);
-    const doc = r.done(r.then(r.apply(r.part(later, "ask"), []), r.then(write(n), write(r.add({ k: "symbol", fqn: "greeting" })))));
+    const doc = r.done(r.then(r.apply(r.part(later, "ask"), []), r.apply(r.part(out, "write"), [n])));
     return { ...doc, declares: [...doc.declares, { param: n, role: "input", name: "n" }] };
   })();
   assert.deepEqual(check2(program), []);
@@ -650,11 +652,8 @@ test("the end names the inputs beside the unanswered cells and the unbound names
   };
   const outcome = await launch({ createKernel, program, configuration: { ceiling: ["later", "output"] }, target: { capabilities: [output, stuck] } });
   assert.equal(outcome.end.kind, "waiting");
-  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs, outcome.end.unbound], [1, ["n"], ["greeting"]]);
-  assert.equal(
-    describe(outcome.end),
-    "waiting: the program waits on 1 cell(s) that no capability will answer and on the input(s) n, which the configuration does not supply and on the name(s) greeting, which nothing binds",
-  );
+  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs], [1, ["n"]]);
+  assert.match(describe(outcome.end), /1 cell\(s\) that no capability will answer and on the input\(s\) n, which the configuration does not supply/);
 });
 
 test("a later phase advances under the same step budget as the evaluation before it", async () => {
