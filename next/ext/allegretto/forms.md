@@ -180,6 +180,15 @@ is not a number.
    *Built.* In the data form it is the node `datum`, in a record of the
    second version.
 
+### Not yet a form
+
+A module's keys have no form. The kernel has them: a private member is
+an entry of a structure keyed by one of the module's keys, read with
+`get` and that key, and passed over by a place, by `count` and by a
+primitive function. A text cannot yet name a key slot or write such an
+entry; the form waits for the standard language's types, which are what
+use it.
+
 ## 5. Against the present tree's base grammar
 
 `src/grammar2/base-grammar.ts` is the grammar the present tree calls

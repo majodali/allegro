@@ -579,6 +579,11 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — A private member is an entry keyed by a key (the
+  second review's cluster 3).** In `next/kernel/kernel.ts`: `get`
+  with the key reads the entry; a place and `count` pass over it; a
+  primitive function is not handed it and it is not evaluated for
+  one. A key slot written as an entry's key takes the module's key.
 - **2026-11-17 — A module's identity covers what it declares (the
   second review's cluster 2).** In `next/kernel/kernel.ts`: `module`
   takes the declarations, and an import's identity is part of the

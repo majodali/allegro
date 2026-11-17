@@ -948,6 +948,42 @@ test("instantiating a module checks its imports: only an instance of the module 
   assert.equal(k.waiting().length, 1);
 });
 
+test("a private member is an entry keyed by a key: only that key reads it", () => {
+  const { k, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(52), name: "size", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.entriesOf(a[0]).length)) });
+  const a = k.symbol("t.a");
+  // module(key, out) => [ {a: 1, <key>: out(42), 3},  o => get(o, key) ]
+  const make = (extra: number) => {
+    const [key, o, outP] = [k.param("key"), k.param("o"), k.param("out")];
+    const obj = k.structure([[a, byte(k, 1)], [key, call(outP, byte(k, 42))], [null, byte(k, extra)]]);
+    return k.module(k.composedFunction([key, outP], k.structure([[null, obj], [null, k.composedFunction([o], call(kp("get"), o, key))]])), 1, [{ role: "capability", name: "output" }]);
+  };
+  const scope = k.scope();
+  const part = (m: Value, i: number) => k.evaluate(call(kp("get"), call(m, say), byte(k, i)), scope).value;
+  const [m, other] = [make(3), make(4)];
+  const [obj, read] = [part(m, 0), part(m, 1)];
+  const big = (v: Value) => k.bitsOf(v).bytes.reduce((n, b) => n * 256 + b, 0);
+  // Without the key: the entry has no place, is not counted, and nothing tells that it is there.
+  assert.equal(big(k.evaluate(call(kp("count"), obj), scope).value), 2);
+  assert.equal(num(k, k.evaluate(call(kp("get"), obj, byte(k, 0)), scope).value), 1);
+  assert.equal(num(k, k.evaluate(call(kp("get"), obj, byte(k, 1)), scope).value), 3, "the place after the private entry");
+  assert.equal(k.evaluate(call(kp("get"), obj, byte(k, 2)), scope).refuted, true);
+  // A primitive function is handed the structure without it, and it is not evaluated for that.
+  assert.equal(num(k, k.evaluate(call(size, obj), scope).value), 2);
+  assert.deepEqual(said, [], "nothing needed the private entry");
+  // With the key, through the module's own function.
+  assert.equal(num(k, k.evaluate(call(read, obj), scope).value), 42);
+  assert.deepEqual(said, [42]);
+  // Another module's key reads nothing, and the refusal does not say whether an entry is there.
+  const wrong = k.evaluate(call(part(other, 1), obj), scope);
+  assert.match(k.reasonOf(wrong.value) ?? "", /no entry under that key/);
+  // The host, which is trusted, sees every entry.
+  assert.equal(k.entriesOf(obj).length, 3);
+  assert.equal(k.isKey(k.entriesOf(obj)[1][0] as Value), true);
+});
+
 test("a module names only what its blocks bind and what it is handed", () => {
   const { k, add, call, kp } = setup();
   const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a) => a[0] });

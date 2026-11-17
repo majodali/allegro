@@ -307,6 +307,27 @@ that imports it.
 Points 1 to 4 are built in the reference kernel and the data form.
 Points 5 and 6 wait for the prompt and for metadata fields.
 
+### Cluster 3: where a private member lives (2026-11-17)
+
+Ruled ("I agree with the solution and all recommendations"):
+
+1. An entry of a structure may be keyed by a key, and `get` with that
+   key reads it.
+2. Such an entry has no place and is not counted.
+3. A primitive function is handed the structure without it, and it is
+   not evaluated for that.
+4. Conformance, descriptions and saved programs follow from the key,
+   as already ruled.
+5. The host's `entriesOf` shows every entry, until the interface is
+   split into narrower handles.
+
+Recorded with it: equality from outside ignores private members; a
+primitive that builds a structure from another is to carry them
+across. Set aside: private data kept inside a function that checks
+the key.
+
+Built in the reference kernel. Allegretto has no form for a key yet.
+
 ## Terms introduced
 
 No terms introduced.
