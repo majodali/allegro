@@ -16,6 +16,7 @@ oracle:
   - npm run lint:corpus
   - npm run harness:present
   - npm run harness:next
+  - npm run bench:next
 chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
 reserves: [B-197, B-198, B-199]
 boundary:
@@ -1220,3 +1221,246 @@ policy is the gate ruled there.
   written as a structure's entry any more. A module that yields no
   longer evaluates every binding it holds once that PR merges, which
   closes the first finding of part 3 of chunk Q5.
+- **2026-11-16 — Q8, part 1: the speed tests of milestone 3, measured.**
+  Built on `origin/main` at `9aa0c78`. The present tree is not changed.
+  The kernel, the shipped primitives, the emitter and the launcher are
+  not changed.
+  - **What runs.** Two Allegretto programs under `next/corpus/speed/`.
+    `parser.alg` is a general parser engine: it takes a grammar as data,
+    a parsing expression grammar of literal, sequence, choice,
+    repetition and rule reference, and a text, and answers a parse tree
+    or the farthest place it failed. Its driver parses arithmetic with
+    `+ - * /`, parentheses and spaces, and prints the tree's value and
+    node count. `typed.alg` builds typed values `{type, value}`; a type
+    is a structure of a name and methods, `plus` and `times` read the
+    method from the left operand's type, and the method claims the right
+    operand's type. It runs a typed sum of squares over a counted loop, a
+    typed fold that builds a text, and the same sum split in halves.
+    `next/corpus/speed/speed.test.ts` runs both at their pinned size in
+    `npm run test:next`. Their twins under `next/corpus/speed/present/`
+    run the same algorithms in the present tree's base language; a
+    comment at the top of each says what differs. The native baselines
+    are the present tree's engine `src/grammar2/` on the same grammar
+    (`present/parser-native.ts`) and its standard language on the same
+    typed loop (`present/typed-native.alg`).
+  - **How it was measured.** `npm run bench:next`
+    (`next/corpus/speed/bench.ts`), one run of 8 minutes, on an Intel
+    Xeon at 2.10 GHz with 4 cores and 16 GiB, Linux 6.18, node 22.22.0,
+    at commit `06832a5` with the probes of the commit that adds this
+    entry. Each time is the median of five runs after a warm-up, in
+    process. The new kernel's time is the launch: kernel creation,
+    loading the record, evaluation, with no step budget. The emit column
+    is the bootstrap's emit of the text, which is not the kernel's. The
+    present tree's time is `evalSource` in process: its parser reads the
+    program text, then it is evaluated; start-up is left out. The file
+    runner from start to exit takes 369 ms in the base language and
+    330 ms in the standard language on the size-10 typed programs. A
+    size whose warm-up passes 10 s is run once and ends that
+    implementation's series. Times in ms.
+  - **Test 1, the parser.** Size: copies of `12 * (3 + 4) - 10 / 2`
+    joined by ` + `; 32 terms are 767 characters.
+
+    | Terms | New steps | New ms | µs per step | Emit ms | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|---|
+    | 1 | 10,412 | 110 | 10.6 | 84.0 | 85.7 | 0.06 | 1.3 | 1,812 |
+    | 2 | 20,741 | 234 | 11.3 | 22.2 | 97.8 | 0.09 | 2.4 | 2,707 |
+    | 4 | 41,399 | 543 | 13.1 | 21.9 | 142 | 0.17 | 3.8 | 3,156 |
+    | 8 | 82,715 | 1,330 | 16.1 | 27.8 | 266 | 0.31 | 5.0 | 4,295 |
+    | 16 | 165,347 | 3,827 | 23.1 | 24.6 | 507 | 0.59 | 7.5 | 6,440 |
+    | 32 | 330,611 | 12,065, one run | 36.5 | 26.7 | 994 | 1.15 | 12.1 | 10,468 |
+    | 64 | not run | | | | 1,927 | 2.89 | | |
+    | 128 | not run | | | | 3,642 | 10.1 | | |
+    | 256 | not run | | | | stack overflow at 4,971 | 11.3 | | |
+
+  - **Test 2a, the typed loop and fold.** Size: n for both the sum of
+    squares and the text of n letters.
+
+    | n | New steps | New ms | µs per step | Emit ms | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|---|
+    | 1 | 156 | 3.48 | 22.3 | 4.75 | 6.91 | 5.27 | 0.5 | 0.7 |
+    | 4 | 351 | 4.21 | 12.0 | 5.01 | 14.8 | 9.33 | 0.3 | 0.5 |
+    | 16 | 1,131 | 9.20 | 8.1 | 7.71 | 10.5 | 8.89 | 0.9 | 1.0 |
+    | 32 | 2,172 | 31.5 | 14.5 | 9.18 | 13.8 | 6.79 | 2.3 | 4.6 |
+    | 64 | 4,251 | 65.5 | 15.4 | 5.15 | 19.7 | 11.1 | 3.3 | 5.9 |
+    | 128 | kernel limit at 3,725 steps | 81.3 | | 8.38 | 30.8 | 13.0 | | |
+    | 256 | not run | | | | 53.7 | 24.1 | | |
+    | 512 | not run | | | | 94.4 | stack overflow | | |
+    | 1024 | not run | | | | stack overflow | not run | | |
+
+    Sizes 2 and 8 are in the bench's output and left out here.
+  - **Test 2b, the typed sum split in halves.** Size: n; the recursion
+    is as deep as the logarithm of n.
+
+    | n | New steps | New ms | µs per step | Emit ms | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|---|
+    | 1 | 156 | 5.88 | 37.7 | 6.73 | 10.1 | 5.29 | 0.6 | 1.1 |
+    | 16 | 831 | 7.62 | 9.2 | 6.70 | 9.50 | 5.03 | 0.8 | 1.5 |
+    | 256 | 11,631 | 78.2 | 6.7 | 6.97 | 33.4 | 16.5 | 2.3 | 4.7 |
+    | 1,024 | 46,191 | 351 | 7.6 | 5.35 | 125 | 51.3 | 2.8 | 6.8 |
+    | 4,096 | 184,431 | 1,548 | 8.4 | 12.7 | 391 | 143 | 4.0 | 10.8 |
+    | 16,384 | 737,391 | 6,780 | 9.2 | 6.04 | 1,870 | 549 | 3.6 | 12.4 |
+    | 65,536 | 2,949,231 | 30,360, one run | 10.3 | 6.58 | 6,930 | 2,217 | 4.4 | 13.7 |
+    | 262,144 | not run | | | | 27,427, one run | 9,278 | | |
+
+  - **The largest size each completes, and what stopped it.**
+
+    | Test | New kernel | Present, same algorithm | Present, native |
+    |---|---|---|---|
+    | Parser | 32 terms; then time, 12.1 s at 32 | 128; the host stack at 256 | 256, every size run |
+    | Typed loop | 64; the kernel's own limit at 128 | 512; the host stack at 1024 | 256; the host stack at 512 |
+    | Typed halving | 65,536; then time, 30.4 s | 65,536; then time, 27.4 s at 262,144 | 262,144, every size run |
+
+  - **Growth.** The exponent k of time ~ size^k, fitted over the runs of
+    50 ms or more. The new kernel's steps grow linearly in all three
+    tests (k 1.00 for the parser, 0.92 for halving). Its time does not:
+    the parser's k is 1.35 overall and 1.66 between 16 and 32 terms; the
+    typed loop's is 1.78 between 16 and 32; halving's is 1.07. The
+    present twin's is 0.82 for the parser, 0.81 for the loop and 0.99
+    for halving; the native baselines' 0.95 for halving and too few
+    points above 50 ms elsewhere. So on the new kernel the time of one
+    step grows with size: from 10.6 to 36.5 µs in the parser, from 8.1
+    to 15.4 µs in the loop, and from 6.0 to 10.3 µs in halving.
+  - **The recursion ceiling.** The largest n that completes, by doubling
+    then halving, one run each:
+
+    | Program | New kernel | Present, same algorithm |
+    |---|---|---|
+    | `sum(n) => if n == 0 then 0 else n + sum(n - 1)`, a fresh process per run | 422 | 222 |
+    | the same, in the bench's process | 511 | 546 |
+    | the parser on `n` nested parentheses around `7` | 41 | 30 |
+    | the typed sum of squares alone | 384 | 635 |
+    | the typed fold of letters alone | 385 | 636 |
+
+    What hits the limit first in the parser is the nesting of
+    parentheses, at 41 levels. Read from the grammar, not measured: each
+    level holds a `sum`, a `product` and a `factor` open at once, each a
+    rule reference, a sequence and a choice. The flat input reaches no
+    stack limit up to 32 terms; there the repetition recurses once per
+    term. In the typed programs it is the counted loop itself, one call
+    per step. The new kernel ends at its own limit in every case, as a
+    run ended `limit` with no budget set, and never faulted. The ceiling
+    of one program differs between runs: the typed loop and fold of
+    size 256 completed in one bench run and reached the limit at 128 in
+    the run recorded here, and the same `sum(n)` reaches 422 in a fresh
+    process and 511 in a warm one.
+  - **Where the new kernel's time goes**, from probes that the
+    interface allows, each the median of five runs:
+    - the time of one step stays flat with recursion depth alone: 6.6 to
+      8.8 µs for `n + sum(n - 1)` from n 50 to 350;
+    - it grows with depth when the recursive call is an argument of a
+      composed function: `pass(n, sum(n - 1))`, with
+      `pass(a, b) => a + b`, takes 13.8 µs per step at n 50 and 49.8 at
+      350. With a claim on that argument, `check(n, sum(n - 1))`, it
+      takes 24.8 and 131.2. The parser and the typed loop recurse this
+      way;
+    - slicing one character off a text costs time in proportion to the
+      whole text: 0.04 to 0.07 ms per call up to 1,000 characters, 1.33
+      ms at 10,000 and 16.9 ms at 100,000. The parser's texts stay under
+      800 characters, where this is not seen;
+    - `==` on two equal texts grows with the square of their length:
+      5.07 ms at 100 characters, 157 at 800 and 850 at 1,600;
+    - `++` grows linearly: 0.79 ms for 1,000 characters, 93.0 ms for
+      100,000;
+    - a structure written in the text costs at load, not per call: 10,000
+      entries take 132 ms with 6 calls and 140 with 60. A tree the
+      program built costs nothing measurable per call when handed on.
+  - **Not measured, and why.**
+    - The parser's flat ceiling on the new kernel: time ran out first.
+      One probe run of 64 terms completed in 44 s.
+    - Memory: the interface reports none, and the bench reads none.
+    - A larger host stack (`node --stack-size`): it changes the host,
+      not the kernel, and would move the ceiling.
+    - The present tree's steps: its evaluator counts differently, and
+      no column compares them.
+    - The native parser's node count: the engine's tree has other nodes,
+      so its count is printed and not compared.
+    - Garbage collection, other machines and other node versions.
+  - **Findings for the kernel stream**, each with the smallest program
+    that shows it:
+    - The kernel's own limit is not a step budget and is not the same
+      from run to run. `capability output`,
+      `sum(n) => if n == 0 then 0 else n + sum(n - 1)`,
+      `output.write(int.text(sum(423)))` ends at the limit in a fresh
+      process, where 422 completes; in a process that has run other
+      programs, 511 completes. "Limits are step budgets" calls a budget
+      of steps deterministic.
+    - The time of a step grows with the depth of nested arguments.
+      `capability output`, `pass(a, b) => a + b`,
+      `sum(n) => if n == 0 then 0 else pass(n, sum(n - 1))`,
+      `output.write(int.text(sum(350)))` takes 49.8 µs per step, and
+      13.8 at `sum(50)`. Read in `next/kernel/kernel.ts`, not measured:
+      `rest` writes each primitive that runs into every open collector,
+      and each argument evaluated when needed and each claim opens one.
+    - `==` on two texts is quadratic in their length. `capability output`,
+      `t = "<1,600 x>"`, `u = "<1,600 x>"`,
+      `output.write(if t == u then "same" else "differ")` takes 850 ms
+      in 7 steps. Read in the source: `same` builds the second value's
+      list of bits once for each bit.
+    - `bits.slice` costs time in the length of the whole value. The same
+      header, `t = "<100,000 x>"` and one `bits.slice(t, 0, 8)` per call
+      take 16.9 ms a call. Read in the source: it expands the value to a
+      list of bits before it takes the part.
+  - **A finding for this stream.** A program that binds the name `int`
+    hides `int.text`: `capability output`, `int(n) => n`,
+    `output.write(int.text(1))` is refuted with "only a structure has
+    entries to read". `typed.alg` names its constructors `anInt` and
+    `aText` for this reason. The emitter reads a dotted name as an entry
+    of what the name is bound to, and forms.md does not say whether a
+    program may bind the first part of a shipped primitive's name.
+  - **A finding about the present tree**, for the comparison harness and
+    not for a change. In its base language, inside a function,
+    `r.at == bits_length(s)` answers false where both are 40;
+    `present/parser.alg` tests the end of the text with `<`. And `true`
+    is not bound there: a structure that holds it stays a residual that
+    `print` does not print, so the twin's results hold 1 and 0.
+  - **The oracle.** `npm run bench:next` is added to the oracle list of
+    this plan's header; `npm run lint:streams` accepts it. It gates
+    nothing and runs in no suite or CI step.
+  - **Measured again in review, on the kernel after PR #229** (a
+    structure's entries are evaluated when read), which merged after
+    the run above: `npm run bench:next` on this branch merged with
+    main at `57b6612`, the same machine. The new kernel is faster on
+    every test and the findings stand.
+
+    | Test, size | New kernel before | New kernel after | Present twin | After / twin | After / native |
+    |---|---|---|---|---|---|
+    | parser, 1 term | 112 ms | 94.7 ms | 68.7 ms | 1.4x | 1,607x |
+    | parser, 16 terms | 3,915 ms | 1,848 ms | 528 ms | 3.5x | 2,361x |
+    | parser, 32 terms | 11,946 ms | 4,714 ms | 1,047 ms | 4.5x | 2,719x |
+    | parser, 64 terms | not run | 14,823 ms | 2,057 ms | 7.2x | 5,146x |
+    | typed loop, 256 | 887 ms | 575 ms | 51.1 ms | 11.3x | 22.7x |
+    | typed halving, 1,024 | 337 ms | 303 ms | 130 ms | 2.3x | 6.6x |
+    | typed halving, 65,536 | 28,415 ms | 23,466 ms | 7,692 ms | 3.1x | 8.6x |
+
+    The parser takes about nine steps in a hundred fewer (300,856 at 32
+    terms, where it took 330,611), and its time per step at 32 terms
+    is 15.7 microseconds, where it was 36.1. Time still grows faster
+    than steps: the fitted exponent is 1.22 for the parser and 1.88
+    for the typed loop. The ceilings: a plain sum completes to 394 in a
+    fresh process and the parser to 41 nested parentheses, as before;
+    the typed loop still reaches the kernel's limit at 512. A step still
+    slows with nested arguments (16.0 microseconds at n 50, 54.8 at
+    n 350), `==` on two texts of 1,600 characters still takes 771 ms,
+    and one slice of a text of 100,000 characters 17.3 ms.
+  - **Ruled by the maintainer on 2026-11-17**, in review of this
+    record.
+    - **What signs milestone 3.** "I agree with option (b)": the shape
+      is fixed first, then the milestone is signed. Time grows in step
+      with the work on both tests, the bench is run again, and the
+      milestone is signed on that run. No ratio against the present
+      tree is set.
+    - **What stops a deep recursion.** "I agree with option (a)": no
+      depth limit. A recursion's depth is bounded by the step budget
+      and by memory only, as "Limits are step budgets" has it; the
+      kernel's own limit at the host's stack goes. This is a
+      requirement of the kernel stream, and the way to meet it is
+      theirs.
+    - **The other three findings** go to the kernel stream as its work
+      list: "Yes to question 3". They are the step that slows as
+      arguments nest, `==` on two texts, and `bits.slice`.
+    - **A number as a condition.** "I agree with option (a)": the
+      kernel's behaviour stands. A condition is a truth value, and
+      `if 1 then 42 else 0` is a refutation. The corpus case
+      `grammar2/base: if-then-else selects branch` changes once a
+      decision's text says so; line 11 of B-197 (evidence against a
+      ruled decision) asks for it.

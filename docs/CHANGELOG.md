@@ -1199,6 +1199,19 @@ re-proposes C111 as C171 and C172 (ask A3).
 Plan `docs/plans/rebuild.md`; lane S; human-gated. Opened 2026-11-13
 with the plan; entries newest first, directly below this line.
 
+### 2026-11 — The backlog classed under the freeze (B-195, chunk G2 (the backlog under the freeze))
+
+B-195 (the rebuild program). Every open item of the backlog carries a
+recommended class under the freeze of the present tree, in
+`docs/records/rebuild/backlog-under-the-freeze.md`. Of 117 items, 49
+are dissolved by a named ruled decision, 6 stay as cases of the
+acceptance corpus, 18 are still needed in the kernel stream, 18 in the
+acceptance stream, 6 outside the rebuild, 13 stop with the freeze, and
+7 belong to another session. The record groups each stream's share by
+chapter of the inventory. No backlog item is marked until the
+maintainer rules. The program plan is active since PR #197 merged. No
+code changed.
+
 ### 2026-11 — The rebuild planned: a kernel beside the present code (B-195, chunk G1)
 
 B-195 (the rebuild program). Phase 1 of the book pass ruled 231
@@ -1223,6 +1236,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The speed tests of milestone 3, measured (B-196, chunk Q8 (the speed tests of milestone 3), part 1)
+
+B-196 (the rebuild's acceptance side). A toy parser engine and a typed
+extension are written in Allegretto under `next/corpus/speed/`, with twins
+in the present tree's base language and the present tree's own engine and
+typed language as native baselines. `npm run bench:next` measures them;
+`npm run test:next` runs the programs at their pinned size only. On the
+new kernel the parser is 1.3 to 12.1 times slower than its twin and three
+to four orders of magnitude slower than the native engine; its steps grow
+linearly with the input and its time with exponent 1.35. The typed loop
+reaches the kernel's own limit at 128 to 512 iterations, varying between
+runs. Four findings go to the kernel stream: the own limit is not
+deterministic, a step costs more under nested arguments, `==` on texts
+is quadratic, and `bits.slice` costs time in the length of the whole
+value. The record is `docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — Two tests follow a structure's entries being evaluated when read (B-196)
 
