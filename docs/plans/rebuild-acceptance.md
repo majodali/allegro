@@ -1442,3 +1442,25 @@ policy is the gate ruled there.
     slows with nested arguments (16.0 microseconds at n 50, 54.8 at
     n 350), `==` on two texts of 1,600 characters still takes 771 ms,
     and one slice of a text of 100,000 characters 17.3 ms.
+  - **Ruled by the maintainer on 2026-11-17**, in review of this
+    record.
+    - **What signs milestone 3.** "I agree with option (b)": the shape
+      is fixed first, then the milestone is signed. Time grows in step
+      with the work on both tests, the bench is run again, and the
+      milestone is signed on that run. No ratio against the present
+      tree is set.
+    - **What stops a deep recursion.** "I agree with option (a)": no
+      depth limit. A recursion's depth is bounded by the step budget
+      and by memory only, as "Limits are step budgets" has it; the
+      kernel's own limit at the host's stack goes. This is a
+      requirement of the kernel stream, and the way to meet it is
+      theirs.
+    - **The other three findings** go to the kernel stream as its work
+      list: "Yes to question 3". They are the step that slows as
+      arguments nest, `==` on two texts, and `bits.slice`.
+    - **A number as a condition.** "I agree with option (a)": the
+      kernel's behaviour stands. A condition is a truth value, and
+      `if 1 then 42 else 0` is a refutation. The corpus case
+      `grammar2/base: if-then-else selects branch` changes once a
+      decision's text says so; line 11 of B-197 (evidence against a
+      ruled decision) asks for it.

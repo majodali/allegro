@@ -3754,6 +3754,16 @@ table and the stream plans.
      in `next/corpus/scenarios/README.md`, "Rulings of 2026-11-15".
   Lines 1 to 9 were recorded in `docs/plans/book-pass-inventory.md` on
   2026-11-16 by the review session, each in a note of that date.
+  10. "Limits are step budgets"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on the speed tests of milestone 3.
+      A recursion's depth is bounded by the step budget and by memory
+      only. The reference kernel's own limit, the host's stack near 400
+      calls, goes; how is the kernel stream's. Recorded in
+      `docs/plans/rebuild-acceptance.md` §7, the entry of chunk Q8 (the speed tests of milestone 3).
+  11. "The kernel's primitives are pure and few"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session. A condition is a
+      truth value: the kernel's conditional refutes anything else, a
+      nonzero number included, where the present tree takes it as true.
+      The decision's text does not say so yet. Recorded in the same
+      entry.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under
