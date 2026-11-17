@@ -312,10 +312,11 @@ accepted".
 - **2026-11-17 — G3: the backlog marked under the freeze.** The
   maintainer merged the record at PR #201, and each recommended class
   became its item's disposition. The seven class names are ratified.
-  In `docs/backlog.md`, 49 dissolved items close with the present title
-  of each decision the record names, and 13 items stopped by the freeze
+  In `docs/backlog.md`, 52 dissolved items close: 49 with the present
+  title of each decision the record names, and 3 by the rulings below.
+  13 items stopped by the freeze
   close as not done, with §4 as the reason. Each closed entry stays in
-  place with its box checked. 17 items still needed in the kernel
+  place with its box checked. 15 items still needed in the kernel
   stream, 18 in the acceptance stream, 6 outside the rebuild and 6
   corpus cases stay open with their class and chapter or milestone.
   The 7 items of another session are untouched. The sixteen boundaries
@@ -331,20 +332,32 @@ accepted".
     dissolved by "Each decision lives in one replaceable unit of code".
     B-130 (the design corpus's editorial pass) is still needed, outside
     the rebuild.
-  - Group C, as the record recommends, taken by the merge. B-029 (the
-    prover protocol revalidated) and B-098 (predicate propagation onto
-    residuals) are dissolved. B-083 (the AI iteration loop) is still
-    needed in the acceptance stream. B-037 (embeddable grammars) and
-    B-116 (an interface's two guarantees) are still needed in the
-    kernel stream. B-177 (the demo ladder chapter's findings) is a
-    corpus case of milestones 5 and 6, and B-190 (name capture) of
-    milestone 6.
+  - Group C. B-029 (the prover protocol revalidated) and B-098
+    (predicate propagation onto residuals) are dissolved. B-083 (the AI
+    iteration loop) is still needed in the acceptance stream. B-177
+    (the demo ladder chapter's findings) is a corpus case of milestones
+    5 and 6, and B-190 (name capture) of milestone 6. The maintainer:
+    "I agree with the recommendations on all other group C items."
+  - Three items change class from the record, by the maintainer's
+    rulings of the same day, and close as dissolved where the record
+    had them still needed in the kernel stream:
+    - B-037 (embeddable grammars): "The parser engine doesn't change,
+      but the grammar it is using to parse the text may change per
+      module or mid-file." Dissolved by "A text can change the grammar
+      it is read in", with "A grammar change reaches to the end of its
+      block".
+    - B-116 (an interface's two guarantees): "let's rule that an
+      interface should refuse method bodies." Dissolved by "An
+      interface is a type drawn from, not instantiated".
+    - B-047 (sync and async modifiers): dissolved by "A missing value
+      is a cell that is filled once", with "Effects on one capability
+      keep their order", as the orchestrating session recommended after
+      the second decision was ruled.
+    Lines 12 and 13 of B-197 (evidence against a ruled decision) hand
+    the first two rulings to the review session for the inventory.
   - B-190's entry also cites "A block of bindings is one kernel
     primitive", ruled after the record, which says a name means the
     innermost block's binding.
-  - B-047 (sync and async modifiers) is not marked. The record classes
-    it still needed in the kernel stream. The orchestrating session has
-    since recommended dissolved, and the maintainer has not answered.
 
 ## 8. How the two sessions meet
 

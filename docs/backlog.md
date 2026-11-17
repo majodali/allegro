@@ -644,8 +644,8 @@ table and the stream plans.
   **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-036** · Parse error recovery (`@error` productions + `@sync`)
   **CLOSED 2026-11-17, dissolved by "Parse failure reporting and recovery"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
-- [ ] **B-037** · Embeddable grammars (different parser mid-file/per-module)
-  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Changing the grammar" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-037** · Embeddable grammars (different parser mid-file/per-module)
+  **CLOSED 2026-11-17, dissolved by "A text can change the grammar it is read in", with "A grammar change reaches to the end of its block"**, by the maintainer's ruling of 2026-11-17: the parser engine does not change; the grammar it uses to parse a text may change per module or mid-file. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream.
 - [x] **B-038** · `modules.md` loading contract (the L1 half of the module
   split); circular-dependency policy
   **CLOSED 2026-11-17, dissolved by "The loader reaches files through a capability", with "A module is an extension that arrives as a file"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
@@ -673,8 +673,9 @@ table and the stream plans.
 - [ ] **B-046** · Configurable mutability: linear types, transient
   mutation, transient→immutable finalization (structures.md §13)
   **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Values" of `docs/plans/book-pass-inventory.md`.
-- [ ] **B-047** · Sync/async type modifiers (async-by-default + `sync`
+- [x] **B-047** · Sync/async type modifiers (async-by-default + `sync`
   hint — revisit under completion effects)
+  **CLOSED 2026-11-17, dissolved by "A missing value is a cell that is filled once", with "Effects on one capability keep their order"**, by the maintainer's ruling of 2026-11-17. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream, before the second decision was ruled.
 - [ ] **B-048** · Algebraic effects (`perform`/`handle`/`resume`; needs
   continuations — see B-072)
   **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Effects" of `docs/plans/book-pass-inventory.md`.
@@ -2291,7 +2292,7 @@ table and the stream plans.
   unification
   **CLOSED 2026-11-17, dissolved by "Law strengths and the transitivity gate", with "Every result says how strongly it holds"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-116** · L2 · **Interface's two guarantees are enforced
+- [x] **B-116** · L2 · **Interface's two guarantees are enforced
   independently, and one of them fails silently.** Raised by the concept
   spine (S3b, `concepts.md` §36). An interface has two properties: **no
   construct** (tested by `InterfaceKind`'s predicate, checkable from any
@@ -2313,7 +2314,7 @@ table and the stream plans.
     the interfaces. A property of this type system, not a general truth, and
     worth stating because the type system is being rebuilt around the absence
     of `extends`
-  - **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Refinement types" of `docs/plans/book-pass-inventory.md`.
+  - **CLOSED 2026-11-17, dissolved by "An interface is a type drawn from, not instantiated"**, by the maintainer's ruling of 2026-11-17: an interface refuses a method body. The decision's text does not say so yet; line 13 of B-197 (evidence against a ruled decision) asks for it. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream.
 
 - [x] **B-117** · L2 · **The verdict is assembled out-of-band rather than
   accumulated.** Raised by the concept spine (S4b, maintainer correction —
@@ -3859,6 +3860,13 @@ table and the stream plans.
       nonzero number included, where the present tree takes it as true.
       The decision's text does not say so yet. Recorded in the same
       entry.
+  12. "A text can change the grammar it is read in"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on B-037 (embeddable grammars).
+      The parser engine does not change within a text. The grammar it
+      uses to parse the text may change per module or mid-file. Recorded
+      in `docs/plans/rebuild.md` §7, the entry of chunk G3.
+  13. "An interface is a type drawn from, not instantiated"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on B-116 (an interface's two guarantees).
+      An interface refuses a method body, where the present tree
+      discards it with no diagnostic. Recorded in the same entry.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under

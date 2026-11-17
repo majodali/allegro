@@ -8,7 +8,7 @@
 > under the freeze. No item is marked here. Marking them follows the
 > maintainer's ruling.
 
-**Marked at chunk G3, 2026-11-17.** B-190 (name capture) also cites "A block of bindings is one kernel primitive", ruled after this record; B-047 (sync and async modifiers) is left unmarked until the maintainer rules its boundary.
+**Marked at chunk G3, 2026-11-17.** B-190 (name capture) also cites "A block of bindings is one kernel primitive", ruled after this record; and three items the table classes still needed by the kernel stream were ruled dissolved by the maintainer the same day and are marked so: B-037 (embeddable grammars), B-047 (sync and async modifiers) and B-116 (an interface's two guarantees). The table below is the record as drafted and is not changed; `docs/plans/rebuild.md` §7 holds the rulings.
 
 ## Asks
 
