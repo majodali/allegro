@@ -343,6 +343,39 @@ approach"):
 Recorded in `next/ext/allegretto/forms.md`. The grammar, reader and
 emitter are the acceptance stream's.
 
+### Cluster 4: the mark on each part (2026-11-17)
+
+The review session proposed four points and asked for rulings. The
+maintainer first asked whether `describe` is needed as a general
+operation: "could we have it only available to a limited set of system
+modules? Would that then remove the need for this fine-grained
+authority machinery?" The review session's answer: yes. Describing by
+a right the configuration grants, and by nothing else, removes the
+marks, the opaque form and marks in the data form; the cost is that a
+solver or an optimiser is trusted to read all code. It recommended the
+change.
+
+Ruled against: "I agree, the vast majority of projects will have only
+a single optimizer and at most one solver - so this is a very
+reasonable approach. However, I'm going to rule we don't take it, and
+keep `describe` generally available, and mark every node in an
+expression. My main reason for this is that it enables more
+sophisticated integrations between a grammar extension and the code
+that uses it - e.g. solvers, autograd, library specific optimizations,
+etc." The maintainer: "When we write the book, this will be a decision
+we encourage readers to try both sides of."
+
+Built on that ruling, with three of the review session's points taken
+as it proposed them and put to the maintainer on the PR:
+
+- A function built from a description takes the mark of the code that
+  built it; a part host code made has none.
+- An opaque part lists the parameters of the described function that
+  it mentions.
+- An origin is read under a right wherever it is mentioned.
+
+Deferred to cluster 10: marks in the saved-program data form.
+
 ## Terms introduced
 
 No terms introduced.
