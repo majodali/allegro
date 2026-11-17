@@ -3477,7 +3477,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of its capabilities, inputs and imports
-- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. A module is instantiated once for each distinct set of arguments; every instance has the module's identity and its keys, since each is the same code.
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. A module is instantiated once for each distinct set of arguments; every instance has the module's identity and its keys, since each is the same code. An input is a named value of plain data that the configuration supplies to the module being run; it grants nothing. An input not supplied is a cell, so a phase evaluates the module with the input unknown and a later phase supplies it. A module that is imported declares no input.
 - Status: open; ruled 2026-11-13 (DR6); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -3492,6 +3492,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the rulings on strength and on identity): a reading, not yet ruled, for issue 13: a module is instantiated once for each set of arguments, and every instance shares the module's identity and keys, so the types they define are the same types.
 - Notes (2026-11-15, titles made accurate): retitled from "A module is a function of the capabilities it declares": its parameters are also its inputs and the modules it imports. Its bindings are its body, not parameters: nothing a module uses from outside is ambient.
 - Notes (2026-11-17, the adversarial review's last issues): the last sentence is added by ruling, for issue 13: two importers that supply a module different capabilities get two instances, and neither gains what the other supplied.
+- Notes (2026-11-17, inputs): the sentences on inputs are added by ruling. The word came in with the ruling of 2026-11-13 on a module as a function, the data form's roles and Allegretto's header line, and had never been ruled on its own: the maintainer asked where it came from. Kept, and ruled narrowly. It is a parameter and not something read through a capability so that a phase can leave it unknown with no effect involved. Open: who supplies the inputs of an imported module, the loader from configuration or the importer by passing values, which would make a module one its importer sets up; and how an input's name is found in a configuration. Taken when a case appears.
 - Chapter: Capabilities and primitive functions
 
 #### Only the module being run performs effects when instantiated

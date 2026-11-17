@@ -579,6 +579,9 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — Inputs ruled.** An input is plain data the
+  configuration supplies to the module being run, a cell until it is
+  supplied; an imported module declares none.
 - **2026-11-17 — Three more findings of the adversarial review
   ruled.** A notation a text uses can only add, and changes a
   production it does not own only where the using text names it. A

@@ -809,6 +809,23 @@ the block of bindings but not written into that entry; the standard
 language's part of issue 5; and the second half of issue 6. The last
 two are settled by building.
 
+### Inputs (2026-11-17)
+
+The maintainer asked when `input` was added as a module's
+declaration, and what it does. It was never ruled on its own: the
+review session wrote "inputs" into the ruling of 2026-11-13 on a
+module as a function, gave the data form a role for it, and put the
+header line `input name` in Allegretto's forms. Ruled now, narrowly
+("keep it and rule it narrowly"):
+
+- An input is a named value of plain data that the configuration
+  supplies to the module being run. It grants nothing.
+- An input not supplied is a cell.
+- A module that is imported declares no input.
+
+Open: who supplies an imported module's inputs, and how an input's
+name is found in a configuration.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
@@ -821,5 +838,7 @@ two are settled by building.
 - **Key slot**: a place in a module where one of its keys goes.
 - **Specialization**: a function whose body is the residual of
   another function's body, evaluated with its parameters unknown.
+- **Input**: a named value of plain data that the configuration
+  supplies to the module being run.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
