@@ -1558,10 +1558,15 @@ its approval.
   pure primitives in `next/prims/index.ts`. Still owed to Allegretto:
   a structure's entries evaluated when read.
 - **2026-11-16 — entries evaluated when read** (the review session).
-  Built, with a second interface call for a value in full. The
+  Built. A second interface call for a value in full merged with it
+  and was removed by ruling the same day. The
   reference kernel has what Allegretto's forms ask of it. The
   launcher's records that write statements as a structure's entries
   have to move to sequence before it can merge.
+- **2026-11-17 — issues 7, 22 and 28 ruled** (the review session): a
+  notation a text uses can only add; a grammar change is a
+  statement; an access's place is the kernel's mark, by function.
+  245 decisions.
 
 ## 8. Sessions
 
