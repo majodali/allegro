@@ -395,15 +395,16 @@ export interface Kernel2 extends Kernel {
    *
    * `declares` says what each parameter after the key slots is, in
    * order, and is part of the content. Calling the module function
-   * instantiates it. An argument for a parameter declared a module must
-   * be an instance of the module declared: anything else is a
-   * refutation, so the code cannot be connected to other imports and
-   * keep its keys. Instances that differ in their capabilities and
-   * inputs are the same module, with the same keys.
+   * instantiates it, and is done with one argument for each capability
+   * and input, in their order. Nobody passes an import: the kernel
+   * supplies the module made under the identity declared, and a module
+   * that imports one not made in this kernel is refuted when called.
+   * Inside its body an import is the imported module's function, which
+   * the body calls to instantiate it. Two calls of a module function
+   * with the same arguments give one instance: its statements happen
+   * once.
    */
   module(fn: Value, keys: number, declares?: readonly Declaration[]): Value;
-  /** The identities of the modules a value is an instance of: what calling a module function yields. Empty for any other value. */
-  instanceOf(value: Value): readonly string[];
   /** The identity of the module a module function was made as, or undefined for any other value. */
   moduleOf(value: Value): string | undefined;
   /**

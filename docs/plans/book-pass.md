@@ -1585,6 +1585,11 @@ its approval.
   review session): every part of an expression is marked with its
   writer. The maintainer weighed describing by a granted right alone,
   and kept per-module describing.
+- **2026-11-18 — the second review's cluster 6 ruled and built** (the
+  review session): an import is a call of the imported module, which
+  the kernel supplies by identity; capabilities and inputs of the same
+  name are handed by default; a library's statements happen when it is
+  first needed.
 
 ## 8. Sessions
 

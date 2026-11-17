@@ -579,6 +579,15 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-18 — An import is a call of the imported module (the
+  second review's cluster 6).** In `next/kernel/kernel.ts`: a module
+  is called with its capabilities and inputs only, and the kernel
+  supplies each module it imports by identity; one instance for each
+  distinct set of arguments, so a module's top-level statements
+  happen once; `refuse(reason)`, which is what a withheld capability
+  is. `Kernel2.instanceOf` is removed. Allegretto's forms gain
+  `import … with …` and `without …`, and declarations may stand
+  anywhere at a module's top level.
 - **2026-11-17 — Every part of an expression is marked with its
   writer (the second review's cluster 4).** In `next/kernel/kernel.ts`:
   a module's parts are marked when it is made, with the module and

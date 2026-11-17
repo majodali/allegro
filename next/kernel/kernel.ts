@@ -96,6 +96,9 @@
 //   "get"       get(structure, key). The entry keyed by a symbol, or at a
 //               place counted from 0, or keyed by a key. The entry may
 //               itself still wait.
+//   "refuse"    refuse(reason). A refutation with that reason, a text. It is
+//               how code says why it will not go on, and what a withheld
+//               capability is: a refusal that happens when it is used.
 //   "count"     count(structure). The number of entries, as 64 bits.
 //               A place or a count outside the value is a refutation.
 //               An entry keyed by a key is private: only `get` with that
@@ -254,7 +257,7 @@ interface Root {
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
   ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
-  ["join", 2], ["length", 1], ["same", 2], ["slice", 3], ["then", 2],
+  ["join", 2], ["length", 1], ["refuse", 1], ["same", 2], ["slice", 3], ["then", 2],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
 const INSPECT = "kernel:inspect";
@@ -277,7 +280,10 @@ export const createKernel: CreateKernel2 = () => {
   /** What each parameter of a module function is declared to be. */
   const moduleDeclares = new WeakMap<Fn, readonly Declaration[]>();
   /** The modules a value is an instance of. */
-  const instances = new WeakMap<object, Set<string>>();
+  /** The modules made in this kernel, by identity: what an import is supplied from. */
+  const modulesById = new Map<string, Fn>();
+  /** The instances of each module: one for each distinct set of arguments. */
+  const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
   /** The module a function was made in, for every function inside a module. */
   /** The pure primitive functions made in this kernel, by content hash. */
   const pureByHash = new Map<string, Prim>();
@@ -764,6 +770,11 @@ export const createKernel: CreateKernel2 = () => {
         if (from + n > a.bitLength) return new Refuted(`${n} bit(s) from place ${from} is outside a value of ${a.bitLength} bit(s)`, undefined);
         return packed(bitList(a).slice(from, from + n));
       }
+      if (fn.name === "refuse") {
+        if (!known(args[0])) return waits();
+        const reason = seen(args[0]);
+        return reason instanceof Bits && reason.bitLength % 8 === 0 ? new Refuted(textOf(reason), undefined) : new Refuted("a refusal's reason is a text", args[0]);
+      }
       if (fn.name === "count") {
         const s = seen(args[0]);
         // An entry keyed by a key has no place and is not counted.
@@ -795,35 +806,37 @@ export const createKernel: CreateKernel2 = () => {
     if (fn instanceof Fn) {
       // A composed function's arguments are not evaluated here. Each goes into the body as
       // it was written, and is evaluated when something in the body needs it.
+      const identity = moduleIds.get(fn);
+      if (identity !== undefined) {
+        // Calling a module function instantiates it. It is handed its capabilities and inputs;
+        // the kernel supplies each module it imports, by the identity declared, so nobody can
+        // connect it to another. The module instantiates its imports itself, in its body.
+        const declares = moduleDeclares.get(fn);
+        const handed = fn.params.map((_, i) => i).filter((i) => declares === undefined || declares[i].role !== "module");
+        if (handed.length !== v.args.length)
+          return new Refuted(`a module of ${handed.length} capability and input parameter(s) was given ${v.args.length} argument(s)`, undefined);
+        const args: V[] = [];
+        handed.forEach((i, j) => (args[i] = later(v.args[j], scope)));
+        for (let i = 0; i < fn.params.length; i++) {
+          const d = declares?.[i];
+          if (d === undefined || d.role !== "module") continue;
+          const imported = d.identity === undefined ? undefined : modulesById.get(d.identity);
+          if (imported === undefined) return new Refuted(`the module ${d.name}, which it imports, is not loaded`, undefined);
+          args[i] = imported;
+        }
+        // One instance for each distinct set of arguments: its statements happen once.
+        const all = instancesOf.get(fn) ?? [];
+        let instance = all.find((x) => x.args.every((a, i) => sameInformation(a, args[i])));
+        if (instance === undefined) {
+          instance = { args, value: new Lazy(substitute(fn.body, new Map(fn.params.map((p, i) => [p, args[i]] as const)), new Map()), scope) };
+          instancesOf.set(fn, [...all, instance]);
+        }
+        return evaluate(instance.value, scope);
+      }
       if (fn.params.length !== v.args.length)
         return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
       const given = v.args.map((a) => later(a, scope));
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
-      const identity = moduleIds.get(fn);
-      if (identity !== undefined) {
-        // Calling a module function instantiates it. Each import must be an instance of the
-        // module declared, so the code cannot be connected to other imports and keep its keys.
-        const declares = moduleDeclares.get(fn) ?? [];
-        for (let i = 0; i < declares.length; i++) {
-          const d = declares[i];
-          if (d.role !== "module") continue;
-          const arg = evaluate(given[i], scope);
-          if (arg instanceof Refuted) return arg;
-          if (!known(arg)) return new Expr(fn, given);
-          const what = seen(arg);
-          const of = typeof what === "object" && what !== null ? instances.get(what) : undefined;
-          if (d.identity === undefined || of === undefined || !of.has(d.identity))
-            return new Refuted(`the import ${d.name} is not an instance of the module it is declared to be`, undefined);
-        }
-        const made = evaluate(substitute(fn.body, env, new Map()), scope);
-        const value = seen(made);
-        if (!(made instanceof Refuted) && known(made) && typeof value === "object" && value !== null) {
-          const of = instances.get(value) ?? new Set<string>();
-          of.add(identity);
-          instances.set(value, of);
-        }
-        return made;
-      }
       if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
       // Ahead of what is done, a call to a function already being opened with the same
       // information is not opened again: it stays in the residual.
@@ -1460,14 +1473,11 @@ export const createKernel: CreateKernel2 = () => {
       }
       const made = new Fn(f.params.slice(count), substitute(f.body, env, new Map()));
       moduleIds.set(made, identity);
+      if (!modulesById.has(identity)) modulesById.set(identity, made);
       if (declares !== undefined) moduleDeclares.set(made, declares);
       // Every part of the module's text is the module's, written in the function it sits in.
       markAll(made, identity, undefined, new Set());
       return out(made);
-    },
-    instanceOf: (value) => {
-      const v = seen(into(value, "the value"));
-      return typeof v === "object" && v !== null ? [...(instances.get(v) ?? [])] : [];
     },
     moduleOf: (value) => {
       const v = into(value, "the value");

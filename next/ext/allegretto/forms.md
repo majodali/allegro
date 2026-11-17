@@ -70,7 +70,7 @@ text chosen by type.
 | `claim(e)` | the kernel's claim |
 
 The kernel's other primitives are reached as names Allegretto binds:
-`then`, `attempt`, `describe`, `build(description, names)`, and those ruled and not yet
+`then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`, and those ruled and not yet
 built. A check the standard language writes as an annotation is written
 as a claim: `claim(is_int(x))`.
 
@@ -119,14 +119,46 @@ A block with bindings stands for the kernel's block of bindings (section
 
 A text is one module: a function, as "A module is a function of its
 capabilities, inputs and imports" has it. Its parameters are declared by
-header lines, before anything else:
+lines of their own. Each may stand anywhere at the top level of the
+module, in any order: like a binding, it declares a name for the whole
+module.
 
 | Form | Declares |
 |---|---|
 | `capability output` | a capability the module is handed, bound to the name `output` |
-| `input name` | an input, bound to `name`: plain data the configuration supplies to the module being run; a cell until it is supplied. A module that is imported declares none |
-| `import name` | another module's bindings, bound to `name`; one is read as `name.f` |
+| `input name` | an input, bound to `name`: plain data. The configuration supplies it to the module being run, and an importing module supplies it to a module it imports. Unknown until it is supplied |
 | `key name` | one of the module's keys, bound to `name`. Several lines declare several keys, in written order |
+| `import name` | another module, instantiated, bound to `name`; a binding of it is read as `name.f` |
+| `import name with a: e, b: f` | the same, with `e` handed for the capability or input the imported module calls `a`, and `f` for `b` |
+| `import name without c` | the same, with the capability or input `c` withheld |
+
+**What an import stands for.** A binding: `name = M(arguments)`, where
+`M` is the imported module's function, which the kernel supplies, and
+the arguments are one for each capability and input `M` declares, in
+`M`'s order:
+
+- by default, the importing module's capability or input of the same
+  name;
+- for a name listed after `with`, the expression given. It may use any
+  name of the importing module, its bindings included;
+- for a name listed after `without`, `refuse("the capability c was
+  withheld by the importing module")`: a refusal that happens if the
+  imported module uses it.
+
+A capability or input the imported module declares, which the importing
+module neither holds under that name, nor hands with `with`, nor
+withholds, is a finding when the text is read. `with` and `without` may
+both appear, each with a comma-separated list.
+
+Being a binding, an import is evaluated when something first needs it.
+The imported module's top-level statements happen then, in written
+order, and once: two imports of one module with the same arguments are
+one instance. An import nothing needs is never instantiated.
+
+`use name` brings a module's bindings and its notation. It takes `with`
+and `without` as `import` does. Its place in the text matters, as no
+other declaration's does: the notation acts from that line. The notation
+is taken from an instance made with no capability and no input.
 
 The rest of the text is the module's block. What the module yields is a
 structure of its bindings, keyed by symbols of their names: those marked
@@ -251,3 +283,10 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    structure literal writes a private entry as `[name]: e`; `p[name]`
    reads it, with no form of its own. The maintainer asked for a form
    since Allegretto has one for everything the kernel does.
+7. **Imports** (2026-11-18). An import is a binding that calls the
+   imported module's function. It hands over the capabilities and
+   inputs of the same name by default; `with` replaces what is handed
+   for a name and `without` withholds one. `capability`, `input`, `key`
+   and `import` may stand anywhere at a module's top level. A module
+   with top-level statements may be imported: they happen when it is
+   first needed.
