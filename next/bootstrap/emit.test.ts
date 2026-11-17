@@ -179,19 +179,14 @@ test("claim is the kernel's claim: a true one lets the module go on, and a refut
 });
 
 test("the kernel primitives Allegretto names: then, attempt, describe and build", () => {
-  const r = run('input see\ninput right\nthen(see("first"), see("second"))\nsee(attempt("tried", 100))');
-  const [first, second, attempted] = seen(r);
-  assert.deepEqual([textOf(r.k, first), textOf(r.k, second)], ["first", "second"]);
+  // build takes the description and the values for the names it leaves free
+  // ("A free name never gets a value"); here it leaves none.
+  const r = run('input see\ninput right\nthen(see("first"), see("second"))\nsee(attempt("tried", 100))\nsee(build(describe(right, x => x), {})("built"))');
+  const [first, second, attempted, built] = seen(r);
+  assert.deepEqual([textOf(r.k, first), textOf(r.k, second), textOf(r.k, built)], ["first", "second", "built"]);
   const [head, value] = r.k.entriesOf(attempted);
   assert.equal(r.k.symbolName(head[1]), "description.value");
   assert.equal(textOf(r.k, value[1]), "tried");
-  // describe and build are written as the kernel's primitives of those names.
-  // What each is applied to is the kernel's to say: the ruling of 2026-11-17,
-  // "A free name never gets a value", gives build a second argument, the
-  // values for the names a description leaves free. So the record is read
-  // here, and nothing is built.
-  const doc = emitted("input right\nf(d, names) => build(d, names)\ng(x) => describe(right, x)");
-  for (const name of ["describe", "build"]) assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === name), `the record names the kernel primitive ${name}`);
 });
 
 // ── Statements and x <- e ──────────────────────────────────────────────

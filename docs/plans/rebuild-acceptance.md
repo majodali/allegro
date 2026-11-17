@@ -1594,3 +1594,26 @@ policy is the gate ruled there.
   - **Measured.**
     `milestone 1: programs 4 (passing 4, failing 0) · cases due 27 · realised 4, named only by a failing program 0, not yet named 23 · up to 1: 4 of 27 realised`;
     `milestone 3: programs 31 (passing 31, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.
+- **2026-11-17 — The launcher and the corpus follow "A free name never gets a value".**
+  PR #244 ruled it and built it in the reference kernel: a module with
+  a free name is refused, a free name that is needed is a refutation,
+  and `waiting` lists cells only. That PR asked three things of this
+  stream. The launcher's list of unbound names is removed
+  (`next/launch/launcher.ts`): the `waiting` end names the cells no
+  capability answers and the inputs no phase supplied, and a record
+  whose module uses a name nothing binds is refused at loading with the
+  kernel's message. The emitter's test of the kernel primitive `build`
+  evaluates it again, with its two arguments: the description, and the
+  values for the names it leaves free. The emitter's own check for a
+  name bound nowhere stays; it is where an author is told which name.
+  Three corpus cases cite the new decision. The case
+  `absent vs unresolved (C2.3b)` gains it beside "A language checks the
+  names it cares about". Two notes said an unbound name leaves a
+  residual: `extension: not available without being provided` of
+  `src/test/base.ts`, and the new result of the Rule 1 case of B-172
+  (the partial-evaluation rules as implemented against the spine) on an
+  unresolved function position. Both now say the notation refuses the
+  text and the kernel gives a free name no value. No class changes. No
+  title changed: `--follow-renames` of `next/tools/corpus.ts` moved no
+  case. Measured: 303 tests pass; 35 programs pass;
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
