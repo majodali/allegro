@@ -387,6 +387,43 @@ it one, and a rule that an unmarked part is open to all would fail
 open. The entry on reading a field with `Y of x` is reworded so that
 `source of x` reads an origin under a right.
 
+### Cluster 6: imports (2026-11-18)
+
+The review session proposed that an importing module name each
+capability it hands a library, and that a module with top-level
+statements could not be imported. The maintainer changed both.
+
+Ruled:
+
+1. An import is a binding the importing module evaluates itself: a
+   call of the imported module's function. The kernel supplies that
+   function by the identity declared. This replaces the check of
+   cluster 2 that an import is an instance of the module declared.
+2. By default an import hands over each capability and input the
+   imported module declares that the importing module holds under the
+   same name. `with name: value` hands another value for a name, in a
+   comma-separated list, and what is not listed is still handed by
+   default. `without name` withholds one: it silences the finding, and
+   hands a refusal that happens if the imported module uses it.
+3. A capability or input the imported module declares and nothing
+   hands it is a finding.
+4. `capability`, `input`, `key` and `import` may stand anywhere at a
+   module's top level, in any order. Only `use` has a place.
+5. A module's top-level statements happen when it is instantiated: a
+   library's when a module that imports it first needs it.
+6. One instance for imports of the same module with the same
+   arguments. The maintainer was unsure of this, "that function may
+   not be pure", had no case that needs two, and let it stand.
+7. A capability a phase lacks is a parameter left unknown.
+8. Reading a text evaluates the notation it uses, from an instance
+   made with no capability and no input.
+9. Inputs are handed to an import as capabilities are.
+
+Built in the reference kernel: the table of modules by identity, the
+instance for each set of arguments, and `refuse`. The forms are in
+`next/ext/allegretto/forms.md`. The finding of point 3 and the forms
+are the reader's and the emitter's.
+
 ## Terms introduced
 
 No terms introduced.

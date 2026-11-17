@@ -72,7 +72,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "same", "slice", "then"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "refuse", "same", "slice", "then"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -914,38 +914,74 @@ test("a module's identity covers what it declares, and through its imports what 
   assert.throws(() => make([]), /not one declaration for each parameter/);
 });
 
-test("instantiating a module checks its imports: only an instance of the module declared is accepted", () => {
+test("an import is supplied by the kernel, by identity, and instantiated by the module that imports it", () => {
   const { k, add, call, kp } = setup();
   const f = k.symbol("lib.f");
   const library = (n: number) => k.module(k.composedFunction([], k.structure([[f, byte(k, n)]])), 0, []);
-  const [lib, lookalike] = [library(1), library(2)];
+  const lib = library(1);
   const idLib = k.moduleOf(lib) as string;
   const p = k.param("lib");
-  const user = k.module(k.composedFunction([p], k.structure([[null, call(add, call(kp("get"), p, k.symbolData("lib.f")), byte(k, 10))]])), 0, [{ role: "module", name: "lib", identity: idLib }]);
+  // user(lib) => get(lib(), `f) + 10: the import is the library's module function, called in the body.
+  const body = call(add, call(kp("get"), call(p), k.symbolData("lib.f")), byte(k, 10));
+  const user = k.module(k.composedFunction([p], body), 0, [{ role: "module", name: "lib", identity: idLib }]);
   const scope = k.scope();
-  const first = (v: Value) => num(k, k.evaluate(k.entriesOf(v)[0][1], scope).value);
-  // An instance of the library declared.
-  const instance = k.evaluate(call(lib), scope).value;
-  assert.deepEqual(k.instanceOf(instance), [idLib]);
-  assert.deepEqual(k.instanceOf(byte(k, 1)), []);
-  assert.equal(first(k.evaluate(call(user, call(lib)), scope).value), 11);
-  // A structure of the same shape that no module yielded, and an instance of another module, are refused.
-  const fake = k.evaluate(call(user, k.structure([[f, byte(k, 1)]])), scope);
-  assert.match(k.reasonOf(fake.value) ?? "", /the import lib is not an instance of the module it is declared to be/);
-  assert.equal(k.evaluate(call(user, call(lookalike)), scope).refuted, true);
-  // A module that imports the library is not thereby an instance of it.
-  const wrapper = k.module(k.composedFunction([p], k.structure([[f, byte(k, 1)]])), 0, [{ role: "module", name: "lib", identity: idLib }]);
-  const wrapped = k.evaluate(call(wrapper, call(lib)), scope).value;
-  assert.deepEqual(k.instanceOf(wrapped), [k.moduleOf(wrapper)]);
-  assert.equal(k.evaluate(call(user, call(wrapper, call(lib))), scope).refuted, true);
-  // An import declared with no identity can never be satisfied.
-  const loose = k.module(k.composedFunction([p], k.structure([[null, p]])), 0, [{ role: "module", name: "lib" }]);
-  assert.equal(k.evaluate(call(loose, call(lib)), scope).refuted, true);
-  // An import that has not arrived leaves the call waiting, and it is taken up when it arrives.
-  const c = k.cell();
-  const waits = k.evaluate(call(user, c), scope);
-  assert.equal(waits.refuted, false);
-  assert.equal(k.waiting().length, 1);
+  // Nobody passes the import: the module is called with its capabilities and inputs only, here none.
+  assert.equal(num(k, k.evaluate(call(user), scope).value), 11);
+  // Passing one is one argument too many, whatever it is.
+  assert.match(k.reasonOf(k.evaluate(call(user, library(2)), scope).value) ?? "", /was given 1 argument/);
+  // A module that imports one not made in this kernel is refuted when it is called.
+  const missing = k.module(k.composedFunction([p], call(p)), 0, [{ role: "module", name: "lib", identity: hash(99) }]);
+  assert.match(k.reasonOf(k.evaluate(call(missing), scope).value) ?? "", /the module lib, which it imports, is not loaded/);
+  // An import declared with no identity can never be supplied.
+  const loose = k.module(k.composedFunction([p], call(p)), 0, [{ role: "module", name: "lib" }]);
+  assert.equal(k.evaluate(call(loose), scope).refuted, true);
+});
+
+test("a module's statements happen when it is instantiated: when first needed, and once for the same arguments", () => {
+  const { k, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const quiet = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(100 + c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const f = k.symbol("lib.f");
+  // library(out) => then(out(7), {f: 1}): it says 7 when it is instantiated.
+  const out = k.param("out");
+  const library = k.module(k.composedFunction([out], call(kp("then"), call(out, byte(k, 7)), k.structure([[f, byte(k, 1)]]))), 0, [{ role: "capability", name: "output" }]);
+  const idLib = k.moduleOf(library) as string;
+  const [lib, o, other] = [k.param("lib"), k.param("out"), k.param("other")];
+  const [first, second, third] = ["t.first", "t.second", "t.third"].map((n) => k.symbol(n));
+  const read = (name: Value) => call(kp("get"), name, k.symbolData("lib.f"));
+  // user(lib, out, other): three imports of the library, two with the same capability, and a statement of its own first.
+  const user = k.module(k.composedFunction([lib, o, other], call(kp("block"),
+    k.structure([[first, call(lib, o)], [second, call(lib, o)], [third, call(lib, other)]]),
+    call(kp("then"), call(o, byte(k, 1)), call(kp("then"), read(first), call(kp("then"), read(second), call(kp("then"), call(o, byte(k, 2)), read(third))))))),
+    0, [{ role: "module", name: "lib", identity: idLib }, { role: "capability", name: "output" }, { role: "capability", name: "other" }]);
+  const r = k.evaluate(call(user, say, quiet), k.scope());
+  assert.equal(num(k, r.value), 1);
+  assert.deepEqual(said, [1, 7, 2, 107], "the library's statement happens when the import is first needed, once for the same capability, and again for another");
+  // An import nothing needs is never instantiated.
+  said.length = 0;
+  const idle = k.module(k.composedFunction([lib, o], call(kp("block"), k.structure([[first, call(lib, o)]]), call(o, byte(k, 3)))), 0,
+    [{ role: "module", name: "lib", identity: idLib }, { role: "capability", name: "output" }]);
+  k.evaluate(call(idle, say), k.scope());
+  assert.deepEqual(said, [3]);
+});
+
+test("a refusal is a refutation with a reason, and a withheld capability is one that happens when it is used", () => {
+  const { k, call, kp } = setup();
+  const reason = (t: string) => k.bits(new TextEncoder().encode(t));
+  const scope = k.scope();
+  const r = k.evaluate(call(kp("refuse"), reason("the capability files was withheld")), scope);
+  assert.equal(r.refuted, true);
+  assert.equal(k.reasonOf(r.value), "the capability files was withheld");
+  // Handed to a module in place of a capability, it refutes nothing until the module uses it.
+  const [files, flag] = [k.param("files"), k.param("flag")];
+  const m = k.module(k.composedFunction([files, flag], call(kp("if"), flag, call(files, byte(k, 1)), byte(k, 0))), 0,
+    [{ role: "capability", name: "files" }, { role: "input", name: "flag" }]);
+  const withheld = call(kp("refuse"), reason("the capability files was withheld"));
+  assert.equal(num(k, k.evaluate(call(m, withheld, truth(k, false)), scope).value), 0);
+  const used = k.evaluate(call(m, withheld, truth(k, true)), scope);
+  assert.equal(k.reasonOf(used.value), "the capability files was withheld");
+  assert.equal(k.evaluate(call(kp("refuse"), k.structure([])), scope).refuted, true);
 });
 
 test("a private member is an entry keyed by a key: only that key reads it", () => {

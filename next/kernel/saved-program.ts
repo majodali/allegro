@@ -8,7 +8,7 @@
 //   "A saved program is a recorded sequence of interface calls"
 //   "A saved program names what it needs by content hash"
 //   "A module is a function of its capabilities, inputs and imports"
-//   "Only the module being run performs effects when instantiated"
+//   "A module's top-level statements happen when it is instantiated"
 //
 // A saved program rebuilds a program in a kernel without parsing. Its
 // data form is a record that constructs values and can do nothing else.
