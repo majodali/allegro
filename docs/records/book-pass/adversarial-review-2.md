@@ -280,6 +280,33 @@ Built in the reference kernel with the ruling, and one fault a
 reviewer reported is fixed: a function made in a block inside a
 module lost the block's names.
 
+### Cluster 2: a module's identity (2026-11-17)
+
+Ruled ("I agree with all six points, and the cost is acceptable"):
+
+1. A module's identity covers what it declares: each parameter's
+   role and name, and for an import the identity of the module
+   imported.
+2. Instantiating checks the imports: an argument for an import must
+   be an instance of the module declared.
+3. Instances that differ only in capabilities and inputs share
+   identity and keys.
+4. A stored outcome is restored only for a claim with nothing unknown
+   under it: no parameter but the module's key slots and imports, and
+   no cell.
+5. A prompt entry is a module that imports the session so far.
+6. A field belongs to a module's identity, not to an instance.
+
+Set aside: a key for each instance covering its capabilities and
+inputs (no key would exist until a run supplies the inputs); and
+instantiation by the loader alone under a granted right (it relies on
+every loader, and does nothing for stored outcomes). The cost,
+accepted: an edit to a module changes the identity of everything
+that imports it.
+
+Points 1 to 4 are built in the reference kernel and the data form.
+Points 5 and 6 wait for the prompt and for metadata fields.
+
 ## Terms introduced
 
 No terms introduced.

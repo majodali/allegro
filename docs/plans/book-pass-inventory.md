@@ -1032,7 +1032,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Metadata
 
 #### An extension registers its own fields
-- Decides: a metadata field is registered by the extension whose concept it holds, with the rule for how it travels. Only a field's owner can write it; any code can read it. A field has one owner: a second registration is a conflict. The kernel registers three: the outcome of a claim, a value's origin, and the mark on a key.
+- Decides: a metadata field is registered by the extension whose concept it holds, with the rule for how it travels. Only a field's owner can write it; any code can read it. A field has one owner: a second registration is a conflict. The kernel registers three: the outcome of a claim, a value's origin, and the mark on a key. A field belongs to a module's identity: a second instance of the module is the same owner and registers nothing new.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1048,6 +1048,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR2): a second registration with the same rule in the same evaluation pass returns the held writer, a workaround for re-evaluation in the REPL.
 - Notes (2026-11-15, the ruling on identity): the kernel now has a third field of its own, the mark of a key.
 - Notes (2026-11-15, titles made accurate): retitled from "An extension registers its own fields; the kernel has two"; the kernel's third is the mark on a key.
+- Notes (2026-11-17, the second adversarial review, cluster 2): the last sentence is added by ruling.
 - Chapter: Metadata
 
 #### A field's rule is a pure, bounded function
@@ -1879,7 +1880,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Modules and programs
 
 #### A key is made with the module that holds it
-- Decides: when a module is made, the kernel derives the module's identity from its content, and makes the module's keys from that identity. A key is a structure that says which module and which slot, carrying a mark that only the kernel writes and that is never carried onto another value. Anyone can build a structure with the same entries; it is not a key. Whether a value is a key, and whether two are the same key, are questions for the kernel, never answered by comparing content. The same module has the same keys in every kernel and every phase, and after it is saved and loaded. No other content has them. A holder of a key can derive further keys from data.
+- Decides: when a module is made, the kernel derives the module's identity from its content, and makes the module's keys from that identity. A key is a structure that says which module and which slot, carrying a mark that only the kernel writes and that is never carried onto another value. Anyone can build a structure with the same entries; it is not a key. Whether a value is a key, and whether two are the same key, are questions for the kernel, never answered by comparing content. The same module has the same keys in every kernel and every phase, and after it is saved and loaded. No other content has them. A holder of a key can derive further keys from data. A module's identity covers its code and what it declares: each parameter's role and name, and for an import the identity of the module imported. So it covers, through its imports, everything the module depends on, and the same code connected otherwise is another module with other keys.
 - Status: partly built (the reference kernel makes modules and keys; deriving a key from data is not built); ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -1890,6 +1891,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Use case: a library defines a type with a private member; a program saved on a build server and loaded on a laptop reaches the member with the same key, and no other library can make that key.
 - Notes: new, by ruling; answers issues 11 and 12 of the adversarial review. To forge a module's key one must present the module's exact content, which only yields the module, whose code does not hand its keys out; change the content to export a key, and the identity and the keys change. A module's content names its parameters by their place, so renaming them changes nothing. The cost: the kernel hashes content, where it computed nothing on bits. The hash is SHA-256.
+- Notes (2026-11-17, the second adversarial review, cluster 2): the last two sentences are added by ruling. Identity had covered the code alone: two records with the same nodes, one declaring a parameter an import and the other a capability, got the same identity and the same key, so a copy connected to imports of its maker's choosing had the original's keys. The cost, accepted by the maintainer: editing a module changes the identity of every module that imports it, directly or not, and their stored outcomes are decided again.
 - Chapter: Modules and programs
 
 #### The loader reaches files through a capability
@@ -1908,7 +1910,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Modules and programs
 
 #### Running a program is evaluating its main module with a configuration's capabilities
-- Decides: there is no separate act of running. A session at a prompt is a module whose text arrives one entry at a time: each entry is read in the grammar the earlier entries left and sees the bindings they made. At a prompt a name may be bound again; the new binding holds for the entries that follow, and what earlier entries computed is unchanged.
+- Decides: there is no separate act of running. A session at a prompt is a module whose text arrives one entry at a time: each entry is read in the grammar the earlier entries left and sees the bindings they made. At a prompt a name may be bound again; the new binding holds for the entries that follow, and what earlier entries computed is unchanged. Each entry at a prompt is a module that imports the session so far, so a session has an identity like any module.
 - Status: partly built; ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
@@ -1919,6 +1921,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling. Rebinding, as the maintainer confirmed on PR #190: each entry opens a scope inside the last, so a later binding hides the earlier one and replaces nothing; the rule that a name is bound once in a scope then holds at a prompt as it does in a file.
 - Held finding (2026-11-12, DR3): a grammar change does not reach the prompt: the REPL loads no module named by a header (tooling claims C60, C61 of docs/book/platform/tooling.ir.md).
+- Notes (2026-11-17, the second adversarial review, cluster 2): the last sentence is added by ruling.
 - Chapter: Modules and programs
 
 #### Every program is evaluated the same way, however it arrives
@@ -3503,7 +3506,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of its capabilities, inputs and imports
-- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. A module is instantiated once for each distinct set of arguments; every instance has the module's identity and its keys, since each is the same code. An input is a named value of plain data that the configuration supplies to the module being run; it grants nothing. An input not supplied is a cell, so a phase evaluates the module with the input unknown and a later phase supplies it. A module that is imported declares no input.
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. A module is instantiated once for each distinct set of arguments. An argument for an import must be an instance of the module declared, or instantiating is refuted. Instances that differ only in their capabilities and inputs have the module's identity and its keys. An input is a named value of plain data that the configuration supplies to the module being run; it grants nothing. An input not supplied is a cell, so a phase evaluates the module with the input unknown and a later phase supplies it. A module that is imported declares no input.
 - Status: open; ruled 2026-11-13 (DR6); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -3519,6 +3522,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, titles made accurate): retitled from "A module is a function of the capabilities it declares": its parameters are also its inputs and the modules it imports. Its bindings are its body, not parameters: nothing a module uses from outside is ambient.
 - Notes (2026-11-17, the adversarial review's last issues): the last sentence is added by ruling, for issue 13: two importers that supply a module different capabilities get two instances, and neither gains what the other supplied.
 - Notes (2026-11-17, inputs): the sentences on inputs are added by ruling. The word came in with the ruling of 2026-11-13 on a module as a function, the data form's roles and Allegretto's header line, and had never been ruled on its own: the maintainer asked where it came from. Kept, and ruled narrowly. It is a parameter and not something read through a capability so that a phase can leave it unknown with no effect involved. Open: who supplies the inputs of an imported module, the loader from configuration or the importer by passing values, which would make a module one its importer sets up; and how an input's name is found in a configuration. Taken when a case appears.
+- Notes (2026-11-17, the second adversarial review, cluster 2): reworded by ruling. An argument for an import must be an instance of the module declared, which the kernel checks when the module is instantiated; so anyone may instantiate a module and nobody can connect it to other imports. Instances that differ only in capabilities and inputs are the same code with the same dependencies and differ only in authority, which is why they may share keys.
 - Chapter: Capabilities and primitive functions
 
 #### Only the module being run performs effects when instantiated
@@ -3644,10 +3648,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a saved library built against one arithmetic implementation refuses to load beside another.
 - Notes: new, by ruling. The maintainer: this "is inviting dependency hell, but every modular programming platform that's successful goes to dependency hell as punishment. I think hash checks will work for now." A checked mapping between two versions of a model might later serve as a compatibility claim; the maintainer is sceptical on grounds of combinatorial complexity.
 - Notes (2026-11-16, the shipped primitives built): by the maintainer's ruling a shipped primitive's hash is taken over its host code: the helpers every primitive shares and its own entry, with comments left out. The review session had proposed hashing a sentence that states the primitive's meaning. The hashes are committed, since a browser cannot read the source, and a test computes them again.
+- Notes (2026-11-17, the second adversarial review, cluster 2): a record names each module it imports by that module's identity, in its declarations. It had named an import by name only.
 - Chapter: Saved programs and export
 
 #### A stored outcome is restored with its builder's name
-- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. An outcome that rests on a capability's answer is never stored: it is decided again when the program is loaded. Deciding again is always available.
+- Decides: because evaluation is deterministic, a stored outcome is what the loading kernel would compute. Restoring one stamps it with the identity of whoever built the saved program, and nothing removes the stamp. The kernel computes the claim's key itself, from the claim and what it rests on, so an outcome cannot be attached to another claim. Restore is a capability narrowed to one builder, and a configuration may withhold it. An outcome that rests on a capability's answer is never stored: it is decided again when the program is loaded. Deciding again is always available. Only a claim with nothing unknown under it is restored: no parameter but the module's key slots and imports, which its identity fixes, and no cell. A claim over an input or over a function's parameter is decided where it is evaluated and is never stored.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3659,6 +3664,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a team's build server saves a library with its laws decided; a developer's kernel restores them stamped with the server's name, and an auditor decides them again.
 - Notes: new, by ruling. The maintainer: fully rechecking on load "will likely be opt-in"; restore is allowed inside the kernel and is configurable, which "means mostly we need to always analyze for vulnerabilities".
 - Notes (2026-11-15, the rulings on strength and on identity): determinism justifies restoring only where it holds, so an outcome that rested on a capability's answer is never stored (issue 10). A restored claim keeps the word its builder's kernel recorded. The kernel computes each outcome's key itself, from the claim's content, the content of the function it sits in and what it rests on (`Kernel2.claimKey`), and `restore` refuses a stored key that differs. The first build left this out; the maintainer asked for it on PR #215.
+- Notes (2026-11-17, the second adversarial review, cluster 2): the last two sentences are added by ruling. A stored outcome for a claim over an input was restored for every value of the input: a claim was reported decided for a value that refutes it, and the value reached an effect. The kernel's own test restored such a claim.
 - Chapter: Saved programs and export
 
 #### A target platform is a model, and export is a transformation into it

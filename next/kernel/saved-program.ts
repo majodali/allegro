@@ -44,7 +44,7 @@
 // module's body is evaluated, by the extension's own constructors), and
 // the host-code form.
 
-import type { Kernel, Kernel2, Rest, Value } from "./interface.js";
+import type { Declaration, Kernel, Kernel2, Rest, Value } from "./interface.js";
 
 export const SAVED_PROGRAM_FORMAT = "allegro-saved-program";
 export const SAVED_PROGRAM_VERSION = 1;
@@ -91,6 +91,12 @@ export interface Declared {
   readonly role: "capability" | "input" | "module";
   /** The capability's name, the input's name, or the module's name. */
   readonly name: string;
+  /**
+   * For a module, in a record of the second version: the identity of the
+   * module imported. It is part of this module's content, so the record
+   * cannot be connected to another module under the same name.
+   */
+  readonly identity?: string;
 }
 
 /** A claim the builder's kernel decided. */
@@ -296,7 +302,8 @@ export function check2(doc: unknown): string[] {
         return;
       }
       if (d.param !== params[i]) out.push(`declares[${i}].param is not parameter ${i} of the module function`);
-      for (const key of extraKeys(d, ["param", "role", "name"])) out.push(`declares[${i}] has unknown key "${key}"`);
+      for (const key of extraKeys(d, doc.version === 2 && d.role === "module" ? ["param", "role", "name", "identity"] : ["param", "role", "name"])) out.push(`declares[${i}] has unknown key "${key}"`);
+      if (d.identity !== undefined && (typeof d.identity !== "string" || !HASH.test(d.identity))) out.push(`declares[${i}].identity is not sha256: and 64 hex digits`);
     });
   }
   if (doc.outcomes !== undefined) {
@@ -384,9 +391,14 @@ function build(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string
  * with any `key`, ask for the keys, and write them in. It reads the
  * record's nodes and `restsOn` only, and evaluates nothing.
  */
+/** What the record declares of each parameter, as the kernel takes it. */
+function declarationsOf(doc: SavedProgram): Declaration[] {
+  return doc.declares.map((d) => (d.identity === undefined ? { role: d.role, name: d.name } : { role: d.role, name: d.name, identity: d.identity }));
+}
+
 export function outcomeKeys(kernel: Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): string[] {
   const values = build(kernel, doc, primitives);
-  return (doc.outcomes ?? []).map((o) => kernel.claimKey(values[o.claim], values[doc.module], o.restsOn));
+  return (doc.outcomes ?? []).map((o) => kernel.claimKey(values[o.claim], values[doc.module], o.restsOn, declarationsOf(doc)));
 }
 
 /**
@@ -417,9 +429,9 @@ export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: Re
     if (restoring) throw new Error("the saved program has outcomes to restore, and this kernel is of the first version");
     return values[doc.module];
   }
-  if (restoring) for (const o of doc.outcomes ?? []) kernel.restore(values[o.claim], values[doc.module], options.restoreAs as string, o.restsOn, o.key);
+  if (restoring) for (const o of doc.outcomes ?? []) kernel.restore(values[o.claim], values[doc.module], options.restoreAs as string, o.restsOn, o.key, declarationsOf(doc));
   if (doc.version === 1) return values[doc.module];
-  return kernel.module(values[doc.module], doc.keys ?? 0);
+  return kernel.module(values[doc.module], doc.keys ?? 0, declarationsOf(doc));
 }
 
 /** Writes a saved program as JSON, one node to a line. */
