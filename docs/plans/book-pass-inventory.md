@@ -914,18 +914,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Authority
 
 #### Describing a function requires authority
-- Decides: a function is opaque: ordinary code can call it and do nothing else with it. Describing one requires authority, held through the key of the module that made the function or through an inspection right that a configuration grants. Opening a call copies the callee's body into the residual; each part of a residual stays marked with the module whose function it came from, and a description shows a part only under a right that covers that module.
+- Decides: a function is opaque: ordinary code can call it and do nothing else with it. Describing one requires authority, held through the key of the module that made the function or through an inspection right that a configuration grants. Opening a call copies the callee's body into the residual; each part of a residual stays marked with the module whose function it came from, and a description shows a part only under a right that covers that module. The mark belongs to the expression and is no metadata field: the kernel writes it on every part when a module is made, every copy the kernel makes while evaluating keeps it, and no program reads or writes it except through what a description shows. So an argument is its writer's wherever it is passed. A function built from a description takes the mark of the code that built it; a part host code made has none and is described only under the inspection right. A part that is not shown appears as opaque, with the parameters of the described function that it mentions and nothing else. Plain data is a value, like bits, and is shown.
 - Status: open; ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
 - Depends on: Reading an expression never yields authority; Authority is an unforgeable value; A composed function is parameters and a body
 - Significance: 5 — what keeps a module's code and what it holds from every other module
 - Label: foundational — privacy, narrowed capabilities, solvers and every tool that inspects code
-- Options recorded: any code can read an expression's structure (the ruling of 2026-11-11, reversed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it)
+- Options recorded: any code can read an expression's structure (the ruling of 2026-11-11, reversed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it); describing by the inspection right alone, with no key of a module describing anything (considered 2026-11-17 and not taken: it removes the marks, the opaque form and marks in the data form, at the price that a solver or an optimiser must be trusted to read all code; the maintainer kept per-module describing for integrations between a notation's library and the code that uses it)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new as an entry of its own; ruled with values and descriptions and first written into "Reading an expression never yields authority". The maintainer's wording of the title.
 - Notes (2026-11-15, solving): the sentence on residuals is added by ruling. Without it, wrapping any function, specializing the wrapper and describing the result would read that function's body. A part the right does not cover is described as opaque.
 - Notes (2026-11-17, the adversarial review's last issues): the mark on each part names the function it was written in, and through it the module; the rule for describing still asks for the module. See "Who may use a member is a claim about where the access was written".
+- Notes (2026-11-17, the second adversarial review, cluster 4): extended by ruling. The kernel had marked whole functions only, so a callee could wrap its argument in a function of its own, describe that with its own key, and read what the caller wrote. The maintainer weighed removing the need for marks altogether, by letting only a right that the configuration grants describe anything, and ruled against it: "the vast majority of projects will have only a single optimizer and at most one solver - so this is a very reasonable approach. However, I'm going to rule we don't take it, and keep `describe` generally available, and mark every node in an expression. My main reason for this is that it enables more sophisticated integrations between a grammar extension and the code that uses it - e.g. solvers, autograd, library specific optimizations". The maintainer wants the book to have readers try both sides of this decision. Not built: marks in the saved-program data form, which a saved residual needs once it holds parts of several modules; taken with what a record of a residual holds (cluster 10 of the same review).
 - Chapter: Authority
 
 #### A live expression is built only from live values
@@ -1049,6 +1050,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the ruling on identity): the kernel now has a third field of its own, the mark of a key.
 - Notes (2026-11-15, titles made accurate): retitled from "An extension registers its own fields; the kernel has two"; the kernel's third is the mark on a key.
 - Notes (2026-11-17, the second adversarial review, cluster 2): the last sentence is added by ruling.
+- Notes (2026-11-17, the second adversarial review, cluster 4): "any code can read it" holds for an extension's fields. A value's origin is read under a right, as a description is.
 - Chapter: Metadata
 
 #### A field's rule is a pure, bounded function
@@ -1081,6 +1083,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR2): the `source` field is attached on demand and read under `observe` (`src/capability.ts:181`).
 - Notes (2026-11-15, values and descriptions): reworded by ruling, answering issue 4 of the adversarial review: an origin readable by any code disclosed the private values a result was computed from, cost memory in proportion to the steps run, and made every optimisation visible. "No later evaluation discards it" is withdrawn.
 - Notes (2026-11-15, titles made accurate): retitled from "Every value keeps its origin": a value can carry an origin, and a phase may drop it.
+- Notes (2026-11-17, the second adversarial review, cluster 4): an origin is read under the same right as any description, everywhere it is mentioned: it is not a field any code reads freely.
 - Chapter: Metadata
 
 #### Trust in a value needs no seal
@@ -2288,6 +2291,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling. The maintainer: these access patterns "are not really privacy concerns", they are "about interface, encapsulation and design discipline". To prove: an accessor reading the origin of its call; the four access patterns restated as claims; the cost of deciding such claims on real programs. A trusted module can still be led to access on another's behalf, which is why the key stays the foundation.
 - Notes (2026-11-17, the adversarial review's last issues): reworded by ruling, for issue 28. The entry rested on origins, which a phase may now drop, and "where it was written" had several answers once a call is opened or a form expands. The mark is the one "Describing a function requires authority" keeps on each part of a residual, made finer: the function, not only the module, because a protected member asks whether the access was written inside a method of a conforming type.
+- Notes (2026-11-17, the second adversarial review, cluster 4): the kernel now keeps the mark, with the function as well as the module. How a claim reads it is settled when the standard language's member rules are built.
 - Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
@@ -2384,11 +2388,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### The `Y of x` component-access form
-- Decides: a metadata field of a value is read by the expression form `Y of x` (`type of x`, `source of x`). Reading a field is free to any code.
-- Status: settled; reworded 2026-11-12 (DR4)
+- Decides: a metadata field of a value is read by the expression form `Y of x`, as in `type of x`. Reading a field an extension registered is free to any code. `source of x` reads a value's origin, which is a description: it is read under the right the reading code holds, shows only what that right covers, and gives nothing where the phase kept no origin.
+- Status: settled; reworded 2026-11-12 (DR4), reworded 2026-11-17
 - Type: capability
 - Rationale kind: mixed
-- Depends on: Metadata is a field on every value; An extension registers its own fields
+- Depends on: Metadata is a field on every value; An extension registers its own fields; A value's origin is a description
 - Significance: 2 — the reader's view of the metadata plane at the surface
 - Label: swappable — a surface over channel reads
 - Units: base-grammar, metadata
@@ -2396,6 +2400,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/language-reference.md (MultiValue component access); docs/book/standard/pattern-matching.md §2; D47 (source of x surface)
 - Book home (fragments' proposal): Surface syntax of Allegro Standard (proposed)
 - Notes: the reference still calls it "MultiValue component access"; MultiValue is retired (D46), so the name is stale.
+- Notes (2026-11-17, the second adversarial review, cluster 4): reworded by ruling. The entry said `source of x` reads a field that any code reads freely, against the ruling of 2026-11-15 that an origin is a description read under a right and that a phase may drop it.
 - Chapter: The surface language
 
 #### Type annotations on parameters and returns
@@ -2996,6 +3001,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, values and descriptions): reworded by ruling: the solver no longer takes its problem unevaluated. The ruling on solving, below, replaced this wording in turn.
 - Notes (2026-11-15, solving): replaced by ruling. The maintainer told the acceptance stream of the change to unevaluated arguments because plan solving "requires inspecting a plan expression after PE has run, so it can find solutions more efficiently". The design: specialize, describe, call. Left out until the planning model needs them: a function built from a description with live values taken from the function described, which a partial inversion needs when the inverse keeps a part the description shows as opaque, and which is a grant separate from the right to describe, since whoever rebuilds a function can use a capability inside it without the guard written around it; and unknowns that carry facts, such as a choice limited to a set of options, which need metadata fields. An inverse returned as a function needs neither: the solver returns a function that interprets the inverted description, and specializing it removes the interpreter.
 - Notes (2026-11-15, titles made accurate): retitled from "A solver sees its problem unevaluated".
+- Notes (2026-11-17, the second adversarial review, cluster 4): a part of a residual that another module wrote is shown to the solver as opaque with the unknowns it mentions, which is what a solver needs to order its search and split its problem. A solver that needs more is granted the inspection right.
 - Chapter: Search and optimization
 
 #### Feasible is decided; best says how strongly it holds

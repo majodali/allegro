@@ -1581,6 +1581,10 @@ its approval.
   unknown under it is restored.
 - **2026-11-17 — the second review's cluster 3 ruled and built** (the
   review session): a private member is an entry keyed by a key.
+- **2026-11-17 — the second review's cluster 4 ruled and built** (the
+  review session): every part of an expression is marked with its
+  writer. The maintainer weighed describing by a granted right alone,
+  and kept per-module describing.
 
 ## 8. Sessions
 

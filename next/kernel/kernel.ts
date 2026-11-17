@@ -115,7 +115,9 @@
 //   bits <bits>            symbol <symbol>          name <symbol>
 //   param <depth> <index>  apply <fn> <args>        function <count> <body>
 //   structure <entries>    kernel <name>            primitive <hash>
-//   capability <name> <part>   key <module> <slot>  opaque   unknown
+//   capability <name> <part>   key <module> <slot>  unknown
+//   opaque <params>: a part another module wrote; only the parameters of
+//                    the described function that it mentions are listed
 // A parameter is named by its place, as in a module's content. The last
 // four hold no value: they say what was there.
 //
@@ -161,13 +163,22 @@ class Sym {
 class Param {
   constructor(readonly name: string) {}
 }
+/** Where a part of an expression was written: the module, and the function of it the part sits in. */
+interface Mark {
+  readonly module: string;
+  readonly fn: Fn | undefined;
+}
 class Struct {
+  /** Written by the kernel when a module is made or a function is built, and kept by every copy. */
+  owner: Mark | undefined = undefined;
   constructor(readonly entries: ReadonlyArray<readonly [V | null, V]>) {}
 }
 class Expr {
+  owner: Mark | undefined = undefined;
   constructor(readonly fn: V, readonly args: readonly V[]) {}
 }
 class Fn {
+  owner: Mark | undefined = undefined;
   constructor(readonly params: readonly Param[], readonly body: V) {}
 }
 class Prim {
@@ -268,7 +279,6 @@ export const createKernel: CreateKernel2 = () => {
   /** The modules a value is an instance of. */
   const instances = new WeakMap<object, Set<string>>();
   /** The module a function was made in, for every function inside a module. */
-  const madeBy = new WeakMap<Fn, string>();
   /** The pure primitive functions made in this kernel, by content hash. */
   const pureByHash = new Map<string, Prim>();
   const keys = new Map<string, Key>();
@@ -407,6 +417,13 @@ export const createKernel: CreateKernel2 = () => {
     return bindings.entries.flatMap(([k]) => (k !== null && seen(k) instanceof Sym ? [seen(k) as Sym] : []));
   };
 
+  /** A copy keeps the mark of what it was copied from: a part is its writer's wherever it goes. */
+  const keep = (from: V, to: V): V => {
+    if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
+      to.owner = from.owner;
+    return to;
+  };
+
   /** The names in a value that no block around them binds, in the order met. */
   const freeNames = (v: V, bound: ReadonlySet<Sym>, found: Sym[], visited: Map<V, ReadonlySet<Sym>[]>): Sym[] => {
     if (v instanceof Sym) {
@@ -435,7 +452,8 @@ export const createKernel: CreateKernel2 = () => {
   };
 
   /** A value with each free name replaced by the value supplied for it. */
-  const supply = (v: V, values: ReadonlyMap<Sym, V>, bound: ReadonlySet<Sym>): V => {
+  const supply = (v: V, values: ReadonlyMap<Sym, V>, bound: ReadonlySet<Sym>): V => keep(v, supplied(v, values, bound));
+  const supplied = (v: V, values: ReadonlyMap<Sym, V>, bound: ReadonlySet<Sym>): V => {
     if (v instanceof Sym) return bound.has(v) ? v : (values.get(v) ?? v);
     if (v instanceof Fn) {
       const body = supply(v.body, values, bound);
@@ -477,9 +495,8 @@ export const createKernel: CreateKernel2 = () => {
       // A function written inside a block may use the block's names, which are tied when
       // the block is evaluated; until then it is not finished.
       if (skip === undefined || skip.size === 0) settled.add(r);
-      const maker = madeBy.get(v);
-      if (maker !== undefined) madeBy.set(r, maker);
     }
+    keep(v, r);
     memo.set(v, r);
     return r;
   };
@@ -521,10 +538,9 @@ export const createKernel: CreateKernel2 = () => {
       if (body !== v.body) {
         r = new Fn(v.params, body);
         if (settled.has(v)) settled.add(r);
-        const maker = madeBy.get(v);
-        if (maker !== undefined) madeBy.set(r, maker);
       }
     }
+    keep(v, r);
     memo.set(v, r);
     return r;
   };
@@ -547,7 +563,9 @@ export const createKernel: CreateKernel2 = () => {
     cell: () => out(new CellV(running)) as Cell,
   };
 
-  const evaluate = (v: V, scope: ScopeV): V => {
+  /** What an evaluation leaves in place of a part is that part's writer's: a residual keeps its mark. */
+  const evaluate = (v: V, scope: ScopeV): V => keep(v, evaluated(v, scope));
+  const evaluated = (v: V, scope: ScopeV): V => {
     if (v instanceof Sym) return evaluate(new NameRef(scope, v), scope);
     if (v instanceof NameRef) {
       const found = bindingOf(v);
@@ -691,7 +709,7 @@ export const createKernel: CreateKernel2 = () => {
         if (!(right instanceof Key)) return new Refuted("describing a function needs a key or the inspection right", right);
         if (!(f instanceof Fn)) return new Refuted("only a function can be described", f);
         const all = right.module === INSPECT;
-        if (!all && madeBy.get(f) !== right.module)
+        if (!all && f.owner?.module !== right.module)
           return new Refuted("describing a function needs a key of the module that made it, or the inspection right", undefined);
         return describe(f, [], all ? undefined : right.module);
       }
@@ -716,6 +734,8 @@ export const createKernel: CreateKernel2 = () => {
         const whole = supply(built, values, new Set()) as Fn;
         const missing = freeNames(whole, new Set(), [], new Map());
         if (missing.length > 0) return new Refuted(`the description leaves ${missing.map((m) => m.fqn).join(", ")} free, and no value was supplied`, undefined);
+        // What is built is the builder's: it takes the mark of the code that called `build`.
+        if (v.owner !== undefined) markAll(whole, v.owner.module, v.owner.fn, new Set());
         return close(whole, scope);
       }
       if (fn.name === "same") {
@@ -1036,6 +1056,23 @@ export const createKernel: CreateKernel2 = () => {
     return v instanceof Fn ? enclosing(target, v.body, [...binders, v], visited) : undefined;
   };
 
+  /** Marks every part that has no mark yet with a module and the function it sits in. */
+  const markAll = (v: V, module: string, within: Fn | undefined, visited: Set<V>): void => {
+    if (visited.has(v)) return;
+    visited.add(v);
+    if (v instanceof Fn) {
+      if (v.owner === undefined) v.owner = { module, fn: within };
+      markAll(v.body, module, v, visited);
+    } else if (v instanceof Expr) {
+      if (v.owner === undefined) v.owner = { module, fn: within };
+      markAll(v.fn, module, within, visited);
+      v.args.forEach((a) => markAll(a, module, within, visited));
+    } else if (v instanceof Struct) {
+      if (v.owner === undefined && !settled.has(v)) v.owner = { module, fn: within };
+      v.entries.forEach(([, e]) => markAll(e, module, within, visited));
+    }
+  };
+
   /** A module's identity: its function's content and what each parameter after the key slots is declared to be. */
   const identityOf = (f: Fn, declares: readonly Declaration[] | undefined): string => {
     const declared = declares === undefined ? "undeclared" : declares.map((d) => `${d.role} ${JSON.stringify(d.name)} ${d.identity ?? "-"}`).join("|");
@@ -1156,16 +1193,34 @@ export const createKernel: CreateKernel2 = () => {
       }
       return data("unknown");
     }
+    // A part another module wrote is not shown: only which parameters of the described
+    // function it mentions. Plain data is a value like bits, and is shown.
+    if (own !== undefined && (v instanceof Expr || v instanceof Fn || (v instanceof Struct && !settled.has(v))) && v.owner?.module !== own) {
+      const mentioned: V[] = [];
+      const walk = (x: V, visited: Set<V>): void => {
+        if (x instanceof Param) {
+          const d = describe(x, binders, own);
+          if (!mentioned.includes(x) && seen((d as Struct).entries[0][1]) !== intern("description.unknown")) mentioned.push(x);
+          return;
+        }
+        if (visited.has(x)) return;
+        visited.add(x);
+        if (x instanceof Expr) [x.fn, ...x.args].forEach((y) => walk(y, visited));
+        else if (x instanceof Struct) x.entries.forEach(([, e]) => walk(e, visited));
+        else if (x instanceof Fn) walk(x.body, visited);
+        else if (x instanceof Lazy) walk(x.value, visited);
+        else if (x instanceof Decided) walk(x.inner, visited);
+      };
+      walk(v, new Set());
+      return data("opaque", list(mentioned.map((m) => describe(m, binders, own))));
+    }
     if (v instanceof Expr) return data("apply", describe(v.fn, binders, own), list(v.args.map((a) => describe(a, binders, own))));
     if (v instanceof Struct) {
       const entries = new Struct(v.entries.map(([k, e]) => [k === null ? null : seen(k) instanceof Key ? describe(seen(k), binders, own) : asData(k, "a structure's key"), describe(e, binders, own)] as const));
       settled.add(entries);
       return data("structure", entries);
     }
-    if (v instanceof Fn) {
-      if (own !== undefined && madeBy.get(v) !== own) return data("opaque");
-      return data("function", number(v.params.length), describe(v.body, [...binders, v], own));
-    }
+    if (v instanceof Fn) return data("function", number(v.params.length), describe(v.body, [...binders, v], own));
     return data("unknown"); // a refutation
   };
 
@@ -1406,19 +1461,8 @@ export const createKernel: CreateKernel2 = () => {
       const made = new Fn(f.params.slice(count), substitute(f.body, env, new Map()));
       moduleIds.set(made, identity);
       if (declares !== undefined) moduleDeclares.set(made, declares);
-      // Every function inside the module is the module's: its keys describe them.
-      const mark = (v: V, visited: Set<V>): void => {
-        if (visited.has(v)) return;
-        visited.add(v);
-        if (v instanceof Fn) {
-          madeBy.set(v, identity);
-          mark(v.body, visited);
-        } else if (v instanceof Expr) {
-          mark(v.fn, visited);
-          v.args.forEach((a) => mark(a, visited));
-        } else if (v instanceof Struct) v.entries.forEach(([, e]) => mark(e, visited));
-      };
-      mark(made, new Set());
+      // Every part of the module's text is the module's, written in the function it sits in.
+      markAll(made, identity, undefined, new Set());
       return out(made);
     },
     instanceOf: (value) => {

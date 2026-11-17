@@ -1118,6 +1118,80 @@ test("a function of another module is opaque inside a description, unless the in
   void ownKey;
 });
 
+test("an argument is its writer's: a callee that wraps it and describes the wrapper does not see it", () => {
+  const { k, add, call, kp } = setup();
+  const scope = k.scope();
+  const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
+  // The library: (key) => [ a => (() => a),  f => describe(key, f) ]
+  const [libKey, a, f] = [k.param("key"), k.param("a"), k.param("f")];
+  const library = k.module(k.composedFunction([libKey], k.structure([
+    [null, k.composedFunction([a], k.composedFunction([], a))],
+    [null, k.composedFunction([f], call(kp("describe"), libKey, f))],
+  ])), 1, []);
+  const lib = k.evaluate(call(library), scope).value;
+  const [wrap, look] = [entry(lib, 0), entry(lib, 1)];
+  // The caller: (wrap, x) => wrap(add(add(x, 7), 1)). The 7 is in the caller's text.
+  const [w, x] = [k.param("wrap"), k.param("x")];
+  const caller = k.module(k.composedFunction([w, x], call(w, call(add, call(add, x, byte(k, 7)), byte(k, 1)))), 0, [{ role: "input", name: "wrap" }, { role: "input", name: "x" }]);
+  const c = k.cell(); // x is not known, so the argument stays an expression
+  const wrapped = k.evaluate(call(caller, wrap, c), scope).value;
+  const seenByLibrary = form(k, k.evaluate(call(look, wrapped), scope).value);
+  assert.equal(seenByLibrary.form, "function", "the wrapper is the library's own, and it may describe it");
+  const body = form(k, seenByLibrary.parts[1]);
+  assert.equal(body.form, "opaque", "what the caller wrote inside it is not shown");
+  assert.deepEqual(k.entriesOf(body.parts[0]), [], "and it mentions none of the wrapper's parameters");
+  // The inspection right sees the caller's expression, constants and all.
+  const all = form(k, form(k, k.evaluate(call(kp("describe"), k.inspectionRight(), wrapped), scope).value).parts[1]);
+  assert.equal(all.form, "apply");
+  // Once the argument has a value, the value is shown: a value is not an expression.
+  const known = k.evaluate(call(caller, wrap, byte(k, 2)), scope).value;
+  k.evaluate(call(known), scope); // something needs it
+  assert.equal(form(k, form(k, k.evaluate(call(look, known), scope).value).parts[1]).form, "bits");
+});
+
+test("what an evaluation leaves in place of a part keeps the part's mark", () => {
+  const { k, add, call, kp } = setup();
+  const scope = k.scope();
+  const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
+  // One module: (key, c) => [ (a => (() => a))(add(c, 1)),  f => describe(key, f) ]
+  const [key, c, a, f] = [k.param("key"), k.param("c"), k.param("a"), k.param("f")];
+  const m = k.module(k.composedFunction([key, c], k.structure([
+    [null, call(k.composedFunction([a], k.composedFunction([], a)), call(add, c, byte(k, 1)))],
+    [null, k.composedFunction([f], call(kp("describe"), key, f))],
+  ])), 1, [{ role: "input", name: "c" }]);
+  const cell = k.cell();
+  const made = k.evaluate(call(m, cell), scope).value;
+  const [closure, look] = [entry(made, 0), entry(made, 1)];
+  // Something needs the argument while c is unknown: what is left is a new expression.
+  k.evaluate(call(closure), scope);
+  const body = form(k, form(k, k.evaluate(call(look, closure), scope).value).parts[1]);
+  assert.equal(body.form, "apply", "the module still sees its own part");
+});
+
+test("a built function is its builder's: the module whose code built it may describe it", () => {
+  const { k, add, call, kp } = setup();
+  const scope = k.scope();
+  const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
+  // A description of () => add(1, 2), taken with the inspection right from a function no module made.
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([], call(add, byte(k, 1), byte(k, 2)))), scope).value;
+  // Two modules, each: (key, d) => [ build(d, {}),  f => describe(key, f),  tag ]
+  const make = (tag: number) => {
+    const [key, dd, f] = [k.param("key"), k.param("d"), k.param("f")];
+    return k.module(k.composedFunction([key, dd], k.structure([
+      [null, call(kp("build"), dd, k.structure([]))],
+      [null, k.composedFunction([f], call(kp("describe"), key, f))],
+      [null, byte(k, tag)],
+    ])), 1, [{ role: "input", name: "d" }]);
+  };
+  const [one, two] = [1, 2].map((tag) => k.evaluate(call(make(tag), d), scope).value);
+  const built = entry(one, 0);
+  assert.equal(num(k, k.evaluate(call(built), scope).value), 3);
+  const own = form(k, k.evaluate(call(entry(one, 1), built), scope).value);
+  assert.equal(own.form, "function", "the module that built it describes it");
+  assert.equal(form(k, own.parts[1]).form, "apply", "every part of it, not only the function");
+  assert.equal(k.evaluate(call(entry(two, 1), built), scope).refuted, true, "another module's key does not");
+});
+
 test("an attempt returns how an evaluation ended, as data, and a refutation inside marks nothing outside", () => {
   const { k, add, isZero, dec, call, kp } = setup();
   const scope = k.scope();
