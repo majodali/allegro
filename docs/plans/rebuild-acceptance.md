@@ -169,7 +169,7 @@ saved-program data form.
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
 | Q5 | **The first notation and the bootstrap.** The first notation is Allegretto, whose forms the kernel stream's `next/ext/allegretto/forms.md` rules (amended 2026-11-16); under `next/bootstrap/`, a grammar for it made from the present base grammar, a reader of the present parser engine's parse tree, and an emitter that writes a saved program in the data form | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
 | Q6 | **The comparison harness.** Under `next/corpus/`. On the present tree it runs each pinned program and compares its printed lines with its pins by class. On the new tree it runs every Allegretto program under `next/corpus/allegretto/` and reports, per milestone, the cases those programs realise: a case is shown by an Allegretto program that passes, with the present expectation, or the case's stated new result where its class is *changes*. A program may hand a standard-language text to the parser engine once that engine exists in Allegretto (amended 2026-11-16, by the maintainer's ruling that the tests and code of milestones 4 to 7 are written in Allegretto) | its tests on a stub kernel, then on the kernel | merge on green |
-| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs | milestone 2's command | merge on green; the milestone is the maintainer's |
+| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs) | milestone 2's command | merge on green; the milestone is the maintainer's |
 | Q8 | **The speed tests of milestone 3.** A typed extension and a toy parser engine, written in the first notation with the kernel stream, measured against the present tree on the same programs | the measurements, recorded in §7 | the maintainer |
 
 **After milestone 3**, by amendment of this plan: the phases as
@@ -1478,3 +1478,73 @@ policy is the gate ruled there.
   `if 1 then 42 else 0`. Measured:
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1584, changes 262, detail 146) · unclassed 0 — consistent`;
   `milestone 3: programs 28 (passing 28, failing 0) · cases due 133 · realised 95, named only by a failing program 0, not yet named 38 · up to 3: 95 of 170 realised`.
+- **2026-11-17 — Q7, part 3: the launcher supplies inputs.**
+  The ruling of PR #238 on inputs left open how an input's name is found
+  in a configuration, "taken when a case appears". This part is that
+  case. The launcher (`next/launch/launcher.ts`) hands each parameter of
+  role `input` the plain data the configuration supplies for it at the
+  start (`inputs`), or else a fresh cell. A later phase (`later`, a list
+  of the same records) is applied when the kernel waits and no
+  capability's answer is due: its inputs fill their cells and `advance`
+  runs under the same step budget. Phases are applied in order, one at
+  a time, and none is applied once nothing waits. The `waiting` end
+  names the inputs still waited on (`inputs`), and their cells are not
+  counted in `unanswered`. The outcome counts the lines printed before
+  each later phase (`linesBeforePhase`). A module that imports is still
+  refused. `readLiteral` (`next/bootstrap/literal.ts`) reads one
+  Allegretto literal as plain data, with the emitter's own encoding of
+  each literal (`literalBits` of `next/bootstrap/emit.ts`).
+  `npm run allegretto` takes `--input name=<literal>` and
+  `--later name=<literal>`. The corpus convention
+  (`next/corpus/allegretto/README.md`) gains `// input:`, `// later:`
+  and `// end: waiting:` lines. The test that asserted an input is
+  refused is replaced by twelve tests of the new behaviour.
+  - **The five answers to the open question.** These are recommendations;
+    the maintainer ratifies them at the PR.
+    1. An input is found in a configuration by its declared name.
+    2. An input the module does not declare, or one supplied more than
+       once, is refused before anything is evaluated, naming the input.
+    3. A later phase runs in the same launch, on the same kernel.
+    4. A value on the command is one Allegretto literal.
+    5. `npm run launch` takes no input flags: a saved program that
+       declares an input ends waiting on it.
+  - **A negative fraction is not a literal.** Prefix `-` stands for
+    `int.neg` (`next/ext/allegretto/forms.md` §2), so `-1.5` in a program
+    is `int.neg` of the bits of 1.5, which is the fraction -3. The
+    reader refuses it as an input's value, so an input and the same text
+    in a program never differ. A negative whole number is read.
+  - **Cases realised.** Milestone 1, under the new directory
+    `next/corpus/allegretto/m1/`: `boundary-tests:applyPhase (C2.3b)`
+    (`phase-fills-input.alg`), `language:reactive: applyPhase triggers
+    dependent re-evaluation` (`phase-re-evaluates.alg`),
+    `boundary-tests:structure kind (C4.1): future cells stay the
+    sanctioned monotonic exception` (`input-filled-once.alg`), and
+    `evaluator:B-172 C1 evaluator: Rule 2 — eval_if at run time with an
+    unresolved condition runs neither branch's effects`
+    (`unknown-condition.alg`). Milestone 3: `boundary-tests:import
+    satisfied by an extension (C2.3b)` (`input-at-start.alg`),
+    `language:reactive: import binding starts incomplete`
+    (`input-not-supplied.alg`), and `language:reactive: applyPhase
+    provides binding and triggers re-eval` (`input-later-binding.alg`).
+  - **Cases left, with the reason.**
+    `boundary-tests:absent vs unresolved (C2.3b)`: its second half, an
+    undeclared name is no cell, is not something a program can show.
+    The emitter refuses the name, and in the kernel a name nothing binds
+    is a cell, by the ruling of 2026-11-14 on "A missing value is a cell
+    that is filled once". The case may need class changes.
+    The B-172 C1 cases of Rule 1 at milestone 1, and Rule 2's "eval_if
+    with an unresolved condition evaluates both branches": each compares
+    the shape of a residual, which only the kernel primitive `describe`
+    reads, with a key no emitted program holds. The reference kernel
+    also evaluates neither branch of an `if` whose condition is unknown.
+    The case of `src/test/async-futures.ts` that future cells are
+    write-once: the launcher refuses an input supplied twice before
+    anything is evaluated, so no program shows the first value standing.
+    `types-battery:compile: report lists unresolved imports`: its note
+    restates a module that no loader supplies, and imports are refused.
+    `pcp:Phase A: summarizeValue collects unresolved symbols`: it reads
+    a function value without applying it, which needs `describe`; the
+    unbound name it reads is refused by the emitter.
+  - **Measured.**
+    `milestone 1: programs 4 (passing 4, failing 0) · cases due 27 · realised 4, named only by a failing program 0, not yet named 23 · up to 1: 4 of 27 realised`;
+    `milestone 3: programs 31 (passing 31, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.
