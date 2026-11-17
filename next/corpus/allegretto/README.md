@@ -18,18 +18,36 @@ Each statement is a comment line of its own:
 |---|---|
 | `// realises: <case id>` | the program shows this case; one line per case, the id exactly as in `next/corpus/cases.json` |
 | `// expect: <line>` | a line the program prints; the lines in order, each compared exactly |
-| `// end: <how>` | how the run ends: `completed`, or `refuted: <the reason the kernel gives>`; every program has one |
+| `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, or `waiting: <reason>`; every program has one |
+| `// end: waiting: <reason>` | the run ends waiting, with the launcher's reason |
 | `// yields: a, b` | the keys of the structure the module yields, in order |
+| `// input: name = <literal>` | the configuration supplies this input at the start |
+| `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
 
 A program written for the purpose that shows no case of the present
 tree has no `// realises:` line.
 
+An input's value is one Allegretto literal: a text, a whole number, a
+decimal fraction, `true`, `false`, a symbol literal, a negative whole
+number, or a structure or array literal of these. `readLiteral` of
+`next/bootstrap/literal.ts` reads it. A module's input that no line
+supplies is a cell for the whole run.
+
+A `// later:` line is one later phase. The launcher applies it when the
+kernel waits and no capability's answer is due, in the order of the
+lines. An `// expect:` line above a `// later:` line must be printed
+before that phase is applied; one below it, in that phase or after. The
+launcher's count of the lines printed before each phase
+(`linesBeforePhase` of `next/launch/launcher.ts`) checks this, and a
+`// later:` line whose phase is never applied fails the program.
+
 `runProgram` of `next/corpus/allegretto.ts` reads these lines. It emits
 the text with `next/bootstrap/emit.ts` and runs the record with the
 launcher of `next/launch/launcher.ts` on the reference kernel, with the
-output capability, the shipped primitives and a budget of 1,000,000
-steps. A program passes when its printed lines, its end and its yielded
-keys are the ones stated.
+output capability, the shipped primitives, its inputs and a budget of
+1,000,000 steps. A program passes when its printed lines, its end, the
+lines printed before each later phase and its yielded keys are the ones
+stated. The yielded keys are read with the program's inputs handed in.
 
 ## When a case is realised
 
