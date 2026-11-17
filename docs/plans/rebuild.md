@@ -332,11 +332,11 @@ accepted".
     dissolved by "Each decision lives in one replaceable unit of code".
     B-130 (the design corpus's editorial pass) is still needed, outside
     the rebuild.
-  - Group C. B-029 (the prover protocol revalidated) and B-098
-    (predicate propagation onto residuals) are dissolved. B-083 (the AI
-    iteration loop) is still needed in the acceptance stream. B-177
-    (the demo ladder chapter's findings) is a corpus case of milestones
-    5 and 6, and B-190 (name capture) of milestone 6. The maintainer:
+  - Group C. B-029 (the prover protocol revalidated) is dissolved, and
+    so is B-098 (predicate propagation onto residuals).
+    B-083 (the AI iteration loop) is still needed in the acceptance stream.
+    B-177 (the demo ladder chapter's findings) is a corpus case of
+    milestones 5 and 6, and B-190 (name capture) of milestone 6. The maintainer:
     "I agree with the recommendations on all other group C items."
   - Three items change class from the record, by the maintainer's
     rulings of the same day, and close as dissolved where the record
