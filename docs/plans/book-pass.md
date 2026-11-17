@@ -1563,6 +1563,10 @@ its approval.
   reference kernel has what Allegretto's forms ask of it. The
   launcher's records that write statements as a structure's entries
   have to move to sequence before it can merge.
+- **2026-11-17 — issues 7, 22 and 28 ruled** (the review session): a
+  notation a text uses can only add; a grammar change is a
+  statement; an access's place is the kernel's mark, by function.
+  245 decisions.
 
 ## 8. Sessions
 
