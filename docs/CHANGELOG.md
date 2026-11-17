@@ -1253,6 +1253,17 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The condition case changes, as ruled (B-196)
+
+B-196 (the rebuild's acceptance side). The maintainer ruled on 2026-11-17
+that a condition is a truth value. The corpus case
+`grammar2/base: if-then-else selects branch` (`if 1 then 42 else 0`, 42 in
+the present tree) is class changes now, by "The kernel's primitives are
+pure and few": the new result is the refutation "a condition that is
+neither true nor false". `next/corpus/allegretto/m3/condition-not-truth.alg`
+realises it. The corpus has 1,584 cases that survive, 262 that change and
+146 of detail; 95 of milestone 3's 133 cases are realised by 28 programs.
+
 ### 2026-11 — The speed tests of milestone 3, measured (B-196, chunk Q8 (the speed tests of milestone 3), part 1)
 
 B-196 (the rebuild's acceptance side). A toy parser engine and a typed
