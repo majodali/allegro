@@ -1464,3 +1464,17 @@ policy is the gate ruled there.
       `grammar2/base: if-then-else selects branch` changes once a
       decision's text says so; line 11 of B-197 (evidence against a
       ruled decision) asks for it.
+- **2026-11-17 — The condition case changes, as ruled.**
+  The maintainer ruled on 2026-11-17 that a condition is a truth value.
+  The case `grammar2/base: if-then-else selects branch` is
+  `if 1 then 42 else 0`, which the present tree answers with 42. It is
+  class changes now, by "The kernel's primitives are pure and few": the
+  new result is the refutation "a condition that is neither true nor
+  false". The decision's text does not carry the sentence yet; line 11
+  of B-197 (evidence against a ruled decision) asks the review session
+  for it, and the case's note says so. The program
+  `next/corpus/allegretto/m3/condition-not-truth.alg` realises it: it
+  prints 42 for `if true then 42 else 0` and ends refuted on
+  `if 1 then 42 else 0`. Measured:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1584, changes 262, detail 146) · unclassed 0 — consistent`;
+  `milestone 3: programs 28 (passing 28, failing 0) · cases due 133 · realised 95, named only by a failing program 0, not yet named 38 · up to 3: 95 of 170 realised`.
