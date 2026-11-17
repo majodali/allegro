@@ -1266,6 +1266,22 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The launcher supplies inputs (B-196, chunk Q7 (the minimal launcher and the output capability), part 3)
+
+B-196 (the rebuild's acceptance side). The launcher hands a module's
+declared inputs the plain data the configuration supplies, by name, at
+the start or in a later phase of the same launch; an input not supplied
+is a cell, and a run that still waits on it ends waiting and names it.
+An undeclared or twice-supplied input is refused. `npm run allegretto`
+takes `--input` and `--later`, each value one Allegretto literal read by
+`next/bootstrap/literal.ts`. Seven programs under
+`next/corpus/allegretto/m1/` and `m3/` realise four cases of milestone 1
+and three of milestone 3. One case of milestone 1 is class changes now, as the
+maintainer ruled it: a name bound nowhere is refused by the notation
+before anything is evaluated. Four tests follow the kernel stream's
+ruling "A free name never gets a value" and pass on the kernel before
+and after it. Record: `docs/plans/rebuild-acceptance.md` §7.
+
 ### 2026-11 — The condition case changes, as ruled (B-196)
 
 B-196 (the rebuild's acceptance side). The maintainer ruled on 2026-11-17

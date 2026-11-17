@@ -1,5 +1,5 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
-// acceptance side), chunk Q7 (the minimal launcher), parts 1 and 2). The only
+// acceptance side), chunk Q7 (the minimal launcher), parts 1 to 3). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
@@ -8,6 +8,10 @@
 //
 // The command that runs an Allegretto text directly, next/launch/allegretto.ts,
 // uses `terminalArguments` and `runOnTerminal` of this file.
+//
+// It takes no input flags. A saved program whose module declares an input
+// ends waiting on that input, which is how the launcher reports an input
+// the configuration does not supply. `npm run allegretto` takes them.
 //
 // It reads the saved program, runs it with the launcher of
 // next/launch/launcher.ts, writes each line the program prints to
@@ -30,7 +34,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import type { CreateKernel2 } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
-import { describe, launch } from "./launcher.js";
+import { describe, launch, type Configuration } from "./launcher.js";
 import { output } from "./output.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
@@ -69,15 +73,20 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
 
 /**
  * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
- * the terminal's configuration and target. Writes each line to stdout; on
- * any end but completed, writes the reason to stderr and exits 1.
+ * the terminal's configuration and target, and the inputs given: those
+ * supplied at the start and each later phase. Writes each line to stdout;
+ * on any end but completed, writes the reason to stderr and exits 1.
  */
-export async function runOnTerminal(program: unknown, steps: number | undefined): Promise<void> {
+export async function runOnTerminal(
+  program: unknown,
+  steps: number | undefined,
+  inputs: Pick<Configuration, "inputs" | "later"> = {},
+): Promise<void> {
   const createKernel = await kernelFactory();
   const outcome = await launch({
     createKernel,
     program,
-    configuration: { ceiling: ["output"], steps },
+    configuration: { ceiling: ["output"], steps, ...inputs },
     target: { capabilities: [output], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
