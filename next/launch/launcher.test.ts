@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import type { Cell, Kernel2, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/create.js";
@@ -688,4 +689,36 @@ test("an input of each kind of plain data is handed as data: bits, a symbol, a s
 test("the launcher does not import the bootstrap", () => {
   const source = fs.readFileSync(path.join(here, "launcher.ts"), "utf8").replace(/^\s*\/\/.*$/gm, "");
   assert.doesNotMatch(source, /from "\.\.\/bootstrap\//);
+});
+
+test("npm run allegretto takes --input and --later: each later phase in the order written; a value that is not a literal, or a flag with no =, exits 1", () => {
+  const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-inputs-"));
+  try {
+    const file = path.join(dir, "inputs.alg");
+    fs.writeFileSync(file, 'capability output\ninput a\ninput b\noutput.write("start")\noutput.write(a)\noutput.write(int.text(b + 1))\n');
+    const atStart = run(file, "--input", 'a="one"', "--input", "b=-3");
+    assert.equal(atStart.stderr, "");
+    assert.equal(atStart.stdout, "start\none\n-2\n");
+    assert.equal(atStart.status, 0);
+    const phased = run(file, "--later", 'b=41', "--later", 'a="one"', "--steps", "1000");
+    assert.equal(phased.stdout, "start\none\n42\n");
+    assert.equal(phased.status, 0);
+    const missing = run(file, "--input", 'a="one"');
+    assert.equal(missing.stdout, "start\none\n");
+    assert.equal(missing.stderr, "waiting: the program waits on the input(s) b, which the configuration does not supply\n");
+    assert.equal(missing.status, 1);
+    const notLiteral = run(file, "--input", "a=x + 1");
+    assert.equal(notLiteral.stdout, "");
+    assert.match(notLiteral.stderr, /^--input a=x \+ 1: an input's value is a literal/);
+    assert.equal(notLiteral.status, 1);
+    const noEquals = run(file, "--later", "a");
+    assert.match(noEquals.stderr, /^--later a: no = between the input's name and its value\nusage: npm run allegretto -- <file\.alg>/);
+    assert.equal(noEquals.status, 1);
+    const undeclared = run(file, "--input", "c=1");
+    assert.equal(undeclared.stderr, "refused: the configuration supplies the input c at the start, which the module does not declare\n");
+    assert.equal(undeclared.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
