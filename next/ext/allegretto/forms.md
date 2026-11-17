@@ -123,7 +123,7 @@ header lines, before anything else:
 | Form | Declares |
 |---|---|
 | `capability output` | a capability the module is handed, bound to the name `output` |
-| `input name` | an input, bound to `name` |
+| `input name` | an input, bound to `name`: plain data the configuration supplies to the module being run; a cell until it is supplied. A module that is imported declares none |
 | `import name` | another module's bindings, bound to `name`; one is read as `name.f` |
 
 The rest of the text is the module's block. What the module yields is a

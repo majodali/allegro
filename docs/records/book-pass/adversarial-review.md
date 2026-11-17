@@ -789,6 +789,43 @@ half of issue 6, both to be settled by building, and issue 13, which
 stands as a reading. Issues 16, 24 and 27 were recommended on
 2026-11-16 and wait for the maintainer's word.
 
+### Issues 13, 24 and 27 (2026-11-17)
+
+The maintainer: "I agree with the recommendations on 13, 24, 27."
+
+- **Issue 13.** A module is instantiated once for each distinct set
+  of arguments, and every instance has the module's identity and keys.
+- **Issue 24.** A proposal is a description and holds no capability.
+  An obligation states what its unknown may be handed; by default,
+  nothing.
+- **Issue 27.** A module with no exports hands out its bindings. Its
+  keys and the capabilities it was given are parameters and are never
+  handed out.
+
+The first adversarial review is closed. Of its 31 issues, 28 are
+ruled or done. Left: issue 16, whose exceptions to "Order of
+definition carries no meaning" are now mostly stated by sequence and
+the block of bindings but not written into that entry; the standard
+language's part of issue 5; and the second half of issue 6. The last
+two are settled by building.
+
+### Inputs (2026-11-17)
+
+The maintainer asked when `input` was added as a module's
+declaration, and what it does. It was never ruled on its own: the
+review session wrote "inputs" into the ruling of 2026-11-13 on a
+module as a function, gave the data form a role for it, and put the
+header line `input name` in Allegretto's forms. Ruled now, narrowly
+("keep it and rule it narrowly"):
+
+- An input is a named value of plain data that the configuration
+  supplies to the module being run. It grants nothing.
+- An input not supplied is a cell.
+- A module that is imported declares no input.
+
+Open: who supplies an imported module's inputs, and how an input's
+name is found in a configuration.
+
 ## Terms introduced
 
 - **Description**: plain data that says what an expression looks
@@ -801,5 +838,7 @@ stands as a reading. Issues 16, 24 and 27 were recommended on
 - **Key slot**: a place in a module where one of its keys goes.
 - **Specialization**: a function whose body is the residual of
   another function's body, evaluated with its parameters unknown.
+- **Input**: a named value of plain data that the configuration
+  supplies to the module being run.
 - **Instantiate**: to call a module's function with its capabilities
   and inputs, yielding its bindings.
