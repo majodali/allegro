@@ -387,7 +387,6 @@ test("a cell that no capability will answer ends the run as waiting, not complet
     reason: "the program waits on 1 cell(s) that no capability will answer",
     unanswered: 1,
     inputs: [],
-    unbound: [],
   });
   assert.deepEqual(outcome.lines, []);
 });
@@ -395,8 +394,8 @@ test("a cell that no capability will answer ends the run as waiting, not complet
 // "A free name never gets a value": ruled 2026-11-17. These two tests rest
 // on the ruling alone: a run whose record uses a name nothing binds never
 // completes, writes nothing through that name, and is told which name. How
-// the kernel says so is the kernel's: it left such a run waiting, and
-// refuses to make a module with a free name once the ruling is built.
+// the kernel says so is the kernel's: it refuses to make a module with a
+// free name, so the record does not load.
 test("a name nothing binds never gets a value: the run does not complete, writes nothing, and its end names the name", async () => {
   const outcome = await launch({ createKernel, program: UNBOUND, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.notEqual(outcome.end.kind, "completed");
@@ -546,7 +545,7 @@ test("an input not supplied is a cell: the run evaluates what does not depend on
   const outcome = await launch({ createKernel, program: PRINTS_N, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.deepEqual(outcome.lines, ["before"]);
   assert.equal(outcome.end.kind, "waiting");
-  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs, outcome.end.unbound], [0, ["n"], []]);
+  assert.deepEqual(outcome.end.kind === "waiting" && [outcome.end.unanswered, outcome.end.inputs], [0, ["n"]]);
   assert.equal(describe(outcome.end), "waiting: the program waits on the input(s) n, which the configuration does not supply");
 });
 

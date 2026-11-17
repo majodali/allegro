@@ -58,8 +58,10 @@
 //      wrote, with the number of lines printed before each later phase was
 //      applied. A refuted run carries the reason the kernel gives for each
 //      refutation it reported (`reasonOf`). A run left waiting names the
-//      inputs no phase supplied and the names nothing binds, apart from the
-//      cells no capability will answer.
+//      inputs no phase supplied, apart from the cells no capability will
+//      answer. A record whose module uses a name nothing binds is refused
+//      at loading, with the kernel's message: "A free name never gets a
+//      value".
 // Step 1 is the caller's: it passes the configuration. Step 3 loads one
 // saved program; the first extensions are a later part.
 //
@@ -174,9 +176,10 @@ export type LaunchEnd =
   | { readonly kind: "limit"; readonly steps: number; readonly reason: string }
   /**
    * The kernel waits on what nothing will supply: `unanswered` counts the
-   * cells no capability will answer, `inputs` names the declared inputs
-   * that no phase of the configuration supplied, and `unbound` names the
-   * names that nothing binds.
+   * cells no capability will answer, and `inputs` names the declared
+   * inputs that no phase of the configuration supplied. A name nothing
+   * binds is not waited on: "A free name never gets a value", so the
+   * kernel refuses a module that has one.
    */
   | {
       readonly kind: "waiting";
@@ -184,7 +187,6 @@ export type LaunchEnd =
       readonly reason: string;
       readonly unanswered: number;
       readonly inputs: readonly string[];
-      readonly unbound: readonly string[];
     }
   /** Refused before anything was evaluated. */
   | { readonly kind: "refused"; readonly reason: string; readonly findings: readonly string[] }
@@ -390,16 +392,12 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       // The cells of inputs no phase supplied are named by the input's declared name.
       const inputOf = new Map([...inputCells].map(([name, cell]) => [cell as Value, name] as const));
       const inputs = [...inputCells.keys()].filter((name) => waiting.includes(inputCells.get(name)!));
-      const rest = waiting.filter((c) => !inputOf.has(c));
-      // A name nothing binds is listed as a cell handle of kind symbol.
-      const unbound = rest.filter((c) => kernel.kind(c) === "symbol").map((c) => kernel.symbolName(c));
-      const unanswered = rest.length - unbound.length;
+      const unanswered = waiting.filter((c) => !inputOf.has(c)).length;
       const parts = [
         ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
         ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
-        ...(unbound.length > 0 ? [`the name(s) ${unbound.join(", ")}, which nothing binds`] : []),
       ];
-      return { lines, linesBeforePhase, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs, unbound } };
+      return { lines, linesBeforePhase, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs } };
     }
 
     // Step 7.

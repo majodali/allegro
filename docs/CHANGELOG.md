@@ -1274,6 +1274,16 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The launcher and the corpus follow "A free name never gets a value" (B-196)
+
+B-196 (the rebuild's acceptance side). PR #244 ruled that a free name
+never gets a value, and the reference kernel now refuses a module that
+has one. The launcher's list of unbound names is removed: a run left
+waiting names cells and inputs only. The emitter's test of the kernel
+primitive `build` gives it its two arguments. Three corpus cases cite
+the new decision, and two of their notes no longer say an unbound name
+leaves a residual. No class changes.
+
 ### 2026-11 — The launcher supplies inputs (B-196, chunk Q7 (the minimal launcher and the output capability), part 3)
 
 B-196 (the rebuild's acceptance side). The launcher hands a module's
