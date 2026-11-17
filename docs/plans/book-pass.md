@@ -1569,6 +1569,10 @@ its approval.
   245 decisions.
 - **2026-11-17 — issues 13, 24 and 27 ruled; the first adversarial
   review closed** (the review session).
+- **2026-11-17 — the second adversarial review run** (the review
+  session), at the maintainer's word, on the decisions with
+  Allegretto's forms and the kernel's interface. 60 findings in 14
+  clusters, recorded and not yet ruled.
 
 ## 8. Sessions
 

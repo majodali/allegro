@@ -1,0 +1,11 @@
+import { test } from "node:test";
+import { setup } from "./common.ts";
+const log = (...a: unknown[]) => console.log("   >>", ...a);
+for (const n of [11, 12, 13, 14, 15]) test("DOS2 join doubling " + n, () => { try {
+  const { k, call, kp, steps, form, show } = setup(); const scope = k.scope();
+  const bindings: any[] = [[k.symbol("m.x0"), k.bits(new Uint8Array(1024))]];
+  for (let i = 1; i <= n; i++) bindings.push([k.symbol("m.x" + i), call(kp("join"), k.symbol("m.x" + (i - 1)), k.symbol("m.x" + (i - 1)))]);
+  const t0 = Date.now();
+  const r = k.evaluate(call(kp("attempt"), call(kp("block"), k.structure(bindings), call(kp("length"), k.symbol("m.x" + n))), steps(100)), scope, { steps: 200 });
+  log(n, "doublings of 1 KiB, attempt(100 steps):", form(r.value).form, form(r.value).parts.map((p) => show(p)), "ended", r.ended, "steps", r.steps, "ms", Date.now() - t0);
+} catch (e) { log("THROWN", (e as Error).constructor.name, String((e as Error).message).slice(0, 200)); } });

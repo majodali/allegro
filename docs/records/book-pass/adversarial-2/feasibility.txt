@@ -1,0 +1,214 @@
+# Feasibility review of Allegro's design (second adversarial review)
+
+Angle: can it be built, and does it do what it says when built.
+
+Probes are in `/tmp/claude-0/-home-user-allegro/3772d497-a833-5650-956a-883ae5b890cd/scratchpad/adv2/probes/` (`feas1.ts`, `feas2.ts`, `feas3.ts`), run from the worktree with `npx tsx <file>`. Each finding says whether it was run. "Kernel" means the reference kernel `next/kernel/kernel.ts`. A fault of the kernel's code is marked as such and kept apart from a fault of the design.
+
+Fifteen findings, most severe first.
+
+---
+
+## 1. The parser engine cannot build its own output from the kernel's primitives
+
+- **Decisions:** D75 (The kernel's primitives are pure and few), D44 (A live expression is built only from live values), D83, D85 (Grammars are values), D99, D103, D106 (The parser engine and the module loader are written in Allegretto). Files: `forms.md` §2 to §4; `kernel.ts` header (the primitive list and the description forms).
+- **Scenario.** The engine reads `f(a, b, c)` and must answer a description: `apply <fn> <args>`, where `<args>` is a structure of three entries, and each name is `name <symbol>`. The kernel's primitives are `if claim describe build block then same join length slice get count attempt`. Allegretto adds the literal forms `{a: e}` and `[e, f]`, whose size and keys are fixed in the text, and the shipped primitives, which take bits and answer bits.
+  - No primitive makes a structure whose number of entries is computed (no append, no concatenation, no "structure from a list").
+  - No primitive makes a structure with a computed key, and none makes a symbol from a text. `kernel.ts` says: "A symbol that is data comes from a description, from a cell or from a primitive function", and no shipped primitive answers a symbol.
+  - No primitive tests whether a structure has a key (`get` on a missing key is a refutation), none reads the key at a place, none lists keys.
+  - No primitive tells a value's kind. `length`, `same`, `count`, `get` each refute on the wrong kind. `forms.md` writes `claim(is_int(x))`, and `is_int` cannot be written except as `attempt(...)` with a budget; an 8-byte text and an integer are the same bits.
+- **What breaks.** The engine cannot build the argument list of a call of unknown arity, nor the name `foo` from the text "foo". So it cannot produce a description, and D83 and D106 cannot be met on this kernel. A grammar is "named productions" in a structure (D85): combining two grammars (D98, D99) must enumerate production names and add one, and neither can be said. A loader cannot build "a structure of its bindings, keyed by symbols of their names" for a module it parsed. D75 does list "making and reading structures" and "asking about keys"; the built set and `forms.md` §4 ("what the kernel stream owes") offer only reading, and mark the list as built.
+- **Severity:** blocks (milestone-level: the first Allegretto program of any size is the engine).
+- **Confidence:** high. Not run; read from the primitive list, which the kernel's own first test asserts. It would change if a structure-making primitive exists under a name I did not see.
+- **Fix direction:** rule the missing kernel primitives now: make a structure from a counted sequence of key and value pairs, read the key at a place, test a key, make a symbol from bits and read its name, tell the kind.
+
+## 2. An attempt's answer depends on the order in which answers arrive
+
+- **Decisions:** D80 (An evaluation can be returned as data), D204 (Limits are step budgets), D70 (The same program and the same information give the same result), D61 (at most once).
+- **Scenario (run, `feas3.ts` P6c).** One block:
+  ```
+  x = down(read())                       // about 400 steps once read() answers 100
+  [ then(c2, attempt(x, 30)), then(c3, x) ]
+  ```
+  `c2` and `c3` are two late answers. Filled `c3` then `c2`: `x` is evaluated outside the attempt, and the attempt answers `value`. Filled `c2` then `c3`: the attempt evaluates `x` under its 30 steps and answers `limit`. Printed: `c3 then c2: the attempt answered "value"` and `c2 then c3: the attempt answered "limit"`.
+- **What breaks.** D204 says where steps run out "may vary with the order in which values arrive, with sharing and with the kernel variant", and that a limit "never decides one differently". D80 returns "a limit reached" as data. A program can branch on that data: `claim(same(form(attempt(x, 30)), `value))` is decided in one arrival order and refuted in the other, on the same program and the same information. D70 forbids exactly that, and D80 lists D70 as a dependency. D222 and D231 (deterministic rebuild, "anyone can rebuild a saved program and compare") inherit the fault, across kernel variants as well.
+- **Severity:** needs a ruling.
+- **Confidence:** high (confirmed).
+- **Fix direction:** either the limit answer is not data a claim can rest on (anything computed from it is at most undecided), or an attempt's step count is defined independently of sharing (count the steps the attempted expression would take alone).
+
+## 3. Evaluation ahead, and specialization, do not end on a loop that carries state
+
+- **Decisions:** D60 (Sequence), D66 (A recursive call is evaluated once for each state of knowledge), D65, D67, D161, D103.
+- **Scenario A (run, `feas1.ts` P1).** A server loop:
+  ```
+  serve(i) => then(accept(), serve(i + 1))
+  ```
+  `accept()` returns a late answer. The first statement waits, so the rest is evaluated ahead. With `serve(i)` in place of `serve(i + 1)` the evaluation ends in 8 steps. With `i + 1` each inner call has other information, D66 does not apply, and the evaluation runs to the limit: `state=true budget=20000: ended=limit steps=2153 accepts=1` (the host stack ran out first), and `no budget: ended=limit`. Every loop that threads state through its arguments does this, and with no mutation that is every loop with state.
+- **Scenario B (not run; D67 is not built).** `down(n) => if n == 0 then 0 else down(n - 1)` with `n` unknown. D67 evaluates both branches. The inner call is given `n - 1`: is that "the same information" as `n`? If unknown values are told apart, every recursive function unfolds to its budget when specialized. If all unknowns count as the same, `f(x, y)` and `f(y, x)` are confused. D161 makes it worse: inside the else branch `n` carries the fact `n != 0`, so each level's information differs. D66 does not define the comparison.
+- **Scenario C (not run).** D103: "a parser for one grammar is the engine partially evaluated over that grammar". The engine calls itself with a known grammar rule and an unknown position. D66 leaves that call "in the residual, as a call to the function being evaluated": a call to the general engine, with the rule passed as data. The residual parser is specialized one level deep and interprets from there on. A real first projection needs one residual function for each (function, known arguments) pair, and D65 returns one function.
+- **What breaks.** A check phase on an ordinary program ends at a limit, with "everything unfinished reported as undecided" (D82). The promised "refutation found at once" (D60) costs the whole budget at every wait. D103's speed claim does not follow from D65 and D66 as written.
+- **Severity:** needs a ruling (A is confirmed; B and C are the standard termination and polyvariance problems of partial evaluation, and the decisions give no generalization rule).
+- **Confidence:** high for A, medium for B and C. A definition of "same information" with a widening rule would change it.
+- **Fix direction:** define the comparison (known arguments by value, unknown ones by position), add a generalization step when the known part grows, give evaluation ahead its own small budget, and let specialization return a group of residual functions.
+
+## 4. An evaluation that reaches a limit after an effect cannot go on, and going on repeats the effect
+
+- **Decisions:** D82, D204, D62, D63 and D61 (at most once), D211. Interface: `Kernel.evaluate`, `Result.ended`, `Kernel.advance`.
+- **Scenario (run, `feas2.ts` P9).** `loop(i) => then(say(i), loop(i + 1))`, evaluated with 20 steps. It says 0 to 4 and ends `limit`. `advance` then does nothing (`steps=0`). Evaluating the returned value again says 0 to 4 a second time; evaluating the program again, a third. In P1, after the limit, filling the awaited cell and calling `advance` also does nothing: the program is dead.
+- **What breaks.** D82 says the evaluation "ends with the limit named and everything unfinished reported as undecided". It does not say what the effects already performed leave behind. The interface gives `advance` a way to go on after a limit and gives `evaluate` none. A launcher that slices work by budget (a prompt, a server per D211, a browser page that must yield) either loses the program or performs its effects twice. The same holds inside the language: `attempt(x, n)` that performs an effect and then meets its limit answers `limit`, and the effect stands.
+- **Severity:** needs a ruling. The kernel's behaviour (returning the original expression, forgetting the waiters) is also a fault of the kernel's code.
+- **Confidence:** high (confirmed).
+- **Fix direction:** a limit returns a residual that holds what was done, and `advance` continues it; state that an effect performed before a limit is never performed again.
+
+## 5. A residual read as data loses "evaluated at most once"
+
+- **Decisions:** D63 (No argument can be inspected), D36 (Expressions form a DAG), D39, D218 (A phase hands its residual to the next), D220, D224, D42. File: `saved-program.ts` (nodes).
+- **Scenario (run, `feas3.ts` P8).** `twice(x) => x + x`, called as `twice(cap(3))` in a phase without `cap`. The residual reads through the interface as `(add (cap 3) (cap 3))`, and the two arguments are one handle. A saver that keeps that sharing exactly (one node, two references, as the record's `Ref` allows) and a next phase that has `cap`: `rebuilt (sharing kept), run with the capability: effects 2`. The original program run with the capability: `effects 1`.
+- **What breaks.** In the kernel, at-most-once lives in a hidden holder for an argument, not in the sharing of the expression node. None of the seven kinds, and no node of the record, says "this is evaluated once". A description (D42) is plain data, a tree, and code cannot tell two equal subtrees from one shared one (`same` refutes on structures). So a residual that crosses a phase boundary, or a describe and build, performs an effect twice. For pure work the same loss turns a DAG of n nodes into up to 2^n work for any analysis written over descriptions (D11, D179).
+- **Severity:** blocks D218 as stated (the residual of a phase is not the same program once saved).
+- **Confidence:** high for the kernel. The design would escape if D39 (memo per evaluation context on the expression node) were the rule and held for effects; the reference kernel does not do it (`feas1.ts` P5b: a shared node in a function body performs its effect twice).
+- **Fix direction:** the residual names each shared argument as a binding of a `block`, so sharing is in the data.
+
+## 6. A phase's residual holds values the record and a description cannot hold
+
+- **Decisions:** D218, D220, D203, D44, D58 (The environment is not a value), D61, D50, D112, D132, D68, D69. File: `saved-program.ts` header ("Still left out").
+- **Scenarios.**
+  - *A function made in a block (run, `feas2.ts` P5a').* `block({k: 7, f: n => n + k}, f)` gives a function; `f(1)` is 8. Through the interface its body is `add(param, symbol t.k)`; described, it is `apply … [param, name]`. Built again and called: `built again, called on 1: <expression> waiting 1`. It waits on `k` for ever. Every function of a module is such a function (a module's body is a block), and so is every recursive one. D44 says a description "can be turned back into a function when it holds no unforgeable value"; this one holds none and cannot. If an enclosing scope happens to bind the name, it silently takes that value.
+  - *A value with metadata (not run; fields are not built).* The record's `bits` node has no metadata, and D203 says an extension's fields are "never written through the interface; the extension's constructors are replayed". In the standard language every value has a type (D112). So no value a phase computed can be stored as computed: the record must hold the expression that makes it. The residual of a build phase is then not "a smaller program", or origins must be kept for every value (D53 lets a phase drop them).
+  - *A value holding another module's key (not run).* A structure whose private member is keyed by module M's key, computed in the main module's phase. The record "never holds a key" and gives the main module only its own key slots.
+  - *A capability that arrives later (read from `interface.ts`).* D68 says a capability a phase lacks is a cell, and D69 says the next phase is "the same event" as filling it. `Kernel.fill` takes plain data only, and the record has no cell node. So a later phase is never a fill; it is a new instantiation, and the residual must first be turned back into a function of the missing things. No decision says who does that.
+- **What breaks.** D218's "a value that can be saved, loaded and evaluated further" holds only for a residual that contains no evaluated function, no typed value and no foreign key.
+- **Severity:** needs a ruling.
+- **Confidence:** high for the first and fourth, medium for the others (they depend on rules not yet written).
+- **Fix direction:** state the normal form of a saved residual: a module function whose body is a block; every closure's names bound by an enclosing block in the data; every value with fields held as its constructing call.
+
+## 7. `x <- e` followed by `y = x + 1` does not mean what it reads
+
+- **Decisions:** D61, D7. File: `forms.md` §2 "Bindings and blocks", §4 item 1 (`x <- e` is `block({x: e}, then(x, rest))`).
+- **Scenario (run, `feas1.ts` P4).**
+  ```
+  x <- read()
+  y = x + 1
+  output.write(y)
+  ```
+  "A block's bindings are one group, whatever lines they are written on", so `y` belongs to the enclosing block. `x` is bound by the inner block that `<-` stands for. Built as the document says, `block({y: x + 1}, block({x: read()}, then(x, write(y))))`: nothing is written and the program waits on the name `x` for ever (`said=[] waiting=1`). When an enclosing block binds another `x` (100), it writes 101, where the reader expects 6.
+- **What breaks.** The most ordinary effectful program is wrong or stuck, and the second case is a silent wrong answer. Moving the `=` bindings that follow into the inner block repairs this case and breaks "one group" (a binding written above the `<-` could not use one written below). `forms.md` also does not say whether a name bound by `<-` is among the bindings a module yields.
+- **Severity:** needs a ruling.
+- **Confidence:** high (confirmed against the stated desugaring).
+- **Fix direction:** `<-` adds the name to the block's one group, bound to the statement's value (a cell filled when the statement happens), with no inner block.
+
+## 8. Recursion is the only loop, and evaluation by need makes it leak
+
+- **Decisions:** D73 (Tail calls by sentinel and loop), D59, D63, D82, D106. File: `forms.md` (no loop form).
+- **Scenario (run, `feas3.ts` P2c, `feas2.ts` P2b).**
+  ```
+  count(n, acc) => if n == 0 then acc else count(n - 1, acc + 1)
+  ```
+  With no budget: `lazy n=200: complete`, `lazy n=400: ended=limit`. The accumulator is not needed until the end, so it becomes a chain of 400 pending additions, and forcing it runs out of host stack. Without the accumulator the loop itself ends at about 700 turns (`none n=2000: ended=limit`).
+- **What breaks, in the design.** D73 is written for the present tree ("marked before precompile", a "sentinel"). Under D59 a tail call sits behind `if`, `then` and a pending argument, and D73 does not say what tail position means there. No decision bounds the pending chain of an argument nothing needs yet; the only way to force it is `then(acc, …)`, which no reader will guess. The engine of D106 loops over every character of a text: a 10 kB file needs 10^4 turns with state.
+- **What breaks, in the kernel's code.** The depth limit is a caught host `RangeError` (`kernel.ts` line 798), so where it strikes depends on the host stack: `forced n=550: limit` and `forced n=600: complete` in one run. That contradicts "a step budget ends an evaluation the same way every time". A `RangeError` inside an `attempt` is not turned into the `limit` answer; it ends the whole evaluation.
+- **Severity:** needs a ruling (design); kernel fault (code).
+- **Confidence:** high (confirmed).
+- **Fix direction:** restate D73 for evaluation by need (a call that is the value of a body, through `if`, `then` and `block`, uses no stack), and decide whether an argument of a self-call is evaluated before the call.
+
+## 9. Three of the five outcomes have no way to be recorded
+
+- **Decisions:** D75, D77 (Only the kernel records the outcome of a claim), D13, D16, D21, D147, D148, D149, D150, D171. Interface: `Outcome`; `kernel.ts` header (`claim`).
+- **Scenario.** The kernel's `claim(x)`: true is decided, "anything else fully known is a refutation", unknown stays. D75 lists one claim primitive: "evaluating a claim".
+  - *Assumed.* `assume terminates` and `Law.assume` (D171) must record "assumed". No extension can write the record (D77), and no kernel primitive assumes.
+  - *Sampled.* The deriver (D149, D150) is an extension that holds no capability. After 100 samples pass it must leave the claim "sampled". Nothing lets it.
+  - *Undecided by judgement.* A universal claim is decided by a function that specializes and looks at the residual (D147). When the residual is not `true`, the function must answer "cannot tell". Whatever known value it returns, `claim` refutes it, against D13 ("never reported as refuted because it could not be decided") and D148 ("a refused proposal never refutes its claim"). The only way to stay undecided is to return something unknown on purpose, and the language has no form for that.
+- **What breaks.** D21's vocabulary cannot be produced by the mechanisms D75 and D77 allow.
+- **Severity:** needs a ruling.
+- **Confidence:** high that the list lacks them; medium that no intended mechanism exists elsewhere (D75 says "and those ruled and not yet built" only through `forms.md`).
+- **Fix direction:** kernel primitives `assume(claim, who)` and `sampled(claim, cases)` that record the weaker word and never a stronger one, and a distinguished "not decided" answer that `claim` keeps as undecided.
+
+## 10. A claim nothing needs is never evaluated, and a claim that is needed changes what happens
+
+- **Decisions:** D59, D13, D14, D122, D130, D146, D217, D22, D63.
+- **Scenario A (run, `feas1.ts` P7).** `block({a: claim(false), b: 1}, b)` gives 1, not refuted. A module's structure of bindings `{a: claim(false), b: 1}`: not refuted, no outcome. So `export limit = Positive(-1)` (D130) passes a check phase unless something reads `limit`, and the body of a function nobody calls is never examined. D217 says check "reports on every claim" and D14 says "the result holds every undecided claim"; with evaluation by need neither follows. D59 allows evaluating more "where no one can tell", and says "a refutation stays where it arose", so it is unclear whether a refutation found that way refutes the program.
+- **Scenario B (not run; follows from `then` and `claim` as tested).** `first(a, b) => a`, called `first(1, output.write("x"))`: nothing is written (D63). Add types: `first(a: Int, b: Int) => a`. D122 puts `claim(is_int(b))` at entry, and a claim needs its expression, so "x" is written. A branching helper `choose(c: Bool, a: Int, b: Int)` now evaluates both `a` and `b`, effects and non-termination included. D22 promises that adding claims moves a program "from experiment to proof without being rewritten"; here adding a claim changes its effects.
+- **Severity:** needs a ruling.
+- **Confidence:** high for A; medium-high for B (it holds unless a parameter claim is delayed until the parameter is needed, which D122's "on entry" excludes).
+- **Fix direction:** say that the check phase needs every binding of a module and specializes every function (D65), and that a refutation found there refutes; say whether a parameter claim is made on entry or when the parameter is first needed.
+
+## 11. A recursive function's claim is "decided" on an assumption, with no termination
+
+- **Decisions:** D66, D21, D166 (Termination is a claim), D160, D147.
+- **Scenario (not run; D66 is not built).**
+  ```
+  absurd(x) => ensures(false)  absurd(x)
+  ```
+  D66: the inner call "stays in the residual", and "claims stated about the function's result are assumed at that inner call and decided on the body". The body's result is the inner call's result, which is assumed to satisfy `false`. So the claim is decided true. D160 makes a held claim knowledge of the value, so `y = absurd(1)` carries `false` as known, and any later claim about `y` is decided from it.
+- **What breaks.** Either D21 applies ("a claim that rests on a weaker claim is itself reported at the weaker strength"), and then no claim about any recursive function is ever "decided", against D66's own words; or it does not, and the kernel reports "decided" for a claim that holds only if the function terminates, which D166 makes an optional, separate claim (`partial` makes none).
+- **Severity:** needs a ruling (a soundness question for the strongest word of D21).
+- **Confidence:** medium-high. A stated rule that the outcome rests on the function's termination claim would settle it.
+- **Fix direction:** the outcome is decided, resting on the termination claim of the function, and carries that claim's strength.
+
+## 12. Whether two effects on different capabilities are ordered is said three ways
+
+- **Decisions:** D62, D60, D70. Files: `forms.md` ("Statements happen in written order"); `interface.ts` (`fill`, `advance`).
+- **Scenario A (not run; the kernel orders everything).**
+  ```
+  output.write("Name? ")
+  name <- input.read()
+  ```
+  D60 and `forms.md`: the read comes after the write. D62: "Effects on different capabilities are unordered unless an order between the two is declared", so the read may come first. No form of Allegretto declares an order. In a phase that has `input` and lacks `output`, D62's own aim ("cannot perform an order in part") needs the read to wait; its unordered rule lets it go.
+- **Scenario B (read from `interface.ts`).** D62: two chains waiting on different late answers "act in the order the answers arrive, which is information like any other". `fill` "evaluates nothing", and several cells may be filled before one `advance`, where "each waiter is then evaluated once". The kernel is not told the order of arrival, so it cannot act in it; and D70 says the order of arrival cannot change an outcome, while here it orders two writes on one capability.
+- **Severity:** needs a ruling.
+- **Confidence:** medium-high.
+- **Fix direction:** `then` orders all effects, and "unordered" is something a capability's definition grants; `fill` carries the order of arrival, or `advance` takes the cells in the order filled.
+
+## 13. Changing the grammar mid-text against a parser that reports every parse
+
+- **Decisions:** D97, D102 (five conditions), D95, D90, D91, D100, D103.
+- **Scenario (not run).** D102 wants every parse reported, no order among alternatives, and "the parse settled up to each change of grammar"; D97 wants "exactly one parse" of the text before the change and "no text scanned ahead". In a generalized parser (GLL, GLR, Earley) the prefix before a `use` statement has several live partial parses whenever any alternative is still open, and later text is what prunes them. A scannerless grammar with keywords in the identifier space (D90) makes this common: `use units` is also a possible start of an expression statement in a grammar with juxtaposition. Then either the engine reports an ambiguity that the rest of the text would have removed (a false refutation), or it commits at the statement boundary, which is a cut and gives the text's order a meaning that D102 denies.
+  Two further costs: (a) after a change the frames of enclosing productions continue in the old grammar and the block in the new, so "the engine partially evaluated over that grammar" (D103) must be done again at parse time for each `use`, over the whole standard grammar; (b) a terminal is any function of position and state (D91), so the usual termination argument for left recursion (finitely many rule and position pairs) fails: `E → BUMP E '+' T | T` with a zero-width terminal that changes the state never repeats a configuration.
+- **What breaks.** D97 and D102 can both hold only with a rule about statement boundaries that neither states.
+- **Severity:** needs a ruling.
+- **Confidence:** medium. A stated commit rule (a block's statements are parsed one at a time, each to a unique parse given only the text so far) would change it, at the price of stating that order.
+- **Fix direction:** state the commit rule, and bound the parser state by requiring an equality on it.
+
+## 14. Nothing says how a library is instantiated without performing its top-level effects
+
+- **Decisions:** D214, D213, D59, D64, D75.
+- **Scenario (not run).** A library `import`ed by the program is handed `output`, and has a top-level `banner <- output.write("lib loaded")` and a function `greet() => then(banner, …)`. D214: instantiating it "performs none". The loader is Allegretto code and instantiates by a call (D213); a call is evaluated like any call (D64), and no primitive of D75 evaluates a call with known arguments and no effects (D65 does so only with parameters unknown). If the kernel leaves the statement in the residual, then the program's first call of `greet()` needs `banner`, and by D59 the effect happens then, during the run, out of written order.
+- **What breaks.** D214 has no mechanism, and the natural one contradicts D59.
+- **Severity:** needs a ruling.
+- **Confidence:** medium.
+- **Fix direction:** a top-level effect in an imported module is a refutation at load, not something silently skipped.
+
+## 15. Small things in Allegretto's forms that make ordinary programs awkward
+
+- **Files:** `forms.md` §2, §3; `next/prims/index.ts`.
+- **Scenarios (read, not run).**
+  - The least integer cannot be written: `-9223372036854775808` is `int.neg` of a literal the reader refuses.
+  - A character test needs widening by hand. `bits.slice(t, i * 8, 8)` gives 8 bits; `int.lt` refuses anything but 64. A range test such as "is a letter" is `bits.slice(0, 0, 56) ++ c` and then a compare, for each character of a scannerless parse.
+  - `==` on floats compares bits: `0.0 == -0.0` is false and a not-a-number equals itself. There is no `float.eq`, `float.gt` or `float.ge`.
+  - `a == b` on two structures is a refutation, so nothing can be compared with `[]`; emptiness is `count`, which the forms do not bind to a name (they name `bits.join`, `bits.length`, `bits.slice` only; `get` has `.` and `[ ]`).
+  - A truth value is one bit and an integer 64: `if 1 then …` is a refutation, and `true == 1` is false. Reasonable, but nothing converts.
+- **Severity:** wording (each is a line in `forms.md` or one more primitive).
+- **Confidence:** high.
+
+---
+
+## Faults of the reference kernel's code, seen on the way
+
+- **A function made in a block inside a module loses the block's names (run, `feas3.ts` P5a'').** `module((key) => block({k: 7, f: n => n + k}, [key, f]))`; `get(m(), 1)(1)` waits on `k` (`<expression> waiting 1`). The same block without `module` gives 8. Probable cause: `module` marks inner functions as closed, so the name is looked up where the function is called. Every Allegretto module is this shape.
+- **The depth limit is the host's stack** (finding 8): not the same every time, and not caught by `attempt`.
+- **After a limit the evaluation is lost** (finding 4).
+- **A binding made with `Kernel.bind` is evaluated again by each `evaluate` call that needs it** (`feas2.ts` P6b: `reads=2` for one binding `x = down(read())` needed by two calls). Low confidence that this is unintended; a block's binding is evaluated once (P6c: `reads = 1`).
+
+## Below the cut
+
+- D52: a rule "may not recurse, which the kernel can check by itself". A type rule over `Array[Array[Int]]`, or the unification of D121, walks a nested structure and has no loop but recursion. And a rule that calls a function found in a field's value (a type holds predicates) recurses out of the kernel's sight.
+- D67 with nested conditions: both branches are opened at each unknown condition, so a chain of k helpers that each branch costs 2^k unless results are shared across branches.
+
+## Looked at, and no problem found
+
+- Cells filled once, with waiters evaluated again and effects not repeated across `advance` (the kernel's tests and my probes agree).
+- A structure that holds itself, handed to a primitive under a budget: it ends at a limit, it does not hang (`feas1.ts` P3).
+- A refutation behind a waiting statement is found at once, and one inside an unneeded argument marks nothing: consistent with D59 and D60.
+- `attempt` keeps a refutation inside; a waiting attempt resumes without repeating an effect.
+- Keys by content (D107) with instances sharing keys (D213): consistent as far as I could push it.
+- The record's shape for unevaluated programs: a DAG of nodes, primitives by hash, capabilities only as parameters. It holds every program as written; the gaps are all in holding a program as evaluated (findings 5 and 6).
+- Purity and content hashes of the shipped primitives; integer wrapping and division rules are stated and match the code.

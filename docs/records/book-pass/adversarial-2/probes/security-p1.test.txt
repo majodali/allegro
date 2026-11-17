@@ -1,0 +1,89 @@
+import { test } from "node:test";
+import { setup, byte, num, truth, hash } from "./common.ts";
+import { load, type SavedProgram } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/saved-program.ts";
+const log = (...a: unknown[]) => console.log("   >>", ...a);
+const safe = (name: string, f: () => void) => test(name, () => { try { f(); } catch (e) { log("THROWN:", (e as Error).constructor.name, String((e as Error).message).slice(0, 300)); } });
+
+safe("L1 refuted through then reaches effect?", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const r = k.evaluate(call(write, call(kp("then"), call(kp("claim"), truth(k, false)), byte(k, 7))), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+});
+safe("L1b effect then refutation", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const r = k.evaluate(call(kp("then"), call(write, byte(k, 7)), call(kp("claim"), truth(k, false))), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+});
+safe("L3 refutation in unread binding; effect", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const r = k.evaluate(call(kp("block"), k.structure([[k.symbol("m.c"), call(kp("claim"), truth(k, false))]]), call(write, byte(k, 7))), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+});
+safe("L5 function position from refuted", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const r = k.evaluate(call(call(kp("then"), call(kp("claim"), truth(k, false)), write), byte(k, 7)), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+});
+safe("L5b const function drops claim arg", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const [a, b] = [k.param("a"), k.param("b")];
+  const second = k.composedFunction([a, b], b);
+  const r = k.evaluate(call(write, call(second, call(kp("claim"), truth(k, false)), byte(k, 7))), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+});
+safe("L7 after a refutation, a later evaluate / an independent waiter performs effects?", () => {
+  const { k, call, kp, write, wrote, isZero } = setup();
+  const scope = k.scope();
+  const [c1, c2] = [k.cell(), k.cell()];
+  const a = k.evaluate(call(kp("claim"), call(isZero, c1)), scope);
+  const b = k.evaluate(call(write, c2), scope);
+  k.fill(c1, byte(k, 5)); k.fill(c2, byte(k, 9));
+  const adv = k.advance();
+  log("advance refuted", adv.refuted.length, "wrote", wrote());
+  // one evaluation, one structure: [claim(isZero(c3)), write(c4)] forced by a primitive
+});
+safe("L7b within one evaluation: refutation in a sibling entry then effect", () => {
+  const { k, call, kp, write, wrote, isZero } = setup();
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(51), name: "size", arity: 1, run: (a, x) => x.bits(Uint8Array.of(x.entriesOf(a[0]).length)) });
+  const r = k.evaluate(call(size, k.structure([[null, call(kp("claim"), truth(k, false))], [null, call(write, byte(k, 3))]])), k.scope());
+  log("refuted", r.refuted, "wrote", wrote());
+  const r2 = k.evaluate(call(size, k.structure([[null, call(write, byte(k, 4))], [null, call(kp("claim"), truth(k, false))]])), k.scope());
+  log("refuted", r2.refuted, "wrote", wrote());
+});
+safe("L9 then(write(cell), claim(false)): ahead refutation, then fill", () => {
+  const { k, call, kp, write, wrote } = setup();
+  const c = k.cell();
+  const r = k.evaluate(call(kp("then"), call(write, c), call(kp("claim"), truth(k, false))), k.scope());
+  log("before fill: refuted", r.refuted, "kind", k.kind(r.value), "wrote", wrote());
+  k.fill(c, byte(k, 8));
+  const adv = k.advance();
+  log("after fill: adv.refuted", adv.refuted.length, "wrote", wrote(), "current refuted reason", k.reasonOf(k.current(r.value)));
+});
+safe("AH1 ahead evaluation + attempt performs effect?", () => {
+  const { k, call, kp, write, wrote, steps, add } = setup();
+  const c = k.cell();
+  const r = k.evaluate(call(kp("then"), call(add, c, byte(k, 1)), call(kp("attempt"), call(write, byte(k, 6)), steps(100))), k.scope());
+  log("ahead attempt: wrote", wrote(), k.kind(r.value));
+  const f = k.composedFunction([], call(write, byte(k, 5)));
+  k.evaluate(call(kp("then"), call(add, c, byte(k, 1)), call(f)), k.scope());
+  log("ahead call: wrote", wrote());
+  k.evaluate(call(kp("then"), call(add, c, byte(k, 1)), call(kp("get"), k.structure([[null, call(write, byte(k, 4))]]), k.bits(new Uint8Array(8)))), k.scope());
+  log("ahead get: wrote", wrote());
+  k.evaluate(call(kp("then"), call(add, c, byte(k, 1)), call(kp("block"), k.structure([[k.symbol("m.w"), call(write, byte(k, 3))]]), k.symbol("m.w"))), k.scope());
+  log("ahead block: wrote", wrote());
+  k.evaluate(call(kp("then"), call(add, c, byte(k, 1)), call(kp("if"), truth(k, true), call(write, byte(k, 2)), byte(k, 0))), k.scope());
+  log("ahead if: wrote", wrote());
+  k.fill(c, byte(k, 1)); k.advance();
+  log("after fill: wrote", wrote());
+});
+safe("OUT outcome propagation: what does 'decided' sit on", () => {
+  const { k, call, kp, add } = setup();
+  const r = k.evaluate(call(kp("claim"), truth(k, true)), k.scope());
+  log("claim(true): kind", k.kind(r.value), "outcome", k.outcomeOf(r.value));
+  const r2 = k.evaluate(call(kp("if"), call(kp("claim"), truth(k, true)), byte(k, 5), byte(k, 6)), k.scope());
+  log("if(claim(true),5,6): outcome", k.outcomeOf(r2.value), JSON.stringify(k.restsOn(r2.value)));
+  const r3 = k.evaluate(call(kp("then"), call(kp("claim"), truth(k, true)), byte(k, 5)), k.scope());
+  log("then(claim(true),5): outcome", k.outcomeOf(r3.value));
+  const r4 = k.evaluate(call(add, byte(k, 1), call(kp("then"), call(kp("claim"), truth(k, true)), byte(k, 5))), k.scope());
+  log("add(1, then(claim(true),5)): outcome", k.outcomeOf(r4.value));
+});

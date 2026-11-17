@@ -579,6 +579,11 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — The second adversarial review.** Four independent
+  reviewers read the 245 decisions, Allegretto's forms and the
+  kernel's interface with no reasoning: 60 findings, sorted into 14
+  clusters in `docs/records/book-pass/adversarial-review-2.md`, with
+  the reports and probes beside it. Nothing is ruled yet.
 - **2026-11-17 — Two more rulings of the acceptance stream's session
   recorded.** A recursion's depth is bounded by its step budget and
   by memory only; a condition is a truth value, and anything else is

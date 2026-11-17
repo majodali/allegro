@@ -1,0 +1,141 @@
+import { test } from "node:test";
+import { setup, byte, num, truth, hash } from "./common.ts";
+import { load, type SavedProgram } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/saved-program.ts";
+const log = (...a: unknown[]) => console.log("   >>", ...a);
+const safe = (name: string, f: () => void) => test(name, () => { try { f(); } catch (e) { log("THROWN:", (e as Error).constructor.name, String((e as Error).message).slice(0, 300)); } });
+
+safe("PA same nodes, different declares: same identity and keys", () => {
+  const s = setup(); const { k, call, add, show } = s;
+  // M(key, dep) => [key, x => dep(x)]   -- content only
+  const nodes = [
+    { k: "param", name: "key" }, { k: "param", name: "dep" }, { k: "param", name: "x" },
+    { k: "expression", fn: 1, args: [2] },
+    { k: "function", params: [2], body: 3 },
+    { k: "structure", entries: [[null, 0], [null, 4]] },
+    { k: "function", params: [0, 1], body: 5 },
+  ] as const;
+  const honest: SavedProgram = { format: "allegro-saved-program", version: 2, needs: [], nodes: nodes as any, module: 6, declares: [{ param: 1, role: "module", name: "trusted_solver" }], keys: 1 };
+  const evil: SavedProgram = { ...honest, declares: [{ param: 1, role: "capability", name: "evil_sink" }] };
+  const m1 = load(k, honest, new Map()); const m2 = load(k, evil, new Map());
+  log("identities equal:", k.moduleOf(m1) === k.moduleOf(m2), k.moduleOf(m1));
+  const x = k.param("x");
+  const dep1 = k.composedFunction([x], x);
+  const y = k.param("y");
+  const dep2 = k.composedFunction([y], call(add, y, byte(k, 1)));
+  const i1 = k.entriesOf(k.evaluate(call(m1, dep1), k.scope()).value); const i2 = k.entriesOf(k.evaluate(call(m2, dep2), k.scope()).value);
+  const k1 = k.current(k.evaluate(i1[0][1], k.scope()).value), k2 = k.current(k.evaluate(i2[0][1], k.scope()).value);
+  log("keys identical object:", k1 === k2, "isKey", k.isKey(k1), k.isKey(k2), JSON.stringify(k.keyOf(k1)), JSON.stringify(k.keyOf(k2)));
+  // the evil instance's key describes the honest instance's function
+  const f1 = k.evaluate(i1[1][1], k.scope()).value;
+  const d = k.evaluate(call(s.kp("describe"), k2, f1), k.scope());
+  log("evil instance key describes honest instance function:", !d.refuted, s.form(d.value).form, show(d.value));
+});
+
+safe("PB free symbol in a module / saved program reaches the scope of instantiation", () => {
+  const s = setup(); const { k, call, write, wrote } = s;
+  const prog: SavedProgram = { format: "allegro-saved-program", version: 2, needs: [], keys: 0, declares: [],
+    nodes: [ { k: "symbol", fqn: "launcher.output" }, { k: "symbol", fqn: "session.password" }, { k: "expression", fn: 0, args: [1] }, { k: "function", params: [], body: 2 } ], module: 3 };
+  const m = load(k, prog, new Map());
+  log("loaded, module identity", k.moduleOf(m));
+  const scope = k.scope();
+  k.bind(scope, k.symbol("launcher.output"), write);
+  const child = k.scope(scope);
+  const r = k.evaluate(call(m), child);
+  log("instantiated before password bound: kind", k.kind(r.value), "wrote", wrote(), "waiting", k.waiting().length);
+  k.bind(child, k.symbol("session.password"), byte(k, 99));
+  const adv = k.advance();
+  log("after a later binding of session.password: wrote", wrote(), adv.ended);
+});
+
+safe("PC build: free names, stray params, primitive by hash", () => {
+  const s = setup(); const { k, call, kp, write, wrote, show, form } = s;
+  const sym = (n: string) => k.symbolData ? k.symbolData("description." + n) : k.symbol("description." + n);
+  const D = (n: string, ...parts: any[]) => k.structure([[null, sym(n)], ...parts.map((p) => [null, p] as const)]);
+  const arr = (...xs: any[]) => k.structure(xs.map((x) => [null, x] as const));
+  const w64 = (n: number) => { const b = new Uint8Array(8); b[7] = n; return k.bits(b); };
+  // learn real shapes from a real description
+  const p = k.param("p");
+  const sample = k.composedFunction([p], call(s.add, p, k.symbol("m.secret")));
+  const real = k.evaluate(call(kp("describe"), k.inspectionRight(), sample), k.scope()).value;
+  log("sample description:", show(real));
+  const ents = k.entriesOf(real);
+  // 1. function with a free name `m.secret`, built by attacker code, applied in victim block scope
+  const desc = D("function", k.entriesOf(real)[1][1], D("name", k.symbolData("m.secret")));
+  const attackerScope = k.scope();
+  const built = k.evaluate(call(kp("build"), desc), attackerScope);
+  log("build fn with free name: refuted", built.refuted, k.reasonOf(built.value), k.kind(built.value));
+  const evil = k.composedFunction([], call(kp("build"), desc));  // attacker function returning a built function
+  k.bind(attackerScope, k.symbol("att.evil"), evil);
+  const evilV = k.evaluate(k.symbol("att.evil"), attackerScope).value;
+  // victim: block({m.secret: 77}, evil()(0))
+  const r = k.evaluate(call(kp("block"), k.structure([[k.symbol("m.secret"), byte(k, 77)]]), call(call(evilV), byte(k, 0))), k.scope());
+  log("victim calls evil()(0) inside a block binding m.secret=77 ->", k.kind(r.value), k.kind(r.value) === "bits" ? num(k, r.value) : "", "refuted", r.refuted, k.reasonOf(r.value));
+  // 2. stray param
+  const stray = k.evaluate(call(kp("build"), D("function", k.entriesOf(real)[1][1], D("param", w64(1), w64(0)))), k.scope());
+  log("build with a param one function out: refuted", stray.refuted, k.reasonOf(stray.value));
+  // 3. primitive by hash, never handed
+  const k9 = k.primitiveFunction({ purity: "pure", hash: hash(99), name: "clock", arity: 0, run: (_a, c) => c.bits(Uint8Array.of(Date.now() & 255)) });
+  void k9;
+  const byHash = k.evaluate(call(kp("build"), D("function", w64(0), D("apply", D("primitive", k.bits(new TextEncoder().encode(hash(99)))), arr()))), k.scope());
+  log("build names a pure primitive by hash it was never handed: refuted", byHash.refuted, k.reasonOf(byHash.value), k.kind(byHash.value));
+  if (!byHash.refuted) { const v = k.evaluate(call(byHash.value), k.scope()); log("  and calls it:", k.kind(v.value), v.refuted); }
+  // 4. key form
+  const keyForm = k.evaluate(call(kp("build"), D("function", w64(0), D("key", k.bits(new TextEncoder().encode(hash(7))), w64(0)))), k.scope());
+  log("build with a key form: refuted", keyForm.refuted, k.reasonOf(keyForm.value));
+  void write; void wrote; void form; void ents;
+});
+
+safe("PD thunk-wrap an argument and describe it with the wrapper's own key", () => {
+  const s = setup(); const { k, call, kp, add, show } = s;
+  const [key, a, f] = [k.param("key"), k.param("a"), k.param("f")];
+  const A = k.module(k.composedFunction([key], k.structure([[null, k.composedFunction([a], k.composedFunction([], a))], [null, k.composedFunction([f], call(kp("describe"), key, f))]])), 1);
+  const inst = k.entriesOf(k.evaluate(call(A), k.scope()).value).map(([, v]) => k.evaluate(v, k.scope()).value);
+  const [wrap, descMine] = inst;
+  const [kv, w, pw] = [k.param("kv"), k.param("wrap"), k.param("pw")];
+  // victim module: (kv, wrap) => (pw => wrap(add(add(pw, 42), 1)))  -- a private computation over a secret constant 42
+  const helper = k.composedFunction([pw], call(add, pw, byte(k, 42)));
+  const V = k.module(k.composedFunction([kv, w], call(w, call(add, call(helper, byte(k, 7)), byte(k, 1)))), 1);
+  const thunk = k.evaluate(call(V, wrap), k.scope());
+  log("thunk kind", k.kind(thunk.value), "refuted", thunk.refuted);
+  const d = k.evaluate(call(descMine, thunk.value), k.scope());
+  log("attacker describes its thunk:", d.refuted ? k.reasonOf(d.value) : show(d.value));
+});
+
+safe("PE restore: an outcome stored for a claim over an input holds for every input", () => {
+  const s = setup(); const { k, call, isZero, write, wrote } = s;
+  const prog: SavedProgram = { format: "allegro-saved-program", version: 2, needs: [{ hash: hash(4), name: "isZero" }], keys: 0,
+    nodes: [ { k: "param", name: "n" }, { k: "param", name: "out" }, { k: "primitive", hash: hash(4) }, { k: "kernel", name: "claim" }, { k: "kernel", name: "then" },
+      { k: "expression", fn: 2, args: [0] }, { k: "expression", fn: 3, args: [5] }, { k: "expression", fn: 1, args: [0] }, { k: "expression", fn: 4, args: [6, 7] },
+      { k: "function", params: [0, 1], body: 8 } ],
+    module: 9, declares: [{ param: 0, role: "input", name: "n" }, { param: 1, role: "capability", name: "output.write" }],
+    outcomes: [{ claim: 6, restsOn: [{ kind: "kernel", variant: "any" }, { kind: "primitive", hash: hash(4), name: "isZero" }], key: "sha256:" + "0".repeat(64) }] };
+  const prims = new Map([[hash(4), isZero]]);
+  const plain = load(k, prog, prims);
+  const r0 = k.evaluate(call(plain, byte(k, 5), write), k.scope());
+  log("no restore, n=5: refuted", r0.refuted, "wrote", wrote());
+  const k2 = setup();
+  const prims2 = new Map([[hash(4), k2.isZero]]);
+  // the record's author computes the key offline: any kernel gives it
+  const { outcomeKeys } = require("/home/user/allegro/.claude/worktrees/f1/next/kernel/saved-program.ts");
+  const keys = outcomeKeys(setup().k, prog, new Map([[hash(4), setup().isZero]]));
+  let key: string;
+  { const t = setup(); key = outcomeKeys(t.k, prog, new Map([[hash(4), t.isZero]]))[0]; }
+  void keys;
+  const withKey = { ...prog, outcomes: [{ ...prog.outcomes![0], key }] };
+  const m = load(k2.k, withKey, prims2, { restoreAs: "team-build" });
+  const r = k2.k.evaluate(k2.call(m, byte(k2.k, 5), k2.write), k2.k.scope());
+  log("restored, n=5: refuted", r.refuted, "wrote", k2.wrote(), "(the claim isZero(5) was never evaluated)");
+});
+
+safe("PI get by place reads an entry whatever its key; count counts it", () => {
+  const s = setup(); const { k, call, kp, show } = s;
+  const k0 = k.param("k0");
+  const m = k.module(k.composedFunction([k0], k.structure([[null, k0]])), 1);
+  const key = k.evaluate(k.entriesOf(k.evaluate(call(m), k.scope()).value)[0][1], k.scope()).value;
+  let obj;
+  try { obj = k.structure([[k.symbolData("t.public"), byte(k, 1)], [key, byte(k, 99)]]); log("a structure entry keyed by a key: accepted"); }
+  catch (e) { log("entry keyed by a key refused:", String((e as Error).message)); obj = k.structure([[k.symbolData("t.public"), byte(k, 1)], [k.symbolData("mod.private#0"), byte(k, 99)]]); }
+  const w64 = (n: number) => { const b = new Uint8Array(8); b[7] = n; return k.bits(b); };
+  const r = k.evaluate(call(kp("get"), obj, w64(1)), k.scope());
+  log("get(obj, 1) without the key:", r.refuted ? k.reasonOf(r.value) : show(r.value), "count:", show(k.evaluate(call(kp("count"), obj), k.scope()).value));
+});
