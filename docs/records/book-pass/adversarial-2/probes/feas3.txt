@@ -1,0 +1,87 @@
+import { createKernel } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/kernel.ts";
+import type { Kernel, PrimitiveDeclaration, Value } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/interface.ts";
+
+const hash = (n: number) => "sha256:" + n.toString(16).padStart(64, "0");
+const w = (k: Kernel, n: number) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, BigInt(n)); return k.bits(b); };
+const rd = (k: Kernel, v: Value) => { try { const { bytes } = k.bitsOf(v); return Number(new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0)); } catch { return `<${k.kind(v)}>`; } };
+function pure(name: string, n: number, arity: number, f: (...xs: bigint[]) => bigint | boolean): PrimitiveDeclaration {
+  return { purity: "pure", hash: hash(n), name, arity, run: (args, c) => {
+    const r = f(...args.map((a) => { const { bytes } = c.bitsOf(a); return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0); }));
+    if (typeof r === "boolean") return c.bits(Uint8Array.of(r ? 1 : 0), 1);
+    const b = new Uint8Array(8); new DataView(b.buffer).setBigInt64(0, r); return c.bits(b);
+  } };
+}
+function setup() {
+  const k = createKernel() as any as Kernel & Record<string, any>;
+  const add = k.primitiveFunction(pure("add", 1, 2, (a, b) => a + b));
+  const dec = k.primitiveFunction(pure("dec", 3, 1, (a) => a - 1n));
+  const isZero = k.primitiveFunction(pure("isZero", 4, 1, (a) => a === 0n));
+  const call = (fn: Value, ...args: Value[]) => k.expression(fn, args);
+  const kp = (name: string) => k.kernelPrimitive(name);
+  return { k, add, dec, isZero, call, kp };
+}
+const form = (k: Kernel, d: Value) => { const e = k.entriesOf(d); return { form: k.symbolName(e[0][1]).replace("description.", ""), parts: e.slice(1).map(([, v]) => v) }; };
+const steps = (k: Kernel, n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+const section = (name: string, f: () => void) => { console.log(`\n== ${name}`); try { f(); } catch (e: any) { console.log("THROWN:", e?.constructor?.name, String(e?.message).slice(0, 200)); } };
+
+
+section("P2c depth: a loop with no accumulator; with a lazy accumulator; with the accumulator needed at each turn", () => {
+  for (const variant of ["none", "lazy", "forced"]) for (const n of [200, 400, 550, 600, 2000]) {
+    const { k, add, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const down = k.symbol("m.down"); const [p, acc] = [k.param("n"), k.param("acc")];
+    const next = call(down, call(dec, p), variant === "none" ? acc : call(add, acc, w(k, 1)));
+    k.bind(scope, down, k.composedFunction([p, acc], call(kp("if"), call(isZero, p), acc, variant === "forced" ? call(kp("then"), acc, next) : next)));
+    const r = k.evaluate(call(down, w(k, n), w(k, 0)), scope); console.log(`${variant} n=${n}: ended=${r.ended} steps=${r.steps} value=${rd(k, r.value)}`);
+  }
+});
+
+section("P5a'' the module case", () => {
+  const { k, add, call, kp } = setup();
+  const [kk, f] = [k.symbol("t.k"), k.symbol("t.f")]; const [key, n] = [k.param("key"), k.param("n")];
+  const m = (k as any).module(k.composedFunction([key], call(kp("block"), k.structure([[kk, w(k, 7)], [f, k.composedFunction([n], call(add, n, kk))]]), k.structure([[null, key], [null, f]]))), 1);
+  const scope = k.scope();
+  const r = k.evaluate(call(call(kp("get"), call(m), w(k, 1)), w(k, 1)), scope);
+  console.log("get(m(), 1)(1) =", rd(k, r.value), "waiting", k.waiting().length);
+});
+
+section("P8 a residual, read through the interface and built again as a record would", () => {
+  const { k, add, call } = setup();
+  let n = 0;
+  const cap = k.primitiveFunction({ purity: "effectful", capability: "c", part: "p", arity: 1, run: (a) => (n++, a[0]) });
+  const x = k.param("x"); const capName = k.symbol("t.cap");
+  const twice = k.composedFunction([x], call(add, x, x));
+  const res = k.evaluate(call(twice, call(capName, w(k, 3))), k.scope());
+  const e = k.expressionOf(res.value);
+  console.log("the residual's two arguments are one handle:", e.args[0] === e.args[1], "; kind", k.kind(e.args[0]));
+  const memo = new Map<Value, Value>();
+  const copy = (v: Value): Value => { if (memo.has(v)) return memo.get(v)!; let r = v; const kd = k.kind(v);
+    if (kd === "expression") { const e = k.expressionOf(v); r = k.expression(copy(e.fn), e.args.map(copy)); }
+    else if (kd === "symbol") r = k.symbol(k.symbolName(v));
+    else if (kd === "bits") { const b = k.bitsOf(v); r = k.bits(b.bytes, b.bitLength); }
+    memo.set(v, r); return r; };
+  const rebuilt = copy(res.value);
+  const e2 = k.expressionOf(rebuilt); console.log("rebuilt: the two arguments are one node:", e2.args[0] === e2.args[1]);
+  const s2 = k.scope(); k.bind(s2, capName, cap);
+  n = 0; const r2 = k.evaluate(rebuilt, s2); console.log("rebuilt (sharing kept), run with the capability: value", rd(k, r2.value), "effects", n);
+  const s3 = k.scope(); k.bind(s3, capName, cap);
+  n = 0; const r1 = k.evaluate(call(twice, call(capName, w(k, 3))), s3); console.log("the original program, run with the capability: value", rd(k, r1.value), "effects", n);
+});
+
+section("P6c one block: an attempt's answer and the order in which two answers arrive", () => {
+  for (const order of ["c3 then c2", "c2 then c3"]) {
+    const { k, dec, isZero, call, kp } = setup();
+    const scope = k.scope(); const [down, x] = [k.symbol("m.down"), k.symbol("m.x")]; const p = k.param("n");
+    let reads = 0;
+    const read = k.primitiveFunction({ purity: "effectful", capability: "input", part: "read", arity: 0, run: (_a, c) => (reads++, w(c as any, 100)) });
+    const [c2, c3] = [k.cell(), k.cell()];
+    const downFn = k.composedFunction([p], call(kp("if"), call(isZero, p), w(k, 0), call(down, call(dec, p))));
+    const prog = call(kp("block"), k.structure([[down, downFn], [x, call(down, call(read))]]),
+      k.structure([[null, call(kp("then"), c2, call(kp("attempt"), x, steps(k, 30)))], [null, call(kp("then"), c3, x)]]));
+    const s = k.evaluate(prog, scope).value;
+    const [A, B] = k.entriesOf(s).map(([, v]) => k.evaluate(v, scope).value);
+    const first = order === "c3 then c2" ? c3 : c2, second = first === c3 ? c2 : c3;
+    k.fill(first, w(k, 1)); k.advance(); k.fill(second, w(k, 1)); k.advance();
+    const a = k.current(A);
+    console.log(`${order}: the attempt answered "${k.kind(a) === "structure" ? form(k, a).form : k.kind(a)}"; x = ${rd(k, k.current(B))}; reads performed = ${reads}`);
+  }
+});

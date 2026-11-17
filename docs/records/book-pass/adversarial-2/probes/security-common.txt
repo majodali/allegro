@@ -1,0 +1,39 @@
+import type { Kernel2, PrimitiveDeclaration, Value } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/interface.ts";
+import { createKernel } from "/home/user/allegro/.claude/worktrees/f1/next/kernel/kernel.ts";
+export const hash = (n: number) => "sha256:" + n.toString(16).padStart(64, "0");
+export const byte = (k: Kernel2, n: number) => k.bits(Uint8Array.of(n));
+export const num = (k: Kernel2, v: Value) => k.bitsOf(v).bytes[0];
+export const truth = (k: Kernel2, b: boolean) => k.bits(Uint8Array.of(b ? 1 : 0), 1);
+export function pure(name: string, n: number, arity: number, f: (...xs: number[]) => number | boolean): PrimitiveDeclaration {
+  return { purity: "pure", hash: hash(n), name, arity, run: (args, c) => {
+    const r = f(...args.map((a) => c.bitsOf(a).bytes[0]));
+    return typeof r === "boolean" ? c.bits(Uint8Array.of(r ? 1 : 0), 1) : c.bits(Uint8Array.of(r & 255));
+  } };
+}
+export function setup() {
+  const k = createKernel();
+  const add = k.primitiveFunction(pure("add", 1, 2, (a, b) => a + b));
+  const mul = k.primitiveFunction(pure("mul", 2, 2, (a, b) => a * b));
+  const dec = k.primitiveFunction(pure("dec", 3, 1, (a) => a - 1));
+  const isZero = k.primitiveFunction(pure("isZero", 4, 1, (a) => a === 0));
+  const eq = k.primitiveFunction(pure("eq", 5, 2, (a, b) => a === b));
+  const call = (fn: Value, ...args: Value[]) => k.expression(fn, args);
+  const kp = (name: string) => k.kernelPrimitive(name);
+  let wrote: number[] = [];
+  const write = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => { wrote.push(c.kind(a[0]) === "bits" ? c.bitsOf(a[0]).bytes[0] : -1); return c.structure([]); } });
+  const steps = (n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+  const form = (d: Value): { form: string; parts: Value[] } => {
+    if (k.kind(d) !== "structure") return { form: "<" + k.kind(d) + ">", parts: [] };
+    const entries = k.entriesOf(d);
+    if (!entries.length || k.kind(entries[0][1]) !== "symbol") return { form: "<structure>", parts: entries.map(([, v]) => v) };
+    return { form: k.symbolName(entries[0][1]).replace("description.", ""), parts: entries.slice(1).map(([, v]) => v) };
+  };
+  const show = (d: Value, depth = 0): string => {
+    const kind = k.kind(d);
+    if (kind === "bits") { const b = k.bitsOf(d); const t = new TextDecoder().decode(b.bytes); return /^[\x20-\x7e]+$/.test(t) && b.bytes.length > 1 ? JSON.stringify(t) : "0x" + [...b.bytes].map((x) => x.toString(16).padStart(2, "0")).join(""); }
+    if (kind === "symbol") return "`" + k.symbolName(d);
+    if (kind === "structure") return depth > 8 ? "…" : "[" + k.entriesOf(d).map(([key, v]) => (key ? show(key, depth + 1) + ":" : "") + show(k.current(v), depth + 1)).join(" ") + "]";
+    return "<" + kind + ">";
+  };
+  return { k, add, mul, dec, isZero, eq, call, kp, write, wrote: () => wrote, steps, form, show };
+}

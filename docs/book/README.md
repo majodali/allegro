@@ -120,4 +120,6 @@ decision review of Part VI, building and running programs) ·
 `../records/book-pass/phase-1-close.md` (record: what phase 1 of the book pass
 leaves) ·
 `../records/book-pass/adversarial-review.md` (record: an adversarial review of
-phase 1's decisions).
+phase 1's decisions) ·
+`../records/book-pass/adversarial-review-2.md` (record: the second adversarial
+review).

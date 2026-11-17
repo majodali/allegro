@@ -1,0 +1,104 @@
+import { test } from "node:test";
+import { setup, byte, num, truth, hash } from "./common.ts";
+const log = (...a: unknown[]) => console.log("   >>", ...a);
+const safe = (name: string, f: () => void) => test(name, () => { try { f(); } catch (e) { log("THROWN:", (e as Error).constructor.name, String((e as Error).message).slice(0, 200)); } });
+const w64 = (k: any, n: number) => { const b = new Uint8Array(8); b[7] = n & 255; b[6] = (n >>> 8) & 255; b[5] = (n >>> 16) & 255; return k.bits(b); };
+
+safe("PC2 control and capability capture through a built function", () => {
+  const s = setup(); const { k, call, kp, write, wrote } = s;
+  const D = (n: string, ...parts: any[]) => k.structure([[null, k.symbolData("description." + n)], ...parts.map((p) => [null, p] as const)]);
+  const arr = (...xs: any[]) => k.structure(xs.map((x) => [null, x] as const));
+  const n32 = (n: number) => k.bits(Uint8Array.of(0, 0, 0, n));
+  // control: an ordinary function with the free name, made in the attacker's scope
+  const attacker = k.scope();
+  const plainFn = k.composedFunction([], k.symbol("v.secret"));
+  k.bind(attacker, k.symbol("att.plain"), k.composedFunction([], plainFn));
+  const pv = k.evaluate(call(k.symbol("att.plain")), attacker).value;
+  const c = k.evaluate(call(kp("block"), k.structure([[k.symbol("v.secret"), byte(k, 77)]]), call(pv)), k.scope());
+  log("control, ordinary function with free name called in victim block:", k.kind(c.value), k.kind(c.value) === "bits" ? num(k, c.value) : "(waits)");
+  // attack: victim module holds a capability under a name and calls a callback an attacker library gave it
+  // description: () => v.out(v.secret)
+  const desc = D("function", n32(0), D("apply", D("name", k.symbolData("v.out")), arr(D("name", k.symbolData("v.secret")))));
+  k.bind(attacker, k.symbol("att.mk"), k.composedFunction([], call(kp("build"), desc)));
+  const cb = k.evaluate(call(k.symbol("att.mk")), attacker);
+  log("attacker's callback built: refuted", cb.refuted, k.kind(cb.value));
+  // victim: block({v.out: write, v.secret: 77, v.run: f => f()}, v.run(callback))
+  const f = k.param("f");
+  const victim = call(kp("block"), k.structure([[k.symbol("v.out"), write], [k.symbol("v.secret"), byte(k, 77)], [k.symbol("v.run"), k.composedFunction([f], call(f))]]), call(k.symbol("v.run"), cb.value));
+  const r = k.evaluate(victim, k.scope());
+  log("victim runs the callback: wrote", wrote(), "refuted", r.refuted);
+  // passed as an unevaluated argument expression: v.run(att.mk()) where att.mk bound in parent scope
+  const s2 = setup();
+  const D2 = (n: string, ...parts: any[]) => s2.k.structure([[null, s2.k.symbolData("description." + n)], ...parts.map((p) => [null, p] as const)]);
+  const desc2 = D2("function", s2.k.bits(Uint8Array.of(0, 0, 0, 0)), D2("apply", D2("name", s2.k.symbolData("v.out")), s2.k.structure([[null, D2("name", s2.k.symbolData("v.secret"))]])));
+  const top = s2.k.scope();
+  s2.k.bind(top, s2.k.symbol("att.mk"), s2.k.composedFunction([], s2.call(s2.kp("build"), desc2)));
+  const f2 = s2.k.param("f");
+  const r2 = s2.k.evaluate(s2.call(s2.kp("block"), s2.k.structure([[s2.k.symbol("v.out"), s2.write], [s2.k.symbol("v.secret"), byte(s2.k, 78)], [s2.k.symbol("v.run"), s2.k.composedFunction([f2], s2.call(f2))]]), s2.call(s2.k.symbol("v.run"), s2.call(s2.k.symbol("att.mk")))), top);
+  log("same, callback made by a call written in the victim's block: wrote", s2.wrote(), r2.refuted);
+});
+
+safe("PF1 step-count oracle with attempt", () => {
+  const s = setup(); const { k, call, kp, eq, form, steps } = s;
+  // victim: check(g0,g1,g2) = if eq(g0,s0) then (if eq(g1,s1) then eq(g2,s2) else false) else false ; secret 13,200,7 closed over
+  const [g0, g1, g2] = [k.param("g0"), k.param("g1"), k.param("g2")];
+  const F = truth(k, false);
+  const check = k.composedFunction([g0, g1, g2], call(kp("if"), call(eq, g0, byte(k, 13)), call(kp("if"), call(eq, g1, byte(k, 200)), call(eq, g2, byte(k, 7)), F), F));
+  const cost = (a: number, b: number, c: number) => { let lo = 1, hi = 200; while (lo < hi) { const mid = (lo + hi) >> 1; const r = form(k.evaluate(call(kp("attempt"), call(check, byte(k, a), byte(k, b), byte(k, c)), steps(mid)), k.scope()).value).form; if (r === "limit") lo = mid + 1; else hi = mid; } return lo; };
+  const found: number[] = [];
+  for (let pos = 0; pos < 3; pos++) { const costs = Array.from({ length: 256 }, (_, v) => { const g = [...found, v, 0, 0].slice(0, 3); return cost(g[0], g[1], g[2]); }); const max = Math.max(...costs); found.push(costs.indexOf(max)); if (pos === 0) log("costs seen at position 0: min", Math.min(...costs), "max", max); }
+  log("secret recovered from step counts alone (2 of 3 need the oracle):", found);
+});
+
+safe("PF2 nested attempt: is the inner budget clipped by the outer?", () => {
+  const s = setup(); const { k, call, kp, form, steps, dec, isZero } = s;
+  const scope = k.scope(); const n = k.param("n"); const loop = k.symbol("m.loop");
+  k.bind(scope, loop, k.composedFunction([n], call(loop, n)));
+  const inner = call(kp("attempt"), call(loop, byte(k, 1)), steps(200000));
+  const t0 = Date.now();
+  const r = k.evaluate(call(kp("attempt"), inner, steps(50)), scope);
+  log("outer attempt(50) around inner attempt(200000) of an endless loop:", form(r.value).form, form(r.value).parts.map((p) => form(p).form), "steps spent by evaluate:", r.steps, "ms", Date.now() - t0);
+  const r2 = k.evaluate(inner, scope, { steps: 50 });
+  log("evaluate limit 50 around attempt(200000):", r2.ended, "steps", r2.steps, form(r2.value).form);
+  void dec; void isZero;
+});
+
+safe("PF3 sharing is observable: has someone else already needed a shared binding?", () => {
+  const s = setup(); const { k, call, kp, form, steps, dec, isZero, add } = s;
+  const scope = k.scope(); const n = k.param("n"); const down = k.symbol("lib.down");
+  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n)))));
+  k.bind(scope, k.symbol("lib.table"), call(down, byte(k, 40)));   // a library's lazily evaluated binding
+  const probe = () => form(k.evaluate(call(kp("attempt"), call(add, k.symbol("lib.table"), byte(k, 0)), steps(20)), scope).value).form;
+  log("before anyone used lib.table, attempt(…,20):", probe());
+  k.evaluate(k.symbol("lib.table"), scope);
+  log("after another module used it:", probe());
+});
+
+safe("PH1 a primitive returns a captured authority; fill with a function", () => {
+  const s = setup(); const { k, call, write, wrote } = s;
+  const leak = k.primitiveFunction({ purity: "pure", hash: hash(77), name: "leak", arity: 0, run: () => write });
+  const r = k.evaluate(call(call(leak), byte(k, 3)), k.scope());
+  log("pure primitive returned an effectful primitive, and it was applied: wrote", wrote(), "refuted", r.refuted);
+  const right = k.inspectionRight();
+  const leak2 = k.primitiveFunction({ purity: "pure", hash: hash(78), name: "leak2", arity: 0, run: () => right });
+  log("pure primitive returns the inspection right: isKey", k.isKey(k.evaluate(call(leak2), k.scope()).value));
+  const c = k.cell();
+  try { k.fill(c, write); log("fill(cell, effectful primitive): accepted"); } catch (e) { log("fill with a function refused:", String((e as Error).message).slice(0, 120)); }
+  const c2 = k.cell();
+  try { k.fill(c2, right); log("fill(cell, inspection right): accepted; isKey(current)", k.isKey(k.current(c2))); } catch (e) { log("fill with a key refused:", String((e as Error).message).slice(0, 120)); }
+  // what a primitive is handed: stash a key between calls
+  let stash: any;
+  const put = k.primitiveFunction({ purity: "pure", hash: hash(79), name: "hashOf", arity: 1, run: (a, c) => (stash = a[0], c.bits(Uint8Array.of(0))) });
+  const take = k.primitiveFunction({ purity: "pure", hash: hash(80), name: "zero", arity: 0, run: () => stash });
+  k.evaluate(call(put, right), k.scope());
+  log("a key handed to one 'pure' primitive comes out of another: isKey", k.isKey(k.evaluate(call(take), k.scope()).value));
+});
+
+safe("L7c order: refutation first, then a separately filled waiter's effect", () => {
+  const { k, call, kp, write, wrote, isZero } = setup();
+  const scope = k.scope(); const [c1, c2] = [k.cell(), k.cell()];
+  k.evaluate(call(kp("claim"), call(isZero, c1)), scope); k.evaluate(call(write, c2), scope);
+  k.fill(c1, byte(k, 5)); const a1 = k.advance();
+  k.fill(c2, byte(k, 9)); const a2 = k.advance();
+  log("advance 1 refuted", a1.refuted.length, "; advance 2 wrote", wrote(), "(the kernel has no notion of the phase that was refuted)");
+});

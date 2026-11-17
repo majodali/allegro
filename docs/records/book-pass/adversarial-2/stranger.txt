@@ -1,0 +1,333 @@
+# Stranger's review: the decisions as a book's skeleton, Allegretto as a first language
+
+Read: `decisions-extract.txt` (D1 to D245, in full), `next/ext/allegretto/forms.md`, `next/kernel/interface.ts`, `next/kernel/saved-program.ts` (header, types, `load`/`build`), `next/kernel/kernel.ts` lines 1 to 125, `next/prims/index.ts`. Nothing under `docs/`. No code was run.
+
+Fifteen findings, most severe first. Then the five programs, the launcher's gaps, the places I had to go back, the decisions that are not one decision, the ten terms, and what I found no problem with.
+
+---
+
+## Findings
+
+### 1. A capability a phase lacks is "a cell", but a cell can only be filled with plain data
+
+- Decisions: D68 "A missing value is a cell that is filled once", D69 "When information arrives, what waited on it is evaluated again", D218 "A phase hands its residual to the next", D217 "check, run and export", D243 "A late answer or its failure fills a cell as plain data". File: `interface.ts`, `Kernel.fill`; `forms.md` header line `capability output`.
+- Scenario: a module begins `capability output` and its block says `output.write("hi")`. The check phase instantiates it without `output`. D68: "A capability a phase is not given ... [is a] cell too." So the launcher passes `kernel.cell()` as the argument. The run phase now holds the residual and the real capability. `fill(cell, value)` accepts "plain data: bits, symbols and structures of them, carrying no metadata". A capability is a structure of effectful primitive functions. The fill is an InterfaceError.
+- What breaks: D218's pipeline cannot be built from the interface as written. The launcher has three guesses: fill is wider than its comment says; the check phase does not instantiate but specializes with parameters unknown (D65), so the residual is still a function of `output`; or the run phase throws the residual away and instantiates afresh, which is not "hands its residual to the next". Each gives a different launcher and a different saved residual.
+- Severity: needs a ruling (it blocks D218 until given).
+- Confidence: high. A sentence in D217 or D218 saying what the check phase passes for a declared capability, and how the next phase supplies it, would settle it.
+- Fix direction: say that a phase without a capability specializes the module function and the residual keeps the capability as a parameter; then D68's "a capability a phase is not given is a cell" goes.
+
+### 2. An imported module that needs a capability has no one to hand it one
+
+- Decisions: D45 "A capability is granted, never acquired" ("An extension receives a capability only when the code using that extension passes it one"), D213 "A module is a function of its capabilities, inputs and imports" ("Instantiating it is a call, made by whoever loaded it"; "instantiated once for each distinct set of arguments"), D214, D76 "What the kernel requires of an extension" ("An extension is evaluated once in a configuration, and everything that names it gets the same values"), D104 ("the values are handed to it"). File: `forms.md`, the header lines.
+- Scenario: `log.alg` begins `capability output` and exports `say(t) => output.write(t)`. `main.alg` begins `capability output` and `import log`. Nothing in `forms.md` lets `main` pass `output` to `log`: `import name` takes no arguments. "Whoever loaded it" is the loader, which D108 gives only file reading. So either the launcher hands `output` to every module that declares it (then a capability is acquired by declaring its name, against D45 and D41 "Nothing is granted by name"), or `log` cannot be written.
+- Second half: D213 gives one instance per distinct set of arguments; D76 says an extension is evaluated once and everyone gets the same values. Two importers that pass different narrowed capabilities get two instances under D213 and one under D76.
+- What breaks: program (d) below works only for capability-free libraries. The stated rule for the other case is contradictory.
+- Severity: needs a ruling.
+- Confidence: high on the gap in the forms; medium on D76 against D213 (D76 may mean "once per set of arguments").
+- Fix direction: an import form that passes arguments (`import log(output)`), and D76 reworded to "once for each set of arguments".
+
+### 3. "Halts" means three different things, and one of them contradicts the others
+
+- Decisions: D13 "If it comes out false, the phase halts." D14 "After a phase has refuted a claim, it performs no further effect, though it goes on evaluating to report every refutation". D82 "Nothing a program does makes the kernel stop midway." D79 "The kernel keeps a refutation in the branch where it arose." D146 "a refuted one halts". D142 and D189 "halts compilation" (D12 says there is no compile time). D133 "refuted like any other, before any effect".
+- Scenario: `output.write("a")`, then `claim(false)`, then `output.write("b")`, in a run phase. By D13 I stop at the claim. By D14 I go on evaluating and suppress "b". By D82 the kernel does not stop at all. And "a" has been written in every reading, so D133's "before any effect" holds only when a check phase ran first, which D122 makes a policy a user may turn off.
+- What breaks: an implementer who builds D13 as written returns at the first false claim and never reports the second refutation D14 requires. A reader of D133 believes a guarantee the design gives only under a default policy.
+- Severity: needs a ruling on wording that changes behaviour.
+- Confidence: high.
+- Fix direction: define "halt" once (the phase performs no further effect and its result is refuted; evaluation continues), and say in D133 and D146 that "before any effect" is a property of a pipeline with a check phase.
+
+### 4. Is a value's origin free to read, or read under authority?
+
+- Decisions: D11 ("the program's expression, which every value carries as metadata"), D51 ("Only a field's owner can write it; any code can read it"; the kernel registers "a value's origin"), D140 ("`source of x`. Reading a field is free to any code") against D53 ("An origin is a description, read under the same authority as any description"; "a run keeps none unless its configuration says so") and D43 ("a function is opaque").
+- Scenario: `r = lib.f(3)`, then `source of r` in code that holds no key of `lib`. D51 and D140 say it reads. If it reads, it shows the body of `lib.f` and D43 is void. If it does not, D51's "any code can read it" has an exception that neither D51 nor D140 states.
+- Related: D11 says every value carries its expression; D53 says a run keeps none. An analysis written against D11 finds nothing in a run.
+- Related: D133 "Each part of an expression carries a mark the kernel writes: the function it was written in ... No phase drops it". D51 says the kernel registers three fields (outcome, origin, the mark on a key). Either the where-written mark is a fourth, or it is the origin, which D53 lets a phase drop.
+- What breaks: an authority guarantee (D43) or a stated rule (D51).
+- Severity: needs a ruling.
+- Confidence: high that the texts conflict; medium on which is meant.
+- Fix direction: D51 says "any code can read a field's value; a field whose value is a description is read under the right that description needs", and D51 counts the where-written mark.
+
+### 5. D26 says the kernel computes nothing on bits; D75 and the reference kernel compute on them
+
+- Decisions: D26 "The kernel can tell two sequences apart and does nothing else with them." D75 "telling bits apart, joining two, measuring one and taking a part of one". `kernel.ts`: `length(a)` answers "the number of bits, as 64 bits"; `slice(a, from, count)`; `get` "at a place counted from 0"; `count` "as 64 bits"; `attempt(x, budget)`.
+- Scenario: `bits.length("ab")` answers a 64-bit pattern that means 16. The kernel has chosen an integer encoding. `get(xs, i)` reads `i` as an integer. So the kernel gives bits a meaning (unsigned or two's complement, big-endian, 64 wide), which D26 says only extensions and capabilities do.
+- What breaks: D26 cannot be built as written beside D75. A reader of D26 alone would refuse to put `length` in the kernel; a reader of D75 alone would not know the encoding D26 forbids the kernel to have. Which integer encoding `get` and `slice` read is stated nowhere in the decisions (is `get(xs, -1)` a refutation or place 2^64-1?).
+- Severity: needs a ruling (wording of D26 at least; the encoding is a real gap).
+- Confidence: high.
+- Fix direction: D26 says "the kernel reads bits as a count or a place where a primitive takes one, in this one encoding, and gives them no other meaning".
+
+### 6. "Symbol" is three things under one kind, and a structure's key is not said to be any of them
+
+- Decisions: D25 (kind Symbol), D30 "Symbol identity is a fully-qualified name" ("defining scope's FQN plus base name"), D35 (interned), D40 "Transient reference symbols resolved by base name" ("with no identity beyond it"), D114 (member symbols), D61 ("No value of the language is a scope"). Files: `interface.ts` `symbol` ("The same name gives the same symbol"; "a name and is looked up") and `Kernel2.symbolData` ("a symbol as data"); `forms.md` `{a: e}` "keys are the symbols `a` and `b`", `p.a`, and "a structure of its bindings, keyed by symbols of their names".
+- Scenario A (launcher): I build a capability, `structure([[K, writePrim]])`. Is `K` `symbol("write")` or `symbolData("write")`? The interface does not say whether a key is evaluated. `kind()` answers "symbol" for both, so I cannot check.
+- Scenario B (two modules): module `m` yields `{double: ...}`. Module `n` writes `m.double`. D30 makes a symbol's identity its defining scope's FQN plus base name, default the module path. If the reader qualifies, the key is `m.double` and the access in `n` asks for `n.double`: not found, a refutation. If the reader does not qualify, D30 and D114's guard ("two types that each spell `size` do not conform by accident") do not apply to Allegretto, and nothing says so.
+- Scenario C: D40's reference symbol has "no identity"; D35 says the same FQN is the same object. `interface.ts` `symbol(fqn)` interns. A name occurrence is then either interned or not.
+- What breaks: I would build keys wrongly in the launcher, or module member access wrongly in the reader.
+- Severity: needs a ruling.
+- Confidence: high that it is unstated; medium on scenario B (the reader may simply use bare names).
+- Fix direction: one decision that names the three (a name, a symbol as data, a registered symbol), says which a key is and what FQN an Allegretto key has.
+
+### 7. A claim written where nothing needs it is never evaluated, and nothing warns
+
+- Decisions: D59 ("A structure does not need its entries"; "A statement needs its value and no more"), D61 ("A binding's value is evaluated when something needs it"), D146 "Nothing is a claim until someone makes it", D217 (check "reports on every claim"), D14 ("The result holds every undecided claim"). File: `forms.md` "Bindings and blocks".
+- Scenario:
+  ```
+  double(x) =>
+    ok = claim(x * 2 > 0)
+    x * 2
+  ```
+  A newcomer writes this. `ok` is a binding; nothing needs it. The claim is never evaluated: not decided, not refuted, not undecided. `double(-1)` flows to an effect. The same holds for `{checked: claim(p), value: v}` when only `.value` is read.
+- What breaks: D217's "every claim" and D14's "every undecided claim" are false for this program unless the check phase finds claims by walking text and not by evaluating. The author believes a claim was made.
+- Severity: needs a ruling.
+- Confidence: high on the behaviour as the forms state it; what would change my mind is a rule that a claim in a binding is needed by its block.
+- Fix direction: either the reader refuses a `claim` that is not a statement, or a block needs every claim among its bindings.
+
+### 8. Loading "evaluates it" (D104) and "evaluates nothing" (D213); and the rule that a library's top-level effects do not happen has no mechanism
+
+- Decisions: D104 ("finds a file, has it parsed, evaluates it and yields an extension"), D213 ("Loading a module constructs that function and evaluates nothing"), D97 ("the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave"), D100 (`use`), D214 ("Instantiating any other module performs none").
+- Scenario A: a text says `use units` and then `3 m`. To read `3 m` the loader needs the grammar value from `units`, so it must instantiate `units` while loading the using module. Loading has evaluated something. D213 says it does not.
+- Scenario B: a library module declares `capability output` and has the top-level statement `output.write("loaded")`. D214 says instantiating it performs no effect. How? If it is not handed `output`, its functions do not hold it either. If it is handed `output`, the statement is a chain of `then` in its body and by D59 it happens. If the reader refuses a top-level statement in an imported module, the reader must know at read time whether the module is "the one being run", and the same file is then two programs.
+- Scenario C (`forms.md`): "the block's value is its last statement's" and "What the module yields is a structure of its bindings". The module's block has two values. Which the instantiating call returns, and where the statements sit relative to the structure, is not said.
+- What breaks: I cannot write the loader; I would pick one of three behaviours for B.
+- Severity: needs a ruling.
+- Confidence: high.
+- Fix direction: state the module function's body as data: `block(bindings, then(s1, ... then(sn, exports)))` or otherwise, and say which party suppresses a library's statements.
+
+### 9. No way to make a structure whose size is computed
+
+- Decisions: D75 ("making and reading structures"), D119 ("Array's map, filter and reduce are written in the language"), D105 ("a usable language"). Files: `kernel.ts` primitive list (`get`, `count` only; "chunk K4 fixed the list"), `forms.md` sections 2 to 4.
+- Scenario: write `map(f, xs)` in Allegretto. The only form that makes a structure is the literal, whose size is fixed in the text. There is no append, no concatenate, no constructor from a count. I can only build nested pairs `[head, tail]`, which `count` and `xs[i]` do not read as a list.
+- What breaks: D119's claim, and D106 (a parser engine in Allegretto needs to build lists of matches).
+- Severity: needs a ruling (a missing primitive; `kernel.ts` does not list it among what is left for later).
+- Confidence: medium. A primitive I was not shown, or one "ruled and not yet built", would change my mind.
+- Fix direction: name the making primitive in D75 and in `forms.md` (for example a join of two structures).
+
+### 10. "Expressions are values" led me to quotation; later decisions take it away
+
+- Decisions: D24, D36 ("an unevaluated application ... is an ordinary value"), D83 ("a parser is a function from a grammar and a text to an expression"), D110 ("an expression built by a running program"), D11 ("a function, evaluated over the program's expression") against D63 ("A function never holds a value of an expression's kind that it can look into"), D44 ("A parser's output is a description"), `kernel.ts` ("There is no quotation").
+- Scenario: after D36 I would give Allegro code a way to hold, build and take apart Expression values, and write the parser of D83 to return one. D63 and D44, twenty decisions later, say code holds only descriptions (plain data) and functions built from them. D83 still says "to an expression" and D110 "an expression built by a running program".
+- What breaks: the type of a parser's result; whether `Expression` and `Param` are kinds a program can ever observe.
+- Severity: wording, with a wrong build behind it.
+- Confidence: high.
+- Fix direction: D36 says who can hold an expression (the kernel and the host); D83 and D110 say "description".
+
+### 11. `forms.md` names things it does not give a way to write
+
+- File: `forms.md` sections 2 and 3. Decisions: D105.
+- (a) Dotted primitive names. `.` is entry access with the highest precedence, so `int.text(n)` parses as `get(int, text)(n)`. Is `int` a structure the reader binds, or is `int.text` one name? Same for `bits.join`.
+- (b) "The kernel's other primitives are reached as names Allegretto binds: `then`, `attempt`, `describe`, `build`, and those ruled and not yet built." `count`, `same`, `get`, `block` are built and not listed. The number of entries of a list has no stated name.
+- (c) `claim(is_int(x))` is the document's one example of a check. No `is_int` ships, and none can: an integer is 64 bits, as is a float and an eight-byte text. The example teaches a check that cannot exist in Allegretto.
+- (d) `attempt`: D80 and D75 say it evaluates "a function"; `kernel.ts` says `attempt(x, budget)` evaluates "its first argument". The shape of the data it answers is not given, so its result cannot be read.
+- (e) `export` is used in prose ("those marked `export`") and has no row in any table. Where a block may appear (after `=>`, after `then`, after `else`) is not stated. An empty block, a block with bindings and no statement, and `[]` have no stated value.
+- (f) `line = read()` and `line <- read()` use a `read` that no shipped capability has (D242: output, timers, HTTP).
+- What breaks: see the programs below; each needed one of these guesses.
+- Severity: wording for (a), (b), (e), (f); needs a ruling for (c) and (d).
+- Confidence: high.
+
+### 12. A launcher cannot read "every claim" out of a result
+
+- Decisions: D14 ("The result holds every undecided claim"), D217 (check "reports on every claim"), D234 ("everything a tool shows ... is in the result"), D237. File: `interface.ts` `Result`, `Advance`, `outcomeOf`, `restsOn`, `reasonOf`.
+- Scenario: I write the `check` launcher. `evaluate` returns `{value, ended, steps, refuted: boolean}`. To list claims I have `outcomeOf(value)` for a value I already hold. There is no call that lists the claims decided, the claims still residual, or their names. I would walk the residual with `expressionOf` and compare each `fn` with `kernelPrimitive("claim")`, but the interface does not say that two handles to one value are `===`, and `kernel.ts` says entries of the result are not evaluated until "the caller evaluates it", with no statement of the scope to pass to `evaluate` for an entry.
+- What breaks: D217 and D234 cannot be met through the interface; each tool would add a walk of its own, which D234 forbids.
+- Severity: needs a ruling.
+- Confidence: medium. A claims listing in a later interface version, or a statement that tools read claims through an Allegro extension holding the inspection right, would change my mind.
+- Fix direction: a call that lists the claims of an evaluation with outcome, reason and what each rests on.
+
+### 13. "Evaluated in a scope that holds it" grants a capability by name
+
+- Decisions: D209 ("code still has to be handed a capability, by value or by being evaluated in a scope that holds it"), D211 ("each in its own scope with its own capabilities") against D41 ("Nothing is granted by name"), D45, D134 ("the capabilities it was given are its parameters").
+- Scenario: the launcher does `bind(scope, symbol("output"), cap)` and evaluates a main module that imports `lib`. If free names resolve through the scope of `evaluate`, any function anywhere that writes the name `output` holds the capability without declaring it. `Kernel2.module` requires a closed function but its list of what makes one open (cell, stray parameter, effectful primitive) does not include a free name.
+- What breaks: D45 and D46 (a bound on capabilities read from what a function holds) if the scope route exists; if it does not, D209 and D211 describe a route that must not be built.
+- Severity: needs a ruling.
+- Confidence: medium; a statement that module functions have no free names after loading would close it.
+
+### 14. A session at a prompt is "a module", but a module's identity and keys come from its content
+
+- Decisions: D109 ("A session at a prompt is a module whose text arrives one entry at a time"; "a name may be bound again"), D214 ("A session at a prompt is the module being run"), D107 ("the kernel derives the module's identity from its content, and makes the module's keys from that identity"), D213 ("Loading a module constructs that function"). Files: `forms.md` ("A name is bound once in a block"), `interface.ts` `bind` ("Binding a symbol twice in one scope is an InterfaceError"), `Kernel2.module` (the function must be complete to hash).
+- Scenario: entry 1 defines a type with a private member, held by the session module's key. Entry 2 arrives. The session's content has changed, so by D107 its identity and keys have changed, and entry 2 cannot reach the member entry 1 made. Or each entry is its own module, and then "a session is a module" is false and entries share no key.
+- What breaks: private members at a prompt; the launcher writer does not know whether to call `module` once, per entry, or never.
+- Severity: needs a ruling.
+- Confidence: medium.
+
+### 15. A group of decisions cannot be acted on as written
+
+- "Decides: open": D124, D165, D185, D194, D196, D200, D227, D240. Each is a question listed as a decision. A reader counting 245 decisions counts eight that decide nothing.
+- Stated in the vocabulary of one host implementation, with no definition anywhere in the 245: D31 ("declaration merging", "the fork point"), D33 ("one declared hidden class", "the boundary invariant"), D55 (`withMeta`, `carryMeta`), D56, D73 ("marked before precompile", "host sentinel", "the first round's depth", "body wrappers"), D116 ("define-spec key", `struct_new`), D28 ("the mutability track"), D113 ("the proof-export boundary"). I could not build these in another host, and D73's "precompile" sits against D12 ("no fixed compile time").
+- D55 against D51: "`withMeta` is the one attachment operation" and "Only a field's owner can write it". Who may call `withMeta` is in neither.
+- D136: "until then every new construct must work in both modes" when one of the two modes does not exist, and `forms.md` gives braces to structures only.
+- D189 ("the plan constructor yields an error value ... weaker than a halt", settled) against D130 ("`Positive(-1)` is a refutation") and D81: a failed check in a constructor is three different things in three decisions.
+- Severity: wording.
+- Confidence: high.
+
+---
+
+## The five programs, written from `forms.md` alone
+
+### (a) Print the numbers 1 to 10, one a line
+
+```
+capability output
+
+count_to(n, last) =>
+  if n > last then true else
+    output.write(int.text(n) ++ "\n")
+    count_to(n + 1, last)
+
+count_to(1, 10)
+```
+
+Guesses:
+- There is no loop form, so recursion. Not said; inferred from the absence.
+- The part is called `write`, from the one example. Whether it adds a line end is unknown; I add `"\n"`.
+- `int.text` is reachable as written (finding 11a).
+- A block may follow `else`. Not stated.
+- `if` has no one-armed form, so the stopping arm needs a value. I chose `true`.
+- A function declared at top level may use `output` from the header. Not stated, inferred from "bound to the name".
+- The module is "the one being run", so the last line's effects happen (D214). If someone imports this file, D214 says nothing is printed, and I do not know how (finding 8).
+
+What I would get wrong: I first wrote `r = output.write(...)` to "do the write and keep going". That is a binding, so nothing is written.
+
+### (b) Read a number as text, double it, print it
+
+```
+capability output
+input n
+
+output.write(int.text(text.int(n) * 2) ++ "\n")
+```
+
+Guesses:
+- "Read" has no source. No shipped capability reads (D242), and the `read()` of the examples is not defined. I used `input`, which the configuration supplies. How a user supplies it on a command line is not stated.
+- An input arrives as text. "Plain data" does not say which.
+- If the text is `"21\n"`, `text.int` refuses and the program is refuted, which by D78 means "the program is wrong", for a user's typing error. D122 tells me to guard outside values "with the same predicate", but no predicate for "is a decimal number" ships; the only guard is `attempt`, whose argument and result shape I do not know (finding 11d).
+- Trimming a line end needs `bits.slice`, which counts in bits. I would have passed byte counts.
+- `* 2` wraps silently at 64 bits.
+
+### (c) A function that sums a list
+
+```
+sum(xs) => sum_from(xs, 0, 0)
+
+sum_from(xs, i, acc) =>
+  if i == count(xs) then acc else sum_from(xs, i + 1, acc + xs[i])
+```
+
+Guesses:
+- `count` is a bound name (finding 11b). If it is not, I cannot find the end of a list: `xs[i]` past the end is a refutation, and using `attempt` to detect the end needs the unknown result shape.
+- `i == count(xs)` compares two 64-bit patterns, which works only if `count` answers the same encoding as the literal `0` plus one. `kernel.ts` says "as 64 bits"; I assume the integer encoding of `42`.
+- `sum([])` is 0 if `[]` is allowed.
+- A function that returns a list (map) I could not write at all (finding 9).
+
+### (d) A module that exports one function, and a module that imports and calls it
+
+`twice.alg`:
+```
+export double(x) => x * 2
+```
+
+`main.alg`:
+```
+capability output
+import twice
+
+output.write(int.text(twice.double(21)) ++ "\n")
+```
+
+Guesses:
+- `export` goes before a binding (no table row; D134 shows `export NAME = …`, so `export double(x) => …` is a second guess on top).
+- `import twice` finds a file named after the word. The extension, directories, and a name that is not an identifier are not stated. I cannot rename on import.
+- The order of header lines among themselves is free.
+- The key `double` in what `twice` yields is the same symbol as the `double` in `twice.double` written in another module (finding 6B).
+- If `twice` needed `output`, I could not pass it (finding 2).
+- A helper in `twice.alg` without `export` is hidden once one binding is exported; with no `export` at all everything is handed out. I would be surprised the first time adding one `export` hid the rest.
+
+### (e) A claim that a function's result is positive
+
+```
+square_plus_one(x) =>
+  r <- x * x + 1
+  claim(r > 0)
+  r
+```
+
+Guesses:
+- A claim must be a statement to be evaluated (finding 7). I use `<-` for `r` only to be safe; `r = …` would do, since the claim needs it.
+- What `claim(e)` answers as a value is not stated in `forms.md`. I assume it does not matter in statement position.
+- Which value the outcome is recorded on (D77 "recording on the value") is unclear: the claim's own result, or `r`? I assume the refutation reaches `r` because the block's value is computed after the `then` chain (D78), but "computed from" for `then(first, second)` is not defined.
+- This claims positivity at each call, with the argument known. The claim "for every `x`" (D147) has no Allegretto form I can find: it needs the specializing primitive, which is "ruled and not yet built" and unnamed. With wrapping arithmetic the universal claim is false anyway (`x * x + 1` wraps), and I could not find that out from Allegretto.
+- With `x` unknown at check time the claim stays residual, so a check phase says "undecided", not "decided".
+
+---
+
+## `interface.ts`: what a new launcher's author does not know how to do
+
+1. **What to pass for each declared parameter.** `SavedProgram.declares` gives role and name. For "capability": a structure of parts, keyed how (finding 6A)? For "input": a cell, a filled cell, or the data? For "module": the imported module's function, or the value its instantiation gave? For a capability the phase lacks: finding 1.
+2. **Who instantiates once.** D213 says once per distinct set of arguments. The interface has no memo; `evaluate(expression(moduleFn, args))` twice gives two instances. Whether the launcher, the loader extension or the kernel keeps the table, and how two argument sets are compared, is not stated.
+3. **Which scope to evaluate in, and what to bind in it.** A module function from `load` looks closed. Then what is `scope` for, beyond a prompt? Whether the Allegretto names (`then`, `int`, `bits`) are nodes in the record or names the launcher must bind is not stated.
+4. **How to read a whole result.** Entries are not evaluated until read; "a host that wants one evaluates the entries it reads", with no scope named for that `evaluate`.
+5. **How to list claims** (finding 12).
+6. **What `kind` answers for a cell.** `Cell extends Value`; `Kind` has seven members and no cell. Also for a key (structure, presumably) and for `symbolData` (finding 6).
+7. **How to tell the two interface versions apart.** `interfaceVersion` is typed `typeof INTERFACE_VERSION`, which is 1, for `Kernel2` as well. `saved-program.ts` tests `"symbolData" in kernel`.
+8. **Where a capability's definition is.** D212 says a capability is defined once, in Allegro, by name and parts; D243 says a failure is filled "in the form the capability's definition states". `PrimitiveDeclaration` carries two free strings. No call registers a definition or checks a declaration against one, and the failure form of the shipped capabilities is not in the files I read.
+9. **How an effectful primitive reports a failure it knows at once.** `Refusal` is a refutation (the program is wrong). Any other throw "is not caught". So a failed write must be returned as plain data in an unstated form.
+10. **Whether the kernel withholds my effectful primitive from refuted or undecided arguments** (D14). `kernel.ts` lists the gate as left for later. `PrimitiveContext` cannot read metadata, so the primitive cannot check for itself.
+11. **The order of effects on `advance`.** The file says it is not stated (D62 is open). A launcher with two pending timers cannot promise an output order.
+12. **Limits.** D202 says "set limits"; the interface takes them per call only. The speculative evaluation of D60 and D67 spends steps, so the same program has a different step count with and without a pending cell; D204 admits this, but a launcher cannot choose a budget from a previous run.
+13. **A prompt** (finding 14): one scope with rebinding is an InterfaceError; a child scope per entry is my guess.
+14. **Who may call `inspectionRight()`.** Anyone holding the kernel object. Fine for a launcher; an embedding application that passes the kernel object to plug-in host code has given away every module's privacy, and the file does not warn.
+
+---
+
+## Where a later decision changed the picture I had formed
+
+| Picture from | Changed by | What I had to redo |
+|---|---|---|
+| D13 "the phase halts" | D14, D82 | Halting is not stopping (finding 3). |
+| D36 "expressions are values" | D63, D44 | No quotation; programs hold descriptions (finding 10). |
+| D11 "every value carries [its expression]" | D53 | Origins are optional and need a right (finding 4). |
+| D30, D34, D40 scopes with FQNs and binding attributes | D58, D61 | A scope is not a value and has no stated identity; what "defining scope's FQN" is for a block is unknown. |
+| D19 "A capability is a named set of effectful [primitive functions]" | D158, D212 | A capability has parts and narrowed forms and is "defined once, in Allegro"; a narrowed form is a composed function, not a set of primitives. |
+| D26 "computes nothing" | D75 | Finding 5. |
+| D59 "evaluated when its value is needed" | D60, D65, D67 | Evaluation ahead, both branches. D59's last sentence allows it, but `kernel.ts` says "neither branch is evaluated" while the condition is unknown, so the reference kernel and D67 differ today. |
+| D76 "evaluated once in a configuration" | D213 | Once per set of arguments (finding 2). |
+| D104 "evaluates it" | D213 | Finding 8. |
+| D21 four strengths | D236, `Outcome` | Five words; "refuted" is an outcome but not a strength. The order of sampled and assumed, which "the weaker strength" needs, appears only in D236's list. |
+| D81 "a failure ... is not a refutation" | D83 "A text that does not parse is a refutation" | A program that parses text it receives (D225) is "wrong" on bad input unless it wraps the parser in `attempt`. |
+
+## Decisions that are two decisions, or whose title and text differ
+
+- D7 "Order of definition carries no meaning": the text names three things whose order has meaning, and adds "Replacing a definition is an explicit operation", which no decision defines outside grammars (D99).
+- D14 "A refuted value never reaches an effect": also decides that weaker strengths block nothing, what a value carries, that a phase stops effects after a refutation, and that the result holds every undecided claim.
+- D19: defines primitive function, capability, the metadata restriction, assumed purity and the claim about returned data.
+- D62 "Effects on one capability keep their order": also decides ordering across capabilities, partial performance, where order is read from, and the race of two late answers.
+- D100 "A grammar change reaches to the end of its block": also decides the words `import` and `use` and that notation is not passed on.
+- D109 "Running a program is evaluating its main module with a configuration's capabilities": the text is about the prompt; the title's statement is one sentence ("there is no separate act of running").
+- D133: the claim about where an access was written, the kernel's mark, and the accessor pattern.
+- D149 "Discharge mechanisms without search": half of it defines the proposer that does search.
+- D213: module as function, instantiation, identity of instances, and inputs.
+- D217: restates D12's definition of a phase, then decides three phases.
+
+## The ten terms a reader most needs defined earlier, in the order they first matter
+
+1. **claim** — first used D1; described D13; "nothing is a claim until someone makes it" only at D146; which value its outcome is recorded on, D77. Changes what D1 to D12 mean.
+2. **configuration** — first used D3; defined D205 (and the chapter note before D201). D12, D14, D45, D76 all assign duties to it.
+3. **capability** — first used D6 ("metadata with its capabilities", where it seems to mean something else); used D12; defined D19; redefined D158 and D212.
+4. **halt** and **refuted / refutation** — "halts" D13, "refuted claim" D14; refutation defined D78; halt never.
+5. **strength** (decided, sampled, assumed, undecided) — used D14; defined D21; ordered only at D236.
+6. **policy** — used D14 and D122; defined D230.
+7. **cell** — used D28 ("an unresolved future cell") and D34 ("cell origin"); defined D68.
+8. **scope** — used D30, D34, D40; D58 and D61 say what it is not; nothing says what it is, or what its FQN is.
+9. **description**, **describe**, **right / inspection right** — "under a right" D38; description D42; rights D43.
+10. **module** and **key** — "the key of the module that made the function" D43; module D104 and D213; key D107.
+
+Next in line: launcher (D208, used from the note before D201), builder (D21, defined D222 and D231), kernel variant (D21, defined D232), shape and knowledge (D127), "Part I / Part II" (D159, D229: the parts are never named in the extract).
+
+## What I looked for and found no problem with
+
+- The dependency order itself: apart from the terms above, each decision's "Depends on" names earlier decisions; I found no decision depending on a later one.
+- The saved-program record: it constructs only, names pure primitives by hash, never a capability, and a param belongs to one function. It matches D220 and D221, and `load` matches the header.
+- Restore: `claimKey` and `restore` do what D222 and D203 say; I could write that part of a loader from the interface.
+- The shipped primitives against `forms.md` section 3: names, domains and refusals agree.
+- The operator table and precedence: complete enough to parse every expression I wrote, apart from the dotted names.
+- The `x <- e` form and its data form `block({x: e}, then(x, rest))`: clear, and consistent with D60 and D61.
+- D87 against the reference kernel's handling of an unbound name: consistent.

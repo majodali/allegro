@@ -358,7 +358,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language
 
 #### Order of definition carries no meaning
-- Decides: the order in which definitions and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Only effects have an order: plain effects are not declarations, and happen in the order the program writes them.
+- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body happen in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -371,6 +371,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
 - Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
 - Notes (2026-11-16, the order of effects): the order of a body's statements is carried by sequence ("Sequence is one kernel primitive"); bindings stay order-free.
+- Notes (2026-11-17, the adversarial review's issue 16): reworded by ruling. The entry said only effects have an order, and later decisions made two more exceptions it did not state. The first is carried by sequence, the second by "A text can change the grammar it is read in", the third by "Running a program is evaluating its main module with a configuration's capabilities". Knowledge from an `assert` holds for the statements after it, which is the first exception again.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
@@ -1380,7 +1381,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability.
+- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability. A condition is one of the kernel's two truth values: the conditional refutes anything else, a number that is not zero included.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1401,6 +1402,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, built): the reference kernel has the primitives on bits (`same`, `join`, `length`, `slice`) and on structures (`get`, `count`). `same` also tells two symbols apart: a grammar is keyed and tagged by symbols, and nothing else could compare them. A symbol is written as data through the interface, for a notation's symbol literal; quotation of an expression stays removed.
 - Notes (2026-11-16, the block of bindings): eleven, with the block of bindings ("A block of bindings is one kernel primitive").
 - Notes (2026-11-16, no way to ask for a whole value): the maintainer ruled against an interface call that evaluates a value in full, and against a kernel primitive for it for now: "it's best to add or update kernel primitives based on necessity as it arises". A tool that prints or saves a value reads each entry, and reading evaluates. A primitive for it is taken up again if Allegretto code shows a general need.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 (the same entry of the acceptance stream's record): `if 1 then 42 else 0` is a refutation, where the present tree takes 1 as true. The note of 2026-11-12 on truth already said so; the decision's text now does.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1707,7 +1709,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Changing the grammar
 
 #### A text can change the grammar it is read in
-- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. Such a form is a statement of a block, never part of an expression, and the text before it in the block must have exactly one parse: more than one is a refutation that names both readings. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse.
+- Decides: a form can replace or augment the grammar at the point where it appears, and the text after it is read in the new grammar. Such a form is a statement of a block, never part of an expression, and the text before it in the block must have exactly one parse: more than one is a refutation that names both readings. The form stands for an expression; the parser evaluates it at once and its value is the new grammar, so parsing and evaluation interleave. Such a form is defined by a grammar like any other, so a language can define its own. No text is scanned ahead of its parse. The parser engine does not change within a text; the grammar it reads the text in may change for each module and in mid-file.
 - Status: open (the code scans a header ahead of the parse and fixes the grammar for the whole file); ruled 2026-11-12 (DR3); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -1721,6 +1723,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR3): every caller scans the header itself and strips it before the parse (`src/use-scanner.ts:47`; `src/index.ts:131`, `:385`, `:442`; `web/allegro-web.ts:38`), and the callers disagree: inspect and verify load no module for a member import or an inline grammar, `prove` leaves the header in place and fails, the sandbox has its own scanner.
 - Held finding (2026-11-12, DR3): an inline grammar inside a library is rejected.
 - Notes (2026-11-17, the adversarial review's last issues): the sentence on where a change may appear is added by ruling, for issue 22: the parse must be settled at a change and every parse must be reported, and the two conflict wherever two readings are alive at the change. At the end of a statement the readings that remain are those that would remain to the end, so nothing is refused that would have been accepted. A form that reads its inside in another grammar already loaded is not a change of grammar.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on the backlog's item for embeddable grammars (docs/plans/rebuild.md §7).
 - Chapter: Changing the grammar
 
 #### Every production can be extended
@@ -2215,7 +2218,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Refinement types
 
 #### An interface is a type drawn from, not instantiated
-- Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types.
+- Decides: an interface is a declaration-only type, recognised by `InterfaceKind`'s predicate (no construct); conformance to it is symbol membership, and Allegro has no abstract types. An interface refuses a method body.
 - Status: partly built
 - Type: capability
 - Rationale kind: technical
@@ -2227,6 +2230,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md §36; D45; B-104(g), B-116
 - Book home (fragments' proposal): standard/type-system
 - Notes: `Interface.define` silently discards a method body (B-116); the `__interface` marker and its deletion are open.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 in the acceptance stream's session: the present tree discards such a body with no diagnostic.
 - Chapter: Refinement types
 
 ### Reaching a member
@@ -3341,7 +3345,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The kernel's interface
 
 #### Limits are step budgets
-- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant.
+- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant. Nothing else bounds an evaluation but memory: a recursion may be as deep as its budget allows.
 - Status: open (a depth bound exists); ruled 2026-11-13 (DR6); reworded 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -3353,6 +3357,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a solver gives each candidate ten thousand steps; a candidate that runs out is undecided, and is so on every machine.
 - Notes: new, by ruling.
 - Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 20: the entry called a step budget deterministic.
+- Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 on the speed tests of milestone 3 (docs/plans/rebuild-acceptance.md §7, the entry on the speed tests): "no depth limit". The reference kernel ended a recursion of about 400 calls at the host's stack, at a depth that differed from run to run. That limit goes; how is the kernel stream's to choose.
 - Chapter: The kernel's interface
 
 ### Configuration

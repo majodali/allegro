@@ -1,0 +1,47 @@
+import { test } from "node:test";
+import { setup, byte, num, truth, hash } from "./common.ts";
+const log = (...a: unknown[]) => console.log("   >>", ...a);
+const safe = (name: string, f: () => void) => test(name, () => { try { f(); } catch (e) { log("THROWN:", (e as Error).constructor.name, String((e as Error).message).slice(0, 200)); } });
+
+safe("PH2 fill with function", () => { const { k, write } = setup(); k.fill(k.cell(), write); log("fill(cell, effectful primitive): accepted"); });
+safe("PH3 fill with key", () => { const { k } = setup(); const c = k.cell(); k.fill(c, k.inspectionRight()); log("fill(cell, inspection right): accepted; isKey", k.isKey(k.current(c))); });
+safe("PH4 key through two 'pure' primitives", () => {
+  const { k, call } = setup(); const right = k.inspectionRight(); let stash: any;
+  const put = k.primitiveFunction({ purity: "pure", hash: hash(79), name: "hashOf", arity: 1, run: (a, c) => (stash = a[0], c.bits(Uint8Array.of(0))) });
+  const take = k.primitiveFunction({ purity: "pure", hash: hash(80), name: "zero", arity: 0, run: () => stash });
+  const r1 = k.evaluate(call(put, right), k.scope()); log("key handed to a primitive: refuted", r1.refuted, k.reasonOf(r1.value));
+  const v = k.evaluate(call(take), k.scope()).value; log("comes out of another: isKey", k.isKey(v));
+});
+safe("PH5 what kinds is a primitive handed", () => {
+  const { k, call, write, add } = setup(); const seen: string[] = [];
+  const peek = k.primitiveFunction({ purity: "pure", hash: hash(81), name: "peek", arity: 1, run: (a, c) => (seen.push(c.kind(a[0])), c.bits(Uint8Array.of(0))) });
+  const p = k.param("p");
+  for (const v of [write, add, k.composedFunction([p], p), k.structure([[null, write]])]) { const r = k.evaluate(call(peek, v), k.scope()); seen.push(r.refuted ? "refuted:" + k.reasonOf(r.value) : "ok"); }
+  log(seen);
+});
+safe("DOS1 deep recursion, no limit given", () => {
+  const { k, call, kp, add } = setup(); const scope = k.scope(); const n = k.param("n"); const f = k.symbol("m.f");
+  // f(n) = add(1, f(n))  : not a tail call, never ends
+  k.bind(scope, f, k.composedFunction([n], call(add, byte(k, 1), call(f, n))));
+  const r = k.evaluate(call(f, byte(k, 1)), scope); log("ended", r.ended, r.steps);
+});
+safe("DOS1b the same inside attempt with a large budget", () => {
+  const { k, call, kp, add, steps, form } = setup(); const scope = k.scope(); const n = k.param("n"); const f = k.symbol("m.f");
+  k.bind(scope, f, k.composedFunction([n], call(add, byte(k, 1), call(f, n))));
+  const r = k.evaluate(call(kp("attempt"), call(f, byte(k, 1)), steps(50_000_000)), scope, { steps: 100_000_000 }); log("attempt says", form(r.value).form, r.steps);
+});
+safe("DOS2 join doubling: memory grows 2^n in n steps", () => {
+  const { k, call, kp, steps, form } = setup();
+  let e: any = k.bits(new Uint8Array(1024));
+  for (let i = 0; i < 26; i++) { const s = k.symbol("m.x" + i); e = call(kp("block"), k.structure([[s, e]]), call(kp("join"), s, s)); }
+  const t0 = Date.now();
+  const r = k.evaluate(call(kp("attempt"), call(kp("length"), e), steps(1000)), k.scope(), { steps: 2000 });
+  log("26 doublings of 1 KiB under attempt(1000 steps):", form(r.value).form, "steps", r.steps, "ms", Date.now() - t0, "rss MB", Math.round(process.memoryUsage().rss / 1e6));
+});
+safe("DOS3 a structure without end handed to a primitive", () => {
+  const { k, call, kp } = setup(); const xs = k.symbol("m.xs");
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(51), name: "size", arity: 1, run: (a, x) => x.bits(Uint8Array.of(x.entriesOf(a[0]).length)) });
+  const e = call(kp("block"), k.structure([[xs, k.structure([[null, byte(k, 1)], [null, xs]])]]), call(size, xs));
+  const r = k.evaluate(e, k.scope(), { steps: 100000 }); log("ended", r.ended, "steps", r.steps, r.refuted, k.kind(r.value));
+  const r2 = k.evaluate(e, k.scope()); log("no limit: ended", r2.ended, "steps", r2.steps);
+});

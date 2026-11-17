@@ -1,0 +1,188 @@
+# Consistency review
+
+Reviewer angle: do the decisions contradict each other, the forms of Allegretto, or the kernel's interface.
+Read: `decisions-extract.txt` (D1 to D245), `next/ext/allegretto/forms.md`, `next/kernel/interface.ts`, `next/kernel/saved-program.ts` (header and types), `next/kernel/kernel.ts` lines 1 to 125, `next/prims/index.ts`. Nothing else.
+
+Fifteen findings, most severe first. Short notes that are not findings follow them.
+
+---
+
+## 1. A second instance with substituted imports carries the module's keys and field ownership
+
+- Decisions: D213 (A module is a function of its capabilities, inputs and imports), D107 (A key is made with the module that holds it), D54 (Trust in a value needs no seal), D51 (An extension registers its own fields), D132 (A private member is one whose key not all code holds), D215 (Loading is three capabilities of rising strength). Interface: `Kernel2.module` ("the rest are what the module declares: capabilities, inputs, other modules ... identity from the function's content").
+- Scenario: module `money` imports `validator` and exports `make(x)`, which calls `validator.ok(x)` and then writes a field `money` owns, or a member under `money`'s key. Module `evil` holds only the capability to load text (D215: the weakest). It loads `money`'s text and instantiates it itself (D213: "Instantiating it is a call, made by whoever loaded it"), passing as the import a structure `{ok: x => true}`. D213: "every instance has the module's identity and its keys, since each is the same code". The identity is derived from the function's content, and the imports are parameters, so they are outside it.
+- What breaks: the second instance's `make` produces values that carry `money`'s mark with the check removed. D54's three reasons ("only the owner can write the field that marks it") no longer give trust: the owner is a content identity that any holder of a loading capability can re-instantiate around arguments of its choosing. The same holds for private members (D132) and for the right to describe (D43).
+- Severity: blocks.
+- Confidence: medium. I would change my mind if a module's identity covered the identities of its imports, or if only the loader of a configuration could instantiate, with one fixed import graph.
+- Fix direction: bind imports into the identity (hash of the import's identity is content), or make keys per instance and state how a saved program then finds them.
+
+## 2. A private member is reachable by place
+
+- Decisions: D132, D32 (The composite is one sequence of optionally-keyed entries), D75 (reading structures). Kernel primitives `get(structure, key)` "or at a place counted from 0" and `count`. Forms: `p[i]`. Interface: `Entry = [key: Value | null, value: Value]`, `PrimitiveContext.entriesOf`.
+- Scenario: a type's module stores a private member as an entry keyed by its key. Code without the key evaluates `count(obj)` and then `get(obj, 0)`, `get(obj, 1)`, and so on. In Allegretto: `obj[2]`.
+- What breaks: D132 says "no other code can [reach the member], by any name". It can, by place. The same reaches a module's unexported bindings if the module object is a structure holding all of them, and any entry of a capability.
+- Severity: blocks.
+- Confidence: medium-high. I would change my mind if a decision said that an entry keyed by a key is skipped by place reads and by `count`, or that private members are not entries of the value at all.
+- Fix direction: reading by place applies to unkeyed entries only; state it in D32 or D132 and in `get`.
+
+## 3. `attempt` returns "limit reached" as data, so a claim can be decided differently in two kernels
+
+- Decisions: D80 (An evaluation can be returned as data), D204 (Limits are step budgets), D70 (The same program and the same information give the same result), D222, D232. Interface comment: "A budget of steps is deterministic".
+- Scenario: `r = attempt(f(), 1000)` followed by `claim(is_value(r))`. D204: "where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant". In one kernel `f()` ends in 990 steps and the claim is decided. In a variant, or with a different arrival order, it needs 1010 and the claim is refuted.
+- What breaks: D70 ("A claim is never decided one way in one evaluation and the other way in another; a limit can only leave it not yet decided"). D80 lists D70 as a dependency and breaks it. D222's restore rests on determinism, and D232's "agrees with the reference" cannot be checked by deciding again.
+- Severity: needs a ruling.
+- Confidence: high. I would change my mind if the "limit reached" answer were not a value a program can branch on.
+- Fix direction: a limit inside `attempt` gives a residual (undecided), never a datum; or step counting is fixed as part of the reference semantics.
+
+## 4. A stored outcome can be restored against different imports
+
+- Decisions: D222 (A stored outcome is restored with its builder's name), D221 (A saved program names what it needs by content hash), D213, D21 and D229 (a result names the extensions it rests on). `saved-program.ts`: `Declared { param, role, name }`, `needs` (primitives only), `StoredOutcome`. `interface.ts`: `Rest` has the kinds kernel, primitive, capability, builder; `claimKey` hashes "the claim's content, the content of the function it sits in, and what the outcome rests on".
+- Scenario: the builder decides `claim(lib.limit() < 10)` in module `m`, with `lib` version 1 handed in as the import. The record stores the outcome. The loader's side instantiates `m` with `lib` version 2, where `limit()` is 50. The record names the import by `name` only. `Rest` has no kind for an extension or a module, and the claim key covers `m`'s function alone.
+- What breaks: the claim is reported "decided" and is false. D222's "a stored outcome is what the loading kernel would compute" does not hold. D221's "each extension it depends on by a hash of its content; a mismatch at load is a refutation" has no place in the record.
+- Severity: blocks (a restored outcome is a core guarantee), with a simple fix.
+- Confidence: medium-high. I would change my mind if outcomes are stored only for claims decided with every module parameter unknown; no decision says so.
+- Fix direction: `Declared` for a module carries the import's identity, `Rest` gains a module kind, and instantiation with another identity discards the outcomes.
+
+## 5. D62 leaves effects on different capabilities unordered; D60, D7, D213 and D214 order them by the text
+
+- Decisions: D62 (Effects on one capability keep their order), D60 (Sequence is one kernel primitive), D7, D213, D214.
+- Scenario: `log.write("deleting"); files.delete(p); log.write("deleted")`. D60: `then` "needs its first argument, and then its value is the second", "the one way the order of a text becomes an order of evaluation". D7: "the statements of a body happen in the order written". D214: "top-level effects, in written order". So "deleted" follows the delete. D62: "Effects on different capabilities are unordered unless an order between the two is declared", so a phase that holds `log` and lacks `files` may write both lines and leave the delete in the residual; D62's own status note says the reference kernel does the opposite.
+- What breaks: two answers for one program. Either `then` orders everything (and D62's partial-phase sentence is void) or it orders one capability only (and D60, D7, D214 overstate). A second case: D62's last sentence lets two chains "act in the order the answers arrive", against D70's "neither the order in which information arrives ... can change the outcome".
+- Severity: needs a ruling.
+- Confidence: high that the texts disagree. I would change my mind if "unordered" were defined to apply only where neither sequence nor need relates the two effects; D62's first sentence could be read that way but its third cannot.
+- Fix direction: say that sequence orders all effects, and that "unordered" is a declared permission to commute.
+
+## 6. "In the scope where it was written" against name resolution by base name, and against a saved residual
+
+- Decisions: D63 (No argument can be inspected), D72 (Substitution of params into bodies), D40 (Transient reference symbols resolved by base name), D61 ("A name means the innermost block's binding"; "No value of the language is a scope or holds one"), D43 ("Opening a call copies the callee's body into the residual"), D218, D220. `saved-program.ts`: a symbol node is a bare name; the record "cannot ... reach a scope".
+- Scenario: `f(a) => block({x: 2}, a + x)`, and the caller has `x = 10; f(x + 1)`. D63: the argument is evaluated in the caller's scope, so 13. D72, D40 and D61: the argument is put in place of the parameter and its `x` resolves by base name to the innermost block, so 5. The kernel can avoid this only if the substituted argument, and every function value (kernel.ts: "free names are tied to the scope in which the function value is first evaluated"), holds a scope, which D61 denies.
+- What breaks: the residual of a phase holds such arguments and functions. D218 says it can be saved; the data form names a symbol by name alone, so the saved residual captures: the loaded program computes 5.
+- Severity: needs a ruling (blocks saving residuals as specified).
+- Confidence: medium-high. I would change my mind if opening a call renames or resolves names to bindings before substitution; D72 says the opposite ("leaves Symbols to resolve by name through the scope").
+- Fix direction: resolve names to binding identities when a function value is made, and give the data form a way to say which binding.
+
+## 7. The mark of where an access was written has no carrier
+
+- Decisions: D133 (Who may use a member is a claim about where the access was written), D43 (parts of a residual "stay marked with the module"), D51 ("The kernel registers three: the outcome of a claim, a value's origin, and the mark on a key"), D53 (origins may be dropped), D42 and D44 (a description is plain data; "A parser's output is a description, and a loader builds the module function from it"), D151. `saved-program.ts`: "Still left out: origins"; no node carries a mark.
+- Scenario A: a notation's form supplies `obj.secret` and the user writes `obj.other` inside the form. D133: the first carries the notation's mark, the second the user's. The parser hands the loader a description. If a description can say "this part is module N's", any code that writes a description claims N's mark, and D133's "nothing can forge it" fails. If it cannot, the notation's mark does not survive `build`.
+- Scenario B: phase 1 opens a call from module A into module B and saves the residual (D218). The record has no place for the per-part module mark, so after loading, B's parts are A's: a caller-based claim (D133) changes its answer, and `describe` under A's key shows B's body (D43).
+- Scenario C: D133 says "No phase drops it" and depends on D53, where "a run keeps none unless its configuration says so". D51's three kernel fields do not include this mark.
+- What breaks: D133 and D43 rest on something no decision supplies and one may drop.
+- Severity: needs a ruling.
+- Confidence: high for B and C, medium for A.
+- Fix direction: make the mark a fourth kernel field, separate from origin; give the data form a mark on function nodes restored only under the builder's name; let `build` mark with the builder's module only.
+
+## 8. No mechanism keeps an imported module's top-level statements from acting
+
+- Decisions: D214 (Only the module being run performs effects when instantiated), D213 ("Its body holds its bindings and its top-level effects, in written order"; "Instantiating it is a call"), D59, D60, D45. Forms: "The rest of the text is the module's block".
+- Scenario: library `lib` declares `capability output`, has the statement `output.write("loaded")`, then its bindings. The program imports it and hands it `output`, as D45 requires for its functions to use it. Instantiating is a call; the caller needs the result; the body is `block(bindings, then(output.write("loaded"), ...))`; `then` needs its first. By D59 and D60 the write happens. By D214 it does not.
+- What breaks: the only stated ways to keep an effect from happening are an absent capability (then the `then` chain waits and the library's bindings never arrive) or a speculative mode (D65, D67), which no decision applies to instantiation. Whether such a statement is a refutation, is skipped, or stays residual is not said.
+- Severity: needs a ruling.
+- Confidence: high. I would change my mind if a decision said a statement in an imported module is refused by the loader.
+- Fix direction: a module with top-level effectful statements cannot be imported (a refutation at load), stated in D214 and in forms.md.
+
+## 9. "Once per distinct set of arguments" against "evaluated once, the same values for all", with no way to compare arguments
+
+- Decisions: D213, D76 ("An extension is evaluated once in a configuration, and everything that names it gets the same values"), D104 (a module is an extension), D51 ("A field has one owner: a second registration is a conflict"), D120 ("identity is physical"), D30 and D35. Kernel `same`: "Anything else is a refutation".
+- Scenario: `units` declares `capability output`. Module A hands it `output`; module B hands it a narrowed `output` (D158). Two instances. D76 says both get the same values. Each instance registers the field `dimension`: the second registration is a conflict under D51, or is the same owner by identity, in which case two physically distinct `Quantity` types carry one name and one FQN, and a value made through A fails B's type claim.
+- Second problem: deciding "distinct" needs equality on capabilities, module objects and unfilled cells (an input not supplied). The kernel's `same` covers bits and symbols only, and forms.md says "two structures are not compared".
+- What breaks: D76 and D213 give different counts of instances; diamond imports give type mismatches or field conflicts.
+- Severity: needs a ruling.
+- Confidence: medium-high.
+- Fix direction: state identity of arguments (by kernel identity, not content), and say what a field registration by a second instance is.
+
+## 10. `use` and in-text grammar changes need a module's values while the text is still being parsed
+
+- Decisions: D97 ("the parser evaluates it at once and its value is the new grammar"), D100 (`use` brings the bindings and the notation), D86 (free names in a form mean what they meant where the form was defined), D213 ("Loading a module constructs that function and evaluates nothing").
+- Scenario: a text has `capability output`, then `use units`, then `3 m/s^2`. To parse the third line the loader must have `units`'s grammar value, so `units` is instantiated during the load of the using text, before that text's module function exists and before anything has handed `units` its arguments. The form's free names (D86) then refer to that parse-time instance. When the using module is later instantiated and passes `units` its capabilities, D213 makes a second instance for the bindings. The literal's `Quantity` type and `units.Quantity` are two types.
+- What breaks: D213's "evaluates nothing" is false for any text with `use` or a grammar block; the notation and the bindings can come from different instances; a grammar form that mentions the text's own bindings is evaluated before they exist.
+- Severity: needs a ruling.
+- Confidence: medium. I would change my mind if a notation were declared a separate, argument-free part of a module.
+- Fix direction: a module's notation is a value of the module function itself (no parameters), and forms refer to bindings through the import parameter of the using module.
+
+## 11. Claims under need-driven evaluation: one that nothing needs is never decided, and one that is undecided stops every later effect
+
+- Decisions: D59 ("a claim [needs] its expression"; "A statement needs its value and no more"), D61 (a binding is evaluated when needed), D60, D14, D142, D148, D130, D146, D217, D237.
+- Scenario A: `x: Positive = -1` where nothing uses `x`, or a `theorem` nothing refers to (D148: "a theorem is a named claim"). D61: never evaluated. If the kernel evaluates ahead, D59: "a refutation stays where it arose". D142 says the declaration "halts when its check fails", D146 "a refuted one halts", D217 check "reports on every claim". Allegretto: `bad = claim(false)` in a module that runs clean.
+- Scenario B: a body has `claim(p(late))` and then `output.write(v)`, where the claim is undecided (a limit, an opaque predicate per D125, or sampled per D149). `then` needs its first and a residual claim is not a value, so the write never happens. D14: "A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it".
+- What breaks: a claim's fate depends on whether it is written as a binding or a statement, and neither matches the decision that describes it. D79 covers refuted branches for the check phase; nothing covers unneeded bindings or entries.
+- Severity: needs a ruling.
+- Confidence: medium-high for A, medium for B (it depends on what `then` does with a residual claim, which is unstated).
+- Fix direction: say that the check phase needs every claim of a module, and what value an undecided claim hands `then`.
+
+## 12. The inductive assumption of D66 makes every claim about a recursive function "assumed"
+
+- Decisions: D66 (A recursive call is evaluated once for each state of knowledge), D21, D16, D236.
+- Scenario: `fact(n: Nat): Positive`. D66: the return claim is "assumed at that inner call and decided on the body". D21: "assumed (accepted without evaluation)"; "A claim that rests on a weaker claim is itself reported at the weaker strength". D16: "every claim that rests on it says so". The body's claim rests on the inner assumed one.
+- What breaks: by D21 the result is "assumed", and by D236 the module's summary is "assumed". By D66 it is "decided". Also, the induction is sound only if the function terminates; D66 does not depend on D166, so a `partial` function gets the same "decided".
+- Severity: needs a ruling.
+- Confidence: high that the words collide.
+- Fix direction: name the inductive hypothesis as something other than the strength "assumed", and tie the result's strength to the termination claim.
+
+## 13. forms.md: `x <- e` opens an inner block, but bindings are "one group, whatever lines"
+
+- File: `next/ext/allegretto/forms.md`, "Bindings and blocks" and section 4 item 1. Decision: D61.
+- Scenario:
+  ```
+  x <- read()
+  y = x + 1
+  output.write(y)
+  ```
+  Section 4: `x <- e` is `block({x: e}, then(x, rest))`, so `x` is bound in an inner block. "A block's bindings are one group, whatever lines they are written on", so `y` belongs to the enclosing block's group, where `x` is not bound. The reader refuses the text for an unbound name, or `y` waits for ever. If instead bindings after a `<-` go to the inner block, "one group, whatever lines" is false and a binding before the `<-` cannot use one after it.
+- What breaks: the most natural program has two readings, one of which is refused.
+- Severity: needs a ruling (small).
+- Confidence: high.
+- Fix direction: say that `<-` binds `x` in the enclosing block's group as a name whose value is the statement's, or that a `=` binding belongs to the innermost `<-` before it.
+
+## 14. A solver cannot read the parts of a residual that came from other modules
+
+- Decisions: D179 (A solver reads the residual of its problem), D43 ("a description shows a part only under a right that covers that module"), D65, D119 ("An operator is a method of its operand's type").
+- Scenario: the problem module P states `x + y < 10`. Specializing opens `+` and `<`, which are functions of the standard extension S. D179: "The caller grants the right to describe as an ordinary function that closes over its key", which is P's key. Under D43 the parts that came from S show as `opaque`.
+- What breaks: "which unknowns each remaining constraint mentions" is hidden behind every operator, so the search order and the independent sub-problems cannot be read. The alternative is the inspection right, which D179 says is not needed ("the key never leaves its module") and which covers every module.
+- Severity: needs a ruling.
+- Confidence: medium. I would change my mind if an opaque part still lists the parameters it mentions.
+- Fix direction: an opaque part of a description names the unknowns inside it.
+
+## 15. A phase's residual holds cells and live capabilities; the data form and `module` accept neither
+
+- Decisions: D218 ("the residual of a phase is a program: a value that can be saved, loaded and evaluated further"), D69 ("The step from one phase to the next is the same event"), D68 (an absent capability and an unsupplied input are cells), D213, D220, D224. Interface: `Kernel2.module` refuses a function that "holds a cell ... an effectful primitive"; `fill` takes "plain data" only. `saved-program.ts`: no node for a cell; the record "cannot ... fill a cell".
+- Scenario: check evaluates `main` with the input `n` unknown and no `output`. The residual waits on two cells. To save it, each cell must become a parameter of a new module function; no decision or interface call says how (D65 specializes a function with all parameters unknown, which is the nearest thing, but D213 says "a phase evaluates the module with the input unknown", an instance). In one kernel the capability cell cannot be filled either: `fill` refuses a primitive function.
+- What breaks: D218 and D69 state a hand-over that the interface cannot perform; the next phase can only instantiate the original module again, which is not "evaluated further".
+- Severity: needs a ruling.
+- Confidence: medium. I would change my mind if a phase is defined as specializing the module function (D65) and never instantiating it.
+- Fix direction: define a phase's residual as the specialized module function, with the same parameters.
+
+---
+
+## Notes that are not findings
+
+Wording or small gaps a reader could act wrongly on. Not counted above.
+
+- D26 says the kernel "can tell two sequences apart and does nothing else with them". D75 and kernel.ts add join, length, slice, and `count`, `get` by place and `length` read or write bits as 64-bit numbers.
+- D105 and forms.md section 1 say each form "stands for something the kernel has". The arithmetic operators stand for shipped primitives, which D241's bare kernel ("a configuration with no extension") does not have.
+- "Halts": D13 ("the phase halts"), D142, D146 and D189 against D14 ("goes on evaluating to report every refutation") and D82 ("Nothing a program does makes the kernel stop midway").
+- D60 calls `then` "the one way the order of a text becomes an order of evaluation". D59 and D62 give a second: a primitive function's arguments, left to right. kernel.ts adds a third the decisions lack: a structure handed to a primitive function has its entries evaluated "in order".
+- D7 says the order of bindings changes nothing. A module yields a structure of its bindings, readable by place, and D107's identity is a hash of content: reordering two bindings may change the keys and every claim key.
+- D65 presents evaluating both branches as what makes specialization speculative. D67 says ordinary evaluation does it for every undecided condition. kernel.ts `if` does neither ("neither branch is evaluated").
+- D60's look-ahead with D14: in `a <- input.read(); t <- timer.wait(1); output.write("x"); claim(a == "ok")` the refutation is found while the timer waits, and D14 then performs no further effect. Whether "x" is written depends on whether the timer answered at once.
+- D52: a rule reads the field "on its arguments". Under D63 an argument nothing needs is not evaluated, so its fields are unknown at a composed call; D118's "carried to every result computed from it" depends on which holds.
+- D109 with D107 and D213: a session is "a module whose text arrives one entry at a time", so it has no content to derive an identity from until it ends, and so no keys while it runs.
+- D106 has the loader written in Allegretto. D75's list has no primitive that makes a module with keys; `Kernel2.module` is host-only.
+- D107 lets a key holder "derive further keys from data". `KeyDescription.slot` is a number from 0, the description form is `key <module> <slot>`, and the record has a count of slots.
+- D80 evaluates "a function"; kernel.ts `attempt(x, budget)` "evaluates its first argument".
+- D14 says "The result holds every undecided claim". `Result` has `value`, `ended`, `steps`, `refuted`; `Result.refuted` covers a refutation on `value` only, though D59 and D79 keep refutations where they arose.
+- `Kernel.advance`'s comment says the order of effects that become ready "waits on a ruling". D62 now rules it. kernel.ts line 24 ("A structure evaluates its entries, in order") contradicts its own line 43 and D59.
+- D220's host-code form "can ... implement a capability", loaded under D215. D209: "no code inside can exceed" the ceiling. D45: "An extension cannot bring host code of its own".
+- D209 "by being evaluated in a scope that holds it" against D41 "Nothing is granted by name" and D213 (capabilities are parameters).
+- kernel.ts lists "the gate that keeps an effect from a value whose claims are undecided". D14 says an undecided claim prevents no effect by default.
+
+## Looked for and found no problem
+
+- The eleven things of D75 against kernel.ts's list and forms.md's names: they match, apart from the notes above; specialize, fields and key questions are marked not yet built.
+- The shipped primitives of forms.md section 3 against `next/prims/index.ts`: the same 22 names, the same domains and refusals.
+- D203 and D222 against `restore` and `claimKey`: no call writes a bare outcome; a capability in `restsOn` is refused; a record never holds a key (D132).
+- D19 against `PrimitiveContext`: a primitive function cannot evaluate, bind, or touch metadata; `fill` takes plain data (D243).
+- D42 and D44 against `describe` and `build`: an unforgeable value appears as its public identity, and `build` refuses to make one from data.
+- D58 and D61 against the interface: a scope is a host handle only, and no kernel primitive yields one.
+- The four strengths (D21, D151, D156) against `Outcome` and `Rest`: one vocabulary, with "refuted" as the fifth word of D236.
+- D134 against forms.md's module yield, and D213's "input" against the header line `input`: they agree.
