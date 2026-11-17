@@ -526,6 +526,7 @@ table and the stream plans.
   obligations; proof-plane `proofValEqual` unification with protocol
   equality; further strict gates from the §6 pre-approved queue
   (`Ordered` totality for sorts)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Equality and laws" of `docs/plans/book-pass-inventory.md`.
 - [x] **B-094** · L0 · Source channel — ASTs as channel payload
   (structures.md §3.1, D47 RATIFIED 2026-08). **Chunk 1 landed
   2026-08**: sourceAware registration + evaluator call-site attachment
@@ -601,14 +602,16 @@ table and the stream plans.
   non-same-arg recursion (`loop(n+1)` ≈ 43s/compile measured at F4) —
   B-018's analyzer-rework bundle or mint at next totality-perf pass;
   nested-slot completion replacement (recorded §10 residue)
-- [ ] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
+- [x] **B-029** · L2 · `[reval]` PCP protocol design revalidation →
   `pcp.md` in `docs/book/standard/`: schemas, multi-prover authorship,
   trivial-pass prevention, hints, catalog (H5), budgets/escalation (H7),
   benchmark methodology (source:
   `docs/plans/archive/phase-h-plan.md`; shipping shape `src/pcp.ts`)
-- [ ] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
+  **CLOSED 2026-11-17, dissolved by "A proposer answers with only the missing value", with "Open obligations are listed for any proposer"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-030** · L2 · M3 sweep: disposition every remaining `TBD` in
   `V1-INVENTORY.md`; re-verify canaries (provable.alg theorems, bench
   corpus, stdlib effects tags)
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-031** · L2 · docs: revise `docs/book/proving-in-allegro.md` to the
   v2 surface (it is the PCP LLM worker's system primer — must track the
   shipping kernel); re-baseline `bench/`. Landed 2026-08 at the
@@ -623,46 +626,65 @@ table and the stream plans.
 
 ### L1 — extension substrate (M2)
 
-- [ ] **B-032** · Grammar extension Phase 8: per-scope `use X in { block }`,
+- [x] **B-032** · Grammar extension Phase 8: per-scope `use X in { block }`,
   single-pass `use` with mid-parse expressions, parse-time builder lambdas
   (parser/evaluator reentry); fold in the never-shipped Phase 6 ideas
   (`combine`/`override`/`without`, restricted-`use` whitelist — archive:
   dappled-cascading-cantor)
-- [ ] **B-033** · Grammar 2 Phase 7+: indent-engine extensions, full GLL
+  **CLOSED 2026-11-17, dissolved by "A text can change the grammar it is read in", with "A grammar change reaches to the end of its block" and "Grammars combine without regard to order"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-033** · Grammar 2 Phase 7+: indent-engine extensions, full GLL
   left recursion, precedence analyzer, remaining stratified-grammar
   migration
-- [ ] **B-034** · Alt-order de-significance + label-directed tree-builder
+  **CLOSED 2026-11-17, dissolved by "Any parsing algorithm will do that meets five conditions"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-034** · Alt-order de-significance + label-directed tree-builder
   (the §2 corrections in `docs/book/extension/grammar.md`) — the parser
   design discussion track
-- [ ] **B-035** · Earley parser retirement in favor of `grammar2_*`
-- [ ] **B-036** · Parse error recovery (`@error` productions + `@sync`)
-- [ ] **B-037** · Embeddable grammars (different parser mid-file/per-module)
-- [ ] **B-038** · `modules.md` loading contract (the L1 half of the module
+  **CLOSED 2026-11-17, dissolved by "Any parsing algorithm will do that meets five conditions", with "Every notation stands for an expression"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-035** · Earley parser retirement in favor of `grammar2_*`
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-036** · Parse error recovery (`@error` productions + `@sync`)
+  **CLOSED 2026-11-17, dissolved by "Parse failure reporting and recovery"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-037** · Embeddable grammars (different parser mid-file/per-module)
+  **CLOSED 2026-11-17, dissolved by "A text can change the grammar it is read in", with "A grammar change reaches to the end of its block"**, by the maintainer's ruling of 2026-11-17: the parser engine does not change; the grammar it uses to parse a text may change per module or mid-file. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream.
+- [x] **B-038** · `modules.md` loading contract (the L1 half of the module
   split); circular-dependency policy
-- [ ] **B-039** · Mid-statement grammar switching (low priority)
+  **CLOSED 2026-11-17, dissolved by "The loader reaches files through a capability", with "A module is an extension that arrives as a file"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-039** · Mid-statement grammar switching (low priority)
+  **CLOSED 2026-11-17, dissolved by "A text can change the grammar it is read in"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 ### L2 — Standard (M3)
 
 - [ ] **B-040** · Qualified import (`import math.round`); re-exports
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Reaching a member" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-041** · Collections: Map/Set as typed generic structures;
   persistent representations (S4)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Types as values" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-042** · Scalar type builder (`Scalar(bitLength)`) + packed Bits
   structures (S4)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Types as values" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-043** · User-defined type declaration syntax (sugar for
   extend/where/distinct/interface — deferred until API patterns settle)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "The surface language" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-044** · Error handling surface (try/catch or channel-consuming
   equivalent — design with S6 error-channel removal rules)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "The surface language" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-045** · Regular expressions (stdlib + literal syntax)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "The surface language" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-046** · Configurable mutability: linear types, transient
   mutation, transient→immutable finalization (structures.md §13)
-- [ ] **B-047** · Sync/async type modifiers (async-by-default + `sync`
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Values" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-047** · Sync/async type modifiers (async-by-default + `sync`
   hint — revisit under completion effects)
+  **CLOSED 2026-11-17, dissolved by "A missing value is a cell that is filled once", with "Effects on one capability keep their order"**, by the maintainer's ruling of 2026-11-17. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream, before the second decision was ruled.
 - [ ] **B-048** · Algebraic effects (`perform`/`handle`/`resume`; needs
   continuations — see B-072)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Effects" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-049** · Patterns as boolean expressions with unification
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Contracts" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-050** · Variance + type constraints (`where T: Comparable`) —
   absorbed conceptually by knowledge-on-type-values (S5); surface design
   remains
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Types as values" of `docs/plans/book-pass-inventory.md`.
 - **See also B-180** (recursion handling under partial evaluation), filed after B-179: a review of the inline cutoff and of the unfolding of recursive calls; B-100 (soundness review of the cutoff) holds the soundness thread.
 
 ### L2 — provability capability (M4)
@@ -671,17 +693,23 @@ table and the stream plans.
   capabilities, D3 information flow, D4 behavioral budgets, D5 declared
   intent (source: `docs/plans/archive/crystal-proving-curry.md`) —
   revalidate against v2 before scheduling
-- [ ] **B-052** · F6 Lean export: proof terms → Lean, refinements →
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Effects" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-052** · F6 Lean export: proof terms → Lean, refinements →
   subtypes, verified-substrate `Allegro.lean` → `proofs.md` in
   `docs/book/standard/` (source:
   `docs/plans/archive/phase-f-plan.md` §F6)
+  **CLOSED 2026-11-17, dissolved by "A decided claim can be translated into a proof an outside checker accepts"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-053** · Phase G expansion: provable stdlib rewrite (sort/search
   + algebraic theorems on map/filter/reduce)
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Claims and proofs" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-054** · PCP H5 proof catalog (`proofs.json` per project).
   v1 implementation preserved at branch `archive/v1-references`
   (parent 0546daa, `allegro catalog`) — pre-rework, reference only
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-055** · PCP H6 multi-strategy parallel prover orchestration
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-056** · PCP H7 effort budgets, escalation, reproducibility
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-057** · Phase C polish. **Scope SETTLED at B-014 (2026-08,
   CT-R gate passed)** — `docs/book/standard/contracts.md` §10:
   (a) relocate an UNDISCHARGED `requires` check to the call site, which
@@ -694,7 +722,8 @@ table and the stream plans.
   (d) contracts in the verdict / `obligations` / assumption ledger — an
   undischarged `requires` is a pending obligation and today reaches
   `inspect` only (CT-R6); (e) `ensures` referencing params, not just `_`
-- [ ] **B-101** · Predicate-carrier residue cleanup (filed at B-014,
+  **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Contracts" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-101** · Predicate-carrier residue cleanup (filed at B-014,
   CT-R5 — **lane D**, touches `src/refinements.ts`): retire the legacy
   single-`domain` component now that predicate sets are the carrier
   (`domainOf`/`predicatesOf` still dual-read it — this was the v1 Phase-C
@@ -708,6 +737,7 @@ table and the stream plans.
   storage under the `knowledge` channel remains C4's. Note for the lane
   table: this is **lane D** work, so it queues behind the Standard
   band's serial ordering rather than riding lane A
+  **CLOSED 2026-11-17, dissolved by "An assumption is always on the record"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-058** · Per-project notification-severity config (kind →
   severity remap; substrate shipped in v1) — **SUPERSEDED by B-099**
   (2026-08). Same surface, described twice: B-099 was minted during the
@@ -719,24 +749,34 @@ table and the stream plans.
 ### T-build (M6)
 
 - [ ] **B-059** · Project root file (structure, phases, deps)
-- [ ] **B-060** · CLI modes: `allegro build` / `allegro test` (run/verify/
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Configuration" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-060** · CLI modes: `allegro build` / `allegro test` (run/verify/
   prove/propose/inspect/obligations exist)
-- [ ] **B-061** · Multi-phase build pipeline: design (per-layer
+  **CLOSED 2026-11-17, dissolved by "A command is a configuration"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-061** · Multi-phase build pipeline: design (per-layer
   capabilities per 2026-07 ruling) then implementation; phase-gate checks
-- [ ] **B-062** · Typed phase-resource declarations (successor to retired
+  **CLOSED 2026-11-17, dissolved by "A phase hands its residual to the next", with "Phases are configuration"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-062** · Typed phase-resource declarations (successor to retired
   `ctx_use` — design with B-013)
+  **CLOSED 2026-11-17, dissolved by "A module is a function of its capabilities, inputs and imports"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-063** · Tree shaking via partial evaluation
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Saved programs and export" of `docs/plans/book-pass-inventory.md`.
 - **See also B-181** (the hard-coded precompile and compile-time phases), filed after B-179: the evaluator and the runtime fix two phases, where B-061 designs a configurable pipeline.
 
 ### T-tooling (M7)
 
 - [ ] **B-064** · Execution tracing + step-through debugging
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-065** · REPL improvements (multi-line, error display, completion)
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - **See also B-175** (the tooling chapter's findings), filed after B-172: eleven defects in the CLI and its documentation, among them the REPL's missing continuation (B-065 owns that fix).
 - [ ] **B-066** · Expression-graph processing (query/transform/rewrite)
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-067** · LSP / IDE integration
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-068** · Review UX (v1 "Phase J"): semantic summary as the primary
   reviewable artifact, drill-down to code
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [x] **B-069** · CLAUDE.md slimming completion (history → CHANGELOG;
   session contract only). Landed 2026-08 at B-095 chunk 3: v1-era
   history migrated to CHANGELOG, CLAUDE.md reduced to the K-002
@@ -777,13 +817,15 @@ table and the stream plans.
 ### T-host
 
 - [ ] **B-070** · Browser runtime packaging (core is browser-compatible)
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "The launchers we ship" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-071** · Async I/O capabilities: filesystem, networking, process,
   WebSocket, timers (env-provided, effect-labeled)
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "The launchers we ship" of `docs/plans/book-pass-inventory.md`.
 - **See also B-176** (the host chapter's findings), filed after B-175: five defects in the web bundle, the sandbox and the host rules, among them a web bundle that fails to load in a browser (B-070 packages the browser runtime).
 
 ### T-backend (M8)
 
-- [ ] **B-072** · Code generation: expression graph → JS first;
+- [x] **B-072** · Code generation: expression graph → JS first;
   continuations decision feeds B-048/B-073 (v1 "Phase I" — revalidate
   against v2 graph shapes; Grammar 2 "Phase 9" emitter folds in here).
   v1 Phase-I substrate + plan preserved at branch
@@ -791,17 +833,21 @@ table and the stream plans.
   Sequencing rationale (maintainer, recorded 2026-06): codegen sits
   after the safety machinery deliberately, so emission can be
   aggressive without forfeiting invariant/effect information
+  **CLOSED 2026-11-17, dissolved by "A target platform is a model, and export is a transformation into it"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 ### T-perf
 
-- [ ] **B-073** · Continuation-based TCO (Stage 2)
-- [ ] **B-074** · Memoization as opt-in Standard feature (re-decide after
+- [x] **B-073** · Continuation-based TCO (Stage 2)
+  **CLOSED 2026-11-17, dissolved by "Tail calls by sentinel and loop"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-074** · Memoization as opt-in Standard feature (re-decide after
   Phase 4 representation data)
-- [ ] **B-075** · Parser constants / tokenizer layer if 1–2k-line corpus
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-075** · Parser constants / tokenizer layer if 1–2k-line corpus
   demands (benchmark first) — the corpus exists since B-151 (the
   planning pilot): `lib/planning.alg` is 1,233 lines; taken up by
   **B-157** (the performance stream) below, where the tokenizer question
   is ruling R4
+  **CLOSED 2026-11-17, dissolved by "Scannerless parsing"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-157** (the performance stream) · T-perf · L1 · **A library
   loads in well under a second.** **CLOSED 2026-10-29**: the outcome is
   met — the planning library's parse 68 s → 0.2 s on the gate's machine
@@ -911,14 +957,17 @@ table and the stream plans.
 
 ### T-bootstrap (M9)
 
-- [ ] **B-076** · Self-hosted parser (standard parser re-expressed via L3
+- [x] **B-076** · Self-hosted parser (standard parser re-expressed via L3
   parser generator per 2026-07 ruling)
-- [ ] **B-077** · Self-hosted type system / module system
+  **CLOSED 2026-11-17, dissolved by "The platform's parser engine ships already built"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-077** · Self-hosted type system / module system
+  **CLOSED 2026-11-17, dissolved by "Everything above the kernel is an extension, and there is one way to extend"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 ### T-ecosystem (M10)
 
 - [ ] **B-078** · Module versioning + compatibility; dependency
   resolution; registry
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Saved programs and export" of `docs/plans/book-pass-inventory.md`.
 
 ### Track R — public release
 
@@ -1250,6 +1299,7 @@ table and the stream plans.
     in the vm-loaded bundle (B-093 progress above; plan §8). The deploy
     is the maintainer's. Next: C2 or D3 as a pilot plan demands, for the
     maintainer to say
+  - **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Plans as outcome graphs" of `docs/plans/book-pass-inventory.md`.
 - [x] **B-153** (re-evaluation per reference) · L0 · **A top-level
   binding is re-evaluated at every reference.** Landed 2026-10-29 by
   B-157 P10 (a binding evaluated once): the re-evaluation was the
@@ -1390,7 +1440,7 @@ table and the stream plans.
   stream) · T-perf · As B-168 (first out-of-scope finding of the
   recursive-precompile stream). Closed unused at the stream's close,
   2026-11-01.
-- [ ] **B-160** (Bits decoded per member lookup) · L0 · **Evaluation
+- [x] **B-160** (Bits decoded per member lookup) · L0 · **Evaluation
   decodes Bits to JavaScript strings on every member lookup.** Found at
   the close of B-157 (the performance stream): the CPU profile of
   `tests/planning-solve-demo.alg` (7.4 s sampled) spends about 16% in
@@ -1402,7 +1452,8 @@ table and the stream plans.
   B-159 before choosing. **Blocked-by**: nothing. **Pointer**:
   `src/types.ts` (`bitsToString`), `src/types-std.ts`
   (`memberBindingByName`), `src/primitives.ts` (`dispatchThroughType`)
-- [ ] **B-161** (CLI startup) · T-tooling · **The CLI's TypeScript module
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-161** (CLI startup) · T-tooling · **The CLI's TypeScript module
   loading is now the largest fixed cost of a short run.** Found at the
   close of B-157 (the performance stream): with the planning library
   loading in 0.6 s, `tsx`'s module loading (`waitForWorker`,
@@ -1413,6 +1464,7 @@ table and the stream plans.
   language or engine question; a tooling one. **Blocked-by**: nothing.
   **Pointer**: `package.json` (`start`, `build:web`), `src/index.ts`
   (the P2 entry)
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-152** · L0 · **Kernel fault: "`type_dispatch` has unresolved
   stub" on one shape of call.** Found by B-151 A2. Minimal pair, with
   `use planning` for the records: a function that binds
@@ -1437,7 +1489,8 @@ table and the stream plans.
   software-systems modeling, workflow/process, automatic reasoning, UI
   modeling, data/analytics; semantic-model variants (functional/
   imperative/mixed) as extensions
-- [ ] **B-081** · Counterexample legibility — domain-specific failure
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Models" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-081** · Counterexample legibility — domain-specific failure
   rendering layer (foundational; coupled to the AI iteration loop; see
   `docs/book/vision.md` §4). v1 rendering-hook sketch (`T.onFailure`)
   preserved at branch `archive/v1-references` (parent b838a89) —
@@ -1451,6 +1504,7 @@ table and the stream plans.
     here: the `inspect` channel, the call-site origin (B-057), rendering
     the refused value itself; a separate explainer for predicates one
     does not own, if a model ever needs it (the plan's C2 row).
+  - **CLOSED 2026-11-17, dissolved by "Every failure carries a legible counterexample", with "A predicate can explain its refusal" and "A value's origin is a description"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-082** · Model composition patterns (cross-domain predicates,
   arbitration, multi-domain [impl, proof] explosion risk), as described in
   Vision §4 (the Vivace hypothesis; one of the seven gaps)
@@ -1459,6 +1513,7 @@ table and the stream plans.
     system model composed with the planning model (row SY1) and a
     documentation model composed with both (row DC1), each admitted by a
     ruling after the loop has run.
+  - **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Models" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-083** · AI iteration loop — usable failure modes (residuals the
   agent can't discharge; surfacing; time-boxing; shared artifact with
   B-081), as described in Vision §4 (one of the seven gaps)
@@ -1468,15 +1523,19 @@ table and the stream plans.
     verified by the kernel, an LLM-free path and the LLM worker,
     authorship and the ledger; first slice delivered by the
     planning-loop stream at L7, PR #192.
+  - **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
 - [ ] **B-084** · Constraint-set completeness — organizational process
   research (external interviews; longest critical path), as described in
   Vision §4 (one of the seven gaps)
+  **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-085** · Bootstrap economics — Vivace value vs. domain-model
   maturity (roadmap question), as described in Vision §4 (one of the seven
   gaps)
+  **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-086** · Escape-hatch awareness tooling ("you're cycling on this
   rule — options"); posture per `docs/book/vision.md` §5 principle 4
-- [ ] **B-098** · Predicate/domain propagation onto residuals —
+  **Under the freeze (2026-11-17)**: still needed, acceptance stream, chapter "Tools" of `docs/plans/book-pass-inventory.md`.
+- [x] **B-098** · Predicate/domain propagation onto residuals —
   (renumbered from a duplicate "B-087" at the 2026-08 backlog groom:
   the ID was minted twice — 2026-07 for the totality-analyzer
   performance item above, 2026-08 for this one; IDs never change
@@ -1492,7 +1551,8 @@ table and the stream plans.
   domains on unresolved arithmetic — then look deeply (likely a one-line
   reorder in `applyPrimitive`, but validate interaction with Rule 2
   branch predicates and precompile placeholders first)
-- [ ] **B-100** · `[reval]` T-R6 soundness review + the checking
+  **CLOSED 2026-11-17, dissolved by "A field's rule is a pure, bounded function"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-100** · `[reval]` T-R6 soundness review + the checking
   algorithm itself. The broadened cutoff (cycle membership rather than
   D34 tier) shipped 2026-08 on measured evidence and maintainer
   ratification, but the reasoning deserves a deeper look than a perf
@@ -1527,7 +1587,8 @@ table and the stream plans.
   algorithm can still reach a host stack overflow through any recursion
   the cutoff does not see; the cutoff's inert period for typed functions
   (2026-08-31 to 2026-11-01, plan §2.5) was an instance
-- [ ] **B-099** · Project severity configuration — the T-R2 surface
+  **CLOSED 2026-11-17, dissolved by "A recursive call is evaluated once for each state of knowledge", with "Evaluation stops early for two reasons only"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-099** · Project severity configuration — the T-R2 surface
   (ratified 2026-08, `docs/book/standard/totality.md` §5/§8;
   subsumes **B-058**, the v1-era statement of the same surface). ONE
   per-project config declaration (shape open — likely a manifest read
@@ -1550,8 +1611,9 @@ table and the stream plans.
   is a contracts knob, and v1's global `--strict` flag (never built, and
   not to be) is superseded here rather than revived
   (`docs/book/standard/contracts.md` §6/§7)
+  **CLOSED 2026-11-17, dissolved by "Nothing is a claim until someone makes it"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-103** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
+- [x] **B-103** · T-tooling · CI: assert the suite's REGISTRATION COUNT,
   not just that it passes. The lane-B split lost nine tests to a bad cut
   and every gate stayed green — typecheck clean, suite 1188/1188, `GATE:
   PASSED` — because a uniformly smaller suite is self-consistent. Two
@@ -1564,13 +1626,15 @@ table and the stream plans.
   direction (turning it into a pin with an explicit-bump workflow), or
   have CI compare `registered=` against the base commit's value. The
   second catches drops on branches without a manual bump ritual
-- [ ] **B-102** · T-tooling · `SCAN_EXCLUDE` in `src/boundary-tests.ts`
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-102** · T-tooling · `SCAN_EXCLUDE` in `src/boundary-tests.ts`
   still lists `src/test.ts`, a file that no longer exists. It is inert —
   the suite modules under `src/test/` are scanned like production code and
   carry zero violations since C0 — but a stale exemption invites someone
   to reintroduce the hole it used to hold open. Delete the entry (lane B
   could not: `boundary-tests.ts` is outside its file set)
-- [ ] **B-104** · L0 · **Retire the `__*` (dunder) identifier convention
+  **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-104** · L0 · **Retire the `__*` (dunder) identifier convention
   from the source entirely** — maintainer directive 2026-08. The prefix
   was a temporary collision-avoidance measure and is no longer needed;
   it is also load-bearing in a way that a naming convention should not
@@ -1736,6 +1800,7 @@ table and the stream plans.
     `InterfaceKind` to `Type` — a semantic change to what `~Interface`
     IS, not a redundancy removal. Deferred to its own chunk with a
     maintainer gate rather than folded into the deletions
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [ ] **B-105** · L2 · **Union types — redesign or leave retired.**
   *(Note added 2026-08: whatever the redesign, it lands on the D48(a)
@@ -1792,6 +1857,7 @@ table and the stream plans.
     the inheritance explicit at all three. Paths that re-stamp their own shape
     (`buildRefinedType`, `buildDistinctType`) needed nothing. Gate green at
     1197 on the first run
+  - **Under the freeze (2026-11-17)**: still needed, kernel stream, chapter "Types as values" of `docs/plans/book-pass-inventory.md`.
 
 - [~] **B-107** · L0 · **Naming and declaration debt found by the concept
   spine (S1, T0–T1).** **(a)(b)(c)(e)(f) LANDED at campaign chunk C9,
@@ -2049,7 +2115,7 @@ table and the stream plans.
       Fixed by using `SLOT_KEYS.discharged` — the lint working exactly as
       designed on a change it had never seen
 
-- [ ] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
+- [x] **B-110** · L0 · **The L0 evaluator implements the L2 type system.**
   Found by the concept spine (S2d) while classifying every abort in the base
   per maintainer ruling. This is the largest delta the spine has produced and
   it violates the project's OWN stated invariant — `CLAUDE.md`: *"Dependencies
@@ -2089,8 +2155,9 @@ table and the stream plans.
     classes in `concepts.md` Part 0 SC-8 (specified aborts; the classification
     itself is `docs/records/concepts-analyses.md` §3) are the vocabulary; the
     mechanism should carry which one. Specification-level, and separable from (a)–(c)
+  - **CLOSED 2026-11-17, dissolved by "Everything above the kernel is an extension, and there is one way to extend", with "Evaluation stops early for two reasons only"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-111** · L0 · **Field vs channel — one word and one registry for two
+- [x] **B-111** · L0 · **Field vs channel — one word and one registry for two
   concepts.** Raised by the concept spine (S2f, maintainer terminology). The
   metadata plane holds **fields**; a **channel** is the whole apparatus by
   which one capability rides values through PE — its fields, their rules,
@@ -2115,8 +2182,9 @@ table and the stream plans.
   - Nomenclature also affects `ChannelSpec`, `ChannelWriter`,
     `channelReadRaw`, `channelSpec`, `viralChannels`, `unionChannels`,
     `installChannelMerge`, `CHANNEL_TABLE`
+  - **CLOSED 2026-11-17, dissolved by "An extension registers its own fields"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
+- [x] **B-112** · L0 · **The four owed plane interfaces.** Raised by the
   concept spine (S2f); `concepts.md` §24 carries the interface table.
   **PLAN: [docs/plans/plane-interfaces.md](plans/plane-interfaces.md)**
   (ratified as a whole 2026-10-21, ruling 2 option (a); **all chunks and the exit landed, 2026-10-21 to 2026-10-24**; the done-condition's two remaining edges are B-146's, plan §9.8) — scoped to the four hooks on measurement: delta 23's
@@ -2192,23 +2260,26 @@ table and the stream plans.
     `kind === Structure` sites 152 → 166, the storage plane at 15 sanctioned
     accesses. **B-128 (b) and (c) are unblocked**; the two violations are
     the ratchet's (B-149) known baseline.
+  - **CLOSED 2026-11-17, dissolved by "An extension is made of functions and metadata fields"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
+- [x] **B-113** · L0 · T-tooling · **TailCall forwarding is convention-only.**
   Body wrappers (`type_check`, the `*_attach` family) must forward the
   TailCall sentinel or a tail call silently degrades to an ordinary call — a
   performance cliff, not an error. Enforced today by a recurring-lesson note
   in `PROCESS.md` §6 and nothing else. Candidate boundary invariant: a wrapper
   that swallows the sentinel should fail the suite
+  **CLOSED 2026-11-17, dissolved by "Tail calls by sentinel and loop", with "A body clause is a notation"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-114** · L0 · **Completion confluence is not guaranteed by
+- [x] **B-114** · L0 · **Completion confluence is not guaranteed by
   construction.** The B-028 arc found an arrival-order bug (an instance kept a
   stale symbol when one field resolved before another) and FIXED it with
   completion replacement — but nothing establishes that arrival order cannot
   matter. This is candidate **R16** (determinism) with no specification item
   and no test that would catch a recurrence. Needs: the property stated, then
   either a construction that guarantees it or a test that samples orders
+  **CLOSED 2026-11-17, dissolved by "The same program and the same information give the same result"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-115** · L2 · **Law backings ride two carriers.** Raised by the
+- [x] **B-115** · L2 · **Law backings ride two carriers.** Raised by the
   concept spine (S3, `concepts.md` §39). A proof's OWN rule backing is a set
   of plain data bindings (`equality`, `lawName`, `lawTier` — the E-R6
   fields, dispatched as `p.lawTier`); the TRANSITIVE backing set the
@@ -2219,8 +2290,9 @@ table and the stream plans.
   (S5 triage): the host-plane half is one of four carriers on the wrong
   plane, and moving it to a metadata field with an accumulating rule is the
   unification
+  **CLOSED 2026-11-17, dissolved by "Law strengths and the transitivity gate", with "Every result says how strongly it holds"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-116** · L2 · **Interface's two guarantees are enforced
+- [x] **B-116** · L2 · **Interface's two guarantees are enforced
   independently, and one of them fails silently.** Raised by the concept
   spine (S3b, `concepts.md` §36). An interface has two properties: **no
   construct** (tested by `InterfaceKind`'s predicate, checkable from any
@@ -2242,8 +2314,9 @@ table and the stream plans.
     the interfaces. A property of this type system, not a general truth, and
     worth stating because the type system is being rebuilt around the absence
     of `extends`
+  - **CLOSED 2026-11-17, dissolved by "An interface is a type drawn from, not instantiated"**, by the maintainer's ruling of 2026-11-17: an interface refuses a method body. The decision's text does not say so yet; line 13 of B-197 (evidence against a ruled decision) asks for it. The record `docs/records/rebuild/backlog-under-the-freeze.md` had classed it still needed by the kernel stream.
 
-- [ ] **B-117** · L2 · **The verdict is assembled out-of-band rather than
+- [x] **B-117** · L2 · **The verdict is assembled out-of-band rather than
   accumulated.** Raised by the concept spine (S4b, maintainer correction —
   `concepts.md` §45). S4 had claimed this as a REQUIREMENT gap (candidate
   R15: the requirement set is per-value, the verdict is program-level). That
@@ -2275,8 +2348,9 @@ table and the stream plans.
     while `inspect` on the same program reports `unresolved refs:
     no_such_function`. The information exists and does not reach the verdict,
     which is this item's whole thesis and B-057's too
+  - **CLOSED 2026-11-17, dissolved by "Every result says how strongly it holds", with "A refutation marks everything computed from it"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-118** · L0 · **Four carriers ride the host plane that belong on the
+- [x] **B-118** · L0 · **Four carriers ride the host plane that belong on the
   metadata plane.** Raised by the concept-spine S5 triage: four deltas filed
   against three different owners are one fix. `concepts.md` §18's placement
   rule — *a plane is chosen by who may write the data and what evaluation
@@ -2308,8 +2382,9 @@ table and the stream plans.
   - **Not a blanket rule.** The host plane is legitimate and §18 says what
     belongs there. Each of (a)–(d) must be argued individually against the
     placement rule; the finding is that none of them ever was
+  - **CLOSED 2026-11-17, dissolved by "An extension registers its own fields"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-119** · L0 · **`Context` still names three different things.**
+- [x] **B-119** · L0 · **`Context` still names three different things.**
   Measured by the C9 naming pass, which deliberately stopped at the line it
   could defend. C9 renamed every DECLARED name in which "Context"/"Ctx"
   denoted the retired composite KIND — a settled decision whose surface name
@@ -2337,6 +2412,7 @@ table and the stream plans.
     the composite kind, four value ROLES, and a parser's own bookkeeping —
     and only the first was retired. Renaming the first makes the other two
     *more* visible, not less, which is the intended outcome
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [x] **B-120** · L0 · **LANDED 2026-09 — the entry-sequence composite** (D48(a), IC-2 option E).
   A Structure becomes a **sequence of optionally-keyed entries** — one thing
@@ -2638,7 +2714,7 @@ table and the stream plans.
     representation the point is that the typed primitive is built once. Can
     land before them or inside B-121's construction work
 
-- [ ] **B-123** · L0 · **The metadata base surface: two unguarded paths, and
+- [x] **B-123** · L0 · **The metadata base surface: two unguarded paths, and
   D28's subsumption never executed.** Found by the B-121 C1 review of every
   registered primitive carrying the old `channel`/`component` vocabulary
   (maintainer request, 2026-08). The naming question turned up two soundness
@@ -2721,8 +2797,9 @@ table and the stream plans.
     refused and the capability is held by its owner. Both halves of the
     original finding are therefore closed: the unguarded write path (`mv_set`,
     deleted at B-125) and the unclaimed capability behind it
+  - **CLOSED 2026-11-17, dissolved by "The kernel's primitives are pure and few", with "The `Y of x` component-access form"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
+- [x] **B-124** · L0 · **Guard-coverage audit: every path to a guarded
   operation must carry the guard.** Raised by B-123, where two independent
   soundness holes turned out to be **one class of defect**: a guarded
   operation reachable by a second, unguarded path. `mv_set` reached the
@@ -2763,6 +2840,7 @@ table and the stream plans.
     itself, as evidence. It is the same move the concept spine made — write
     down what is actually there, and the gaps are visible without a test
     having to find them
+  - **CLOSED 2026-11-17, dissolved by "Authority is an unforgeable value"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [x] **B-125** · L0 · **LANDED 2026-08.** Delete `mv_set`, and rebuild the
   three tests that use it (maintainer ruling, 2026-08; B-123(a)). `mv_set` is the
@@ -2794,7 +2872,7 @@ table and the stream plans.
     unreachable operation is a stronger guarantee than a refused one, and the
     replacement asserts the unreachability rather than assuming it
 
-- [ ] **B-126** · L0 · **`param.owner` is now a two-state flag wearing a
+- [x] **B-126** · L0 · **`param.owner` is now a two-state flag wearing a
   pointer's type.** Raised by the maintainer at B-121 (2026-08), after
   `ownsParam` retired the field's identity: *this may end up misunderstood and
   misused in the future.*
@@ -2831,6 +2909,7 @@ table and the stream plans.
   - **Generalised by B-135** (2026-09): this is one instance of a host-plane
     property whose declared meaning exceeds its real one. Whatever rule B-135
     states should decide this item rather than the reverse
+  - **CLOSED 2026-11-17, dissolved by "Positional parameters owned by membership"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [x] **B-127** · T-tooling · **LANDED 2026-09 — `scripts/analyze/`, a
   binder-aware survey tool.**
@@ -2861,7 +2940,7 @@ table and the stream plans.
     B-112's interfaces, as B-128's own sequencing line says. Corrected
     2026-09 at the maintainer's catch.
 
-- [ ] **B-128** · L0 · T-tooling · **Layer separation is stated but not
+- [x] **B-128** · L0 · T-tooling · **Layer separation is stated but not
   policed, so code relies on representation without knowing it.** Raised by
   the maintainer at B-121 C2 (2026-08) as *the biggest learning*: *we were not
   using layer interfaces and that really hurt when the code started relying on
@@ -2933,6 +3012,7 @@ table and the stream plans.
     spelling needs the plane to have a stated content rule first.
     `Structure.memberPrivilege`, written and read through `as any` and
     declared nowhere, is what an unpoliced host plane looks like today
+  - **CLOSED 2026-11-17, dissolved by "Each decision lives in one replaceable unit of code"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 
 - [ ] **B-129** · T-docs · **Editorial pass: bring the registers to P-006
@@ -2950,6 +3030,7 @@ table and the stream plans.
     rules have been tested in ordinary work (owner ruling, 2026-09-01).
   - **Pointer**: methodology [P-006 (registers hold uniform rows)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md#p-006--registers-hold-uniform-rows)
     and its [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md).
+  - **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [ ] **B-130** · T-docs · **Editorial pass: P-001–P-005 across the Tier-1
   design corpus.**
@@ -2962,6 +3043,7 @@ table and the stream plans.
   - **When**: after B-129, and after the rules have been exercised.
   - **Pointer**: methodology [style guide](https://github.com/majodali/methodology/blob/main/docs/style.md)
     and [P-001–P-005 (prose \& presentation)](https://github.com/majodali/methodology/blob/main/docs/rules/prose.md).
+  - **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [x] **B-131** · T-docs · **CLOSED 2026-09-05 — deviation D-1 retired.**
   - **What landed**: `docs/book/process.md` §3 now states all four of the
@@ -3025,7 +3107,7 @@ table and the stream plans.
   B-174 (the book's existing chapters retrofitted to IR) as the lane's
   next stream, and the findings items B-171 (the pipeline chapter's two
   findings), B-172, B-175, B-176 and B-177 (the plan's §7 closing entry)
-- [ ] **B-171** (the pipeline chapter's two findings) · T-docs · L0 ·
+- [x] **B-171** (the pipeline chapter's two findings) · T-docs · L0 ·
   **Two facts the evaluation pipeline chapter states that no item owns.**
   Filed by chunk A2 of B-170 (the book, Part II and III chapters writable
   now) from the stream's spare id; the chapter is
@@ -3043,6 +3125,7 @@ table and the stream plans.
   in `CLAUDE.md` and `docs/book/standard/README.md`; decide whether the
   rule or the code gives (lane D). **Pointer**: the chapter's claims C79,
   C80 and C136 to C143.
+  **CLOSED 2026-11-17, dissolved by "Type annotations on parameters and returns"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [x] **B-172** (the partial-evaluation rules as implemented against the
   spine) · T-docs · L0 · **The spine's §25 (partial evaluation) delta
   says both PE rules are implemented as specified; the evaluator chapter
@@ -3094,7 +3177,7 @@ table and the stream plans.
   plan's §7 closing entry. Reserves B-178 (first out-of-scope finding of
   the PE-rules stream) and B-179 (second out-of-scope finding of the
   PE-rules stream) closed unused.
-- [ ] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
+- [x] **B-175** (the tooling chapter's findings) · T-tooling · T-docs ·
   lane C (items 7 and 11 lie in lane K) · **Eleven defects in the CLI and
   its documentation that the tooling chapter's IR records and no item
   owned.** Found by chunk A3 of B-170 (the book, Part II and III chapters
@@ -3170,7 +3253,8 @@ table and the stream plans.
   states the defect; the chapter's reasoning role edits the IR when the
   code changes. **Pointer**: `docs/book/platform/tooling.ir.md`; the
   plan's §7 A3 bullet, `docs/plans/book-chapters-now.md`
-- [ ] **B-176** (the host chapter's findings) · T-host · T-docs · lane C
+  - **CLOSED 2026-11-17, dissolved by "A command is a configuration", with "Every program is evaluated the same way, however it arrives", "Open obligations are listed for any proposer" and "A module's summary is the weakest strength among its claims"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-176** (the host chapter's findings) · T-host · T-docs · lane C
   (item 1's guard lies in lane K; item 3's chapter statement lies in lane
   A) · **Five defects in the web bundle, the sandbox and the host rules
   that the host chapter's IR records and no item owned.** Found by chunk
@@ -3232,6 +3316,7 @@ table and the stream plans.
   role edits the IR when the code changes. **Pointer**:
   `docs/book/platform/host.ir.md`; the plan's §7 A4 bullet,
   `docs/plans/book-chapters-now.md`
+  - **CLOSED 2026-11-17, dissolved by "The browser launcher is one bundle", with "The core runs in a browser" and "A late answer or its failure fills a cell as plain data"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-177** (the demo ladder chapter's findings) · Track R · T-docs ·
   lane D (`src/test/`; `docs/book/` lies in lanes A and D, and `demos/`
   in no lane of `scripts/analyze/lanes.json`) · **Eight defects in the
@@ -3289,6 +3374,7 @@ table and the stream plans.
   states the defect; the chapter's reasoning role edits the IR when the
   code changes. **Pointer**: `docs/book/demo-ladder.ir.md`; the plan's §7
   A5 bullet, `docs/plans/book-chapters-now.md`
+  - **Under the freeze (2026-11-17)**: corpus case, milestones 5 and 6 of `docs/plans/rebuild.md` §5.
 - [x] **B-178** (first out-of-scope finding of the PE-rules stream) ·
   L0 · Reserved by stream D (`docs/plans/pe-rules.md`) for a finding
   outside its boundary. Placeholder until used; the stream rewrites this
@@ -3297,7 +3383,7 @@ table and the stream plans.
 - [x] **B-179** (second out-of-scope finding of the PE-rules stream) ·
   L0 · As B-178 (first out-of-scope finding of the PE-rules stream).
   Closed unused 2026-11-03 when the stream closed.
-- [ ] **B-180** (recursion handling under partial evaluation) · L0 ·
+- [x] **B-180** (recursion handling under partial evaluation) · L0 ·
   lane D (lane P for the cutoff's performance side) · **Review how
   partial evaluation handles a recursive call; the current handling
   stands until then.** Filed on the maintainer's instruction of
@@ -3349,7 +3435,8 @@ table and the stream plans.
   hard-coded precompile and compile-time phases). **Pointer**:
   `docs/plans/pe-rules.md` §2.3 and RR7; `docs/plans/recursive-precompile.md`
   §2.5 and §7; B-100 above.
-- [ ] **B-181** (the hard-coded precompile and compile-time phases) ·
+  - **CLOSED 2026-11-17, dissolved by "A recursive call is evaluated once for each state of knowledge"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
+- [x] **B-181** (the hard-coded precompile and compile-time phases) ·
   T-build · L0 · lane C (the track) and lane D (the evaluator) · **Review
   whether the two phases that the evaluator and the runtime hard-code
   should be program-specific or configurable, as earlier decided; the
@@ -3402,6 +3489,7 @@ table and the stream plans.
   §2; `docs/book/platform/README.md` (T-build row);
   `docs/plans/pe-rules.md` RR3; `docs/book/platform/build-pipeline.ir.md`
   C126.
+  - **CLOSED 2026-11-17, dissolved by "Phases are configuration", with "The platform ships three phases: check, run and export"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-182** (unit tidy-ups from the book pass) · T-docs · L0 ·
   lane D or lane K by file (lane P for `src/grammar2/`, lane C for
   `src/index.ts`, `src/introspect.ts` and `src/pcp.ts`) · **The hand-off
@@ -3582,6 +3670,7 @@ table and the stream plans.
   after the loop; B-180 (recursion handling under partial evaluation) is
   the likely home of the fix.
   **Pointer**: the plan's §7, the L5 entry ("The engine finding")
+  **Under the freeze (2026-11-17)**: corpus case, milestone 3 of `docs/plans/rebuild.md` §5.
 - [ ] **B-189** (a self-applied function exhausts the JS stack) · L0 ·
   **A function handed to itself and called from a lambda inside its own
   body exhausts the host's stack three levels down.** Minimal case:
@@ -3599,6 +3688,7 @@ table and the stream plans.
   loop; B-180 (recursion handling under partial evaluation) is the
   likely home of the fix.
   **Pointer**: the plan's §7, the L5 entry ("The engine finding")
+  **Under the freeze (2026-11-17)**: corpus case, milestone 3 of `docs/plans/rebuild.md` §5.
 - [ ] **B-190** (name capture) · L2 · A `use`d library's own free
   names resolve in the calling file's scope: a top-level binding of the
   consumer file changes what a name inside a library function resolves
@@ -3620,6 +3710,7 @@ table and the stream plans.
   own plan. Owner: lane D, a plan of its own later; the fix is in
   `src/runtime.ts` and `src/evaluator.ts`, outside the pilot-findings
   boundary. **Pointer**: `docs/plans/pilot-findings.md` §2.2
+  **Under the freeze (2026-11-17)**: corpus case, milestone 6 of `docs/plans/rebuild.md` §5; "A block of bindings is one kernel primitive" says a name means the innermost block's binding.
 - [ ] **B-191** (a trailing block comment breaks the dedent) · L1 ·
   After B-183 (a trailing comment breaks a contract body's parse)
   landed at PR #172, a block's last line followed by a `/* … */` block
@@ -3632,7 +3723,8 @@ table and the stream plans.
   by the pilot-findings stream (`docs/plans/pilot-findings.md`) at its
   close, as PR #172's ask 2 defaulted. Owner: lane P (`src/grammar2/**`).
   **Pointer**: `docs/plans/trailing-comment-dedent.md` §7
-- [ ] **B-192** (the backing union of an induction and a `by` proof) ·
+  **Under the freeze (2026-11-17)**: corpus case, milestone 8 of `docs/plans/rebuild.md` §5.
+- [x] **B-192** (the backing union of an induction and a `by` proof) ·
   L2 · Two gaps left when B-185 (a sampled induction proof reported as
   discharged) landed at PR #173, chunk PF2 of
   `docs/plans/pilot-findings.md`. `prove_induction_impl`
@@ -3643,6 +3735,7 @@ table and the stream plans.
   a proof drops that proof's backings. Filed 2026-11-09 by the pilot-findings stream
   at its close, as PR #173's ask 3 defaulted. Owner: lane D.
   **Pointer**: `docs/plans/pilot-findings.md` §7, the PF2 entry
+  **CLOSED 2026-11-17, dissolved by "Every result says how strongly it holds"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-193** (`by` read as a unit inside a proposition) · L2 · Under
   `use units`, `theorem t: 2 > 1 by chain` does not parse: the quantity
   literal of `units_grammar` in `lib/units.alg` reads `1 by` as a
@@ -3652,7 +3745,8 @@ table and the stream plans.
   `docs/plans/pilot-findings.md`, filed 2026-11-09 by the stream at its
   close, as PR #173's ask 4 defaulted. Owner: lane D (`lib/units.alg`).
   **Pointer**: `docs/plans/pilot-findings.md` §7, the PF2 entry
-- [ ] **B-194** (one vocabulary of four strengths in the planning loop) ·
+  **Under the freeze (2026-11-17)**: corpus case, milestone 6 of `docs/plans/rebuild.md` §5.
+- [x] **B-194** (one vocabulary of four strengths in the planning loop) ·
   L3 · The planning loop's library, records and documents say
   "admitted" and "discharged" (`lib/planning_loop.alg`: "admitted
   promise", the states "discharged" and "unclaimed"; the ledger lines
@@ -3671,6 +3765,7 @@ table and the stream plans.
   **Pointer**: `docs/records/book-pass/dr5-part-5-vivace.md`, "Rulings
   taken"; `docs/plans/book-pass-inventory.md`, "Four strengths, one
   vocabulary"
+  **CLOSED 2026-11-17, dissolved by "Four strengths, one vocabulary"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 - [ ] **B-195** (the rebuild program) · Track R · lane S · **The code
   rebuilt to the 231 ruled decisions, in a tree beside the present
   one.** Filed 2026-11-13 on the maintainer's rulings of that day: both
@@ -3767,6 +3862,15 @@ table and the stream plans.
       entry.
   Lines 10 and 11 were recorded in `docs/plans/book-pass-inventory.md`
   on 2026-11-17 by the review session, each in a note of that date.
+  12. "A text can change the grammar it is read in"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on B-037 (embeddable grammars).
+      The parser engine does not change within a text. The grammar it
+      uses to parse the text may change per module or mid-file. Recorded
+      in `docs/plans/rebuild.md` §7, the entry of chunk G3.
+  13. "An interface is a type drawn from, not instantiated"; the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on B-116 (an interface's two guarantees).
+      An interface refuses a method body, where the present tree
+      discards it with no diagnostic. Recorded in the same entry.
+  Lines 12 and 13 were recorded in `docs/plans/book-pass-inventory.md`
+  on 2026-11-17 by the review session, each in a note of that date.
 - [ ] **B-198** (first out-of-scope finding of the acceptance stream) ·
   L0 · Placeholder, reserved by `docs/plans/rebuild-acceptance.md`.
   Filed 2026-11-13 so the plan's header resolves under
@@ -3813,7 +3917,7 @@ table and the stream plans.
   - **Pointer**: [D50](decisions.md), [D51](decisions.md);
     `docs/book/units.md` §7–§8; `scripts/analyze/units.json`.
 
-- [ ] **B-143** · L0 · **D22 is declared, not enforced.**
+- [x] **B-143** · L0 · **D22 is declared, not enforced.**
   - **What**: build the enforcement the immutable bit was a placeholder for —
     a structure that has finished construction refuses an in-place write, and
     deep immutability is checkable rather than asserted by review.
@@ -3833,6 +3937,7 @@ table and the stream plans.
     unowned (W-005).
   - **Pointer**: [D22](decisions.md); `src/structure.ts` header (the in-place
     rule); `docs/book/allegretto/structures.md` §2.
+  - **CLOSED 2026-11-17, dissolved by "Structures immutable by default; derive, never mutate"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [ ] **B-144** · T-docs · T-tooling · **"What's next" has no check, so a
   blocked item can be recommended as ready.** Raised by the maintainer,
@@ -3859,8 +3964,9 @@ table and the stream plans.
   - **Not just tooling**: the same gap explains why the four form-audit
     violations in **B-142** sat unowned. A ready-list that nobody can query
     is a list nobody reads.
+  - **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-145** · L0 · L2 · **Type vocabulary: a base primitive names a type
+- [x] **B-145** · L0 · L2 · **Type vocabulary: a base primitive names a type
   it must not know.** Filed from `docs/plans/plane-interfaces.md` §6 — the
   largest of the four populations B-112 does not cover.
   - **What**: ~25 distinct symbols, including 13 type constants (`IntType`,
@@ -3889,8 +3995,9 @@ table and the stream plans.
     constraint substrate* plausibly does — this stops being deferrable and
     becomes rung 3's blocker. That is the assumption the sequence rests on.
   - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+  - **CLOSED 2026-11-17, dissolved by "Everything above the kernel is an extension, and there is one way to extend"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-146** · L0 · L2 · **Knowledge propagation: the evaluator does
+- [x] **B-146** · L0 · L2 · **Knowledge propagation: the evaluator does
   abstract interpretation over knowledge it must not understand.**
   - **Scope note (B-112's exit, 2026-10-24).** The evaluator's two
     remaining L2 edges are this item's: `refinements` (abstract domains
@@ -3917,8 +4024,9 @@ table and the stream plans.
     `predicates`, not a peer of it — belongs to this cluster's design.
   - **When**: after rung 3.
   - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+  - **CLOSED 2026-11-17, dissolved by "A field's rule is a pure, bounded function", with "An effect is the use of a capability"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-147** · L0 · L2 · **Diagnostics: L0 renders L2 findings as text.**
+- [x] **B-147** · L0 · L2 · **Diagnostics: L0 renders L2 findings as text.**
   - **What**: ~8 symbols — `formatProofFinding`, `formatProvenFinding`,
     `formatMismatch`, `describeFailedProof`, plus the finding TYPES
     (`ProofFinding`, `DivObligation`, `DivergenceResult`,
@@ -3933,8 +4041,9 @@ table and the stream plans.
   - **When**: after rung 3. Cheapest of the four, and the one whose interface
     already exists.
   - **Pointer**: `docs/plans/plane-interfaces.md` §6.
+  - **CLOSED 2026-11-17, dissolved by "Everything above the kernel is an extension, and there is one way to extend"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-148** · L2 · **`setLawInstantiationSuspended` is a phase-scoped
+- [x] **B-148** · L2 · **`setLawInstantiationSuspended` is a phase-scoped
   mutable global.**
   - **What**: a module-level `let` in `types-std.ts`, toggled true/false
     around a critical section in `runtime.ts`, read by `assertPureForEquality`
@@ -3948,6 +4057,7 @@ table and the stream plans.
     would dignify it.
   - **When**: with or after B-112, whichever names the probes.
   - **Pointer**: `docs/plans/plane-interfaces.md` §7.2.
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [ ] **B-142** · T-docs · **Seven standing form-audit violations, none
   owned.**
@@ -3973,8 +4083,9 @@ table and the stream plans.
     B-142, the next free ID, because this entry had no citations and the
     other had ten.
   - **Pointer**: found at the methodology 1.5.0 migration, 2026-09-02.
+  - **Under the freeze (2026-11-17)**: still needed, outside the rebuild, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-132** · L0 · **Parse-time contexts are plain literals using the
+- [x] **B-132** · L0 · **Parse-time contexts are plain literals using the
   retired `Context` kind.**
   - **What**: `parser-helpers.ts`'s own `makeStructure` returns
     `{ kind: 'Context', bindings, bindingList }` — an object literal, not a
@@ -3987,6 +4098,7 @@ table and the stream plans.
     by **B-136**: once the scope has its own type, these are visibly a third
     thing rather than an implied one.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §2.2.
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
 - [x] **B-133** · L0 · **LANDED 2026-09 — `positional` is a derived cache, not
   a type indicator.**
@@ -4019,7 +4131,7 @@ table and the stream plans.
     the bit checked deep immutability O(1); none of them was true.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.5.
 
-- [ ] **B-135** · L0 · **Nothing says what may live on an L0 type's host
+- [x] **B-135** · L0 · **Nothing says what may live on an L0 type's host
   plane.** Raised by the maintainer at B-120 E4 (2026-09): *we may want to
   define some tighter rules to validate host-plane properties and design
   across all L0 types.*
@@ -4093,8 +4205,9 @@ table and the stream plans.
   - **Not in scope**: Scope's representation, now **D49** / **B-136**.
   - **Pointer**: `docs/plans/host-plane-declaration.md`;
     `docs/plans/entry-sequence-composite.md` §5.5 and §5.7.
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-136** · L0 · **Scope leaves `Value` (D49).**
+- [x] **B-136** · L0 · **Scope leaves `Value` (D49).**
   - **What**: give the evaluation environment its own host representation.
     `EvalFn` and `PrimitiveFnImpl` type their ctx on it; the slot store
     arrives by composition rather than by sharing `Structure`; `parent`,
@@ -4119,8 +4232,9 @@ table and the stream plans.
     names three things) is the same subject.
   - **Pointer**: `docs/plans/entry-sequence-composite.md` §5.6;
     [D49](decisions.md).
+  - **CLOSED 2026-11-17, dissolved by "The environment is not a value"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-137** · L0 · **Eliminate weak typing in the L0 host
+- [x] **B-137** · L0 · **Eliminate weak typing in the L0 host
   implementation.** Maintainer target set at B-120 E4 (2026-09): *we want to
   eliminate ALL weak typing (`as any` etc.) in the L0 host implementation.*
   - **Mechanical half LANDED 2026-09.** Implementation files (excluding the
@@ -4156,8 +4270,9 @@ table and the stream plans.
     the declarations removes them without a judgment call each.
   - **Pointer**: `docs/plans/host-plane-declaration.md`;
     `docs/plans/entry-sequence-composite.md` §5.7.
+  - **CLOSED 2026-11-17, not done: stopped by the freeze** of `docs/plans/rebuild.md` §4, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-138** · L1 · L2 · **The ruled L1/L2 module boundary has no
+- [x] **B-138** · L1 · L2 · **The ruled L1/L2 module boundary has no
   interface.**
   - **What**: `layers.md` rules the module system split — *the loading
     mechanism (extensions, dependency resolution, caching) is L1; typed module
@@ -4173,8 +4288,9 @@ table and the stream plans.
     both are "state the boundary as a type".
   - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Admission);
     `docs/book/layers.md` §1, *Module system (split)*.
+  - **CLOSED 2026-11-17, dissolved by "A module is an extension that arrives as a file", with "Imported modules are typed objects whose type encapsulates"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-139** · L0 · L2 · **`Construct value` has two outcomes and one
+- [x] **B-139** · L0 · L2 · **`Construct value` has two outcomes and one
   signature.**
   - **What**: CE-R8 and CT-R2 rule that a construction-path invariant failure
     yields an error **value** while a contract failure **halts** — a
@@ -4191,8 +4307,9 @@ table and the stream plans.
     the outcome to be nameable.
   - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Evaluation);
     [CE-R8 and CT-R2](decisions.md).
+  - **CLOSED 2026-11-17, dissolved by "Constructing a refined value claims its predicate"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-140** · L2 · **`Check declared constraint` is four code paths and no
+- [x] **B-140** · L2 · **`Check declared constraint` is four code paths and no
   surface.**
   - **What**: annotation, refinement, contract and effect-declaration checks
     share a severity model — a failed check halts (CE-R1) — and share no
@@ -4207,8 +4324,9 @@ table and the stream plans.
     **B-099**/T-R2, which configures exactly these severities.
   - **Pointer**: `docs/book/actors-and-activities.md` §4.1 and §5a.2
     (Policy).
+  - **CLOSED 2026-11-17, dissolved by "Correctness and safety are one kind of claim"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
 
-- [ ] **B-141** · T-host · **There is no Environment interface; host swapping
+- [x] **B-141** · T-host · **There is no Environment interface; host swapping
   is interception.**
   - **What**: the Node CLI and the browser sandbox differ by *capturing*
     `print` output (`web/allegro-web.ts`'s `onOutput`) and by substituting
@@ -4226,3 +4344,4 @@ table and the stream plans.
     exist first.
   - **Pointer**: `docs/book/actors-and-activities.md` §5a.2 (Environment);
     `docs/book/layers.md` §2, T-host.
+  - **CLOSED 2026-11-17, dissolved by "The terminal and the browser ship output, timers and HTTP"**, as classed in `docs/records/rebuild/backlog-under-the-freeze.md`.
