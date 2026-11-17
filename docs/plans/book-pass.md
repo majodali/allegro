@@ -1573,6 +1573,8 @@ its approval.
   session), at the maintainer's word, on the decisions with
   Allegretto's forms and the kernel's interface. 60 findings in 14
   clusters, recorded and not yet ruled.
+- **2026-11-17 — the second review's cluster 1 ruled and built** (the
+  review session): a free name never gets a value. 246 decisions.
 
 ## 8. Sessions
 

@@ -579,6 +579,14 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-17 — A free name never gets a value (the second review's
+  cluster 1).** A name means the innermost block's binding, and
+  nothing binds a name from outside. In `next/kernel/kernel.ts`:
+  `bind` removed; a module with a free name refused; `build` takes
+  the values for a description's free names; a needed free name is a
+  refutation; `waiting()` lists cells only. A function made in a
+  block inside a module keeps the block's names. The inventory holds
+  246 decisions.
 - **2026-11-17 — The second adversarial review.** Four independent
   reviewers read the 245 decisions, Allegretto's forms and the
   kernel's interface with no reasoning: 60 findings, sorted into 14

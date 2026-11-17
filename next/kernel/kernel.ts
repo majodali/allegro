@@ -67,9 +67,14 @@
 //               the function, or the inspection right. Where the function
 //               holds an unforgeable value the description holds its
 //               public identity only.
-//   "build"     build(description). The function a description describes.
-//               A refutation where the description holds the identity of
-//               an unforgeable value: nothing makes authority from data.
+//   "build"     build(description, names). The function a description
+//               describes. `names` is a structure keyed by symbols: the
+//               value for each name the description leaves free. A free
+//               name with no value is a refutation, so a built function
+//               reads nothing from the place it is built. A refutation
+//               too where the description holds the identity of an
+//               unforgeable value: nothing makes authority from data, and
+//               a live value is supplied under a name.
 //   "block"     block(bindings, body). The bindings are a structure keyed
 //               by symbols. They are one group, in a scope of their own:
 //               each may use any other, and itself, so a recursive
@@ -232,7 +237,7 @@ interface Root {
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["attempt", 2], ["block", 2], ["build", 1], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
   ["join", 2], ["length", 1], ["same", 2], ["slice", 3], ["then", 2],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
@@ -389,6 +394,53 @@ export const createKernel: CreateKernel2 = () => {
     return bindings.entries.flatMap(([k]) => (k !== null && seen(k) instanceof Sym ? [seen(k) as Sym] : []));
   };
 
+  /** The names in a value that no block around them binds, in the order met. */
+  const freeNames = (v: V, bound: ReadonlySet<Sym>, found: Sym[], visited: Map<V, ReadonlySet<Sym>[]>): Sym[] => {
+    if (v instanceof Sym) {
+      if (!bound.has(v) && !found.includes(v)) found.push(v);
+      return found;
+    }
+    if (v instanceof NameRef) {
+      if (bindingOf(v) === undefined && !bound.has(v.sym) && !found.includes(v.sym)) found.push(v.sym);
+      return found;
+    }
+    if (!(v instanceof Expr || v instanceof Struct || v instanceof Fn || v instanceof Lazy)) return found;
+    const seenWith = visited.get(v) ?? [];
+    if (seenWith.includes(bound)) return found;
+    visited.set(v, [...seenWith, bound]);
+    if (v instanceof Lazy) return v.done ? found : freeNames(v.value, bound, found, visited);
+    if (v instanceof Fn) return freeNames(v.body, bound, found, visited);
+    if (v instanceof Struct) {
+      if (!settled.has(v)) v.entries.forEach(([, e]) => freeNames(e, bound, found, visited));
+      return found;
+    }
+    const names = blockNames(v);
+    const inner = names === undefined ? bound : new Set([...bound, ...names]);
+    freeNames(v.fn, bound, found, visited);
+    v.args.forEach((a) => freeNames(a, inner, found, visited));
+    return found;
+  };
+
+  /** A value with each free name replaced by the value supplied for it. */
+  const supply = (v: V, values: ReadonlyMap<Sym, V>, bound: ReadonlySet<Sym>): V => {
+    if (v instanceof Sym) return bound.has(v) ? v : (values.get(v) ?? v);
+    if (v instanceof Fn) {
+      const body = supply(v.body, values, bound);
+      return body === v.body ? v : new Fn(v.params, body);
+    }
+    if (v instanceof Struct) {
+      if (settled.has(v)) return v;
+      const entries = v.entries.map(([k, e]) => [k, supply(e, values, bound)] as const);
+      return entries.some(([, e], i) => e !== v.entries[i][1]) ? new Struct(entries) : v;
+    }
+    if (!(v instanceof Expr)) return v;
+    const names = blockNames(v);
+    const inner = names === undefined ? bound : new Set([...bound, ...names]);
+    const fn = supply(v.fn, values, bound);
+    const args = v.args.map((a) => supply(a, values, inner));
+    return fn !== v.fn || args.some((a, i) => a !== v.args[i]) ? new Expr(fn, args) : v;
+  };
+
   const tie = (v: V, scope: ScopeV, memo: Map<V, V>, skip?: ReadonlySet<Sym>): V => {
     const done = memo.get(v);
     if (done !== undefined) return done;
@@ -409,7 +461,9 @@ export const createKernel: CreateKernel2 = () => {
     } else if (v instanceof Fn && !settled.has(v)) {
       const body = tie(v.body, scope, memo, skip);
       r = body === v.body ? v : new Fn(v.params, body);
-      settled.add(r);
+      // A function written inside a block may use the block's names, which are tied when
+      // the block is evaluated; until then it is not finished.
+      if (skip === undefined || skip.size === 0) settled.add(r);
       const maker = madeBy.get(v);
       if (maker !== undefined) madeBy.set(r, maker);
     }
@@ -483,7 +537,7 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof Sym) return evaluate(new NameRef(scope, v), scope);
     if (v instanceof NameRef) {
       const found = bindingOf(v);
-      if (found === undefined) return v;
+      if (found === undefined) return new Refuted(`the name ${v.sym.fqn} is bound by no block around it`, undefined);
       if (found.binding.memo !== undefined) {
         found.binding.rests.forEach(rest);
         return found.binding.memo;
@@ -633,7 +687,22 @@ export const createKernel: CreateKernel2 = () => {
         if (description instanceof Refuted) return description;
         if (!knownInFull(description)) return waits();
         const built = build(description, []);
-        return built instanceof Fn ? close(built, scope) : built instanceof Refuted ? built : new Refuted("only the description of a function can be built", args[0]);
+        if (built instanceof Refuted) return built;
+        if (!(built instanceof Fn)) return new Refuted("only the description of a function can be built", args[0]);
+        // A built function reads nothing from where it is built: each name the description
+        // leaves free takes the value supplied for it, and one with no value is refused.
+        const supplied = seen(args[1]);
+        if (!(supplied instanceof Struct)) return known(args[1]) ? new Refuted("the names supplied to build are a structure keyed by symbols", args[1]) : waits();
+        const values = new Map<Sym, V>();
+        for (const [k, e] of supplied.entries) {
+          const name = k === null ? undefined : seen(k);
+          if (!(name instanceof Sym)) return new Refuted("the names supplied to build are a structure keyed by symbols", args[1]);
+          values.set(name, e);
+        }
+        const whole = supply(built, values, new Set()) as Fn;
+        const missing = freeNames(whole, new Set(), [], new Map());
+        if (missing.length > 0) return new Refuted(`the description leaves ${missing.map((m) => m.fqn).join(", ")} free, and no value was supplied`, undefined);
+        return close(whole, scope);
       }
       if (fn.name === "same") {
         if (!known(args[0]) || !known(args[1])) return waits();
@@ -807,8 +876,6 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof CellV) {
       if (!v.filled) found.add(v);
       else waitsOn(v.value as V, found, visited);
-    } else if (v instanceof NameRef) {
-      if (bindingOf(v) === undefined) found.add(v);
     } else if (v instanceof Expr) {
       waitsOn(v.fn, found, visited);
       v.args.forEach((a) => waitsOn(a, found, visited));
@@ -1123,15 +1190,6 @@ export const createKernel: CreateKernel2 = () => {
     kernelPrimitiveNames: () => [...kernelPrims.keys()],
 
     scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
-    bind: (scope, symbol, value) => {
-      const s = scopeIn(scope, "the scope");
-      const sym = into(symbol, "the symbol");
-      if (!(sym instanceof Sym)) throw new InterfaceError("bind: the name is not of kind symbol");
-      if (s.bindings.has(sym)) throw new InterfaceError(`bind: ${sym.fqn} is already bound in this scope`);
-      s.bindings.set(sym, { value: into(value, "the value"), memo: undefined, rests: [] });
-      dirty = true;
-    },
-
     cell: () => out(new CellV(undefined)) as Cell,
     fill: (cell, value) => {
       const c = into(cell, "the cell");
@@ -1243,6 +1301,8 @@ export const createKernel: CreateKernel2 = () => {
       const f = into(fn, "the function");
       if (!(f instanceof Fn)) throw new InterfaceError("module: not a composed function");
       if (!Number.isInteger(count) || count < 0 || count > f.params.length) throw new InterfaceError("module: the number of key slots does not fit the function's parameters");
+      const free = freeNames(f, new Set(), [], new Map());
+      if (free.length > 0) throw new InterfaceError(`module: the function has the free name(s) ${free.map((n) => n.fqn).join(", ")}; a module names only what its blocks bind and what it is handed`);
       const identity = `sha256:${contentOf(f, [], new Map()).digest}`;
       const env = new Map<Param, V>();
       for (let slot = 0; slot < count; slot++) {

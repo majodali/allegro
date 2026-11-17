@@ -261,3 +261,18 @@ test("a record of the second version holds a symbol as data and a block of bindi
   delete (first as Record<string, unknown>).outcomes;
   assert.ok(check(first).some((f) => f.includes("needs version 2")));
 });
+
+test("a record whose module holds a free name does not load", () => {
+  // The module's body:  host.output(session.password), neither declared nor bound.
+  const doc = {
+    format: "allegro-saved-program", version: 2, needs: [],
+    nodes: [
+      { k: "symbol", fqn: "host.output" },
+      { k: "symbol", fqn: "session.password" },
+      { k: "expression", fn: 0, args: [1] },
+      { k: "function", params: [], body: 2 },
+    ],
+    module: 3, declares: [], keys: 0, outcomes: [],
+  };
+  assert.throws(() => load(createKernel(), doc as unknown as SavedProgram, new Map()), /free name\(s\) host\.output, session\.password/);
+});

@@ -51,6 +51,11 @@ function whole(k: Kernel, expression: Value, scope = k.scope()): ReturnType<Kern
   return r;
 }
 
+/** A block that binds these names around a body: how a name gets a value. */
+function within(k: Kernel, bindings: ReadonlyArray<readonly [Value, Value]>, body: Value): Value {
+  return k.expression(k.kernelPrimitive("block"), [k.structure(bindings), body]);
+}
+
 function setup() {
   const k = createKernel();
   const add = k.primitiveFunction(pure("add", 1, 2, (a, b) => a + b));
@@ -149,51 +154,57 @@ test("recursion on known arguments runs to its end", () => {
   const scope = k.scope();
   const n = k.param("n");
   const fact = k.symbol("m.fact");
-  k.bind(scope, fact, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n))))));
-  assert.equal(num(k, k.evaluate(call(fact, byte(k, 5)), scope).value), 120);
+  const factFn = k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n)))));
+  assert.equal(num(k, k.evaluate(within(k, [[fact, factFn]], call(fact, byte(k, 5))), scope).value), 120);
 });
 
-test("a name may be used before it is bound: an unbound name is a residual, never a refutation", () => {
-  const { k, add, call } = setup();
+test("a name no block binds is a refutation when it is needed, and a name gets a later value through a cell", () => {
+  // Until the ruling of 2026-11-17 an unbound name was a residual that waited to be bound.
+  // Nothing can bind a free name now, so it never waits.
+  const { k, add, call, kp } = setup();
   const scope = k.scope();
   const a = k.symbol("m.a");
   const r = k.evaluate(call(add, a, byte(k, 1)), scope);
-  assert.equal(r.refuted, false);
-  assert.equal(k.kind(r.value), "expression");
-  const waiting = k.waiting();
-  assert.equal(waiting.length, 1);
-  assert.equal(k.symbolName(waiting[0]), "m.a");
-  assert.equal(k.filled(waiting[0]), false);
-  k.bind(scope, a, byte(k, 41));
+  assert.equal(r.refuted, true);
+  assert.match(k.reasonOf(r.value) ?? "", /the name m\.a is bound by no block/);
+  assert.deepEqual(k.waiting(), [], "a free name is not something that waits");
+  // A free name nothing needs refutes nothing.
+  assert.equal(num(k, k.evaluate(call(kp("if"), truth(k, true), byte(k, 7), a), scope).value), 7);
+  // A value that arrives later: a block binds the name to a cell, and the host fills the cell.
+  const c = k.cell();
+  const waits = k.evaluate(within(k, [[a, c]], call(add, a, byte(k, 1))), scope);
+  assert.equal(waits.refuted, false);
+  assert.equal(k.waiting().length, 1);
+  k.fill(c, byte(k, 41));
   assert.deepEqual(k.advance().refuted, []);
-  assert.equal(num(k, k.current(r.value)), 42);
+  assert.equal(num(k, k.current(waits.value)), 42);
   assert.deepEqual(k.waiting(), []);
-  assert.throws(() => k.bind(scope, a, byte(k, 0)), /already bound/);
 });
 
-test("a binding is an expression, evaluated when it is needed and in its own scope", () => {
+test("a binding is an expression, evaluated when it is needed and in its own block", () => {
   const { k, add, call } = setup();
-  const outer = k.scope();
-  const inner = k.scope(outer);
   const [a, b] = [k.symbol("m.a"), k.symbol("m.b")];
-  k.bind(outer, b, call(add, a, byte(k, 1))); // b = a + 1, with a bound below it in the text
-  k.bind(outer, a, byte(k, 10));
-  k.bind(inner, a, byte(k, 99));
-  assert.equal(num(k, k.evaluate(b, inner).value), 11, "b's own a, not the inner scope's");
-  assert.equal(num(k, k.evaluate(a, inner).value), 99);
+  // b = a + 1, with a bound below it in the text; an inner block binds a again.
+  const nested = within(k, [[b, call(add, a, byte(k, 1))], [a, byte(k, 10)]], within(k, [[a, byte(k, 99)]], k.structure([[null, b], [null, a]])));
+  assert.deepEqual(k.entriesOf(whole(k, nested).value).map(([, v]) => num(k, v)), [11, 99], "b's own a, not the inner block's");
 });
 
-test("a function's free names mean what they meant where the function was evaluated", () => {
+test("a function's names mean what they meant where the function was written", () => {
   const { k, add, call } = setup();
-  const home = k.scope();
-  const away = k.scope();
   const [x, f] = [k.symbol("m.x"), k.symbol("m.f")];
   const p = k.param("p");
-  k.bind(home, x, byte(k, 1));
-  k.bind(home, f, k.composedFunction([p], call(add, p, x)));
-  const fValue = k.evaluate(f, home).value;
-  k.bind(away, x, byte(k, 100));
-  assert.equal(num(k, k.evaluate(call(fValue, byte(k, 1)), away).value), 2);
+  const home = within(k, [[x, byte(k, 1)], [f, k.composedFunction([p], call(add, p, x))]], within(k, [[x, byte(k, 100)]], call(f, byte(k, 1))));
+  assert.equal(num(k, k.evaluate(home, k.scope()).value), 2);
+});
+
+test("nothing can be bound from outside: the interface has no call for it", () => {
+  const { k, add, call } = setup();
+  assert.equal((k as unknown as Record<string, unknown>).bind, undefined);
+  // Two evaluations share nothing: a name one binds is free in the other.
+  const a = k.symbol("m.a");
+  const scope = k.scope();
+  assert.equal(num(k, k.evaluate(within(k, [[a, byte(k, 1)]], call(add, a, a)), scope).value), 2);
+  assert.equal(k.evaluate(call(add, a, a), scope).refuted, true);
 });
 
 test("a primitive runs only when its arguments are fully known", () => {
@@ -249,10 +260,10 @@ test("an argument is evaluated when it is needed: a conditional written as a fun
   const scope = k.scope();
   const [c, a, b, n] = ["c", "a", "b", "n"].map((name) => k.param(name));
   const [choose, fact] = [k.symbol("m.choose"), k.symbol("m.fact")];
-  k.bind(scope, choose, k.composedFunction([c, a, b], call(kp("if"), c, a, b)));
+  const chooseFn = k.composedFunction([c, a, b], call(kp("if"), c, a, b));
   // The recursive call is an argument of `choose`. It is evaluated only when the branch is taken.
-  k.bind(scope, fact, k.composedFunction([n], call(choose, call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n))))));
-  assert.equal(num(k, k.evaluate(call(fact, byte(k, 5)), scope).value), 120);
+  const factFn = k.composedFunction([n], call(choose, call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n)))));
+  assert.equal(num(k, k.evaluate(within(k, [[choose, chooseFn], [fact, factFn]], call(fact, byte(k, 5))), scope).value), 120);
 });
 
 test("an argument nothing needs is never evaluated: its effect does not happen and its refutation marks nothing", () => {
@@ -291,14 +302,12 @@ test("an argument is evaluated at most once, however often it is used, and acros
 
 test("an argument is evaluated in the scope where it was written, wherever it ends up", () => {
   const { k, add, call } = setup();
-  const [written, elsewhere] = [k.scope(), k.scope()];
-  const a = k.symbol("m.a");
-  k.bind(written, a, byte(k, 1));
-  k.bind(elsewhere, a, byte(k, 100));
+  const [a, kept] = [k.symbol("m.a"), k.symbol("m.kept")];
   const [x, y] = [k.param("x"), k.param("y")];
   const keep = k.composedFunction([x], k.composedFunction([y], call(add, x, y))); // x => y => x + y
-  const kept = k.evaluate(call(keep, a), written).value; // `a` is not needed yet
-  assert.equal(num(k, k.evaluate(call(kept, byte(k, 1)), elsewhere).value), 2, "the `a` of where it was written");
+  // `a` is not needed where `keep(a)` is written; it is needed inside a block that binds another `a`.
+  const program = within(k, [[a, byte(k, 1)], [kept, call(keep, a)]], within(k, [[a, byte(k, 100)]], call(kept, byte(k, 1))));
+  assert.equal(num(k, k.evaluate(program, k.scope()).value), 2, "the `a` of where it was written");
 });
 
 test("an effect happens when its value is needed, and a structure does not need its entries", () => {
@@ -565,7 +574,7 @@ test("a description made by code is read in full when it is built", () => {
   const d = k.evaluate(call(kp("describe"), k.inspectionRight(), f), scope).value;
   // The same description, put together entry by entry: each entry is an expression until it is read.
   const pieces = k.structure(k.entriesOf(d).map((_, i) => [null, call(kp("get"), d, byte(k, i))] as const));
-  const built = k.evaluate(call(kp("build"), pieces), scope);
+  const built = k.evaluate(call(kp("build"), pieces, k.structure([])), scope);
   assert.equal(built.refuted, false);
   assert.equal(num(k, k.evaluate(call(built.value, byte(k, 6)), scope).value), 7);
 });
@@ -642,14 +651,14 @@ test("a step budget ends an evaluation the same way every time", () => {
   const scope = k.scope();
   const n = k.param("n");
   const down = k.symbol("m.down");
-  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n)))));
-  const full = k.evaluate(call(down, byte(k, 50)), scope);
+  const program = within(k, [[down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n))))]], call(down, byte(k, 50)));
+  const full = k.evaluate(program, scope);
   assert.equal(full.ended, "complete");
-  const cut1 = k.evaluate(call(down, byte(k, 50)), scope, { steps: 40 });
-  const cut2 = k.evaluate(call(down, byte(k, 50)), scope, { steps: 40 });
+  const cut1 = k.evaluate(program, scope, { steps: 40 });
+  const cut2 = k.evaluate(program, scope, { steps: 40 });
   assert.deepEqual([cut1.ended, cut1.steps, cut1.refuted], ["limit", 40, false]);
   assert.equal(cut2.steps, cut1.steps);
-  assert.equal(k.evaluate(call(down, byte(k, 50)), scope, { steps: full.steps }).ended, "complete");
+  assert.equal(k.evaluate(program, scope, { steps: full.steps }).ended, "complete");
 });
 
 test("a recursion that never ends is ended by the budget, and is not a fault", () => {
@@ -657,9 +666,9 @@ test("a recursion that never ends is ended by the budget, and is not a fault", (
   const scope = k.scope();
   const loop = k.symbol("m.loop");
   const n = k.param("n");
-  k.bind(scope, loop, k.composedFunction([n], call(loop, n)));
-  assert.equal(k.evaluate(call(loop, byte(k, 1)), scope, { steps: 500 }).ended, "limit");
-  assert.equal(k.evaluate(call(loop, byte(k, 1)), scope).ended, "limit", "with no budget, the depth it can reach is the limit");
+  const program = within(k, [[loop, k.composedFunction([n], call(loop, n))]], call(loop, byte(k, 1)));
+  assert.equal(k.evaluate(program, scope, { steps: 500 }).ended, "limit");
+  assert.equal(k.evaluate(program, scope).ended, "limit", "with no budget, the depth it can reach is the limit");
 });
 
 test("an effect is performed once, when its arguments are known", () => {
@@ -812,9 +821,8 @@ test("what a binding's value rested on is kept with it", () => {
   const { k, isZero, call, kp } = setup();
   const scope = k.scope();
   const z = k.symbol("m.z");
-  k.bind(scope, z, call(isZero, byte(k, 0)));
-  k.evaluate(z, scope);
-  const r = k.evaluate(call(kp("claim"), z), scope);
+  // The binding is needed twice and evaluated once; the claim on its second use still rests on what it used.
+  const r = k.evaluate(within(k, [[z, call(isZero, byte(k, 0))]], call(kp("then"), z, call(kp("claim"), z))), scope);
   assert.ok(k.restsOn(r.value).some((x) => x.kind === "primitive" && x.name === "isZero"), "though the binding was not evaluated again");
 });
 
@@ -854,13 +862,59 @@ test("restore records an outcome under a builder's name, only where the kernel's
   assert.throws(() => k.claimKey(other, fn, []), /not inside that function/);
 });
 
-test("isCell tells a cell and a waiting name from other values", () => {
+test("isCell tells a cell from other values, and only a cell waits", () => {
+  // Until the ruling of 2026-11-17 a name nothing had bound also waited.
   const { k, add, call } = setup();
   const c = k.cell();
   assert.equal(k.isCell(c), true);
   assert.equal(k.isCell(byte(k, 1)), false);
-  k.evaluate(call(add, k.symbol("m.later"), byte(k, 1)), k.scope());
-  assert.equal(k.isCell(k.waiting()[0]), true);
+  k.evaluate(call(add, c, byte(k, 1)), k.scope());
+  assert.deepEqual(k.waiting().map((w) => k.isCell(w)), [true]);
+});
+
+test("a module names only what its blocks bind and what it is handed", () => {
+  const { k, add, call, kp } = setup();
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a) => a[0] });
+  const [out, secret, x] = [k.symbol("host.output"), k.symbol("session.password"), k.symbol("m.x")];
+  // A function with a free name is not a module, whatever a host might later mean by the name.
+  assert.throws(() => k.module(k.composedFunction([], call(out, secret)), 0), /free name\(s\) host\.output, session\.password/);
+  // A name a block inside it binds is not free, nor is a parameter.
+  const p = k.param("out");
+  const ok = k.module(k.composedFunction([p], within(k, [[x, byte(k, 2)]], call(p, call(add, x, x)))), 0);
+  assert.equal(num(k, k.evaluate(call(ok, say), k.scope()).value), 4);
+  // A free name in a branch that is never taken is refused too: the check reads the text.
+  assert.throws(() => k.module(k.composedFunction([], call(kp("if"), truth(k, true), byte(k, 1), secret)), 0), /free name/);
+});
+
+test("a function made in a block inside a module keeps the block's names", () => {
+  const { k, add, call, kp } = setup();
+  const [kk, f] = [k.symbol("m.k"), k.symbol("m.f")];
+  const n = k.param("n");
+  const m = k.module(k.composedFunction([], within(k, [[kk, byte(k, 7)], [f, k.composedFunction([n], call(add, n, kk))]], k.structure([[null, f]]))), 0);
+  const scope = k.scope();
+  const made = k.evaluate(call(kp("get"), call(m), byte(k, 0)), scope).value;
+  assert.equal(num(k, k.evaluate(call(made, byte(k, 1)), scope).value), 8);
+});
+
+test("a built function reads nothing from where it is built: its free names are supplied", () => {
+  const { k, add, call, kp } = setup();
+  const [v, lib, got] = [k.symbol("m.v"), k.symbol("m.lib"), k.symbol("m.got")];
+  const scope = k.scope();
+  // The description of () => add(v, 1), with v left free.
+  const describing = k.composedFunction([], within(k, [[v, byte(k, 0)]], k.composedFunction([], call(add, v, byte(k, 1)))));
+  const inner = k.evaluate(call(describing), scope).value;
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), inner), scope).value;
+  // Built with no value for v: refused, also where a block around the call binds a v of its own.
+  const bare = k.evaluate(call(kp("build"), d, k.structure([])), scope);
+  assert.match(k.reasonOf(bare.value) ?? "", /leaves m\.v free/);
+  const around = k.evaluate(within(k, [[v, byte(k, 78)]], call(kp("build"), d, k.structure([]))), scope);
+  assert.match(k.reasonOf(around.value) ?? "", /leaves m\.v free/, "the caller's binding is not read");
+  // Built with a value for v: it uses that value, wherever it is called.
+  const built = within(k, [[lib, call(kp("build"), d, k.structure([[v, byte(k, 41)]]))]], within(k, [[v, byte(k, 99)], [got, call(lib)]], got));
+  assert.equal(num(k, k.evaluate(built, scope).value), 42);
+  // A name a block inside the description binds is that block's, whatever is supplied under the same name.
+  const own = k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([], within(k, [[v, byte(k, 5)]], call(add, v, byte(k, 1))))), scope).value;
+  assert.equal(num(k, k.evaluate(call(call(kp("build"), own, k.structure([[v, byte(k, 41)]]))), scope).value), 6);
 });
 
 // ---- Values and descriptions (chunk K4) -------------------------------------
@@ -919,10 +973,10 @@ test("a description never yields authority: a capability inside is described by 
   const named = form(k, use.parts[0]);
   assert.equal(named.form, "capability");
   assert.deepEqual(named.parts.map((v) => text(k, v)), ["files", "write"], "the description says which capability, and holds none");
-  const rebuilt = k.evaluate(call(kp("build"), d), scope);
+  const rebuilt = k.evaluate(call(kp("build"), d, k.structure([])), scope);
   assert.match(k.reasonOf(rebuilt.value) ?? "", /nothing makes authority from data/);
   // The part that applies the capability, cut out of its guard, cannot be built either.
-  const cut = k.evaluate(call(kp("build"), k.entriesOf(condition.parts[1])[1][1]), scope);
+  const cut = k.evaluate(call(kp("build"), k.entriesOf(condition.parts[1])[1][1], k.structure([])), scope);
   assert.equal(cut.refuted, true);
   assert.equal(wrote, 0);
 });
@@ -931,12 +985,12 @@ test("a description of a function that holds no unforgeable value builds a funct
   const { k, call, kp, ownKey, inc } = moduleWithFunction();
   const scope = k.scope();
   const d = k.evaluate(call(kp("describe"), ownKey, inc), scope).value;
-  const built = k.evaluate(call(kp("build"), d), scope).value;
+  const built = k.evaluate(call(kp("build"), d, k.structure([])), scope).value;
   assert.equal(k.kind(built), "composed-function");
   assert.notEqual(built, inc);
   assert.equal(num(k, k.evaluate(call(built, byte(k, 41)), scope).value), 42);
-  assert.match(k.reasonOf(k.evaluate(call(kp("build"), byte(k, 1)), scope).value) ?? "", /not a description/);
-  assert.match(k.reasonOf(k.evaluate(call(kp("build"), form(k, d).parts[0]), scope).value) ?? "", /not a description/);
+  assert.match(k.reasonOf(k.evaluate(call(kp("build"), byte(k, 1), k.structure([])), scope).value) ?? "", /not a description/);
+  assert.match(k.reasonOf(k.evaluate(call(kp("build"), form(k, d).parts[0], k.structure([])), scope).value) ?? "", /not a description/);
 });
 
 test("a function of another module is opaque inside a description, unless the inspection right describes it", () => {
@@ -966,10 +1020,10 @@ test("an attempt returns how an evaluation ended, as data, and a refutation insi
 
   const n = k.param("n");
   const down = k.symbol("m.down");
-  k.bind(scope, down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n)))));
-  assert.equal(tried(call(down, byte(k, 200)), 30).form, "limit");
-  assert.equal(tried(call(down, byte(k, 200)), 30).form, "limit", "the same every time");
-  assert.equal(tried(call(down, byte(k, 3)), 30).form, "value");
+  const downTo = (m: number) => within(k, [[down, k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n))))]], call(down, byte(k, m)));
+  assert.equal(tried(downTo(200), 30).form, "limit");
+  assert.equal(tried(downTo(200), 30).form, "limit", "the same every time");
+  assert.equal(tried(downTo(3), 30).form, "value");
   // A search: try candidates until one satisfies a claim.
   const candidate = k.param("candidate");
   const fits = k.composedFunction([candidate], call(kp("attempt"), call(kp("claim"), call(isZero, call(dec, candidate))), steps(k, 100)));

@@ -263,10 +263,15 @@ export interface Kernel {
 
   // ---- Scopes ---------------------------------------------------------
 
-  /** A new scope: a child of `parent`, or, with no parent, one that shares nothing with any other. */
+  /**
+   * A token `evaluate` takes and ignores. It holds nothing and nothing can
+   * be put in it: a name means the binding of the innermost block that
+   * binds it, and a host gives a program a value by passing it as an
+   * argument, or by building a block that binds a name to it. This call and
+   * `evaluate`'s scope argument go when the interface's two versions are
+   * made one.
+   */
   scope(parent?: Scope): Scope;
-  /** Binds a symbol in a scope. Binding a symbol twice in one scope is an InterfaceError. */
-  bind(scope: Scope, symbol: Value, value: Value): void;
 
   // ---- Cells ----------------------------------------------------------
 
@@ -434,7 +439,7 @@ export interface Kernel2 extends Kernel {
 
   // ---- Cells --------------------------------------------------------------
 
-  /** True for a cell, filled or not, and for a name that waits to be bound. */
+  /** True for a cell, filled or not. */
   isCell(value: Value): boolean;
 }
 

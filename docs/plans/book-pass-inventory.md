@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 245 decisions in 6 parts and 38 chapters (231 when the phase closed; fourteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 57; Part III: 26; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 246 decisions in 6 parts and 38 chapters (231 when the phase closed; fifteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -38,7 +38,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A block of bindings is one kernel primitive; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A block of bindings is one kernel primitive; A free name never gets a value; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; Tail calls by sentinel and loop.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -878,6 +878,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: the parser decides what an identifier refers to (rejected)
 - Sources: docs/book/concepts.md T0 §4; docs/decisions.md D14, D29
 - Book home (fragments' proposal): symbols chapter (proposed)
+- Notes (2026-11-17, the second adversarial review, cluster 1): this entry describes the present tree. In the rebuilt kernel a name means the innermost block's binding, and a free name gets no value.
 - Chapter: Programs as values
 
 ### Authority
@@ -938,6 +939,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: rebuilding a changed expression against the original under rules the kernel checks (rejected: a rebuilt part can leave out the guard that the original put around a capability)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. With "Reading an expression never yields authority" it closes the path the adversarial review found: treating a live expression as data and then making part of it live again.
+- Notes (2026-11-17, the second adversarial review, cluster 1): the names a description leaves free are how a live value is supplied: the kernel's `build` takes a structure of them. A built function reads nothing from the place it is built.
 - Chapter: Authority
 
 #### A capability is granted, never acquired
@@ -1196,6 +1198,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling: Allegretto's forms, as ruled, name the block of bindings as what a block stands for. A binding at a place, `x <- e`, is a block that binds `x` around a sequence that needs `x` first.
 - Chapter: Evaluation
 
+
+#### A free name never gets a value
+- Decides: a name no block around it binds is free, and nothing gives a free name a value: no call of the interface binds a name, and no code is evaluated in a scope that holds one. So what a function can name is fixed by its own text: its parameters, and the blocks written around the name. A module's function has no free names, and the kernel refuses to make a module from one that has. A function built from a description takes a value for each name the description leaves free from whoever builds it, and is refused if one is missing. A free name in an expression handed to the kernel is a refutation when it is needed.
+- Status: partly built (the reference kernel); ruled 2026-11-17
+- Type: capability
+- Rationale kind: technical
+- Depends on: A block of bindings is one kernel primitive; The environment is not a value; Authority is an unforgeable value; A live expression is built only from live values
+- Significance: 5 — a program reaches only what its text names
+- Label: foundational — every module, every built function, every saved program and every proposal
+- Options recorded: a free name resolved where the code is evaluated (what the reference kernel did: a saved program used a capability it never declared, and a built function read its caller's bindings); a free name as a residual that waits to be bound (the ruling of 2026-11-14 on issue 15 of the first review: once nothing can bind it, it waits for ever and a mistake looks like a program still running)
+- Sources: the maintainer's rulings of 2026-11-17 (../records/book-pass/adversarial-review-2.md, Rulings taken)
+- Notes: new, by ruling. What once needed a free name no longer does: a name used before its definition is bound by the same block; a solver's unknown is a parameter; a value that arrives later is a cell a block binds the name to; a name in a description is data until it is built. The maintainer asked whether a free name can appear in a correct program; it cannot, except where it is never needed.
+- Chapter: Evaluation
 #### Effects on one capability keep their order
 - Decides: where need alone orders two effects, the order is fixed: a primitive function needs its arguments left to right. Effects on one capability keep the order that sequence and need give them, and no rewrite may change it. Effects on different capabilities are unordered unless an order between the two is declared; a capability's definition may also declare parts of itself unordered. An effect is performed only when every effect ordered before it has been performed, and otherwise stays in the residual, so a phase that holds one capability and lacks another cannot perform an order in part. The order is read from the residual of a phase that holds no capability, and a claim about it is stated over that residual's description. Two chains that each wait on a different late answer are not ordered: they act in the order the answers arrive, which is information like any other, unless an order is declared.
 - Status: open (the reference kernel performs nothing after a statement that waits, whatever the capability; declared orders are not built); ruled 2026-11-16
@@ -1281,7 +1296,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### A missing value is a cell that is filled once
-- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, an input not yet supplied, and a name that nothing has bound yet are cells too.
+- Decides: a structure is always complete in shape. What may be missing is a value in one of its places: a cell, filled exactly once and never changed. A capability a phase is not given, an input not yet supplied, and a value a name will have later are cells too: a block binds the name to the cell.
 - Status: settled; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1291,6 +1306,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: incompleteness as a state of a structure (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Incompleteness lives in write-once future cells" and absorbs "One residualising resolution semantics for scopes": a declared name with no value yet is such a cell. (Ruled otherwise on 2026-11-14: a name nothing has bound is such a cell as well, and is no refutation.) The maintainer doubted that a name without a value arises apart from these cases; it does not, so it is not a decision of its own.
+- Notes (2026-11-17, the second adversarial review, cluster 1): reworded: a name is not itself a cell; a block binds the name to one.
 - Chapter: Evaluation
 
 #### When information arrives, what waited on it is evaluated again
@@ -1347,6 +1363,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: none recorded
 - Sources: docs/book/allegretto/evaluator.md §4
 - Book home (fragments' proposal): allegretto/evaluator.md §4
+- Notes (2026-11-17, the second adversarial review, cluster 1): this entry describes the present tree, where a symbol is resolved by name through the scope of the call. In the rebuilt kernel it is not.
 - Chapter: Evaluation
 
 #### Tail calls by sentinel and loop
@@ -1566,7 +1583,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### A language checks the names it cares about
-- Decides: the kernel never refutes an unbound name; evaluating one gives a residual that waits on it. The extension that reads a text decides which names must be bound, and when. It computes, from the expression it built, the names the expression uses and the names it binds, and states the result as a claim on that constant: true, or the names left over. A utility for this is defined outside the kernel, for parsers and loaders to use. The standard language checks at the end of a text, so a name may be used before it is defined.
+- Decides: the extension that reads a text decides which names must be bound, and when. It computes, from the expression it built, the names the expression uses and the names it binds, and states the result as a claim on that constant: true, or the names left over. A utility for this is defined outside the kernel, for parsers and loaders to use. The standard language checks at the end of a text, so a name may be used before it is defined. The kernel is the backstop: it gives a free name no value.
 - Status: open (the kernel refuses an undeclared name itself); ruled 2026-11-14
 - Type: capability
 - Rationale kind: technical
@@ -1578,6 +1595,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a module calls a function defined further down the file, and misspells another; the first is fine, and the check at the end of the text refutes the second by name.
 - Notes: new, by ruling; answers issue 15 of the adversarial review. The grammar has already said which identifiers matter, in the expression: one it wants checked is a symbol in a position that will be evaluated; a nonterminal or a logic variable is data or a cell, and the utility does not see it as a name. Because a module is a closed function, the check needs no view of any environment. A language that makes no such claim gets no refutation for a misspelt name; a tool can report names that nothing can bind when a phase ends, as a matter of completion. A name computed while a program runs cannot be checked ahead.
 - Notes (2026-11-15, values and descriptions): the check works on a description, which is what a parser produces, before the module function is built; it needs no right to describe.
+- Notes (2026-11-17, the second adversarial review, cluster 1): the first sentence, "the kernel never refutes an unbound name; evaluating one gives a residual that waits on it", is removed by ruling, with the reason it had: nothing can bind a free name any more ("A free name never gets a value"). The language's own check still comes first and says where in the text.
 - Chapter: Parsing
 
 #### The `grammar { … }` block
@@ -3328,6 +3346,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the rulings on strength and on identity): the second version, `Kernel2` in `next/kernel/interface.ts`, adds: making a module, with its keys; reading a key; what a result rests on; the reason for a refutation; restore; and whether a value is a cell.
 - Notes (2026-11-16, the block of bindings): by ruling, `scope` and `bind` may leave the interface ("Scope and bind may leave the interface"). A block of bindings gives an expression its names, and a name whose value arrives later is bound to a cell. The host then cannot put a name into a program from outside, and two evaluations share nothing. They leave when the interface's two versions are made one.
 - Notes (2026-11-16, entries evaluated when read): a caller evaluates a value and is given no more. A structure in a result is complete in shape; an entry that nothing has read is handed back as an expression, which the caller may evaluate.
+- Notes (2026-11-17, the second adversarial review, cluster 1): `bind` is removed. `scope` stays as a token `evaluate` ignores until the interface's two versions are made one.
 - Chapter: The kernel's interface
 
 #### No interface call writes a bare claim outcome
@@ -3422,7 +3441,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Launching
 
 #### Only the launcher sets the ceiling
-- Decides: the capabilities a launcher gives an execution are a ceiling: no code inside can exceed it. Within it, code still has to be handed a capability, by value or by being evaluated in a scope that holds it.
+- Decides: the capabilities a launcher gives an execution are a ceiling: no code inside can exceed it. Within it, code still has to be handed a capability, by value.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3433,6 +3452,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a check phase is launched with no capability to act; nothing the program loads can write a file.
 - Notes: new, by ruling.
+- Notes (2026-11-17, the second adversarial review, cluster 1): "or by being evaluated in a scope that holds it" is removed by ruling: a capability is handed over by value only.
 - Chapter: Launching
 
 #### Startup, step by step
@@ -3452,7 +3472,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Launching
 
 #### One kernel serves many invocations
-- Decides: a launcher may have one kernel evaluate a stream of commands, events or requests, each in its own scope with its own capabilities. The stream may equally be handled by Allegro code through a capability.
+- Decides: a launcher may have one kernel evaluate a stream of commands, events or requests, each with the capabilities it is handed. The stream may equally be handled by Allegro code through a capability.
 - Status: partly built (the prompt); ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3463,6 +3483,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a server answers each request in a fresh scope that holds only that request's capabilities.
 - Notes: new, by ruling.
+- Notes (2026-11-17, the second adversarial review, cluster 1): "each in its own scope" is removed: two evaluations share nothing, and there is no scope to give.
 - Chapter: Launching
 
 ### Capabilities and primitive functions
@@ -3607,6 +3628,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. "The platform's parser engine ships already built" is its first use.
 - Notes (2026-11-13, after the adversarial review): reworded by ruling, answering issue 25 of the adversarial review (a record could contain any interface call). The first version of the data form, `next/kernel/saved-program.ts`, holds no claim outcomes, no keys and no origins, and defines the data form only; those return with the rulings on identity and on strength.
 - Notes (2026-11-15, the rulings on strength and on identity): the second version of the data form adds key slots and stored outcomes (`next/kernel/saved-program.ts`).
+- Notes (2026-11-17, the second adversarial review, cluster 1): a record's module has no free names: the kernel refuses it otherwise.
 - Chapter: Saved programs and export
 
 #### A saved program names what it needs by content hash
@@ -3892,6 +3914,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a model answers a theorem with a term; the tool splices it and the kernel decides.
 - Notes: was "One proof-term contract for human and machine provers".
 - Notes (2026-11-17, the adversarial review's last issues): the last two sentences are added by ruling, for issue 24: an accepted proposal ran later with the capabilities of the place it filled.
+- Notes (2026-11-17, the second adversarial review, cluster 1): what an obligation states its unknown may be handed covers names as well as arguments: a tool builds a proposal with exactly the names the obligation lists, so a proof term can name the lemmas it needs and nothing else.
 - Chapter: Tools
 
 #### A trace is read from origins
