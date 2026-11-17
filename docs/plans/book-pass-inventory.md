@@ -2262,8 +2262,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
-- Decides: `export NAME = …` marks the binding, never the value. A module hands out what it exports, and what it does not hand out cannot be reached. A module that declares no exports hands out everything.
-- Status: settled; reworded 2026-11-12 (DR4)
+- Decides: `export NAME = …` marks the binding, never the value. A module hands out what it exports, and what it does not hand out cannot be reached. A module that declares no exports hands out everything. Everything means its bindings: a module's keys and the capabilities it was given are its parameters, and are never handed out.
+- Status: settled; reworded 2026-11-12 (DR4); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
 - Depends on: A module is an extension that arrives as a file; A capability is granted, never acquired
@@ -2273,6 +2273,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: an `exported` value-plane channel (deleted: `y = x` copied export-ness)
 - Sources: V-R4 (docs/plans/visibility.md §3; docs/decisions.md); B-097 V1; docs/book/extension/modules.md "Module objects and encapsulation"
 - Book home (fragments' proposal): extension/modules (L2 half)
+- Notes (2026-11-17, the adversarial review's last issues): the last sentence is added by ruling, for issue 27.
 - Chapter: Reaching a member
 
 #### Imported modules are typed objects whose type encapsulates
@@ -3476,8 +3477,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Capabilities and primitive functions
 
 #### A module is a function of its capabilities, inputs and imports
-- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it.
-- Status: open; ruled 2026-11-13 (DR6)
+- Decides: a module is a function. Its parameters are the capabilities and inputs it declares, and the modules it imports. Its body holds its bindings and its top-level effects, in written order. Loading a module constructs that function and evaluates nothing. Instantiating it is a call, made by whoever loaded it. A module is instantiated once for each distinct set of arguments; every instance has the module's identity and its keys, since each is the same code. An input is a named value of plain data that the configuration supplies to the module being run; it grants nothing. An input not supplied is a cell, so a phase evaluates the module with the input unknown and a later phase supplies it. A module that is imported declares no input.
+- Status: open; ruled 2026-11-13 (DR6); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
 - Depends on: A module is an extension that arrives as a file; Only the launcher sets the ceiling; A capability is granted, never acquired; The loader reaches files through a capability
@@ -3490,6 +3491,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-13, after the adversarial review): reworded by ruling: the decision is taken literally, for a module loaded from text and for a saved program alike. Whether a module is instantiated once in a kernel or once for each set of capabilities supplied is issue 13 of the adversarial review, still open. The rule on top-level effects is the next entry.
 - Notes (2026-11-15, the rulings on strength and on identity): a reading, not yet ruled, for issue 13: a module is instantiated once for each set of arguments, and every instance shares the module's identity and keys, so the types they define are the same types.
 - Notes (2026-11-15, titles made accurate): retitled from "A module is a function of the capabilities it declares": its parameters are also its inputs and the modules it imports. Its bindings are its body, not parameters: nothing a module uses from outside is ambient.
+- Notes (2026-11-17, the adversarial review's last issues): the last sentence is added by ruling, for issue 13: two importers that supply a module different capabilities get two instances, and neither gains what the other supplied.
+- Notes (2026-11-17, inputs): the sentences on inputs are added by ruling. The word came in with the ruling of 2026-11-13 on a module as a function, the data form's roles and Allegretto's header line, and had never been ruled on its own: the maintainer asked where it came from. Kept, and ruled narrowly. It is a parameter and not something read through a capability so that a phase can leave it unknown with no effect involved. Open: who supplies the inputs of an imported module, the loader from configuration or the importer by passing values, which would make a module one its importer sets up; and how an input's name is found in a configuration. Taken when a case appears.
 - Chapter: Capabilities and primitive functions
 
 #### Only the module being run performs effects when instantiated
@@ -3871,8 +3874,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Tools
 
 #### A proposer answers with only the missing value
-- Decides: a proposal is the value an obligation waits for and nothing else: a proof term, a catalog entry. A tool places it, has the claim evaluated again, and keeps it only if the claim is decided, for a bounded number of attempts.
-- Status: settled for proofs; reworded 2026-11-13 (DR6)
+- Decides: a proposal is the value an obligation waits for and nothing else: a proof term, a catalog entry. A tool places it, has the claim evaluated again, and keeps it only if the claim is decided, for a bounded number of attempts. A proposal is a description, so it holds no capability. An obligation states what its unknown may be handed when it is used, and by default that is nothing.
+- Status: settled for proofs; reworded 2026-11-13 (DR6); extended 2026-11-17
 - Type: capability
 - Rationale kind: technical
 - Depends on: Open obligations are listed for any proposer; One primer for every proposer; A proof term is a proposal
@@ -3883,6 +3886,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/proving-in-allegro.md "Output contract for an LLM prover"; vision.md §1–§2 (not read here); docs/book/proving-in-allegro.md (Output contract for an LLM prover); docs/book/platform/tooling.ir.md C123 to C136; docs/plans/planning-loop.md §6
 - Use case: a model answers a theorem with a term; the tool splices it and the kernel decides.
 - Notes: was "One proof-term contract for human and machine provers".
+- Notes (2026-11-17, the adversarial review's last issues): the last two sentences are added by ruling, for issue 24: an accepted proposal ran later with the capabilities of the place it filled.
 - Chapter: Tools
 
 #### A trace is read from origins

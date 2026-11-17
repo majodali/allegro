@@ -1567,6 +1567,8 @@ its approval.
   notation a text uses can only add; a grammar change is a
   statement; an access's place is the kernel's mark, by function.
   245 decisions.
+- **2026-11-17 — issues 13, 24 and 27 ruled; the first adversarial
+  review closed** (the review session).
 
 ## 8. Sessions
 
