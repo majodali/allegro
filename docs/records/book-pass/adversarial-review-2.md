@@ -494,6 +494,65 @@ and building a structure from a list in one step.
 
 Built in the reference kernel.
 
+### Cluster 10: what a residual holds (2026-11-18)
+
+The review session proposed that a phase's residual be a module
+function that can be saved as a third version of the data form, loaded
+only on its builder's word because it would hold marks, other modules'
+keys and values with fields.
+
+The maintainer questioned the premise: "My assumption has been that
+phases get rerun, rather than saving a residual. That's also not a
+decision, we need to weight the pros and cons of saving a phase's
+residual. If multiple phases are run in sequence in a single
+execution, I assume that means we just use the residual from an
+earlier phase directly without saving."
+
+The review session weighed it. Saving buys faster starts, carrying
+build-only information to a run, and shipping less. It costs a record
+that is trusted on a builder's word, a saved form for every future
+kernel feature, two paths that must agree, and staleness. It
+recommended rerunning.
+
+The maintainer on export, which keeps the need: "When an exported
+executable gets run, it will have a wrapper than binds runtime
+capabilities like console, filesystem, networking etc. Similarly, when
+a deployable artifact is exported and then deployed, it has
+environmental information and resources configured and attached. In
+both of these cases, the code must act exactly as if those same
+resources/capabilities were bound within an Allegro execution. So
+ultimately we can't escape the 'two paths that must agree'." And on
+phases: "I've never thought of phases as a first class element of the
+Allegro build system."
+
+Ruled: "Let's go with rerunning phases in sequence, until we address
+the export use case." Then: "I agree with all recommendations, and
+confirm the block form for `describe`."
+
+1. Phases are rerun. In one execution the next phase evaluates the
+   residual as the kernel holds it. A later execution loads the saved
+   programs, restores outcomes and runs the phases again.
+2. Saving a residual is not taken now. It returns with export, with
+   marks in a data form, other modules' keys and values with fields.
+3. An exported program behaves as the same program in a kernel with
+   the same capabilities bound, and tests hold the two together. A new
+   decision; not built.
+4. A description is a program that means the same. A function made in
+   a block is described with the bindings it reads, as a block around
+   it. An argument used more than once and not yet evaluated is a
+   binding of that block. The kernel renames a binding whose name the
+   description already writes. Sharing a part in two places means
+   nothing.
+
+Built: point 4, in the kernel's `describe` and `build`. A binding that
+is plain data is written where it is used and needs no block. The
+block is around the whole function, which is right while no binding
+mentions a parameter of a function inside the description; a block
+inside a function comes with specialization.
+
+Not answered: a residual that waits on a cell at the end of a phase
+stays in its kernel, and nothing more is ruled about it.
+
 ## Terms introduced
 
 No terms introduced.

@@ -1101,10 +1101,12 @@ test("a built function reads nothing from where it is built: its free names are 
   const { k, add, call, kp } = setup();
   const [v, lib, got] = [k.symbol("m.v"), k.symbol("m.lib"), k.symbol("m.got")];
   const scope = k.scope();
-  // The description of () => add(v, 1), with v left free.
-  const describing = k.composedFunction([], within(k, [[v, byte(k, 0)]], k.composedFunction([], call(add, v, byte(k, 1)))));
-  const inner = k.evaluate(call(describing), scope).value;
-  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), inner), scope).value;
+  // The description of () => add(v, 1), with v left free: the function is written with no
+  // block around it. (Until the ruling of 2026-11-18 on cluster 10 of the second review this
+  // test took its description from a function made in a block that bound v, and the
+  // description left v free. A description now carries the bindings its function reads, so
+  // that one is no longer a description with a free name; the test below holds it.)
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([], call(add, v, byte(k, 1)))), scope).value;
   // Built with no value for v: refused, also where a block around the call binds a v of its own.
   const bare = k.evaluate(call(kp("build"), d, k.structure([])), scope);
   assert.match(k.reasonOf(bare.value) ?? "", /leaves m\.v free/);
@@ -1116,6 +1118,79 @@ test("a built function reads nothing from where it is built: its free names are 
   // A name a block inside the description binds is that block's, whatever is supplied under the same name.
   const own = k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([], within(k, [[v, byte(k, 5)]], call(add, v, byte(k, 1))))), scope).value;
   assert.equal(num(k, k.evaluate(call(call(kp("build"), own, k.structure([[v, byte(k, 41)]]))), scope).value), 6);
+});
+
+test("a description is a program that means the same: it carries the bindings its function reads", () => {
+  const { k, add, call, kp } = setup();
+  const [v, f, n] = [k.symbol("m.v"), k.symbol("m.f"), k.param("n")];
+  const scope = k.scope();
+  const none = k.structure([]);
+  const describe = (x: Value) => k.evaluate(call(kp("describe"), k.inspectionRight(), x), scope).value;
+  // A function made in a block that binds v to plain data: the value is written where it is used.
+  const closure = k.evaluate(within(k, [[v, byte(k, 7)]], k.composedFunction([n], call(add, n, v))), scope).value;
+  const plain = describe(closure);
+  assert.equal(form(k, plain).form, "function", "a binding that is plain data needs no block");
+  assert.equal(num(k, k.evaluate(call(call(kp("build"), plain, none), byte(k, 1)), scope).value), 8, "built again with no names, it still adds 7");
+  // A function that calls another binding of its block: the description is a block around it.
+  const twoStep = k.evaluate(
+    within(k, [[v, k.composedFunction([n], call(add, n, byte(k, 10)))], [f, k.composedFunction([n], call(v, call(v, n)))]], f),
+    scope,
+  ).value;
+  const around = form(k, describe(twoStep));
+  assert.equal(around.form, "apply", "a block around the function");
+  assert.equal(text(k, form(k, around.parts[0]).parts[0]), "block");
+  assert.equal(num(k, k.evaluate(call(call(kp("build"), describe(twoStep), none), byte(k, 1)), scope).value), 21);
+});
+
+test("a description carries a function's own binding: a recursive function is built again and runs", () => {
+  const { k, mul, dec, isZero, call, kp } = setup();
+  const [fact, n] = [k.symbol("m.fact"), k.param("n")];
+  const scope = k.scope();
+  const factFn = k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 1), call(mul, n, call(fact, call(dec, n)))));
+  const made = k.evaluate(within(k, [[fact, factFn]], fact), scope).value;
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), made), scope).value;
+  assert.equal(form(k, d).form, "apply", "a block that binds the function's own name");
+  // Built where a block binds the same name to something else: the description's own binding is the one read.
+  const again = within(k, [[fact, byte(k, 0)]], call(call(kp("build"), d, k.structure([])), byte(k, 5)));
+  assert.equal(num(k, k.evaluate(again, scope).value), 120);
+});
+
+test("a description says once with a binding: an argument used twice is performed once when built again", () => {
+  const { k, add, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const [s, a] = [k.symbol("m.say"), k.param("a")];
+  const scope = k.scope();
+  // (a => (() => a + a))(say(3)), with say a free name: the function made holds the argument, not yet evaluated, twice.
+  const made = k.evaluate(call(k.composedFunction([a], k.composedFunction([], call(add, a, a))), call(s, byte(k, 3))), scope).value;
+  assert.deepEqual(said, [], "nothing needed the argument");
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), made), scope).value;
+  const block = form(k, d);
+  assert.equal(block.form, "apply", "a block around the function");
+  assert.equal(k.entriesOf(form(k, k.entriesOf(block.parts[1])[0][1]).parts[0]).length, 1, "one binding: the shared argument");
+  // Built again with the capability supplied for the name, and called: one effect, as in the program described.
+  const r = k.evaluate(call(call(kp("build"), d, k.structure([[s, say]]))), scope);
+  assert.equal(num(k, r.value), 6);
+  assert.deepEqual(said, [3], "performed once");
+  // An argument used once needs no binding.
+  const once = k.evaluate(call(k.composedFunction([a], k.composedFunction([], call(add, a, byte(k, 1)))), call(s, byte(k, 3))), scope).value;
+  assert.equal(form(k, k.evaluate(call(kp("describe"), k.inspectionRight(), once), scope).value).form, "function");
+});
+
+test("a name the kernel picks for a binding is not one the description already writes", () => {
+  const { k, add, call, kp } = setup();
+  const [v, a] = [k.symbol("m.v"), k.param("a")];
+  const scope = k.scope();
+  const outer = k.composedFunction([a], call(add, a, byte(k, 1)));
+  // In a block that binds v to a function, a function whose body has a block of its own binding v.
+  const made = k.evaluate(
+    within(k, [[v, outer]], k.composedFunction([a], call(add, call(v, a), within(k, [[v, byte(k, 100)]], v)))),
+    scope,
+  ).value;
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), made), scope).value;
+  const names = k.entriesOf(form(k, k.entriesOf(form(k, d).parts[1])[0][1]).parts[0]).map(([key]) => k.symbolName(key as Value));
+  assert.deepEqual(names, ["m.v_2"], "the outer v is renamed: the inner block writes v");
+  assert.equal(num(k, k.evaluate(call(call(kp("build"), d, k.structure([])), byte(k, 1)), scope).value), 102);
 });
 
 // ---- Values and descriptions (chunk K4) -------------------------------------

@@ -228,6 +228,7 @@
     {"title":"A target platform is a model, and export is a transformation into it","part":"VI","chapter":"Saved programs and export","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"Saving is export to a target whose model is the kernel's interface","part":"VI","chapter":"Saved programs and export","type":"implementation","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"An exported program needs a kernel only if it handles expressions at run time","part":"VI","chapter":"Saved programs and export","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
+    {"title":"An exported program behaves as the program does in a kernel","part":"VI","chapter":"Saved programs and export","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"A law licenses a rewrite, and the rewritten program carries the law's strength","part":"VI","chapter":"Saved programs and export","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"How extensions are distributed","part":"VI","chapter":"Saved programs and export","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},
     {"title":"Three things are trusted: the kernel, the launcher and primitive functions","part":"VI","chapter":"Trust","type":"capability","present":"open","owner":"Q","state":"none","unit":null,"cases":[]},

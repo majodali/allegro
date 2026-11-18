@@ -72,8 +72,11 @@ text chosen by type.
 The kernel's other primitives are reached as names Allegretto binds:
 `then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
 `assume(x)`, `undecided(reason)`, and those ruled and not yet
-built. A check the standard language writes as an annotation is written
-as a claim: ``claim(kind(x) == `bits)``.
+built. What `describe` gives is a program that means the same as the
+function: where the function reads names of a block, or holds an
+argument used more than once and not yet evaluated, the description is
+a block around the function that binds them. A check the standard
+language writes as an annotation is written as a claim: ``claim(kind(x) == `bits)``.
 
 Data whose shape the text does not fix is built and read with five more:
 

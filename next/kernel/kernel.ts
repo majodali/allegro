@@ -74,9 +74,13 @@
 //               as plain data. `right` is a key of the module that made
 //               the function, or the inspection right. Where the function
 //               holds an unforgeable value the description holds its
-//               public identity only.
+//               public identity only. A description is a program that
+//               means the same: the bindings the function reads from a
+//               block, and an argument used more than once and not yet
+//               evaluated, are the bindings of a block around it.
 //   "build"     build(description, names). The function a description
-//               describes. `names` is a structure keyed by symbols: the
+//               describes, which is a function or a block around one.
+//               `names` is a structure keyed by symbols: the
 //               value for each name the description leaves free. A free
 //               name with no value is a refutation, so a built function
 //               reads nothing from the place it is built. A refutation
@@ -786,7 +790,7 @@ export const createKernel: CreateKernel2 = () => {
         const all = right.module === INSPECT;
         if (!all && f.owner?.module !== right.module)
           return new Refuted("describing a function needs a key of the module that made it, or the inspection right", undefined);
-        return describe(f, [], all ? undefined : right.module);
+        return describeWhole(f, all ? undefined : right.module);
       }
       if (fn.name === "build") {
         // A description is read whole, so it is needed in full.
@@ -795,7 +799,9 @@ export const createKernel: CreateKernel2 = () => {
         if (!knownInFull(description)) return waits();
         const built = build(description, []);
         if (built instanceof Refuted) return built;
-        if (!(built instanceof Fn)) return new Refuted("only the description of a function can be built", args[0]);
+        // A function, or a block around one: the bindings the function reads, each evaluated at most once.
+        const blockOf = built instanceof Expr && built.fn === kernelPrims.get("block") && built.args.length === 2 && built.args[1] instanceof Fn;
+        if (!(built instanceof Fn) && !blockOf) return new Refuted("only the description of a function can be built", args[0]);
         // A built function reads nothing from where it is built: each name the description
         // leaves free takes the value supplied for it, and one with no value is refused.
         const supplied = seen(args[1]);
@@ -806,12 +812,12 @@ export const createKernel: CreateKernel2 = () => {
           if (!(name instanceof Sym)) return new Refuted("the names supplied to build are a structure keyed by symbols", args[1]);
           values.set(name, e);
         }
-        const whole = supply(built, values, new Set()) as Fn;
+        const whole = supply(built, values, new Set());
         const missing = freeNames(whole, new Set(), [], new Map());
         if (missing.length > 0) return new Refuted(`the description leaves ${missing.map((m) => m.fqn).join(", ")} free, and no value was supplied`, undefined);
         // What is built is the builder's: it takes the mark of the code that called `build`.
         if (v.owner !== undefined) markAll(whole, v.owner.module, v.owner.fn, new Set());
-        return close(whole, scope);
+        return whole instanceof Fn ? close(whole, scope) : evaluate(whole, scope);
       }
       if (fn.name === "same") {
         if (!known(args[0]) || !known(args[1])) return waits();
@@ -1313,9 +1319,17 @@ export const createKernel: CreateKernel2 = () => {
     if (v instanceof Bits) return data("bits", v);
     if (v instanceof Quoted) return v.inner instanceof Sym ? data("symbol", v) : describe(v.inner, binders, own);
     if (v instanceof Sym) return data("name", new Quoted(v));
-    if (v instanceof NameRef) return data("name", new Quoted(v.sym));
+    if (v instanceof NameRef) {
+      const found = bindingOf(v);
+      if (found === undefined) return data("name", new Quoted(v.sym));
+      const name = showing?.names.get(found.binding);
+      return name !== undefined ? data("name", new Quoted(name)) : describe(boundValue(found), binders, own);
+    }
     if (v instanceof Decided) return describe(v.inner, binders, own);
-    if (v instanceof Lazy) return describe(v.value, binders, own);
+    if (v instanceof Lazy) {
+      const name = v.done ? undefined : showing?.shared.get(v);
+      return name !== undefined ? data("name", new Quoted(name)) : describe(v.value, binders, own);
+    }
     if (v instanceof CellV) return v.filled ? describe(v.value as V, binders, own) : data("unknown");
     if (v instanceof KernelPrim) return data("kernel", text(v.name));
     if (v instanceof Key) return data("key", text(v.module), number(v.slot));
@@ -1359,6 +1373,100 @@ export const createKernel: CreateKernel2 = () => {
     }
     if (v instanceof Fn) return data("function", number(v.params.length), describe(v.body, [...binders, v], own));
     return data("unknown"); // a refutation
+  };
+
+  /** True where a part is another module's and is shown as opaque. */
+  const closedTo = (v: V, own: string | undefined): boolean =>
+    own !== undefined && (v instanceof Expr || v instanceof Fn || (v instanceof Struct && !settled.has(v))) && v.owner?.module !== own;
+
+  /** What a name of a block stands for now: its value where that is known, else what is still to be evaluated. */
+  const boundValue = (found: { binding: Binding; scope: ScopeV }): V => {
+    if (found.binding.memo !== undefined) return found.binding.memo;
+    const value = found.binding.value;
+    return value instanceof Fn ? close(value, found.scope) : value;
+  };
+
+  /** The names a description in the making writes: for a block's binding, and for an argument used more than once. */
+  let showing: { names: Map<Binding, Sym>; shared: Map<Lazy, Sym> } | undefined;
+
+  /**
+   * The description of a function, as a program that means the same.
+   *
+   * Inside the kernel two things are held that plain data does not show.
+   * A function made in a block reads the block's names, and an argument
+   * used more than once is evaluated once. A description says both as a
+   * block around the function: each binding the function reads, and each
+   * shared argument still waiting, is a binding of that block. Sharing a
+   * node means nothing in a description; a binding is what says "once".
+   *
+   * A binding is named as it was written, unless that name is taken in
+   * what is shown: then the kernel picks another.
+   *
+   * The block is around the whole function. That is right while no
+   * binding mentions a parameter of a function inside the description,
+   * which holds for every value this kernel makes: a function's body is
+   * not evaluated until it is called. Specialization will need a block
+   * inside a function.
+   */
+  const describeWhole = (f: Fn, own: string | undefined): V => {
+    const bindings = new Map<Binding, { found: { binding: Binding; scope: ScopeV }; sym: Sym }>();
+    const uses = new Map<Lazy, number>();
+    const written = new Set<Sym>();
+    const order: (Binding | Lazy)[] = [];
+    // The walk follows what `describe` shows, part for part: a part shown twice counts twice.
+    const walk = (v: V): void => {
+      if (v instanceof Sym) written.add(v);
+      else if (v instanceof Quoted) { if (!(v.inner instanceof Sym)) walk(v.inner); }
+      else if (v instanceof Decided) walk(v.inner);
+      else if (v instanceof CellV) { if (v.filled) walk(v.value as V); }
+      else if (v instanceof NameRef) {
+        const found = bindingOf(v);
+        if (found === undefined) { written.add(v.sym); return; }
+        if (bindings.has(found.binding)) return;
+        const value = boundValue(found);
+        // A value that is plain is written where it is used.
+        if (!(value instanceof Fn || value instanceof Expr || value instanceof Lazy || value instanceof NameRef || (value instanceof Struct && !settled.has(value)))) return;
+        bindings.set(found.binding, { found, sym: v.sym });
+        order.push(found.binding);
+        walk(value);
+      } else if (v instanceof Lazy) {
+        if (v.done) { walk(v.value); return; }
+        const n = uses.get(v) ?? 0;
+        uses.set(v, n + 1);
+        if (n === 0) walk(v.value);
+        else if (n === 1) order.push(v);
+      } else if (closedTo(v, own)) return;
+      else if (v instanceof Expr) [v.fn, ...v.args].forEach(walk);
+      else if (v instanceof Struct) v.entries.forEach(([, e]) => walk(e));
+      else if (v instanceof Fn) walk(v.body);
+    };
+    walk(f);
+    if (order.length === 0) return describe(f, [], own);
+    const names = new Map<Binding, Sym>();
+    const shared = new Map<Lazy, Sym>();
+    const fresh = (wanted: string): Sym => {
+      for (let n = 1; ; n++) {
+        const sym = intern(n === 1 ? wanted : `${wanted}_${n}`);
+        if (!written.has(sym)) { written.add(sym); return sym; }
+      }
+    };
+    for (const item of order) {
+      if (item instanceof Lazy) shared.set(item, fresh("shared"));
+      else names.set(item, fresh((bindings.get(item) as { sym: Sym }).sym.fqn));
+    }
+    const before = showing;
+    showing = { names, shared };
+    try {
+      const entries = new Struct(order.map((item) => {
+        const value = item instanceof Lazy ? item.value : boundValue((bindings.get(item) as { found: { binding: Binding; scope: ScopeV } }).found);
+        const name = item instanceof Lazy ? shared.get(item) : names.get(item);
+        return [name as Sym, describe(value, [], own)] as const;
+      }));
+      settled.add(entries);
+      return data("apply", data("kernel", text("block")), list([data("structure", entries), describe(f, [], own)]));
+    } finally {
+      showing = before;
+    }
   };
 
   /** The value a description describes, or a refutation where it cannot be built. */
