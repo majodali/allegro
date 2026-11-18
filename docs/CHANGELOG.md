@@ -579,6 +579,12 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-18 — Building data (the second review's cluster 11).**
+  Five kernel primitives in `next/kernel/kernel.ts`: `put` gives a
+  structure one more entry or another value under a key, `key` reads
+  an entry's key, `kind` tells what a value is, `symbol` makes a
+  symbol from a text and `spelling` reads its name. A program can now
+  build a description, which is what a parser yields.
 - **2026-11-18 — Attempts and limits (the second review's cluster
   7).** In `next/kernel/kernel.ts`: what goes on from an attempt's
   "limit" rests on a limit, and such an outcome is not restored; a
