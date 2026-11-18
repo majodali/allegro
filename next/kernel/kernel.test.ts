@@ -72,7 +72,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "refuse", "same", "slice", "then"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "refuse", "same", "slice", "then", "undecided"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -964,6 +964,59 @@ test("a module's statements happen when it is instantiated: when first needed, a
     [{ role: "module", name: "lib", identity: idLib }, { role: "capability", name: "output" }]);
   k.evaluate(call(idle, say), k.scope());
   assert.deepEqual(said, [3]);
+});
+
+test("an assumption is recorded as assumed, with the module that made it, and is never evaluated", () => {
+  const { k, isZero, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const scope = k.scope();
+  // module(out) => then(assume(isZero(out(5))), out(1)): the assumed claim would write 5 and is false.
+  const out = k.param("out");
+  const m = k.module(k.composedFunction([out], k.structure([[null, call(kp("assume"), call(isZero, call(out, byte(k, 5))))], [null, call(out, byte(k, 1))]])), 0, [{ role: "capability", name: "output" }]);
+  const [assumed, after] = k.entriesOf(k.evaluate(call(m, say), scope).value).map(([, v]) => k.evaluate(v, scope).value);
+  assert.equal(k.outcomeOf(assumed), "assumed");
+  assert.deepEqual(k.restsOn(assumed), [{ kind: "assumption", by: k.moduleOf(m) }], "the record names the module, from the mark on its code");
+  assert.deepEqual(said, [1], "what was assumed was not evaluated; what follows goes ahead");
+  assert.equal(num(k, after), 1);
+  // A claim that rests on an assumption is no stronger than assumed.
+  const resting = k.evaluate(call(kp("claim"), call(kp("assume"), call(isZero, byte(k, 0)))), scope);
+  assert.equal(k.outcomeOf(resting.value), "assumed");
+  assert.ok(k.restsOn(resting.value).some((r) => r.kind === "assumption"));
+  // Code that belongs to no module assumes under no name.
+  assert.deepEqual(k.restsOn(k.evaluate(call(kp("assume"), byte(k, 0)), scope).value), [{ kind: "assumption", by: "" }]);
+  // Nothing an assumption does makes a claim decided, and a claim that is simply true is still decided.
+  assert.equal(k.outcomeOf(k.evaluate(call(kp("claim"), call(isZero, byte(k, 0))), scope).value), "decided");
+});
+
+test("what decides a claim may answer that it cannot tell: the claim is done, undecided, and holds nothing back", () => {
+  const { k, isZero, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const reason = (t: string) => k.bits(new TextEncoder().encode(t));
+  const scope = k.scope();
+  const r = k.evaluate(call(kp("claim"), call(kp("undecided"), reason("no rule applies"))), scope);
+  assert.equal(r.refuted, false);
+  assert.equal(k.outcomeOf(r.value), "undecided");
+  assert.equal(k.reasonOf(r.value), "no rule applies");
+  assert.notEqual(k.kind(r.value), "expression", "it is done: nothing waits");
+  assert.deepEqual(k.waiting(), []);
+  // What follows such a claim goes ahead.
+  k.evaluate(call(kp("then"), call(kp("claim"), call(kp("undecided"), reason("no rule applies"))), call(say, byte(k, 1))), scope);
+  assert.deepEqual(said, [1]);
+  // A claim that waits on a value is another thing: what follows it waits too.
+  said.length = 0;
+  const c = k.cell();
+  const waits = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, c)), call(say, byte(k, 2))), scope);
+  assert.equal(k.kind(waits.value), "expression");
+  assert.deepEqual(said, []);
+  k.fill(c, byte(k, 0));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [2]);
+  // An undecided answer is neither true nor false: a conditional on it is refuted.
+  assert.equal(k.evaluate(call(kp("if"), call(kp("claim"), call(kp("undecided"), reason("x"))), byte(k, 1), byte(k, 2)), scope).refuted, true);
+  // It cannot be used to refute, or to decide.
+  assert.equal(k.evaluate(call(kp("undecided"), k.structure([])), scope).refuted, true, "the reason is a text");
 });
 
 test("a refusal is a refutation with a reason, and a withheld capability is one that happens when it is used", () => {

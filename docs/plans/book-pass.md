@@ -1590,6 +1590,8 @@ its approval.
   the kernel supplies by identity; capabilities and inputs of the same
   name are handed by default; a library's statements happen when it is
   first needed.
+- **2026-11-18 — the second review's cluster 5 ruled; assuming and
+  "cannot tell" built** (the review session). 247 decisions.
 
 ## 8. Sessions
 

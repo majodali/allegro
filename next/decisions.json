@@ -148,6 +148,7 @@
     {"title":"Combinators before keyword declaration syntax","part":"IV","chapter":"The surface language","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"String interpolation with braces","part":"IV","chapter":"The surface language","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Nothing is a claim until someone makes it","part":"IV","chapter":"Claims and proofs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"A claim is needed where it is made","part":"IV","chapter":"Claims and proofs","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A claim about every value is decided by evaluating it with the value unknown","part":"IV","chapter":"Claims and proofs","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A proof term is a proposal","part":"IV","chapter":"Claims and proofs","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Discharge mechanisms without search","part":"IV","chapter":"Claims and proofs","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},

@@ -70,7 +70,8 @@ text chosen by type.
 | `claim(e)` | the kernel's claim |
 
 The kernel's other primitives are reached as names Allegretto binds:
-`then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`, and those ruled and not yet
+`then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
+`assume(x)`, `undecided(reason)`, and those ruled and not yet
 built. A check the standard language writes as an annotation is written
 as a claim: `claim(is_int(x))`.
 
