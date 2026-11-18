@@ -3447,7 +3447,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Configuration
 
 #### Configuration sources have a priority, and a result says which supplied each value
-- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. Each value has a rule for which sources may set it, and the launcher holds those rules: the kernel, the accepted keys and the ceiling of capabilities are set only by the launcher and the command line, and so are granting the inspection right, allowing restore, keeping origins and turning off a default policy; a project's file may choose its parser and its loader. A loader a project chose runs under the ceiling the launcher set, as any code of that project does. The result of an execution records which source supplied each value.
+- Decides: configuration is read from sources in a stated order, the highest first: the command line, files, the environment, what is built into the launcher. A value a higher source sets replaces the same value from a lower one, and a value missing from one source is taken from the next below it. Each value has a rule for which sources may set it, and the launcher holds those rules: the kernel, the accepted keys and the ceiling of capabilities are set only by the launcher and the command line, and so are granting the inspection right, allowing restore, keeping origins and turning off a default policy; a project's file may choose its parser and its loader. A loader a project chose runs under the ceiling the launcher set, as any code of that project does. The result of an execution records which source supplied each value.
 - Status: open; ruled 2026-11-13 (DR6); extended 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -3459,6 +3459,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a flag on the command line replaces a value from the project's file, and the report shows that it did.
 - Notes: new, by ruling. An environment variable that redirects a capability to another implementation is a risk the chapter on trust takes up.
 - Notes (2026-11-16, the adversarial review's remaining issues): the sentence on which source may set which value is added by the maintainer's ruling of 2026-11-16 on issue 26. A project that defines a language must be able to choose its parser and loader.
+- Notes (2026-11-18): the order was written lowest first, and "taken from the next" then read the wrong way; the maintainer noticed it in review. The command line is highest. Nothing ruled changes.
 - Notes (2026-11-18, the second adversarial review, cluster 13): extended by ruling. A reviewer's case: a cloned project's file names its own loader, check hands it file reading, and it prints a file from outside the project in a report. Ruled: a project keeps its choice of loader and parser, bounded by the ceiling; and four more settings are the launcher's and the command line's alone. Reserving the loader's choice to the launcher was weighed and not taken: under the ceiling a project's loader can misuse only what the project could.
 - Chapter: Configuration
 
