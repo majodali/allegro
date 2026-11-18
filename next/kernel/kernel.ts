@@ -311,7 +311,7 @@ export const createKernel: CreateKernel2 = () => {
   const opening: { fn: Fn; args: readonly V[] }[] = [];
 
   const restKey = (r: Rest): string =>
-    r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : `builder ${r.builder}`;
+    r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : r.kind === "limit" ? "limit" : `builder ${r.builder}`;
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(restKey(r), r);
   };
@@ -566,6 +566,16 @@ export const createKernel: CreateKernel2 = () => {
     if (spent >= budget) throw new LimitReached();
     spent++;
   };
+  /** Charges work on bits: one step for each 64 bits handled, beyond the step of the call itself. */
+  const charge = (bits: number): void => {
+    const steps = Math.floor(bits / 64);
+    if (steps === 0) return;
+    if (spent + steps > budget) {
+      spent = budget;
+      throw new LimitReached();
+    }
+    spent += steps;
+  };
 
   const context: PrimitiveContext = {
     bits: (bytes, bitLength) => out(new Bits(bytes, bitLength ?? bytes.length * 8)),
@@ -714,7 +724,12 @@ export const createKernel: CreateKernel2 = () => {
         try {
           r = evaluate(v.args[0], scope);
         } catch (e) {
-          if (e instanceof LimitReached && spent < outer) return data("limit");
+          // The attempt's own budget ran out, or the kernel's own limit was reached inside it:
+          // either way the answer is "limit", and what goes on from it rests on a limit.
+          if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
+            rest({ kind: "limit" });
+            return data("limit");
+          }
           throw e;
         } finally {
           budget = outer;
@@ -769,7 +784,13 @@ export const createKernel: CreateKernel2 = () => {
       if (fn.name === "same") {
         if (!known(args[0]) || !known(args[1])) return waits();
         const [a, b] = [seen(args[0]), seen(args[1])];
-        if (a instanceof Bits && b instanceof Bits) return a.bitLength === b.bitLength && bitList(a).every((x, i) => x === bitList(b)[i]) ? TRUE : FALSE;
+        if (a instanceof Bits && b instanceof Bits) {
+          if (a.bitLength !== b.bitLength) return FALSE;
+          charge(a.bitLength);
+          if (whole(a) && whole(b)) return a.bytes.every((x, i) => x === b.bytes[i]) ? TRUE : FALSE;
+          const [x, y] = [bitList(a), bitList(b)];
+          return x.every((bit, i) => bit === y[i]) ? TRUE : FALSE;
+        }
         if (a instanceof Sym && b instanceof Sym) return a === b ? TRUE : FALSE;
         return new Refuted("only two bits values or two symbols can be told apart", undefined);
       }
@@ -777,6 +798,13 @@ export const createKernel: CreateKernel2 = () => {
         if (!known(args[0]) || !known(args[1])) return waits();
         const [a, b] = [seen(args[0]), seen(args[1])];
         if (!(a instanceof Bits && b instanceof Bits)) return new Refuted("only two bits values can be joined", undefined);
+        charge(a.bitLength + b.bitLength);
+        if (whole(a) && whole(b)) {
+          const bytes = new Uint8Array(a.bytes.length + b.bytes.length);
+          bytes.set(a.bytes, 0);
+          bytes.set(b.bytes, a.bytes.length);
+          return new Bits(bytes, bytes.length * 8);
+        }
         return packed([...bitList(a), ...bitList(b)]);
       }
       if (fn.name === "length") {
@@ -790,6 +818,11 @@ export const createKernel: CreateKernel2 = () => {
         if (!(a instanceof Bits)) return new Refuted("only a bits value can be taken apart", args[0]);
         if (from === undefined || n === undefined) return new Refuted("a place and a count are whole numbers, as bits", undefined);
         if (from + n > a.bitLength) return new Refuted(`${n} bit(s) from place ${from} is outside a value of ${a.bitLength} bit(s)`, undefined);
+        if (whole(a) && from % 8 === 0 && n % 8 === 0) {
+          charge(n);
+          return new Bits(a.bytes.slice(from / 8, (from + n) / 8), n);
+        }
+        charge(a.bitLength);
         return packed(bitList(a).slice(from, from + n));
       }
       if (fn.name === "undecided") {
@@ -930,6 +963,7 @@ export const createKernel: CreateKernel2 = () => {
       try {
         for (const [k, e] of s.entries) {
           if (hidden(k)) continue;
+          step(); // a structure handed over whole costs a step for each entry
           const x = inFull(e, scope);
           if (x instanceof Refuted) return x;
           if (!knownInFull(x)) ahead = true;
@@ -1180,6 +1214,8 @@ export const createKernel: CreateKernel2 = () => {
     return all.slice(all.length - b.bitLength);
   };
   /** A bits value from its bits, held in as few bytes as hold them. */
+  /** True where a bits value is whole bytes, so it can be handled a byte at a time. */
+  const whole = (b: Bits): boolean => b.bitLength === b.bytes.length * 8;
   const packed = (bits: readonly number[]): V => {
     const bytes = new Uint8Array(Math.ceil(bits.length / 8));
     const pad = bytes.length * 8 - bits.length;
@@ -1534,6 +1570,8 @@ export const createKernel: CreateKernel2 = () => {
     restore: (claim, within, builder, restsOn, key, declares) => {
       const c = into(claim, "the claim");
       if (builder === "") throw new InterfaceError("restore: an outcome is restored under a builder's name");
+      if (restsOn.some((r) => r.kind === "limit"))
+        throw new InterfaceError("restore: an outcome that rests on a limit is never stored");
       if (restsOn.some((r) => r.kind === "capability"))
         throw new InterfaceError("restore: an outcome that rests on a capability's answer is never stored");
       const w = into(within, "the function");

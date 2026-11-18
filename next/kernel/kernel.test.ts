@@ -1320,3 +1320,66 @@ test("an attempt that waits is taken up again from where it stopped, so an effec
   assert.equal(num(k, done.parts[0]), 5);
   assert.equal(wrote, 1, "the effect was not performed again");
 });
+
+test("what goes on from an attempt's limit rests on a limit, and such an outcome is never stored", () => {
+  const { k, dec, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const isData = k.primitiveFunction({ purity: "pure", hash: hash(70), name: "isData", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.kind(a[0]) === "structure" ? 1 : 0), 1) });
+  const [down, n] = [k.symbol("t.down"), k.param("n")];
+  const downFn = k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(down, call(dec, n))));
+  const tried = (m: number, budget: number) => call(kp("claim"), call(isData, call(kp("attempt"), within(k, [[down, downFn]], call(down, byte(k, m))), steps(k, budget))));
+  // The attempt runs out: the claim is still decided here, and says what it rests on.
+  const limited = k.evaluate(tried(200, 30), scope);
+  assert.equal(k.outcomeOf(limited.value), "decided");
+  assert.ok(k.restsOn(limited.value).some((r) => r.kind === "limit"));
+  // The attempt ends within its budget: nothing rests on a limit.
+  const within30 = k.evaluate(tried(3, 30), scope);
+  assert.ok(!k.restsOn(within30.value).some((r) => r.kind === "limit"));
+  // An outcome that rests on a limit is not restored.
+  const p = k.param("p");
+  const claim = call(kp("claim"), call(isZero, byte(k, 0)));
+  const fn = k.composedFunction([p], claim);
+  const grounds: Rest[] = [{ kind: "limit" }];
+  assert.throws(() => k.restore(claim, fn, "team-build", grounds, k.claimKey(claim, fn, grounds)), /rests on a limit is never stored/);
+});
+
+test("a step is a bounded amount of work: bits are charged by size, and a structure handed over by its entries", () => {
+  const { k, call, kp } = setup();
+  const kib = k.bits(new Uint8Array(1024).fill(0x61)); // 8192 bits
+  const scope = k.scope();
+  // Joining two values of 8192 bits handles 16384 bits: 256 steps beyond the call's own.
+  const joined = k.evaluate(call(kp("join"), kib, kib), scope);
+  assert.equal(k.bitsOf(joined.value).bitLength, 16384);
+  assert.ok(joined.steps >= 256, `${joined.steps} steps`);
+  assert.equal(k.evaluate(call(kp("join"), kib, kib), scope, { steps: 100 }).ended, "limit", "a small budget does not buy a large value");
+  // Doubling a value under an attempt ends at the attempt's budget, long before memory does.
+  const twice = k.param("x");
+  const double = k.composedFunction([twice], call(kp("join"), twice, twice));
+  let grown: Value = kib;
+  for (let i = 0; i < 20; i++) grown = call(double, grown);
+  const r = k.evaluate(call(kp("attempt"), grown, steps(k, 5000)), scope);
+  assert.equal(r.ended, "complete");
+  assert.equal(form(k, r.value).form, "limit");
+  // Comparing and slicing are charged too, and give what they gave.
+  const same = k.evaluate(call(kp("same"), kib, k.bits(new Uint8Array(1024).fill(0x61))), scope);
+  assert.deepEqual(k.bitsOf(same.value), { bytes: Uint8Array.of(1), bitLength: 1 });
+  assert.ok(same.steps >= 128);
+  const part = k.evaluate(call(kp("slice"), kib, steps(k, 8), steps(k, 4096)), scope);
+  assert.equal(k.bitsOf(part.value).bitLength, 4096);
+  assert.ok(part.steps >= 64 && part.steps < 128, "a slice of whole bytes is charged for what it takes");
+  // A structure handed to a primitive function costs a step for each entry.
+  const size = k.primitiveFunction({ purity: "pure", hash: hash(71), name: "size", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.entriesOf(a[0]).length)) });
+  const few = k.evaluate(call(size, k.structure([[null, byte(k, 1)]])), scope).steps;
+  const many = k.evaluate(call(size, k.structure(Array.from({ length: 41 }, () => [null, byte(k, 1)] as const))), scope).steps;
+  assert.equal(many - few, 40);
+});
+
+test("the kernel's own limit inside an attempt is the attempt's limit, not the end of the evaluation", () => {
+  const { k, add, call, kp } = setup();
+  const [deep, n] = [k.symbol("t.deep"), k.param("n")];
+  // deep(n) = add(1, deep(n)): it never ends, and each call sits inside the one before.
+  const deepFn = k.composedFunction([n], call(add, byte(k, 1), call(deep, n)));
+  const r = k.evaluate(call(kp("attempt"), within(k, [[deep, deepFn]], call(deep, byte(k, 1))), steps(k, 50_000_000)), k.scope());
+  assert.equal(r.ended, "complete", "the attempt answers; the evaluation goes on");
+  assert.equal(form(k, r.value).form, "limit");
+});

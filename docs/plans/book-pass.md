@@ -1592,6 +1592,9 @@ its approval.
   first needed.
 - **2026-11-18 — the second review's cluster 5 ruled; assuming and
   "cannot tell" built** (the review session). 247 decisions.
+- **2026-11-18 — the second review's cluster 7 ruled and built** (the
+  review session): a limit is information; a step is bounded work.
+  The seven clusters put first are ruled; seven remain.
 
 ## 8. Sessions
 

@@ -445,6 +445,36 @@ Ruled ("I agree with all four points"):
 Built at the maintainer's word: `assume` and `undecided`. Sampling and
 the standard language's claim forms are built with Part IV.
 
+### Cluster 7: attempts and limits (2026-11-18)
+
+Ruled ("I agree on all five rules and recommendations"):
+
+1. An attempt's answer "limit" is information from outside the
+   program. A result that went on from it rests on a limit, is never
+   stored or restored, and is not compared between kernels.
+2. `attempt` stays available to all code. Step counts can be observed;
+   the kernel's comparison takes steps by size and not by content, and
+   a project may claim a module does not use the primitive. Attempting
+   as a right was set aside.
+3. A limit pauses an evaluation, which the caller continues. Built
+   when the evaluator stops using the host's stack.
+4. A step is a bounded amount of work: bits are charged by size, and a
+   structure handed to a primitive function by its entries.
+5. Effects inside an attempt that reaches its limit stay performed.
+   An evaluation made for a text nobody trusts yet runs under a
+   configured budget.
+
+Built: the record of a limit, the refusal to restore an outcome that
+rests on one, charging by size with primitives on bits that work a
+byte at a time, and a fault fixed: the host's stack running out inside
+an attempt ended the whole evaluation.
+
+With this the seven clusters the maintainer put first are ruled.
+Seven remain: the order of effects and a kernel that knows no phase
+(8), recursion and strength (9), what a residual and a record hold
+(10), building data in Allegretto (11), notation (12), what is trusted
+and what the interface gives away (13), and wording (14).
+
 ## Terms introduced
 
 No terms introduced.
