@@ -206,6 +206,47 @@ export interface Result {
   readonly steps: number;
   /** True when a refutation is recorded on `value`: the program is wrong. */
   readonly refuted: boolean;
+  /** The claims this call evaluated: one record for each claim as written. */
+  readonly claims: readonly ClaimRecord[];
+}
+
+/**
+ * What one call of `evaluate` or `advance` did with one claim.
+ *
+ * There is one record for a claim as written, however often the call
+ * evaluated it: a claim in a function called a thousand times is one
+ * record with a count of a thousand. The four counts are of this call.
+ * `waiting` is a level, not a count of this call: how many evaluations
+ * of the claim wait now. A claim a call did not evaluate has no record
+ * in it, and its level is what its last record said.
+ *
+ * An evaluation that waited and is taken up again by a later call is
+ * counted there under how it came out, and leaves the level.
+ */
+export interface ClaimRecord {
+  /**
+   * The claim as written: the application of the kernel's claim
+   * primitive that the host constructed or a saved program built. It is
+   * the same handle, so a host finds it by `===`, and it is what
+   * `claimKey` takes.
+   */
+  readonly claim: Value;
+  /** The identity of the module whose code wrote the claim, where a module did. */
+  readonly module?: string;
+  /** Evaluations that came out decided, a restored outcome among them. */
+  readonly decided: number;
+  /** Evaluations that came out resting on an assumption. */
+  readonly assumed: number;
+  /** Evaluations where what decides the claim answered that it cannot tell. */
+  readonly undecided: number;
+  /** Evaluations that were refuted: the claim was not true, or what it claimed was a refutation. */
+  readonly refuted: number;
+  /** How many evaluations of the claim wait now, on a cell or on anything else not yet known. */
+  readonly waiting: number;
+  /** The reasons given by this call's undecided and refuted evaluations, each once. */
+  readonly reasons: readonly string[];
+  /** What this call's decided, assumed and undecided evaluations rest on, each once. */
+  readonly restsOn: readonly Rest[];
 }
 
 /** What one call of `advance` returns. */
@@ -219,6 +260,8 @@ export interface Advance {
   readonly steps: number;
   /** The values on which a refutation was recorded during this call. */
   readonly refuted: readonly Value[];
+  /** The claims this call evaluated: one record for each claim as written. */
+  readonly claims: readonly ClaimRecord[];
 }
 
 /**
@@ -265,7 +308,18 @@ export interface Declaration {
   readonly identity?: string;
 }
 
-/** The kernel, as host code sees it. */
+/**
+ * The kernel, as host code sees it.
+ *
+ * Whoever holds this object is trusted as the launcher is. It restores
+ * an outcome under any builder's name, takes the inspection right and
+ * reads any function's body. So it is not handed to host code a
+ * launcher does not trust, such as a plug-in of an application that
+ * embeds a kernel. Allegro code never holds it: what Allegro code may
+ * do of this, it does through a capability the launcher makes, as
+ * narrow as the launcher chooses (restore under one builder's name,
+ * for one).
+ */
 export interface Kernel {
   readonly interfaceVersion: typeof INTERFACE_VERSION;
   /** The hash that identifies this kernel variant. */
@@ -290,7 +344,12 @@ export interface Kernel {
   expression(fn: Value, args: readonly Value[]): Value;
   /** A composed function: parameters and a body. */
   composedFunction(params: readonly Value[], body: Value): Value;
-  /** A primitive function. An effectful one is authority: whoever is handed the value can use it. */
+  /**
+   * A primitive function. An effectful one is authority: whoever is
+   * handed the value can use it. A pure one is available to all code: a
+   * description that names its hash is built into it. Its hash and its
+   * purity are the caller's statement; the kernel verifies neither.
+   */
   primitiveFunction(declaration: PrimitiveDeclaration): Value;
   /**
    * One of the kernel's own primitives, by name. The names are Part II's

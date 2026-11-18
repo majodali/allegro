@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-18 — What is trusted; a result lists its claims (the
+  second review's cluster 13).** Ruled: the loader and the parser are
+  named in every result; a project's choice of them is bounded by the
+  ceiling; the holder of the kernel object is trusted as the launcher
+  is; a primitive's hash and its "pure" are its registrar's statement.
+  In `next/kernel/kernel.ts` and `next/kernel/interface.ts`:
+  `evaluate` and `advance` return one record for each claim as
+  written, with counts by outcome and how many wait.
 - **2026-11-18 — Phases are rerun; a description means what it
   describes (the second review's cluster 10).** Ruled: no residual is
   saved between executions, the next phase of one execution evaluates

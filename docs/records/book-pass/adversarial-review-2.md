@@ -553,6 +553,42 @@ inside a function comes with specialization.
 Not answered: a residual that waits on a cell at the end of a phase
 stays in its kernel, and nothing more is ruled about it.
 
+### Cluster 13: what is trusted (2026-11-18)
+
+Six points, ruled as the review session proposed them ("I agree with
+all 6 rulings"):
+
+1. The loader and the parser are checked code that is still relied on:
+   the loader is handed every capability a program gets, and the
+   parser gives every text its meaning. A result names both by module
+   identity, with the source that chose each.
+2. A project's file keeps its choice of loader and parser, bounded
+   three ways. The loader's file capability in check reads only the
+   project's and the platform's directories. A loader a project chose
+   runs under the launcher's ceiling. Only the launcher and the
+   command line grant the inspection right, allow restore, keep
+   origins or turn off a default policy.
+3. Whoever holds the kernel object is trusted as the launcher is. The
+   interface is not split into narrower handles. Allegro code reaches
+   restore, inspection and loading through capabilities the launcher
+   makes, each as narrow as its decision says. The split waits for an
+   embedding application with host plug-ins.
+4. A primitive's hash is its registrar's statement; the kernel does
+   not verify it.
+5. A pure primitive is available to all code. Reviewing a primitive
+   includes reviewing its "pure".
+6. A result lists its claims: one record for each claim as written,
+   with counts by outcome, how many wait, the reasons and what the
+   outcomes rest on.
+
+Built: point 6, in the reference kernel and the interface, and the
+warning of point 3 in the interface. Points 1 and 2 wait for the
+loader and the launcher's configuration.
+
+The stranger's fourteen questions from a new launcher's author are
+mostly wording of the interface; they are taken with cluster 14 or at
+the interface merge.
+
 ## Terms introduced
 
 No terms introduced.

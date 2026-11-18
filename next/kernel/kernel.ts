@@ -170,7 +170,7 @@
 
 import type {
   Declaration,
-  Advance, Cell, CreateKernel2, Entry, Kernel2, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
+  Advance, Cell, ClaimRecord, CreateKernel2, Entry, Kernel2, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
   Value,
 } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -201,6 +201,8 @@ class Struct {
 }
 class Expr {
   owner: Mark | undefined = undefined;
+  /** For what is left of a claim: the claim as it was written. */
+  site: Expr | undefined = undefined;
   constructor(readonly fn: V, readonly args: readonly V[]) {}
 }
 class Fn {
@@ -452,8 +454,61 @@ export const createKernel: CreateKernel2 = () => {
   const keep = (from: V, to: V): V => {
     if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
       to.owner = from.owner;
+    // What a copy or an evaluation leaves of a claim is still that claim, as written.
+    if (to !== from && to instanceof Expr && from instanceof Expr && to.site === undefined && (from.site !== undefined || from.fn === kernelPrims.get("claim")))
+      to.site = from.site ?? from;
     return to;
   };
+
+  // ---- The claims of a call ------------------------------------------------
+  //
+  // One tally for each claim as written, however often it was evaluated.
+
+  interface Tally { decided: number; assumed: number; undecided: number; refuted: number; reasons: Set<string>; rests: Map<string, Rest> }
+  /** The tallies of the call of `evaluate` or `advance` now running. */
+  let tallies = new Map<Expr, Tally>();
+  /** How many evaluations of each written claim wait now, and which residuals they are. */
+  const waitingAt = new Map<Expr, number>();
+  const waitingClaims = new WeakSet<Expr>();
+  const tallyOf = (site: Expr): Tally => {
+    let t = tallies.get(site);
+    if (t === undefined) tallies.set(site, (t = { decided: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
+    return t;
+  };
+  /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
+  const tallied = (from: Expr, result: V, rests: readonly Rest[]): V => {
+    const site = from.site ?? from;
+    const t = tallyOf(site);
+    if (waitingClaims.has(from)) {
+      waitingClaims.delete(from);
+      waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
+    }
+    if (result instanceof Refuted) {
+      t.refuted++;
+      t.reasons.add(result.reason);
+    } else if (result instanceof Decided) {
+      t[result.outcome]++;
+      if (result.reason !== undefined) t.reasons.add(result.reason);
+      for (const r of [...result.rests, ...rests]) t.rests.set(restKey(r), r);
+    } else if (result instanceof Expr) {
+      result.site = site;
+      waitingClaims.add(result);
+      waitingAt.set(site, (waitingAt.get(site) ?? 0) + 1);
+    }
+    return result;
+  };
+  const claimRecords = (): ClaimRecord[] =>
+    [...tallies].map(([site, t]) => ({
+      claim: out(site),
+      ...(site.owner === undefined ? {} : { module: site.owner.module }),
+      decided: t.decided,
+      assumed: t.assumed,
+      undecided: t.undecided,
+      refuted: t.refuted,
+      waiting: waitingAt.get(site) ?? 0,
+      reasons: [...t.reasons],
+      restsOn: [...t.rests.values()],
+    }));
 
   /** The names in a value that no block around them binds, in the order met. */
   const freeNames = (v: V, bound: ReadonlySet<Sym>, found: Sym[], visited: Map<V, ReadonlySet<Sym>[]>): Sym[] => {
@@ -657,7 +712,7 @@ export const createKernel: CreateKernel2 = () => {
     const stored = restored.get(v);
     if (stored !== undefined) {
       stored.forEach(rest);
-      return new Decided(TRUE, stored);
+      return tallied(v, new Decided(TRUE, stored), []);
     }
     step();
     const fn = evaluate(v.fn, scope);
@@ -668,17 +723,17 @@ export const createKernel: CreateKernel2 = () => {
       if (fn.name === "claim") {
         const { value: claimed, rests } = collecting(() => evaluate(v.args[0], scope));
         rests.forEach(rest);
-        if (claimed instanceof Refuted) return claimed;
+        if (claimed instanceof Refuted) return tallied(v, claimed, rests);
         // What decides the claim answered that it cannot tell: the claim is done, and undecided.
         const told = through(claimed);
-        if (told instanceof Decided && told.outcome === "undecided") return new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason);
+        if (told instanceof Decided && told.outcome === "undecided") return tallied(v, new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason), rests);
         if (truthOf(claimed) === true) {
           // A claim that rests on an assumption is no stronger than assumed.
           const assumed = rests.some((r) => r.kind === "assumption");
-          return new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided");
+          return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided"), rests);
         }
-        if (known(claimed)) return new Refuted("a claim that is not true", claimed);
-        return new Expr(fn, [claimed]);
+        if (known(claimed)) return tallied(v, new Refuted("a claim that is not true", claimed), rests);
+        return tallied(v, new Expr(fn, [claimed]), rests);
       }
       if (fn.name === "assume") {
         // The claim is not evaluated. The record says who assumed it: the module whose code this is.
@@ -1605,6 +1660,7 @@ export const createKernel: CreateKernel2 = () => {
     evaluate: (expression, scope, limits): Result => {
       const e = into(expression, "the expression");
       const s = scopeIn(scope, "the scope");
+      tallies = new Map();
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
       if (r.ended === "complete" && !known(value)) {
@@ -1612,11 +1668,12 @@ export const createKernel: CreateKernel2 = () => {
         roots.push(root);
         rootOf.set(value, root);
       }
-      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted };
+      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords() };
     },
     advance: (limits): Advance => {
-      if (!dirty) return { ended: "complete", steps: 0, refuted: [] };
+      if (!dirty) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       dirty = false;
+      tallies = new Map();
       const refuted: Value[] = [];
       const r = within(limits, () => {
         for (const root of roots) {
@@ -1629,7 +1686,7 @@ export const createKernel: CreateKernel2 = () => {
         }
       });
       if (r.ended === "limit") dirty = true;
-      return { ended: r.ended, steps: r.steps, refuted };
+      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords() };
     },
     current: (value) => {
       const v = into(value, "the value");
