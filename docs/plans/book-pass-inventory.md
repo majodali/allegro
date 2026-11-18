@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 247 decisions in 6 parts and 38 chapters (231 when the phase closed; sixteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 64; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 248 decisions in 6 parts and 38 chapters (231 when the phase closed; seventeen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 64; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 214, implementation 18. By significance: 5: 38, 4: 70, 3: 78, 2: 40, 1: 6. By label: foundational 121, swappable 111. By status against the code: settled 93, partly built 62, open 77. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -113,8 +113,8 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
    - Decisions: A capability is a named set of effectful primitives; A module is a function of its capabilities, inputs and imports; A module's top-level statements happen when it is instantiated; Loading is three capabilities of rising strength; Every pure primitive the platform ships has a reference definition.
 34. **Phases** (3 decisions). The three shipped phases, residuals handed on, and defining or extending a phase.
    - Decisions: The platform ships three phases: check, run and export; A phase hands its residual to the next; A project defines a phase or extends one.
-35. **Saved programs and export** (8 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
-   - Decisions: A saved program is a recorded sequence of interface calls; A saved program names what it needs by content hash; A stored outcome is restored with its builder's name; A target platform is a model, and export is a transformation into it; Saving is export to a target whose model is the kernel's interface; An exported program needs a kernel only if it handles expressions at run time; A law licenses a rewrite, and the rewritten program carries the law's strength; How extensions are distributed.
+35. **Saved programs and export** (9 decisions). Saved programs, restoring outcomes, target platforms, when a kernel is needed, rewrites by laws, distribution.
+   - Decisions: A saved program is a recorded sequence of interface calls; A saved program names what it needs by content hash; A stored outcome is restored with its builder's name; A target platform is a model, and export is a transformation into it; Saving is export to a target whose model is the kernel's interface; An exported program needs a kernel only if it handles expressions at run time; An exported program behaves as the program does in a kernel; A law licenses a rewrite, and the rewritten program carries the law's strength; How extensions are distributed.
 36. **Trust** (6 decisions). What is trusted, what a result names, policies, builders, the reference kernel, purity.
    - Decisions: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on; A policy is a claim over what a result rests on; A builder is identified by hash, then manifest, then signature; One reference kernel is the root of trust; A primitive's purity is assumed and named unless something stronger is shown.
 37. **Tools** (7 decisions). Tools that read results, commands, summaries, the tools for proposing, tracing.
@@ -865,6 +865,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: no memo, re-evaluate per reference (exponential under PE)
 - Sources: docs/book/concepts.md IC-6, T0 §6; docs/plans/metadata-on-values.md §3.3 (the clone shares the memo)
 - Book home (fragments' proposal): kinds chapter (planned)
+- Notes (2026-11-18, the second adversarial review, cluster 10): this entry gives meaning to one node standing in two places. In the rebuild it has none: what says "once" is a parameter or a block's binding. To settle when the entry is written.
 - Chapter: Programs as values
 
 #### Transient reference symbols resolved by base name
@@ -928,6 +929,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, solving): the sentence on residuals is added by ruling. Without it, wrapping any function, specializing the wrapper and describing the result would read that function's body. A part the right does not cover is described as opaque.
 - Notes (2026-11-17, the adversarial review's last issues): the mark on each part names the function it was written in, and through it the module; the rule for describing still asks for the module. See "Who may use a member is a claim about where the access was written".
 - Notes (2026-11-17, the second adversarial review, cluster 4): extended by ruling. The kernel had marked whole functions only, so a callee could wrap its argument in a function of its own, describe that with its own key, and read what the caller wrote. The maintainer weighed removing the need for marks altogether, by letting only a right that the configuration grants describe anything, and ruled against it: "the vast majority of projects will have only a single optimizer and at most one solver - so this is a very reasonable approach. However, I'm going to rule we don't take it, and keep `describe` generally available, and mark every node in an expression. My main reason for this is that it enables more sophisticated integrations between a grammar extension and the code that uses it - e.g. solvers, autograd, library specific optimizations". The maintainer wants the book to have readers try both sides of this decision. Not built: marks in the saved-program data form, which a saved residual needs once it holds parts of several modules; taken with what a record of a residual holds (cluster 10 of the same review).
+- Notes (2026-11-18, the second adversarial review, cluster 10): marks in the saved-program data form, left here by cluster 4, are not built: a saved program is one module, marked when it is made a module, and no residual is saved. The question returns with export, beside other modules' keys and values with fields.
 - Chapter: Authority
 
 #### A live expression is built only from live values
@@ -942,6 +944,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. With "Reading an expression never yields authority" it closes the path the adversarial review found: treating a live expression as data and then making part of it live again.
 - Notes (2026-11-17, the second adversarial review, cluster 1): the names a description leaves free are how a live value is supplied: the kernel's `build` takes a structure of them. A built function reads nothing from the place it is built.
+- Notes (2026-11-18, the second adversarial review, cluster 10): a description is a program that means the same as what it describes, by ruling. A function made in a block is described with the bindings it reads, as a block around it, so it builds again with no name supplied. A binding that is plain data is written where it is used. Built in the reference kernel.
 - Chapter: Authority
 
 #### A capability is granted, never acquired
@@ -1242,6 +1245,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling; it replaces the `lazy` and `sourceAware` declarations of primitives. The declaration is a property of the parameter, since the kernel has no syntax. The maintainer: the function cannot know which other extensions are loaded, so that information is carried in the expression; here each part of an expression holds the function it applies, and the context stays with the expression. Use cases to work through: `if` with branch knowledge (first), pattern matching, `&&` and `||`, reading a function's body for termination, diagnostics that show an expression, rewriting by laws.
 - Notes (2026-11-15, values and descriptions): replaced by ruling. The review session first wrote it as "a delayed expression is a function, and the notation wraps it", which is needed only in a kernel that evaluates arguments before a call; the maintainer pointed out that this confused two things. Evaluating an argument when it is needed is lazy evaluation, which was always the design and raises none of the review's objections. An unevaluated argument, in the sense that was removed, is an argument of an expression's kind that the function may inspect. The old decision let a callee hand a transformed expression back to be evaluated in its caller's context, which made the context a thing to probe by name (issue 2 of the adversarial review) and stopped any rewriting of an argument passed to an unknown function (issue 3). The maintainer had suggested it for four use cases, and now sees "separate solutions for each": conditionals passing knowledge into branches (this entry); language features such as solving and grammars (functions of unknowns, and descriptions); analysis, optimisation and transforms (descriptions, under the right to describe); reporting in the terms of the original code (origins as descriptions).
 - Notes (2026-11-15, titles made accurate): retitled from "A function may take an argument unevaluated". That an argument is evaluated when it is needed follows from "An expression is evaluated when its value is needed"; this entry keeps what is particular to arguments.
+- Notes (2026-11-18, the second adversarial review, cluster 10): "at most once" was held by the kernel and lost in a description: an argument used twice, described and built again, was performed twice. Ruled: a description writes an argument that is used more than once and not yet evaluated as a binding of a block, and sharing one part in two places means nothing. Built in the reference kernel.
 - Chapter: Evaluation
 
 #### A call is evaluated by evaluating the function's body
@@ -3629,17 +3633,18 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Phases
 
 #### A phase hands its residual to the next
-- Decides: the residual of a phase is a program: a value that can be saved, loaded and evaluated further. A sequence of phases is a pipeline. A phase may state what it must leave decided before the next begins.
+- Decides: the residual of a phase is a program, and the next phase evaluates it further in the same execution, as the kernel holds it. A sequence of phases is a pipeline. A phase may state what it must leave decided before the next begins. A later execution runs the phases again, from the saved programs and with stored outcomes restored: no residual is saved between executions. A residual leaves the kernel by export.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
 - Depends on: The platform ships three phases: check, run and export; Evaluation is total over unresolved information; A refuted value never reaches an effect
 - Significance: 4 — building is evaluating in steps
 - Label: foundational — pipelines, saved programs and export
-- Options recorded: phases that each start from source
+- Options recorded: phases that each start from source; a residual saved as a record and loaded in a later execution (not taken on 2026-11-18: the record would hold marks, other modules' keys and values with fields, which only a kernel can vouch for, so it would load only on its builder's word; taken up again with export, which has to carry a residual out of the kernel)
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a build phase resolves everything but the request data; the server's run phase starts from that residual.
 - Notes: new, by ruling.
+- Notes (2026-11-18, the second adversarial review, cluster 10): reworded by ruling. The entry said a residual "can be saved, loaded and evaluated further". Two reviewers showed what a residual loses when it is read out as data: an argument used twice is performed twice, a function made in a block loses the block's names, and a record has no place for a mark, a cell or another module's key. The maintainer: "My assumption has been that phases get rerun, rather than saving a residual", and phases run in one execution "just use the residual from an earlier phase directly without saving". Ruled: "Let's go with rerunning phases in sequence, until we address the export use case." On phases: "I've never thought of phases as a first class element of the Allegro build system"; a phase is one call of the module function with some capabilities and inputs given.
 - Chapter: Phases
 
 #### A project defines a phase or extends one
@@ -3748,6 +3753,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a command-line tool exports to a few hundred lines with no kernel; a notebook server exports with one.
 - Notes: new, by ruling. "This residual needs no kernel" can be a claim a target requires.
+- Chapter: Saved programs and export
+
+#### An exported program behaves as the program does in a kernel
+- Decides: an exported program, run with its target's capabilities bound, behaves exactly as the same program evaluated in a kernel with the same capabilities bound. This holds for an executable whose wrapper binds the console, the file system and the network, and for a deployed artifact that has its environment and resources attached at deployment. Tests hold the two paths together for every target.
+- Status: open; ruled 2026-11-18
+- Type: capability
+- Rationale kind: technical
+- Depends on: A target platform is a model, and export is a transformation into it; A phase hands its residual to the next; The same program and the same information give the same result
+- Significance: 4 — what makes an export the same program
+- Label: foundational — every export target and its tests
+- Options recorded: none
+- Sources: the maintainer's ruling of 2026-11-18 (../records/book-pass/adversarial-review-2.md, Rulings taken, cluster 10)
+- Use case: a service passes its tests in a kernel with a stand-in network; the exported service, with the target's network bound, gives the same answers.
+- Notes: new, by ruling. The maintainer: "the code must act exactly as if those same resources/capabilities were bound within an Allegro execution. So ultimately we can't escape the 'two paths that must agree'. We'll need complete test coverage ensuring that exported versions of programs behave exactly as they would if not exported. But we don't need that today." The shape export needs is a residual as a function of what was not supplied; it is not ruled.
 - Chapter: Saved programs and export
 
 #### A law licenses a rewrite, and the rewritten program carries the law's strength

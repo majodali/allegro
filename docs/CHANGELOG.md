@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-18 — Phases are rerun; a description means what it
+  describes (the second review's cluster 10).** Ruled: no residual is
+  saved between executions, the next phase of one execution evaluates
+  the residual as the kernel holds it, and saving one returns with
+  export. A new decision: an exported program behaves as the program
+  does in a kernel. In `next/kernel/kernel.ts`: `describe` writes the
+  bindings a function reads, and an argument used more than once and
+  not yet evaluated, as a block around the function, renaming where a
+  name is taken; `build` takes that form. 248 decisions.
 - **2026-11-17 — The first adversarial review closed.** Issues 13,
   24 and 27 ruled: a module has one instance for each distinct set of
   arguments; a proposal holds no capability; an open module hands out
