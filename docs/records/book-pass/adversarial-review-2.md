@@ -589,6 +589,47 @@ The stranger's fourteen questions from a new launcher's author are
 mostly wording of the interface; they are taken with cluster 14 or at
 the interface merge.
 
+### Cluster 9: recursion, loops and strength (2026-11-18)
+
+The review session proposed seven points, the third being an
+induction rule in the kernel. The maintainer: "When we get into the
+standard language we'll implement more sophisticated recursion
+analysis - all recursion will be unfolded and put through rigorous
+data-flow analysis. That will cover most of these points." And on the
+third: "do we leave recursive functions assumed until the standard
+language, or do we implement a simple kernel rule now that is
+superseded by more sophisticated analysis in the standard language?"
+
+The review session recommended leaving it, and withdrew its reason
+for a kernel rule: the standard language's analysis is a function the
+kernel evaluates, so its answer is decided and rests on the extension;
+only the kernel writes "decided" either way. A claim inside a
+recursive function in Allegretto is evaluated on each call's real
+arguments and needs no induction. A kernel rule would need
+specialization and knowledge carried on an unknown value first, and
+would then be replaced.
+
+Ruled ("Ok - go ahead with those rulings"):
+
+1. The kernel never assumes. The sentence "assumed at that inner call
+   and decided on the body" is struck.
+2. A claim about every value of a recursive function is as strong as
+   the function's termination claim. The standard language's rule.
+3. No induction rule in the kernel. Until the standard language,
+   Allegretto writes such a claim with `assume`.
+4. Ahead of what is done, a function already being opened is not
+   opened again, whatever it is given.
+5. "The same information" is defined with specialization, by the
+   standard language's unfolding of recursion.
+6. An argument that is a pure primitive function applied to values
+   already known is evaluated when the call is made.
+7. A call that is the value of a body takes no space. The entry on
+   tail calls is restated and retitled "A loop written as a recursion
+   runs in constant space". No loop form in Allegretto.
+
+Built: points 4 and 6. Point 7 comes with the evaluator's move off the
+host's stack.
+
 ## Terms introduced
 
 No terms introduced.

@@ -88,6 +88,12 @@ Data whose shape the text does not fix is built and read with five more:
 | `symbol(t)` | the symbol whose name is the text `t`, as data |
 | `spelling(s)` | the name of the symbol `s`, as text |
 
+Allegretto has no loop form: a loop is a function that calls itself.
+A call that is the value of the function's body takes no space, and a
+counter or a total computed by one primitive on known values is
+evaluated at each call. A value carried by a function of the program's
+own is put first with `then` where it must not be put off.
+
 `put` never changes `s`. A structure of a size the text does not fix is
 built by a recursion: `range(n) => if n == 0 then [] else put(range(n -
 1), [], n)`.

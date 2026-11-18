@@ -1611,3 +1611,51 @@ test("a claim's record tells the weaker outcomes apart and names the module that
   assert.equal(u?.module, k.moduleOf(m), "the module whose code wrote the claim");
   assert.equal(a?.module, k.moduleOf(m));
 });
+
+// ---- Recursion as the loop (the second review's cluster 9) -------------------
+
+test("ahead of what is done, a loop that carries state ends: a function being opened is not opened again", () => {
+  const { k, add, call, kp } = setup();
+  let accepted = 0;
+  const pending: Value[] = [];
+  const accept = k.primitiveFunction({ purity: "effectful", capability: "net", part: "accept", arity: 0, run: (_a, c) => (accepted++, pending.push(c.cell()), pending[pending.length - 1]) });
+  const [serve, i] = [k.symbol("t.serve"), k.param("i")];
+  // serve(i) = then(accept(), serve(i + 1)): the answer comes late, and each turn has a new i.
+  const serveFn = k.composedFunction([i], call(kp("then"), call(accept), call(serve, call(add, i, byte(k, 1)))));
+  const r = k.evaluate(within(k, [[serve, serveFn]], call(serve, byte(k, 0))), k.scope(), { steps: 2000 });
+  assert.equal(r.ended, "complete", "it ends well inside its budget");
+  assert.ok(r.steps < 50, `a few steps, not the budget: ${r.steps}`);
+  assert.equal(accepted, 1, "one effect: the rest was ahead");
+  // When the answer arrives the loop goes on by one turn, and waits again.
+  k.fill(pending[0] as never, k.structure([]));
+  const next = k.advance({ steps: 2000 });
+  assert.equal(next.ended, "complete");
+  assert.equal(accepted, 2);
+});
+
+test("an argument that is one step of work on known values is evaluated at the call", () => {
+  const { k, add, dec, isZero, call, kp } = setup();
+  let ran = 0;
+  const tick = k.primitiveFunction({ ...pure("tick", 20, 1, (a) => a), run: (a, c) => (ran++, c.bits(c.bitsOf(a[0]).bytes)) });
+  const [a, n, acc, count] = [k.param("a"), k.param("n"), k.param("acc"), k.symbol("t.count")];
+  const scope = k.scope();
+  // The function does not use its argument; the argument is evaluated all the same, once.
+  const ignore = k.composedFunction([a], byte(k, 9));
+  assert.equal(num(k, k.evaluate(call(ignore, call(tick, byte(k, 1))), scope).value), 9);
+  assert.equal(ran, 1, "evaluated at the call");
+  // Not where a value under it is not known yet, and not where it is a call of a composed function.
+  k.evaluate(call(ignore, call(tick, k.cell())), scope);
+  k.evaluate(call(ignore, call(k.composedFunction([], call(tick, byte(k, 1))))), scope);
+  assert.equal(ran, 1, "neither was evaluated");
+  // A refutation it comes to is held: the call goes through, and using the argument is what refutes.
+  const fails = k.primitiveFunction({ ...pure("fails", 21, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  assert.equal(k.evaluate(call(ignore, call(fails, byte(k, 1))), scope).refuted, false);
+  assert.equal(k.evaluate(call(k.composedFunction([a], a), call(fails, byte(k, 1))), scope).refuted, true);
+  // A loop with a total: each turn's total is a value, so the last turn hands back bits with nothing put off.
+  // count(n, acc) = if isZero(n) then acc else count(dec(n), tick(add(acc, 1)))
+  ran = 0;
+  const countFn = k.composedFunction([n, acc], call(kp("if"), call(isZero, n), acc, call(count, call(dec, n), call(add, acc, byte(k, 1)))));
+  const r = k.evaluate(within(k, [[count, countFn]], call(count, byte(k, 250), byte(k, 0))), scope);
+  assert.equal(r.ended, "complete");
+  assert.equal(num(k, r.value), 250);
+});

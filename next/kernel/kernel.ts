@@ -325,8 +325,8 @@ export const createKernel: CreateKernel2 = () => {
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
   let ahead = false;
-  /** The calls being opened while evaluating ahead: a function and what it was given. */
-  const opening: { fn: Fn; args: readonly V[] }[] = [];
+  /** The functions being opened while evaluating ahead. */
+  const opening: Fn[] = [];
 
   const restKey = (r: Rest): string =>
     r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : r.kind === "limit" ? "limit" : `builder ${r.builder}`;
@@ -1017,13 +1017,21 @@ export const createKernel: CreateKernel2 = () => {
       }
       if (fn.params.length !== v.args.length)
         return new Refuted(`a function of ${fn.params.length} parameter(s) was given ${v.args.length} argument(s)`, undefined);
-      const given = v.args.map((a) => later(a, scope));
+      const given = v.args.map((a) => {
+        const l = later(a, scope);
+        // An argument that is one step of work on values already known is evaluated now: a
+        // loop's counter or total then never grows into a chain of work put off. It has no
+        // effect, and a refutation it comes to is held until something needs the argument.
+        if (l instanceof Lazy && oneStep(l.value)) collecting(() => evaluate(l, scope));
+        return l;
+      });
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
       if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
-      // Ahead of what is done, a call to a function already being opened with the same
-      // information is not opened again: it stays in the residual.
-      if (opening.some((o) => o.fn === fn && o.args.every((a, i) => sameInformation(a, given[i])))) return new Expr(fn, given);
-      opening.push({ fn, args: given });
+      // Ahead of what is done, a function already being opened ahead is not opened again,
+      // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
+      // refutation early, and a loop that carries state would otherwise never end.
+      if (opening.includes(fn)) return new Expr(fn, given);
+      opening.push(fn);
       try {
         return evaluate(substitute(fn.body, env, new Map()), scope);
       } finally {
@@ -1102,6 +1110,14 @@ export const createKernel: CreateKernel2 = () => {
    * and means there what it meant here. What needs no evaluation is
    * handed on as it is.
    */
+  /** The kernel's primitives that compute on data and do nothing else. */
+  const ONE_STEP = new Set(["join", "length", "slice", "same", "count", "kind", "key", "symbol", "spelling"]);
+  /** True for a pure primitive function, or such a kernel primitive, applied to values already known. */
+  const oneStep = (e: V): boolean =>
+    e instanceof Expr &&
+    ((e.fn instanceof Prim && e.fn.declaration.purity === "pure") || (e.fn instanceof KernelPrim && ONE_STEP.has(e.fn.name))) &&
+    e.args.every((a) => !(a instanceof Expr || a instanceof NameRef || a instanceof Sym) && knownInFull(a));
+
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
     return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)) ? new Lazy(tied, scope) : tied;

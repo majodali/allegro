@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-18 — Recursion, loops and strength (the second review's
+  cluster 9).** Ruled: the kernel never assumes a claim at a recursive
+  call and gets no induction rule; the standard language's analysis
+  decides recursion. In `next/kernel/kernel.ts`: ahead of what is
+  done, a function being opened is not opened again, so a loop that
+  carries state ends at a wait; an argument that is a pure primitive
+  on known values is evaluated at the call. "Tail calls by sentinel
+  and loop" is restated as "A loop written as a recursion runs in
+  constant space".
 - **2026-11-18 — What is trusted; a result lists its claims (the
   second review's cluster 13).** Ruled: the loader and the parser are
   named in every result; a project's choice of them is bounded by the
