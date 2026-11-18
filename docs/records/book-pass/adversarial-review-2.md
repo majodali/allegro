@@ -424,6 +424,27 @@ instance for each set of arguments, and `refuse`. The forms are in
 `next/ext/allegretto/forms.md`. The finding of point 3 and the forms
 are the reader's and the emitter's.
 
+### Cluster 5: claims under evaluation when needed (2026-11-18)
+
+Ruled ("I agree with all four points"):
+
+1. A claim is needed where it is made. Every claim form of the
+   standard language places its claim among the statements of its
+   block. In Allegretto a claim written as a value stays evaluated
+   when needed, and the end-of-text check reports one nothing needs.
+2. Claiming a parameter's type needs the argument: a typed function
+   evaluates that argument on entry.
+3. A claim that waits for a value holds back what follows. A claim
+   that is done holds back nothing, whatever its outcome short of
+   refuted.
+4. The weaker outcomes are recorded by the kernel on request: assumed,
+   with who assumed it from the mark; undecided, when what decides a
+   claim answers that it cannot tell; sampled, by the kernel evaluating
+   the cases. Code can ask for a weaker outcome and never a stronger.
+
+Built at the maintainer's word: `assume` and `undecided`. Sampling and
+the standard language's claim forms are built with Part IV.
+
 ## Terms introduced
 
 No terms introduced.

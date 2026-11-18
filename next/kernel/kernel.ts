@@ -62,6 +62,14 @@
 //               tested, and applies it to values that carry the fact.
 //   "claim"     claim(x). True records the outcome "decided". Anything
 //               else fully known is a refutation. Unknown stays a residual.
+//   "assume"    assume(x). Records the outcome "assumed" and does not
+//               evaluate x. The record names the module whose code wrote
+//               the call, from the mark on it. A claim that rests on an
+//               assumption comes out assumed, never decided.
+//   "undecided" undecided(reason). The answer of what decides a claim when
+//               it cannot tell. A claim on it is done, with the outcome
+//               "undecided" and that reason; it refutes nothing, and what
+//               follows the claim goes ahead.
 //   "describe"  describe(right, function). A description of the function,
 //               as plain data. `right` is a key of the module that made
 //               the function, or the inspection right. Where the function
@@ -215,8 +223,9 @@ class Quoted {
   constructor(readonly inner: V) {}
 }
 /** A value with the kernel's record of a claim's outcome on it. */
+/** A value with the outcome of a claim on it: decided, assumed, or undecided with the reason nothing could tell. */
 class Decided {
-  constructor(readonly inner: V, readonly rests: readonly Rest[]) {}
+  constructor(readonly inner: V, readonly rests: readonly Rest[], readonly outcome: "decided" | "assumed" | "undecided" = "decided", readonly reason?: string) {}
 }
 /**
  * An argument that has not been needed yet: an expression, the scope it
@@ -256,8 +265,8 @@ interface Root {
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
-  ["join", 2], ["length", 1], ["refuse", 1], ["same", 2], ["slice", 3], ["then", 2],
+  ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["join", 2], ["length", 1], ["refuse", 1], ["same", 2], ["slice", 3], ["then", 2], ["undecided", 1],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
 const INSPECT = "kernel:inspect";
@@ -302,7 +311,7 @@ export const createKernel: CreateKernel2 = () => {
   const opening: { fn: Fn; args: readonly V[] }[] = [];
 
   const restKey = (r: Rest): string =>
-    r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : `builder ${r.builder}`;
+    r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : `builder ${r.builder}`;
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(restKey(r), r);
   };
@@ -634,9 +643,22 @@ export const createKernel: CreateKernel2 = () => {
         const { value: claimed, rests } = collecting(() => evaluate(v.args[0], scope));
         rests.forEach(rest);
         if (claimed instanceof Refuted) return claimed;
-        if (truthOf(claimed) === true) return new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests]);
+        // What decides the claim answered that it cannot tell: the claim is done, and undecided.
+        const told = through(claimed);
+        if (told instanceof Decided && told.outcome === "undecided") return new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason);
+        if (truthOf(claimed) === true) {
+          // A claim that rests on an assumption is no stronger than assumed.
+          const assumed = rests.some((r) => r.kind === "assumption");
+          return new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided");
+        }
         if (known(claimed)) return new Refuted("a claim that is not true", claimed);
         return new Expr(fn, [claimed]);
+      }
+      if (fn.name === "assume") {
+        // The claim is not evaluated. The record says who assumed it: the module whose code this is.
+        const by: Rest = { kind: "assumption", by: v.owner?.module ?? "" };
+        rest(by);
+        return new Decided(TRUE, [by], "assumed");
       }
       if (fn.name === "if") {
         // The condition is needed; a branch is needed only if it is the one taken.
@@ -769,6 +791,12 @@ export const createKernel: CreateKernel2 = () => {
         if (from === undefined || n === undefined) return new Refuted("a place and a count are whole numbers, as bits", undefined);
         if (from + n > a.bitLength) return new Refuted(`${n} bit(s) from place ${from} is outside a value of ${a.bitLength} bit(s)`, undefined);
         return packed(bitList(a).slice(from, from + n));
+      }
+      if (fn.name === "undecided") {
+        if (!known(args[0])) return waits();
+        const reason = seen(args[0]);
+        if (!(reason instanceof Bits) || reason.bitLength % 8 !== 0) return new Refuted("the reason nothing could tell is a text", args[0]);
+        return new Decided(new Bits(new Uint8Array(0), 0), [], "undecided", textOf(reason));
       }
       if (fn.name === "refuse") {
         if (!known(args[0])) return waits();
@@ -1443,7 +1471,7 @@ export const createKernel: CreateKernel2 = () => {
       let s = into(v, "the value");
       for (;;) {
         if (s instanceof Refuted) return "refuted";
-        if (s instanceof Decided) return "decided";
+        if (s instanceof Decided) return s.outcome;
         const t = through(s);
         if (t !== s) s = t;
         else if (s instanceof Quoted) s = s.inner;
@@ -1500,7 +1528,7 @@ export const createKernel: CreateKernel2 = () => {
     },
     reasonOf: (value) => {
       const v = through(into(value, "the value"));
-      return v instanceof Refuted ? v.reason : undefined;
+      return v instanceof Refuted ? v.reason : v instanceof Decided ? v.reason : undefined;
     },
     claimKey: (claim, within, restsOn, declares) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn, declares),
     restore: (claim, within, builder, restsOn, key, declares) => {

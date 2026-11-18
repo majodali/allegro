@@ -579,6 +579,14 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-18 — The weaker outcomes of a claim (the second review's
+  cluster 5).** In `next/kernel/kernel.ts`: `assume(x)` records
+  "assumed" without evaluating, and names the module whose code
+  asked; `undecided(reason)` is what a decision procedure answers when
+  it cannot tell, and a claim on it is done and holds nothing back. A
+  claim that rests on an assumption comes out assumed. Ruled with it:
+  a claim is needed where it is made. The inventory holds 247
+  decisions.
 - **2026-11-18 — An import is a call of the imported module (the
   second review's cluster 6).** In `next/kernel/kernel.ts`: a module
   is called with its capabilities and inputs only, and the kernel

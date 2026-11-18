@@ -141,10 +141,13 @@ export interface Limits {
  *               it came out true;
  *   "sampled"   it was evaluated on some cases;
  *   "assumed"   someone stated it and no kernel evaluated it;
- *   "undecided" it still waits;
+ *   "undecided" nothing decided it: it still waits, and its value is then of
+ *               kind "expression"; or it was evaluated and what decides it
+ *               answered that it cannot tell, and `reasonOf` says why;
  *   "refuted"   it was evaluated and is not true.
- * The first version of a kernel records "decided", "refuted" and
- * "undecided" only.
+ * Only the kernel records an outcome. Code can ask for a weaker one, by
+ * the kernel's primitives `assume` and `undecided`, and never for a
+ * stronger: nothing but the kernel's own evaluation gives "decided".
  */
 export type Outcome = "decided" | "refuted" | "undecided" | "sampled" | "assumed";
 
@@ -161,7 +164,13 @@ export type Rest =
   /** An effectful primitive whose answer was an input: a part of a capability. */
   | { readonly kind: "capability"; readonly capability: string; readonly part: string }
   /** Whoever built the saved program a restored outcome came from. */
-  | { readonly kind: "builder"; readonly builder: string };
+  | { readonly kind: "builder"; readonly builder: string }
+  /**
+   * An assumption: the module whose code wrote it, by identity, taken by
+   * the kernel from the mark on that code. Empty where the code that
+   * assumed belongs to no module.
+   */
+  | { readonly kind: "assumption"; readonly by: string };
 
 /** What one call of `evaluate` returns: how things stood when it returned. */
 export interface Result {

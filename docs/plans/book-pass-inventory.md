@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 246 decisions in 6 parts and 38 chapters (231 when the phase closed; fifteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 63; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 247 decisions in 6 parts and 38 chapters (231 when the phase closed; sixteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 64; Part V: 27; Part VI: 44. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 213, implementation 18. By significance: 5: 38, 4: 69, 3: 78, 2: 40, 1: 6. By label: foundational 120, swappable 111. By status against the code: settled 93, partly built 62, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -69,8 +69,8 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
    - Decisions: A private member is one whose key not all code holds; Who may use a member is a claim about where the access was written; Export marks the binding, and a module with no exports is open; Imported modules are typed objects whose type encapsulates.
 17. **The surface language** (10 decisions). The spellings a programmer writes: blocks, declarations, conditionals, annotations, pattern matching.
    - Decisions: Indentation blocks, with brace and offside both as the goal; Refinement types written `T & predicate` with `_` as the value; Function declarations with `=>`; Expression-valued `if then else`; The `Y of x` component-access form; Type annotations on parameters and returns; Statement forms that declare a binding; `when / is / then` pattern matching; Combinators before keyword declaration syntax; String interpolation with braces.
-18. **Claims and proofs** (7 decisions). Nothing is a claim until someone makes it; claims about every value, proof terms as proposals, deciding without search, sampling, and the four strengths.
-   - Decisions: Nothing is a claim until someone makes it; A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Discharge mechanisms without search; Bounded sampling for universal claims; Four strengths, one vocabulary; Tactics as a pure Allegro library.
+18. **Claims and proofs** (8 decisions). Nothing is a claim until someone makes it; claims about every value, proof terms as proposals, deciding without search, sampling, and the four strengths.
+   - Decisions: Nothing is a claim until someone makes it; A claim is needed where it is made; A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Discharge mechanisms without search; Bounded sampling for universal claims; Four strengths, one vocabulary; Tactics as a pure Allegro library.
 19. **Equality and laws** (4 decisions). Equality by shape, the default equality, lawful interfaces and the strength of a law.
    - Decisions: Lawful interfaces; Equality dispatches on shape, then coerces, else not-equal; Default equality belongs to the standard extension; Law strengths and the transitivity gate.
 20. **Effects** (3 decisions). An effect is the use of a capability; parts and narrowed forms; how a bound is written.
@@ -592,6 +592,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): the safety grade reads `proven-safe` whenever nothing complained (`src/introspect.ts:496`–`504`); a verdict resting on sampled backing is headed "Verdict (verified)" (`src/pcp.ts:646`, `959`). Held on "Safety grade as the default verification surface" and "The verdict as accumulated metadata".
 - Held finding (2026-11-12, DR4): the verdict is assembled by a walk of top-level bindings outside evaluation (`buildVerdict`), where the decision makes it the result's own metadata; and contracts that stay undecided reach `inspect` only, not the verdict or the record of assumptions. Formerly the entries "The verdict as accumulated metadata" and "Contracts in the verdict and the ledger".
 - Notes (2026-11-15, the rulings on strength and on identity): reworded: strength and what a result rests on are two things, where the decisions had treated them as one (issues 8 to 10). The weakest-link rule applies among claims only, so a claim that used arithmetic is decided and names its primitives.
+- Notes (2026-11-18, the second adversarial review, cluster 5): "undecided" covers two cases, told apart by whether the claim is done: it waits for a value, or it was evaluated and what decides it could not tell. A claim that rests on an assumed claim is assumed.
 - Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
@@ -1427,6 +1428,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 (the same entry of the acceptance stream's record): `if 1 then 42 else 0` is a refutation, where the present tree takes 1 as true. The note of 2026-11-12 on truth already said so; the decision's text now does.
 - Notes (2026-11-17, the second adversarial review, cluster 3): reading a structure takes a key as well as a symbol or a place, and a place or a count passes over an entry keyed by a key ("A private member is one whose key not all code holds").
 - Notes (2026-11-18, the second adversarial review, cluster 6): a refusal is added to the claim primitives: `refuse(reason)` is a refutation with that reason. It is what a withheld capability is, and how code says why it will not go on.
+- Notes (2026-11-18, the second adversarial review, cluster 5): the claim primitives are four: evaluating a claim, assuming one, answering that one cannot be told, and refusing with a reason. Sampling is to come.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1447,7 +1449,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Correctness
 
 #### Only the kernel records the outcome of a claim
-- Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record.
+- Decides: evaluating an expression as a claim, and recording on the value whether it was decided, refuted or left undecided, is an operation of the kernel. No extension can write that record. Code may ask the kernel for a weaker outcome and never for a stronger. The kernel records "assumed" for a claim without evaluating it, and names who assumed it from the mark on the code that asked. What decides a claim may answer that it cannot tell, and the kernel then records "undecided" with the reason; such a claim is done and holds back nothing. The kernel records "sampled" by evaluating the claim itself on the cases it is given. A claim that waits for a value is another matter: it is not done, and what follows it waits.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1457,6 +1459,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a claim as an ordinary function of some extension, writing the outcome into its own field (rejected: it does not remove the trusted operation, it moves it into that extension)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: new, by ruling. The kernel's contents are then values, pure primitives, the evaluator, metadata with its fields and rules, authority, and this operation.
+- Notes (2026-11-18, the second adversarial review, cluster 5): extended by ruling. The kernel's claim knew two results, true and refuted, so nothing could record assumed, sampled or "cannot tell": a decision procedure that could not tell had only answers that refute. And a claim left undecided held back the effects after it, against the ruling that a strength short of decided prevents no effect. Built: assuming, and the answer that cannot tell. Sampling is built with the standard language.
 - Chapter: Correctness
 
 #### A refutation marks everything computed from it
@@ -2113,7 +2116,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Types as values
 
 #### A typed function claims its parameter types on entry and its return type on exit
-- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there. A parameter claim means the same at every phase. A failed one is a refutation and cannot be caught; a program that takes outside values guards them with the same predicate. The policy "every parameter claim is decided before the run begins" is on by default, and a user may turn it off for a script.
+- Decides: the claims are part of the function's body, so they are evaluated wherever a call is evaluated, with whatever is known there. A parameter claim means the same at every phase. A failed one is a refutation and cannot be caught; a program that takes outside values guards them with the same predicate. The policy "every parameter claim is decided before the run begins" is on by default, and a user may turn it off for a script. Claiming a parameter's type needs the argument: a function that claims one evaluates that argument on entry, where its untyped form would evaluate it only if the body used it.
 - Status: open (the evaluator checks a typed call itself); ruled 2026-11-12 (DR4); extended 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -2126,6 +2129,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR4): the evaluator checks a typed call before substitution (`applyComposed`, `src/evaluator.ts`), through an installed host function.
 - Notes (2026-11-15, arguments are evaluated when needed): a consequence to test: evaluating the claim on a parameter needs the argument, so a typed function evaluates its arguments on entry. Typed code is strict in practice and long chains of pending arguments arise only in untyped code.
 - Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 3): "one of Allegro's goals is that the same type checking happens at compile time as run time".
+- Notes (2026-11-18, the second adversarial review, cluster 5): the last sentence is added by ruling; it was noted on 2026-11-15 as a consequence to test. A reviewer pointed out that adding a type can so change what a program does. That is what the claim asks. Checking an argument only when the body first uses it was set aside: an unused argument would never be checked.
 - Chapter: Types as values
 
 #### `distinct` mints a fresh-symbol newtype
@@ -2498,6 +2502,19 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR4): findings have severities, and a project configuration to move them is designed.
 - Chapter: Claims and proofs
 
+
+#### A claim is needed where it is made
+- Decides: every form of the standard language that makes a claim places it among the statements of the block it is written in: a type on a binding, a contract, a theorem, `verify`. A statement is always needed, in written order, so the claim is always evaluated. What the claim is about is needed there too: a binding with a type is evaluated at its line, not when it is first used. Where a text writes the kernel's claim as a value, it is evaluated only if something needs it, and the check at the end of the text reports a claim nothing needs.
+- Status: open; ruled 2026-11-18
+- Type: capability
+- Rationale kind: technical
+- Depends on: Nothing is a claim until someone makes it; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A language checks the names it cares about
+- Significance: 4 — no claim is skipped because nothing happened to need it
+- Label: foundational — every claim form of the standard language
+- Options recorded: a claim evaluated when its value is needed, like any expression (a claim written on a binding nothing uses would never be evaluated, where the tools promise every claim); a check phase that needs every binding of a module (it would find claims on bindings and miss those inside values)
+- Sources: the maintainer's rulings of 2026-11-18 (../records/book-pass/adversarial-review-2.md, Rulings taken)
+- Notes: new, by ruling. Three reviewers found that a claim nothing needs is never evaluated; one showed it by running.
+- Chapter: Claims and proofs
 #### A claim about every value is decided by evaluating it with the value unknown
 - Decides: a proposition is an expression that evaluates to true or false. A claim about every value is decided by evaluating it with the value unknown: if the residual is true, the claim holds for all values. Enumerating a finite type decides it too. Deciding is reduction, never search, and a refuted claim carries its counterexample.
 - Status: settled; reworded 2026-11-12 (DR4)
@@ -2877,6 +2894,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: CT-R3 (docs/decisions.md; docs/book/standard/contracts.md §2, §10); B-057, B-101
 - Book home (fragments' proposal): standard/contracts
 - Notes: `assume_invariant` is still registered (`src/primitives.ts:4566`).
+- Notes (2026-11-18, the second adversarial review, cluster 5): the kernel writes the record: who assumed is the module whose code asked, taken from the mark on that code, so an assumption cannot be made under another's name or under none.
 - Chapter: When a check fails
 
 #### Every failure carries a legible counterexample
