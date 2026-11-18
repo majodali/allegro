@@ -557,6 +557,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr1-part-1-the-bet.md, Rulings taken); docs/book/platform/host.ir.md (environment capabilities)
 - Notes: new, by ruling. A database driver, a file system and a fast numeric routine are one construct; the last is a capability with no effect. Data from outside arrives with no claims and earns them by being checked.
 - Notes (2026-11-13, DR6): was "Host code reaches a program only as a capability"; reworded for the four kinds of function the Part VI review settled: a primitive function or a composed function, each effectful or pure. Kept in Part I, where the decisions that depend on it need it.
+- Notes (2026-11-18, the second adversarial review, cluster 13): a primitive's content hash is stated by whoever registers it and is not verified by the kernel, and a pure primitive is available to all code ("Three things are trusted: the kernel, the launcher and primitive functions").
 - Chapter: Keep it simple
 
 #### No interface limits optimization
@@ -3446,7 +3447,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Configuration
 
 #### Configuration sources have a priority, and a result says which supplied each value
-- Decides: configuration is read from sources in a stated order: built into the launcher, the environment, files, the command line. A value missing from one source is taken from the next. Each value has a rule for which sources may set it, and the launcher holds those rules: the kernel, the accepted keys and the ceiling of capabilities are set only by the launcher and the command line; a project's file may choose its parser and its loader. The result of an execution records which source supplied each value.
+- Decides: configuration is read from sources in a stated order, the highest first: the command line, files, the environment, what is built into the launcher. A value a higher source sets replaces the same value from a lower one, and a value missing from one source is taken from the next below it. Each value has a rule for which sources may set it, and the launcher holds those rules: the kernel, the accepted keys and the ceiling of capabilities are set only by the launcher and the command line, and so are granting the inspection right, allowing restore, keeping origins and turning off a default policy; a project's file may choose its parser and its loader. A loader a project chose runs under the ceiling the launcher set, as any code of that project does. The result of an execution records which source supplied each value.
 - Status: open; ruled 2026-11-13 (DR6); extended 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -3458,6 +3459,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a flag on the command line replaces a value from the project's file, and the report shows that it did.
 - Notes: new, by ruling. An environment variable that redirects a capability to another implementation is a risk the chapter on trust takes up.
 - Notes (2026-11-16, the adversarial review's remaining issues): the sentence on which source may set which value is added by the maintainer's ruling of 2026-11-16 on issue 26. A project that defines a language must be able to choose its parser and loader.
+- Notes (2026-11-18): the order was written lowest first, and "taken from the next" then read the wrong way; the maintainer noticed it in review. The command line is highest. Nothing ruled changes.
+- Notes (2026-11-18, the second adversarial review, cluster 13): extended by ruling. A reviewer's case: a cloned project's file names its own loader, check hands it file reading, and it prints a file from outside the project in a report. Ruled: a project keeps its choice of loader and parser, bounded by the ceiling; and four more settings are the launcher's and the command line's alone. Reserving the loader's choice to the launcher was weighed and not taken: under the ceiling a project's loader can misuse only what the project could.
 - Chapter: Configuration
 
 #### A full configuration is a model, evaluated in a first phase
@@ -3620,7 +3623,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Phases
 
 #### The platform ships three phases: check, run and export
-- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability but the loader's, to read the modules the program names, and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
+- Decides: a phase is one evaluation, defined by the information and the capabilities available to it. Check evaluates a program with no capability but the loader's, which reads files in the project's and the platform's directories and nowhere else, and reports on every claim. Run supplies capabilities. Export emits code for a target in place of performing capabilities.
 - Status: open (the pipeline's stages are fixed in host code); ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3635,6 +3638,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): phases are hard-coded: `evalSource` runs a fixed list of stages, with precompile, the post-passes and soft failure among them (carried over from the Part I review).
 - Held finding (2026-11-13, DR6): the soundness review of the cutoff for recursive bindings is pending.
 - Notes (2026-11-16, the adversarial review's remaining issues): a stale wording corrected (issue 30).
+- Notes (2026-11-18, the second adversarial review, cluster 13): the loader's capability in check is narrowed by ruling to the project's and the platform's directories, so checking a project nobody trusts yet reads nothing else.
 - Chapter: Phases
 
 #### A phase hands its residual to the next
@@ -3806,7 +3810,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Trust
 
 #### Three things are trusted: the kernel, the launcher and primitive functions
-- Decides: everything else is checked. Allegro code from any source is evaluated like any program; a proposal is never trusted; a saved program is trusted as far as its builder and can be decided again.
+- Decides: everything else is checked. Allegro code from any source is evaluated like any program; a proposal is never trusted; a saved program is trusted as far as its builder and can be decided again. Two pieces of Allegro code are checked and still relied on, because of what they are handed: the loader is handed every capability a program gets, and the parser gives every text its meaning. Neither can do more than it is handed, and a result names both. Host code that holds the kernel object is trusted as the launcher is: Allegro code never holds it, and reaches restoring, inspecting and loading only through capabilities the launcher makes from it, each as narrow as its decision says. A primitive function's content hash is the statement of whoever registered it, and so is "pure"; a pure primitive is available to all code, so reviewing a primitive includes reviewing that word.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3817,10 +3821,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: an organization reviews one kernel, one launcher and a dozen primitive functions, and nothing of the four hundred libraries it uses.
 - Notes: new, by ruling. The chapter opens with what a user would otherwise trust. Against a conventional stack Allegro improves four things: dependencies written in Allegro are checked; a dependency can do only what it is handed; a result names what it rests on; a stored build can be reproduced. It improves nothing for host code, and the kernel is trusted, though small. The maintainer: "A big part of the issue is a user (or organization) determining what level of trust they need, and where Allegro reliably improves on what they would otherwise do." The cases, their risks and the counter to each are chapter material: the kernel; the launcher; a capability's implementation; an extension as text; a saved program (altered, built by another kernel or configuration, out of date, carrying keys); exported code; a proposal; a configuration source.
+- Notes (2026-11-18, the second adversarial review, cluster 13): the last four sentences are added by ruling. A reviewer showed that the loader distributes authority and the parser assigns meaning, and that the interface gives any holder of the kernel object restore under any builder's name, the inspection right and every function's body. Ruled: the set of three stays; the loader and the parser are named in every result; the interface is not split into narrower handles, because host code is trusted already, and the split waits for a real embedding application with host plug-ins. The kernel cannot hash host code, so a hash is a statement; the shipped primitives' hashes are computed from their source by a tool and held by a test. A pure primitive is reachable by its hash through `build` by code never handed it, which is safe by what pure means; a host function wrongly declared pure is a fault in trusted code.
 - Chapter: Trust
 
 #### A result names everything it rests on
-- Decides: beside the extensions and capabilities Part I names, a result names the kernel variant, the configuration and its sources, the primitive functions, the builders of saved programs and the target.
+- Decides: beside the extensions and capabilities Part I names, a result names the kernel variant, the configuration and its sources, the loader and the parser by module identity with the source that chose each, the primitive functions by their stated hashes, the builders of saved programs and the target. A result lists its claims: one record for each claim as written, with how many of its evaluations came out decided, assumed, undecided and refuted, how many wait, the reasons given and what the outcomes rest on.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -3831,6 +3836,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a report says a property is decided, by this kernel, with these two primitives, on outcomes restored from one named builder.
 - Notes: new, by ruling.
+- Notes (2026-11-18, the second adversarial review, cluster 13): the loader, the parser and the list of claims are added by ruling. A launcher had one boolean for a whole result, so check could not report on every claim. The list of claims is built in the reference kernel: `evaluate` and `advance` return it. Naming the loader and the parser waits for the loader.
 - Chapter: Trust
 
 #### A policy is a claim over what a result rests on

@@ -71,7 +71,8 @@ test("the kernel is passive and states its interface", () => {
   const k = createKernel();
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
-  assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
+  // The record of claims was added on 2026-11-18 (cluster 13 of the second review): with nothing to do, there are none.
+  assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] });
   assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "slice", "spelling", "symbol", "then", "undecided"]);
 });
 
@@ -1549,4 +1550,64 @@ test("a structure's keys, a value's kind, and a symbol's spelling can be read", 
   assert.equal(run("symbol", text("")).refuted, true);
   assert.equal(run("symbol", k.structure([])).refuted, true);
   assert.equal(run("spelling", byte(k, 1)).refuted, true);
+});
+
+// ---- The claims of a call (the second review's cluster 13) -------------------
+
+test("a call lists its claims: one record for each claim as written, however often it was evaluated", () => {
+  const { k, isZero, call, kp } = setup();
+  const n = k.param("n");
+  const scope = k.scope();
+  const written = call(kp("claim"), call(isZero, n));
+  const f = k.composedFunction([n], call(kp("then"), written, n));
+  const three = k.evaluate(call(kp("then"), call(f, byte(k, 0)), call(kp("then"), call(f, byte(k, 0)), call(f, byte(k, 0)))), scope);
+  assert.equal(three.claims.length, 1, "one written claim, one record");
+  const [record] = three.claims;
+  assert.equal(record.claim, written, "the claim as written, by the handle the host made");
+  assert.deepEqual([record.decided, record.assumed, record.undecided, record.refuted, record.waiting], [3, 0, 0, 0, 0]);
+  assert.ok(record.restsOn.some((r) => r.kind === "primitive"), "what the outcomes rest on");
+  assert.equal(record.module, undefined, "no module wrote it");
+  // A refuted evaluation is counted, with its reason. The counts are of this call alone.
+  const bad = k.evaluate(call(f, byte(k, 3)), scope);
+  assert.deepEqual([bad.claims[0].decided, bad.claims[0].refuted], [0, 1]);
+  assert.deepEqual(bad.claims[0].reasons, ["a claim that is not true"]);
+  // A call that evaluates no claim lists none.
+  assert.deepEqual(k.evaluate(call(isZero, byte(k, 0)), scope).claims, []);
+});
+
+test("a claim that waits is listed as waiting, and the advance that takes it up says how it came out", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const [c, d] = [k.cell(), k.cell()];
+  const [first, second] = [call(kp("claim"), call(isZero, c)), call(kp("claim"), call(isZero, d))];
+  const r = k.evaluate(k.structure([[null, first], [null, second]]), scope);
+  assert.deepEqual(r.claims, [], "a structure does not need its entries: no claim was evaluated");
+  const one = k.evaluate(first, scope);
+  const two = k.evaluate(second, scope);
+  assert.deepEqual([one.claims[0].decided, one.claims[0].waiting], [0, 1]);
+  assert.equal(two.claims[0].claim, second);
+  k.fill(c, byte(k, 0));
+  const advanced = k.advance();
+  const of = (claim: Value) => advanced.claims.find((x) => x.claim === claim);
+  assert.deepEqual([of(first)?.decided, of(first)?.waiting], [1, 0], "taken up and decided: it waits no longer");
+  assert.equal(of(second)?.waiting ?? 1, 1, "the other still waits");
+  k.fill(d, byte(k, 7));
+  const last = k.advance();
+  assert.deepEqual([last.claims.find((x) => x.claim === second)?.refuted, last.claims.find((x) => x.claim === second)?.waiting], [1, 0]);
+});
+
+test("a claim's record tells the weaker outcomes apart and names the module that wrote the claim", () => {
+  const { k, isZero, call, kp } = setup();
+  const reason = (t: string) => k.bits(new TextEncoder().encode(t));
+  const key = k.param("key");
+  const cannotTell = call(kp("claim"), call(kp("undecided"), reason("no rule applies")));
+  const assumed = call(kp("claim"), call(kp("assume"), call(isZero, byte(k, 3))));
+  const m = k.module(k.composedFunction([key], call(kp("then"), cannotTell, assumed)), 1);
+  const r = k.evaluate(call(m), k.scope());
+  assert.equal(r.claims.length, 2);
+  const [u, a] = [r.claims.find((x) => x.undecided === 1), r.claims.find((x) => x.assumed === 1)];
+  assert.deepEqual(u?.reasons, ["no rule applies"]);
+  assert.ok(a?.restsOn.some((x) => x.kind === "assumption"), "an assumed claim names who assumed");
+  assert.equal(u?.module, k.moduleOf(m), "the module whose code wrote the claim");
+  assert.equal(a?.module, k.moduleOf(m));
 });

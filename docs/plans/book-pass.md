@@ -1600,6 +1600,8 @@ its approval.
 - **2026-11-18 — the second review's cluster 10 ruled; the block form
   of a description built** (the review session): phases are rerun and
   no residual is saved until export is designed. 248 decisions.
+- **2026-11-18 — the second review's cluster 13 ruled; the list of a
+  result's claims built** (the review session).
 
 ## 8. Sessions
 
