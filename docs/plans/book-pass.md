@@ -1595,6 +1595,8 @@ its approval.
 - **2026-11-18 — the second review's cluster 7 ruled and built** (the
   review session): a limit is information; a step is bounded work.
   The seven clusters put first are ruled; seven remain.
+- **2026-11-18 — the second review's cluster 11 ruled and built** (the
+  review session): five primitives for building and reading data.
 
 ## 8. Sessions
 

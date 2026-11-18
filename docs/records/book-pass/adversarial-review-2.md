@@ -475,6 +475,25 @@ Seven remain: the order of effects and a kernel that knows no phase
 (10), building data in Allegretto (11), notation (12), what is trusted
 and what the interface gives away (13), and wording (14).
 
+### Cluster 11: building data (2026-11-18)
+
+Ruled ("I agree with all five primitives and both recommendations"):
+
+- `put(structure, key, value)`: a new structure with the entry added
+  at its end, or in place of the entry already under that key. The
+  key is a symbol, a key, or the empty structure for none. The value
+  is not evaluated. Private entries are carried across.
+- `key(structure, place)`: a symbol, or the empty structure.
+- `kind(value)`: bits, symbol, structure, function or key, as a plain
+  symbol. A composed function and a primitive one are both functions.
+- `symbol(text)` and `spelling(symbol)`.
+- The brackets of a structure literal take any expression.
+
+Left out until needed: removing an entry, listing all keys at once,
+and building a structure from a list in one step.
+
+Built in the reference kernel.
+
 ## Terms introduced
 
 No terms introduced.

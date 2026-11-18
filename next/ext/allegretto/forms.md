@@ -42,7 +42,7 @@ by its name in section 3.
 | `1.5` | bits: 64, IEEE 754 binary64 |
 | `true`, `false` | bits of length one: 1 and 0 |
 | `{a: e, b: f}` | a structure whose keys are the symbols `a` and `b` |
-| `{a: e, [k]: f}` | the same, with a private entry: `k` is a name a `key` header line declares, and the entry is keyed by that key |
+| `{a: e, [k]: f}` | the same, with an entry whose key is computed: `put({a: e}, k, f)`. `k` is any expression that gives a symbol or a key. Where it is a name a `key` header line declares, the entry is private |
 | `[e, f]` | a structure with no keys |
 | `` `name `` | the symbol `name`, as data |
 
@@ -73,7 +73,21 @@ The kernel's other primitives are reached as names Allegretto binds:
 `then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
 `assume(x)`, `undecided(reason)`, and those ruled and not yet
 built. A check the standard language writes as an annotation is written
-as a claim: `claim(is_int(x))`.
+as a claim: ``claim(kind(x) == `bits)``.
+
+Data whose shape the text does not fix is built and read with five more:
+
+| Name | Gives |
+|---|---|
+| `put(s, k, v)` | a new structure: `s` with the entry `v` under the key `k`, added at the end or in place of the entry already under `k`. `k` is a symbol, a key, or `[]` for an entry with no key. `v` is evaluated when the entry is read |
+| `key(s, i)` | the key of the entry of `s` at place `i`: a symbol, or `[]` where it has none |
+| `kind(x)` | what `x` is, as a symbol: `` `bits ``, `` `symbol ``, `` `structure ``, `` `function `` or `` `key `` |
+| `symbol(t)` | the symbol whose name is the text `t`, as data |
+| `spelling(s)` | the name of the symbol `s`, as text |
+
+`put` never changes `s`. A structure of a size the text does not fix is
+built by a recursion: `range(n) => if n == 0 then [] else put(range(n -
+1), [], n)`.
 
 ### Operators
 
@@ -234,8 +248,8 @@ output.write(int.text(count(box)))     // 1: the private entry is not counted
 output.write(int.text(hidden(box)))    // 42
 ```
 
-The brackets of a literal hold only the name of a key for now: the
-kernel does not evaluate an entry's key. A module may hand a key out by
+The brackets of a literal may hold any expression that gives a symbol or
+a key; a key's name is one case. A module may hand a key out by
 binding it and exporting the binding; the header name itself is not a
 binding, so a module with no exports hands out no key. In the data form
 the keys are the module function's first parameters, counted by `keys`,
@@ -291,3 +305,6 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    and `import` may stand anywhere at a module's top level. A module
    with top-level statements may be imported: they happen when it is
    first needed.
+8. **Building data** (2026-11-18). Five names: `put`, `key`, `kind`,
+   `symbol` and `spelling`. The brackets of a structure literal take
+   any expression. `kind`'s answers are plain symbols.
