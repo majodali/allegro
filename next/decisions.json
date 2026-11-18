@@ -74,7 +74,7 @@
     {"title":"The same program and the same information give the same result","part":"II","chapter":"Evaluation","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Scopes layer by parent chain","part":"II","chapter":"Evaluation","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Substitution of params into bodies","part":"II","chapter":"Evaluation","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
-    {"title":"Tail calls by sentinel and loop","part":"II","chapter":"Evaluation","type":"implementation","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"A loop written as a recursion runs in constant space","part":"II","chapter":"Evaluation","type":"implementation","present":"open","owner":"R","state":"none","unit":null,"cases":[],"was":["Tail calls by sentinel and loop"]},
     {"title":"An extension is made of functions and metadata fields","part":"II","chapter":"Extensions","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"The kernel's primitives are pure and few","part":"II","chapter":"Extensions","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"What the kernel requires of an extension","part":"II","chapter":"Extensions","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},

@@ -1602,6 +1602,9 @@ its approval.
   no residual is saved until export is designed. 248 decisions.
 - **2026-11-18 — the second review's cluster 13 ruled; the list of a
   result's claims built** (the review session).
+- **2026-11-18 — the second review's cluster 9 ruled; two rules of
+  evaluation built** (the review session): no induction in the
+  kernel; one title changed.
 
 ## 8. Sessions
 
