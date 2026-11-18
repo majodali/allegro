@@ -1341,6 +1341,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Determinism and confluence of evaluation", which was open. It holds only if every cell is filled exactly once.
 - Notes (2026-11-16, the adversarial review's remaining issues): the second sentence is added by the maintainer's ruling of 2026-11-16 on issue 20.
 - Notes (2026-11-16, the order of effects): the order in which late answers arrive is information: two chains of effects that wait on different answers act in the order of arrival unless an order is declared ("Effects on one capability keep their order").
+- Notes (2026-11-18, the second adversarial review, cluster 7): an attempt's answer "limit" counts as information, like the order in which late answers arrive: what rests on it says so and is not carried to another evaluation.
 - Chapter: Evaluation
 
 #### Scopes layer by parent chain
@@ -1493,7 +1494,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Correctness
 
 #### An evaluation can be returned as data
-- Decides: one kernel primitive evaluates a function under a step budget and returns how the evaluation ended, as data: a value, a refutation with its reason, or a limit reached. A refutation inside does not mark what is outside.
+- Decides: one kernel primitive evaluates a function under a step budget and returns how the evaluation ended, as data: a value, a refutation with its reason, or a limit reached. A refutation inside does not mark what is outside. The answer "limit" is information from outside the program, as a capability's answer is: a result that went on from it rests on a limit and says so, holds for this evaluation, and is never stored, restored or compared between kernels. Effects performed inside an evaluation that reaches its limit stay performed. The primitive is available to all code, so how many steps a call takes can be observed.
 - Status: open; ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -1503,6 +1504,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: no way to test for a refutation (the earlier wording; rejected: every checker of candidates written in the language needs a boundary at which a refutation becomes an outcome it can read)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling; answers issue 14 of the adversarial review. The budget is in steps, so the outcome is the same every time.
+- Notes (2026-11-18, the second adversarial review, cluster 7): extended by ruling. Where steps run out differs with sharing, with the order answers arrive and with the kernel, and a program could branch on the answer, so a claim could come out two ways. A reviewer also recovered secret bytes from a function that compared them one at a time, by counting steps. The maintainer kept the primitive generally available, as with describing: step counts are observable as time is in any language; the kernel's comparison of two values takes steps by their size and not by their content; a project may claim that a module does not use the primitive. Set aside: attempting as a right code must be handed, which a check phase, holding no capability, could not give to the searches and proposal loops that run there.
 - Chapter: Correctness
 
 #### A failure a program can handle is supplied by an extension
@@ -3402,7 +3404,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The kernel's interface
 
 #### Limits are step budgets
-- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant. Nothing else bounds an evaluation but memory: a recursion may be as deep as its budget allows.
+- Decides: a caller limits an evaluation by a budget of steps. A limit by the clock belongs to the launcher. An evaluation with a budget is also available to code inside the kernel, for evaluating what it does not trust. A limit leaves claims undecided, and never decides one differently: where the steps run out may vary with the order in which values arrive, with sharing and with the kernel variant. Nothing else bounds an evaluation but memory: a recursion may be as deep as its budget allows. A step is a bounded amount of work: the kernel charges its primitives on bits by the bits they handle, and a structure handed to a primitive function by its entries, so a budget bounds memory as well as time, up to a constant. A limit pauses an evaluation: the caller continues it with a new budget, and nothing done is done again. An evaluation made for a text nobody trusts yet, to read its notation or to try a proposal, runs under a budget the configuration sets.
 - Status: open (a depth bound exists); ruled 2026-11-13 (DR6); reworded 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -3415,6 +3417,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling.
 - Notes (2026-11-16, the adversarial review's remaining issues): reworded by the maintainer's ruling of 2026-11-16 on issue 20: the entry called a step budget deterministic.
 - Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 on the speed tests of milestone 3 (docs/plans/rebuild-acceptance.md §7, the entry on the speed tests): "no depth limit". The reference kernel ended a recursion of about 400 calls at the host's stack, at a depth that differed from run to run. That limit goes; how is the kernel stream's to choose.
+- Notes (2026-11-18, the second adversarial review, cluster 7): extended by ruling. Sixteen steps had taken 8.6 seconds and 8 MiB by joining a value to itself, and after a limit an evaluation could not go on: evaluating again repeated its effects. Charging by size is built. Pausing is not: the reference kernel loses its place when it stops, and the interface says an evaluation ended by a limit cannot be continued. It comes when the evaluator stops using the host's stack, which the ruling of 2026-11-17 on the depth of recursion already asks for.
 - Chapter: The kernel's interface
 
 ### Configuration
@@ -3702,6 +3705,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: fully rechecking on load "will likely be opt-in"; restore is allowed inside the kernel and is configurable, which "means mostly we need to always analyze for vulnerabilities".
 - Notes (2026-11-15, the rulings on strength and on identity): determinism justifies restoring only where it holds, so an outcome that rested on a capability's answer is never stored (issue 10). A restored claim keeps the word its builder's kernel recorded. The kernel computes each outcome's key itself, from the claim's content, the content of the function it sits in and what it rests on (`Kernel2.claimKey`), and `restore` refuses a stored key that differs. The first build left this out; the maintainer asked for it on PR #215.
 - Notes (2026-11-17, the second adversarial review, cluster 2): the last two sentences are added by ruling. A stored outcome for a claim over an input was restored for every value of the input: a claim was reported decided for a value that refutes it, and the value reached an effect. The kernel's own test restored such a claim.
+- Notes (2026-11-18, the second adversarial review, cluster 7): an outcome that rests on a limit is never stored, as one that rests on a capability's answer is not.
 - Chapter: Saved programs and export
 
 #### A target platform is a model, and export is a transformation into it
@@ -3845,6 +3849,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a fast kernel runs in production; a nightly job decides a sample of its results again on the reference.
 - Notes: new, by ruling.
+- Notes (2026-11-18, the second adversarial review, cluster 7): agreement with the reference is not asked of a result that rests on a limit.
 - Chapter: Trust
 
 #### A primitive's purity is assumed and named unless something stronger is shown

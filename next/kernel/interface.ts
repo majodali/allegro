@@ -128,7 +128,15 @@ export type PrimitiveDeclaration =
       readonly run: (args: readonly Value[], context: PrimitiveContext) => Value;
     };
 
-/** A limit on one evaluation. A budget of steps is deterministic; a limit by the clock is the launcher's business. */
+/**
+ * A limit on one evaluation: a budget of steps. A step is a bounded amount
+ * of work: the kernel charges its primitives on bits by the bits they
+ * handle, and a structure handed to a primitive function by its entries,
+ * so a budget bounds memory as well as time, up to a constant. A limit by
+ * the clock is the launcher's business. An evaluation that ends at its
+ * limit cannot be continued by this kernel: evaluating the expression
+ * again starts again, and performs again any effect already performed.
+ */
 export interface Limits {
   /** The evaluation ends, with everything unfinished undecided, after this many steps. */
   readonly steps?: number;
@@ -170,7 +178,15 @@ export type Rest =
    * the kernel from the mark on that code. Empty where the code that
    * assumed belongs to no module.
    */
-  | { readonly kind: "assumption"; readonly by: string };
+  | { readonly kind: "assumption"; readonly by: string }
+  /**
+   * A limit: an attempt inside the evaluation ran out of steps, and the
+   * program went on from that answer. Where steps run out may differ
+   * between kernels and with the order answers arrive, so a result that
+   * rests on a limit holds for this evaluation only: it is never stored
+   * or restored, and is not compared between kernels.
+   */
+  | { readonly kind: "limit" };
 
 /** What one call of `evaluate` returns: how things stood when it returned. */
 export interface Result {

@@ -579,6 +579,14 @@ name.
   arguments; a proposal holds no capability; an open module hands out
   its bindings and never its keys or capabilities. Of the review's 31
   issues, three remain, two of them to be settled by building.
+- **2026-11-18 — Attempts and limits (the second review's cluster
+  7).** In `next/kernel/kernel.ts`: what goes on from an attempt's
+  "limit" rests on a limit, and such an outcome is not restored; a
+  step is a bounded amount of work, with joining, slicing and
+  comparing bits charged by size and done a byte at a time, and a
+  structure handed to a primitive function charged by its entries;
+  the host's stack running out inside an attempt is the attempt's
+  limit. Pausing at a limit waits for the evaluator's rewrite.
 - **2026-11-18 — The weaker outcomes of a claim (the second review's
   cluster 5).** In `next/kernel/kernel.ts`: `assume(x)` records
   "assumed" without evaluating, and names the module whose code
