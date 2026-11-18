@@ -108,6 +108,17 @@
 //   "get"       get(structure, key). The entry keyed by a symbol, or at a
 //               place counted from 0, or keyed by a key. The entry may
 //               itself still wait.
+//   "put"       put(structure, key, value). A new structure: the old one with
+//               the entry added at its end, or in place of the entry
+//               already under that key. The key is a symbol, one of the
+//               module's keys for a private entry, or the empty structure
+//               for an entry with no key. The value is not evaluated.
+//   "key"       key(structure, place). The key of the entry there: a
+//               symbol, or the empty structure where it has none.
+//   "kind"      kind(value). What a value is, as a symbol: bits, symbol,
+//               structure, function or key.
+//   "symbol"    symbol(text). The symbol of that name, as data.
+//   "spelling"  spelling(symbol). The symbol's name, as text.
 //   "refuse"    refuse(reason). A refutation with that reason, a text. It is
 //               how code says why it will not go on, and what a withheld
 //               capability is: a refusal that happens when it is used.
@@ -270,7 +281,8 @@ interface Root {
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
   ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
-  ["join", 2], ["length", 1], ["refuse", 1], ["same", 2], ["slice", 3], ["then", 2], ["undecided", 1],
+  ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["slice", 3], ["spelling", 1],
+  ["symbol", 1], ["then", 2], ["undecided", 1],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */
 const INSPECT = "kernel:inspect";
@@ -698,6 +710,26 @@ export const createKernel: CreateKernel2 = () => {
         }
         return evaluate(v.args[1], inner);
       }
+      if (fn.name === "put") {
+        // A new structure: the old one with this entry added at its end, or put in place of the
+        // entry already under that key. The value is not evaluated: an entry is evaluated when read.
+        const [target, k] = [evaluate(v.args[0], scope), evaluate(v.args[1], scope)];
+        if (target instanceof Refuted) return target;
+        if (k instanceof Refuted) return k;
+        const s = seen(target);
+        if (!(s instanceof Struct)) return known(target) ? new Refuted("only a structure can be given an entry", target) : new Expr(fn, [target, k, later(v.args[2], scope)]);
+        if (!known(k)) return new Expr(fn, [target, k, later(v.args[2], scope)]);
+        const key = seen(k);
+        const none = key instanceof Struct && key.entries.length === 0;
+        if (!none && !(key instanceof Sym) && !(key instanceof Key)) return new Refuted("an entry's key is a symbol, a key, or the empty structure for none", k);
+        charge(s.entries.length);
+        const value = later(v.args[2], scope);
+        const at = none ? -1 : s.entries.findIndex(([x]) => x !== null && seen(x) === key);
+        const entries = at < 0 ? [...s.entries, [none ? null : (key as V), value] as const] : s.entries.map((e, i) => (i === at ? ([e[0], value] as const) : e));
+        const made = new Struct(entries);
+        built.add(made);
+        return made;
+      }
       if (fn.name === "then") {
         // The first is needed, and only then the second. While the first waits, the second
         // is evaluated ahead with no effect performed, so a refutation in it is found now.
@@ -841,6 +873,34 @@ export const createKernel: CreateKernel2 = () => {
         if (!known(args[0])) return waits();
         const reason = seen(args[0]);
         return reason instanceof Bits && reason.bitLength % 8 === 0 ? new Refuted(textOf(reason), undefined) : new Refuted("a refusal's reason is a text", args[0]);
+      }
+      if (fn.name === "key") {
+        const s = seen(args[0]);
+        if (!(s instanceof Struct)) return known(args[0]) ? new Refuted("only a structure has entries with keys", args[0]) : waits();
+        if (!known(args[1])) return waits();
+        const place = countOf(args[1]);
+        if (place === undefined) return new Refuted("a place is a whole number, as bits", args[1]);
+        const open = s.entries.filter(([k]) => !hidden(k));
+        if (place >= open.length) return new Refuted(`place ${place} is outside a structure of ${open.length} entr${open.length === 1 ? "y" : "ies"}`, undefined);
+        const k = open[place][0];
+        return k === null ? list([]) : new Quoted(seen(k) as Sym);
+      }
+      if (fn.name === "kind") {
+        if (!known(args[0])) return waits();
+        const x = seen(args[0]);
+        const name = x instanceof Bits ? "bits" : x instanceof Sym ? "symbol" : x instanceof Struct ? "structure" : x instanceof Key ? "key" : x instanceof Fn || x instanceof Prim || x instanceof KernelPrim ? "function" : undefined;
+        return name === undefined ? new Refuted("a value of no kind a program can hold", args[0]) : new Quoted(intern(name));
+      }
+      if (fn.name === "symbol") {
+        if (!known(args[0])) return waits();
+        const t = seen(args[0]);
+        if (!(t instanceof Bits) || !whole(t) || t.bitLength === 0) return new Refuted("a symbol is made from a text that is not empty", args[0]);
+        return new Quoted(intern(textOf(t)));
+      }
+      if (fn.name === "spelling") {
+        if (!known(args[0])) return waits();
+        const x = seen(args[0]);
+        return x instanceof Sym ? text(x.fqn) : new Refuted("only a symbol has a spelling", args[0]);
       }
       if (fn.name === "count") {
         const s = seen(args[0]);

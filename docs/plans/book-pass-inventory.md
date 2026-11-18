@@ -700,6 +700,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/decisions.md D22, D13; docs/book/concepts.md IC-3a; docs/book/allegretto/structures.md §2 "Immutability", "There is no immutable bit"; docs/plans/metadata-on-values.md §3.4
 - Book home (fragments' proposal): allegretto/structures.md
 - Notes: the in-place rule is stated, not enforced (B-143). The cross-module form, the owner-module invariant of B-158 (a library's values are immutable after load), belongs to the modules fragment. D22's own text still names the bit.
+- Notes (2026-11-18, the second adversarial review, cluster 11): in the rebuilt kernel a structure is derived by the primitive that gives it one more entry or another value under a key; the structure it was given is as it was, and its private entries are carried to the new one.
 - Chapter: Values
 
 #### Arrays are structures with unkeyed entries
@@ -730,6 +731,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-4, T0 §4; docs/decisions.md D20, D29, C5.2-R4, C5.2-R5; docs/book/allegretto/structures.md §5
 - Book home (fragments' proposal): symbols chapter (proposed, within the kinds chapter)
 - Notes: the qualification syntax `x[ns.name]` is deferred (C5.2-R4); ambiguity is a detected error.
+- Notes (2026-11-18, the second adversarial review, cluster 11): a program makes the symbol of a name from a text, and reads a symbol's name as text. A symbol made so is the same as one written with that name.
 - Chapter: Values
 
 #### Value as a contract, seven kind units and an assembly
@@ -1409,7 +1411,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Extensions
 
 #### The kernel's primitives are pure and few
-- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability. A condition is one of the kernel's two truth values: the conditional refutes anything else, a number that is not zero included.
+- Decides: the kernel's primitives cover eleven things: telling bits apart, joining two, measuring one and taking a part of one; making and reading structures, an entry at a time, with their keys and the kind of a value; one conditional; one sequence; one block of bindings; describing a function and building one from a description; specializing a function with its parameters unknown; evaluating a claim; evaluating a function and returning the result as data, under a budget; registering, reading and writing metadata fields; and asking about keys. None performs an effect. An effect is always a capability. A condition is one of the kernel's two truth values: the conditional refutes anything else, a number that is not zero included.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1434,6 +1436,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-17, the second adversarial review, cluster 3): reading a structure takes a key as well as a symbol or a place, and a place or a count passes over an entry keyed by a key ("A private member is one whose key not all code holds").
 - Notes (2026-11-18, the second adversarial review, cluster 6): a refusal is added to the claim primitives: `refuse(reason)` is a refutation with that reason. It is what a withheld capability is, and how code says why it will not go on.
 - Notes (2026-11-18, the second adversarial review, cluster 5): the claim primitives are four: evaluating a claim, assuming one, answering that one cannot be told, and refusing with a reason. Sampling is to come.
+- Notes (2026-11-18, the second adversarial review, cluster 11): making and reading structures gains what a program needs to build and walk data whose shape its text does not fix: giving a structure one more entry, or another value under a key it has; reading the key of an entry; telling what kind of value something is; and, for symbols, making one from a text and reading its name. A parser's output is a description, whose applications and structures have as many parts as the text gives, and no primitive could build one. Left out until needed: removing an entry, and building a structure from a list in one step. A structure built an entry at a time copies what it keeps each time, so n entries cost on the order of n squared.
 - Chapter: Extensions
 
 #### What the kernel requires of an extension
@@ -1882,6 +1885,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, Allegretto's forms): the forms are ruled, in `next/ext/allegretto/forms.md`: an operator stands for exactly one primitive function; a block is bindings, order-free and recursive, and statements in written order; `x <- e` binds a statement's value at its place; a module's header declares each capability, input and import. The present tree's parser engine reads it first, with the base grammar less the standard language's productions.
 - Notes (2026-11-17, a form for keys): by ruling Allegretto has forms for a module's keys, so that every kernel primitive that exists has a form or a name in it: a header line `key name`, and a private entry `[name]: e` in a structure literal. Reading is `p[name]`, the form for `get`.
 - Notes (2026-11-18, the second adversarial review, cluster 6): `capability`, `input`, `key` and `import` may stand anywhere at a module's top level, in any order; only `use` has a place, since a grammar change acts from where it is written. The maintainer: "I was never that sold on having a strict header section." A reader no longer sees all a module is handed in its first lines; a tool lists it, and a language built on Allegretto may require declarations first.
+- Notes (2026-11-18, the second adversarial review, cluster 11): five names for building and reading data are added, and the brackets of a structure literal take any expression that gives a symbol or a key.
 - Chapter: Modules and programs
 
 #### The parser engine and the module loader are written in Allegretto
@@ -2292,6 +2296,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the rulings on strength and on identity): the key is now made as "A key is made with the module that holds it" says. "Cannot be written out and read back into existence" is replaced: a record holds slots, and loading derives the keys again from the module's content (issue 12).
 - Notes (2026-11-17, the second adversarial review, cluster 3): reworded by ruling: the entry said who may reach a private member and not where it is stored. A structure is the only composite, and every entry was reachable by place, counted, and handed to every primitive function. Set aside: private data kept inside a function that checks the key, which needs a primitive to compare keys and makes every member a call. Three consequences. Equality from outside ignores private members, since the standard language's equality runs without the key; the type's module can define its own with the key. A copy made entry by entry from outside would drop private members, so a primitive that builds a structure from another, when one is added, carries them across. The host's `entriesOf` shows every entry: the host is trusted, and which host code holds what is settled with the interface (cluster 13 of the same review).
 - Notes (2026-11-17, a form for keys): Allegretto writes one as `{ shown: n, [secret]: e }` under a header line `key secret`, and reads it as `p[secret]` (`next/ext/allegretto/forms.md`). A module may hand a key out by exporting a binding of it; that is how access for chosen other code can be built.
+- Notes (2026-11-18, the second adversarial review, cluster 11): a private entry is also made by giving a structure an entry under a key, and code without the key that adds to such a structure keeps what it cannot see.
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written

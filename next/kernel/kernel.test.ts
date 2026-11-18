@@ -72,7 +72,7 @@ test("the kernel is passive and states its interface", () => {
   assert.equal(k.interfaceVersion, 1);
   assert.deepEqual(k.waiting(), []);
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "length", "refuse", "same", "slice", "then", "undecided"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "slice", "spelling", "symbol", "then", "undecided"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -1457,4 +1457,96 @@ test("the kernel's own limit inside an attempt is the attempt's limit, not the e
   const r = k.evaluate(call(kp("attempt"), within(k, [[deep, deepFn]], call(deep, byte(k, 1))), steps(k, 50_000_000)), k.scope());
   assert.equal(r.ended, "complete", "the attempt answers; the evaluation goes on");
   assert.equal(form(k, r.value).form, "limit");
+});
+
+test("a structure is built an entry at a time: put adds or replaces, and never changes what it was given", () => {
+  const { k, add, dec, isZero, call, kp } = setup();
+  const said: number[] = [];
+  const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  const scope = k.scope();
+  const run = (name: string, ...args: Value[]) => k.evaluate(call(kp(name), ...args), scope);
+  const big = (v: Value) => k.bitsOf(v).bytes.reduce((n, b) => n * 256 + b, 0);
+  const none = k.structure([]);
+  const [a, b] = [k.symbolData("a"), k.symbolData("b")];
+  const base = k.evaluate(k.structure([[k.symbol("a"), byte(k, 1)]]), scope).value;
+  // An entry with no key goes at the end; one with a new key too; one with a key already there takes its place.
+  const two = run("put", base, none, byte(k, 2)).value;
+  const three = run("put", two, b, byte(k, 3)).value;
+  const replaced = run("put", three, a, byte(k, 9)).value;
+  assert.equal(big(run("count", base).value), 1, "what was given is as it was");
+  assert.equal(big(run("count", three).value), 3);
+  assert.equal(big(run("count", replaced).value), 3);
+  assert.deepEqual([0, 1, 2].map((i) => num(k, run("get", replaced, byte(k, i)).value)), [9, 2, 3]);
+  assert.equal(num(k, run("get", three, a).value), 1);
+  assert.equal(num(k, run("get", replaced, b).value), 3);
+  // The value is not evaluated by put: it is evaluated when the entry is read, once.
+  const lazy = run("put", none, none, call(say, byte(k, 7))).value;
+  assert.deepEqual(said, []);
+  run("get", lazy, byte(k, 0));
+  run("get", lazy, byte(k, 0));
+  assert.deepEqual(said, [7]);
+  // A structure of a size the text does not fix: range(n) = if n == 0 then [] else put(range(n - 1), [], n).
+  const [range, n] = [k.symbol("t.range"), k.param("n")];
+  const rangeFn = k.composedFunction([n], call(kp("if"), call(isZero, n), none, call(kp("put"), call(range, call(dec, n)), none, n)));
+  const five = k.evaluate(within(k, [[range, rangeFn]], call(range, byte(k, 5))), scope).value;
+  assert.deepEqual(k.entriesOf(whole(k, five).value).map(([, v]) => num(k, v)), [1, 2, 3, 4, 5]);
+  // Refusals.
+  assert.equal(run("put", byte(k, 1), none, byte(k, 2)).refuted, true, "only a structure");
+  assert.equal(run("put", none, byte(k, 1), byte(k, 2)).refuted, true, "a key is a symbol, a key or none");
+  void add;
+});
+
+test("put with a key makes a private entry, and carries the private entries of what it was given", () => {
+  const { k, call, kp } = setup();
+  const scope = k.scope();
+  // module(key) => [ put(put({}, key, 42), `shown, 1),  o => get(o, key) ]
+  const [key, o] = [k.param("key"), k.param("o")];
+  const made = call(kp("put"), call(kp("put"), k.structure([]), key, byte(k, 42)), k.symbolData("shown"), byte(k, 1));
+  const m = k.module(k.composedFunction([key], k.structure([[null, made], [null, k.composedFunction([o], call(kp("get"), o, key))]])), 1, []);
+  const [obj, read] = k.entriesOf(k.evaluate(call(m), scope).value).map(([, v]) => k.evaluate(v, scope).value);
+  const big = (v: Value) => k.bitsOf(v).bytes.reduce((n, b) => n * 256 + b, 0);
+  assert.equal(big(k.evaluate(call(kp("count"), obj), scope).value), 1, "the private entry is not counted");
+  assert.equal(k.symbolName(k.evaluate(call(kp("key"), obj, byte(k, 0)), scope).value), "shown", "and has no place");
+  // Code without the key adds an entry: the private one is carried across.
+  const more = k.evaluate(call(kp("put"), obj, k.structure([]), byte(k, 5)), scope).value;
+  assert.equal(big(k.evaluate(call(kp("count"), more), scope).value), 2);
+  assert.equal(num(k, k.evaluate(call(read, more), scope).value), 42);
+});
+
+test("a structure's keys, a value's kind, and a symbol's spelling can be read", () => {
+  const { k, add, call, kp } = setup();
+  const scope = k.scope();
+  const run = (name: string, ...args: Value[]) => k.evaluate(call(kp(name), ...args), scope);
+  const text = (t: string) => k.bits(new TextEncoder().encode(t));
+  const s = k.evaluate(k.structure([[k.symbol("first"), byte(k, 1)], [null, byte(k, 2)]]), scope).value;
+  // key: a symbol, or the empty structure for an entry with none.
+  assert.equal(k.symbolName(run("key", s, byte(k, 0)).value), "first");
+  const unkeyed = run("key", s, byte(k, 1)).value;
+  assert.equal(k.kind(unkeyed), "structure");
+  assert.equal(k.entriesOf(unkeyed).length, 0);
+  assert.equal(run("key", s, byte(k, 2)).refuted, true, "no such place");
+  // kind: what a value is.
+  const kindOf = (v: Value) => k.symbolName(run("kind", v).value);
+  assert.equal(kindOf(byte(k, 1)), "bits");
+  assert.equal(kindOf(k.symbolData("x")), "symbol");
+  assert.equal(kindOf(s), "structure");
+  assert.equal(kindOf(add), "function");
+  assert.equal(kindOf(k.composedFunction([], byte(k, 1))), "function", "a composed function and a primitive one are not told apart");
+  assert.equal(kindOf(kp("if")), "function");
+  assert.equal(kindOf(k.inspectionRight()), "key");
+  // The key of an unkeyed entry is told from a symbol by its kind.
+  assert.equal(kindOf(unkeyed), "structure");
+  assert.equal(kindOf(run("key", s, byte(k, 0)).value), "symbol");
+  // A value that has not arrived has no kind yet.
+  const c = k.cell();
+  assert.equal(k.kind(k.evaluate(call(kp("kind"), c), scope).value), "expression");
+  // symbol and spelling.
+  const made = run("symbol", text("total")).value;
+  assert.equal(k.symbolName(made), "total");
+  assert.deepEqual(k.bitsOf(run("same", made, k.symbolData("total")).value), k.bitsOf(truth(k, true)), "the symbol of that name, the same as one written");
+  assert.equal(new TextDecoder().decode(k.bitsOf(run("spelling", made).value).bytes), "total");
+  assert.equal(num(k, run("get", k.structure([[k.symbol("total"), byte(k, 8)]]), call(kp("symbol"), text("total"))).value), 8, "a computed symbol reads an entry");
+  assert.equal(run("symbol", text("")).refuted, true);
+  assert.equal(run("symbol", k.structure([])).refuted, true);
+  assert.equal(run("spelling", byte(k, 1)).refuted, true);
 });
