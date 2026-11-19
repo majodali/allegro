@@ -1187,7 +1187,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### Sequence is one kernel primitive
-- Decides: the kernel primitive `then(first, second)` needs its first argument, and then its value is the second. It is the one way a text says that one thing is over before another starts. A body of statements is not a chain of it: its statements do not wait for each other. A notation offers a form whose statements are a chain of `then`; Allegretto writes it `sync`. While the first waits, the second is evaluated ahead with no effect performed, so a refutation in it is found at once.
+- Decides: the kernel primitive `then(first, second)` needs its first argument to be over, and then its value is the second. Over means that the first's value is known and that nothing which evaluating it started still goes on: a caller who writes `then` cannot see what a function it calls left going. A refutation in that work refutes the `then`. It is the one way a text says that one thing is over before another starts. A body of statements is not a chain of it: its statements do not wait for each other. A notation offers a form whose statements are a chain of `then`; Allegretto writes it `sync`. While the first waits, the second is evaluated ahead with no effect performed, so a refutation in it is found at once.
 - Status: partly built (the reference kernel); ruled 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -1198,6 +1198,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. A function has one body expression, so "a body needs its statements in written order" had nothing to stand on; the acceptance stream's first-notation proposal met the gap and wrote statements as a structure's entries.
 - Notes (2026-11-19, the second adversarial review, cluster 8): the second and third sentences are changed by ruling. A body of statements was a chain of `then`, so the text ordered every effect; the maintainer ruled that nothing is ordered unless need or `then` orders it ("A statement does not wait for the one before it"), and that a block in sequence is offered as an option.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): "to be over" is added by ruling. A function may give its value and leave work going ("A statement does not wait for the one before it"), and `then` waited for the value only, so `then(save_all(docs), exit())` could exit with a write still going, and a cleanup written after a body could run before the body's work was over. The maintainer asked: "Should `then(a, b)` wait for `a` to finish all async effects before calling `b`?" Ruled: yes. A caller who writes `also`, or nothing, does not wait, so a handler still gives its reply and goes on to close its socket. Built in the reference kernel.
 - Chapter: Evaluation
 
 #### A statement does not wait for the one before it
@@ -1213,6 +1214,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: `price(fetch(a)) + price(fetch(b))` has both requests in flight; a handler gives its reply and then checks whether to close its socket.
 - Notes: new, by ruling. The maintainer on what unordered means: "lack of explicit effect order doesn't mean indeterminacy. Two executions with the same information and inputs will still result in the same output including order of effects." On a block's value: "There may be some value in a function returning its value and allowing its calling expression to continue evaluation, while kicking off some asynchronous cleanup. An example might be an websocket request that returns a response and then checks if it should close the socket." On a claim: "refuted claims should block all effects written later in the same block". This reverses what the reference kernel did since 2026-11-16, when an argument or an entry that waited held back the effects of those after it.
 - Notes (2026-11-19, the second adversarial review, cluster 8): the last two sentences are added the same day, by the ruling on failures. The maintainer weighed a check that holds nothing against a claim that holds like any other, "if the claim is cleared at runtime then the two statements run at once, if not, then the `also` behaves like a `then`", and the second was ruled. It needs nothing of the kernel: the claim is an ordinary one.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): what a block leaves going is waited for by a `then` around it, and by nothing else ("Sequence is one kernel primitive").
 - Chapter: Evaluation
 
 #### A block of bindings is one kernel primitive
@@ -2925,7 +2927,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: When a check fails
 
 #### An assumption is always on the record
-- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired.
+- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired. What rests on an assumption names the module whose code made it and the assumption itself, as written, so everything that rests on one assumption can be listed. A configuration may withdraw an assumption, one by one or every one a module makes: a withdrawn assumption is not taken on trust but evaluated as a claim, and comes out decided, refuted or undecided. Nothing assumes a claim false: the kernel derives nothing from an assumption, so there would be nothing to see; whoever doubts a claim withdraws it, or supplies a value that makes it false.
 - Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
@@ -2938,6 +2940,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/contracts
 - Notes: `assume_invariant` is still registered (`src/primitives.ts:4566`).
 - Notes (2026-11-18, the second adversarial review, cluster 5): the kernel writes the record: who assumed is the module whose code asked, taken from the mark on that code, so an assumption cannot be made under another's name or under none.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): the last three sentences are added by ruling. The maintainer asked whether a claim could be assumed false, or another's assumption overridden: "a user may decide claim assumed by a module is unreliable or concerning and want to analyze a program with that claim assumed false, to see the effect." Ruled: no way to assume a claim false; the record names the assumption; a configuration withdraws one. Built in the reference kernel: what a result rests on carries the assumption as written, and `withdraw` takes an assumption or a module's identity. The launcher's configuration for it is not built.
 - Chapter: When a check fails
 
 #### Every failure carries a legible counterexample

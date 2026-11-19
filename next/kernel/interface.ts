@@ -176,9 +176,12 @@ export type Rest =
   /**
    * An assumption: the module whose code wrote it, by identity, taken by
    * the kernel from the mark on that code. Empty where the code that
-   * assumed belongs to no module.
+   * assumed belongs to no module. `at` is the assumption as written, the
+   * application of the kernel's `assume`, so that everything resting on
+   * one assumption can be listed and that assumption withdrawn. It is
+   * a handle of this kernel and is no part of a stored outcome.
    */
-  | { readonly kind: "assumption"; readonly by: string }
+  | { readonly kind: "assumption"; readonly by: string; readonly at?: Value }
   /**
    * A limit: an attempt inside the evaluation ran out of steps, and the
    * program went on from that answer. Where steps run out may differ
@@ -522,6 +525,17 @@ export interface Kernel2 extends Kernel {
    * only the functions of a module whose key it holds.
    */
   inspectionRight(): Value;
+  /**
+   * Withdraws an assumption: from then on it is not taken on trust. The
+   * kernel evaluates what was assumed as a claim, which comes out
+   * decided, refuted or undecided like any other and is listed among a
+   * result's claims. `what` is one assumption as written (the `at` of
+   * what a result rests on), or the identity of a module, for every
+   * assumption its code makes. A launcher calls this for what its
+   * configuration does not accept. It does not reach back: a result
+   * already given keeps the word it was given with.
+   */
+  withdraw(what: Value | string): void;
   /** True for a key: a structure carrying the kernel's mark. False for a structure with the same entries and no mark. */
   isKey(value: Value): boolean;
   /** Reads a key. An InterfaceError for a value that is not one. */

@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-19 — `then` waits for all of its first; an assumption is
+  named and can be withdrawn.** Three rulings after cluster 8. In
+  `next/kernel/kernel.ts`: `then` starts its second when its first's
+  value is known and nothing the first started still goes on; what
+  rests on an assumption names the assumption as written; `withdraw`
+  makes the kernel evaluate an assumption as a claim. Two discussions
+  are filed in the backlog: threads and budgets at run time, and
+  streams, large data and asynchronous iteration.
 - **2026-11-19 — What a refutation halts (the second review's cluster
   8, closed).** "Halts" has one meaning, in "A refuted value never
   reaches an effect"; seven entries reworded. In

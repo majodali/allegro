@@ -879,6 +879,32 @@ With this cluster 8 is ruled. Two remain: notation (12) and wording
 budgets at run time) and B-203 (streams, large data and asynchronous
 iteration).
 
+### Three questions after cluster 8 (2026-11-19)
+
+The maintainer asked three things before cluster 12.
+
+Whether a claim can be assumed false, or another's assumption
+overridden: "a user may decide claim assumed by a module is unreliable
+or concerning and want to analyze a program with that claim assumed
+false, to see the effect." The review session: the kernel derives
+nothing from an assumption, so assuming one false would show nothing.
+Ruled: no way to assume a claim false; what rests on an assumption
+names the assumption as written; a configuration may withdraw an
+assumption, which is then evaluated as a claim.
+
+Streams, large data and asynchronous iteration: a discussion of its
+own, filed as B-203 (streams, large data and asynchronous
+iteration) beside B-202 (threads and budgets at run time).
+
+"Should `then(a, b)` wait for `a` to finish all async effects before
+calling `b`?" Ruled: yes. `then` is the one word for "over", and a
+caller cannot see what a function it calls left going. A caller who
+does not write `then` does not wait. This replaces what PR #257 said
+of "finally": a cleanup written `then(attempt(body, n), cleanup)` now
+runs after everything the body started.
+
+Built in the reference kernel: all three.
+
 ## Terms introduced
 
 No terms introduced.

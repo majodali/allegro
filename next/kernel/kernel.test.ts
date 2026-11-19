@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
+import type { Kernel, Kernel2, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { createKernel, InterfaceError } from "./kernel.js";
 import { Refusal } from "./interface.js";
 import { load, type SavedProgram } from "./saved-program.js";
@@ -991,10 +991,12 @@ test("an assumption is recorded as assumed, with the module that made it, and is
   const scope = k.scope();
   // module(out) => then(assume(isZero(out(5))), out(1)): the assumed claim would write 5 and is false.
   const out = k.param("out");
-  const m = k.module(k.composedFunction([out], k.structure([[null, call(kp("assume"), call(isZero, call(out, byte(k, 5))))], [null, call(out, byte(k, 1))]])), 0, [{ role: "capability", name: "output" }]);
+  const written = call(kp("assume"), call(isZero, call(out, byte(k, 5))));
+  const m = k.module(k.composedFunction([out], k.structure([[null, written], [null, call(out, byte(k, 1))]])), 0, [{ role: "capability", name: "output" }]);
   const [assumed, after] = k.entriesOf(k.evaluate(call(m, say), scope).value).map(([, v]) => k.evaluate(v, scope).value);
   assert.equal(k.outcomeOf(assumed), "assumed");
-  assert.deepEqual(k.restsOn(assumed), [{ kind: "assumption", by: k.moduleOf(m) }], "the record names the module, from the mark on its code");
+  // Since the ruling of 2026-11-19 the record also names the assumption itself, as written.
+  assert.deepEqual(k.restsOn(assumed), [{ kind: "assumption", by: k.moduleOf(m), at: written }], "the record names the module, from the mark on its code, and the assumption as written");
   assert.deepEqual(said, [1], "what was assumed was not evaluated; what follows goes ahead");
   assert.equal(num(k, after), 1);
   // A claim that rests on an assumption is no stronger than assumed.
@@ -1002,7 +1004,8 @@ test("an assumption is recorded as assumed, with the module that made it, and is
   assert.equal(k.outcomeOf(resting.value), "assumed");
   assert.ok(k.restsOn(resting.value).some((r) => r.kind === "assumption"));
   // Code that belongs to no module assumes under no name.
-  assert.deepEqual(k.restsOn(k.evaluate(call(kp("assume"), byte(k, 0)), scope).value), [{ kind: "assumption", by: "" }]);
+  const bare = call(kp("assume"), byte(k, 0));
+  assert.deepEqual(k.restsOn(k.evaluate(bare, scope).value), [{ kind: "assumption", by: "", at: bare }]);
   // Nothing an assumption does makes a claim decided, and a claim that is simply true is still decided.
   assert.equal(k.outcomeOf(k.evaluate(call(kp("claim"), call(isZero, byte(k, 0))), scope).value), "decided");
 });
@@ -1979,4 +1982,113 @@ test("a call of advance that meets a refutation performs no further effect, and 
   assert.deepEqual(second.refuted, []);
   assert.deepEqual(said, [1, 3]);
   assert.deepEqual(k.waiting(), []);
+});
+
+// ---- Assumptions named and withdrawn; a sequence that waits for all (2026-11-19) ----
+
+test("what rests on an assumption names that assumption, and two of one module are told apart", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const [a1, a2] = [call(kp("assume"), call(isZero, byte(k, 0))), call(kp("assume"), call(isZero, byte(k, 3)))];
+  const [onFirst, onBoth] = [call(kp("claim"), a1), call(kp("claim"), call(kp("then"), a1, a2))];
+  const r = k.evaluate(k.structure([[null, onFirst], [null, onBoth]]), scope);
+  const [first, both] = k.entriesOf(r.value).map(([, v]) => k.evaluate(v, scope));
+  const at = (x: ReturnType<Kernel["evaluate"]>) => k.restsOn(x.value).filter((rest) => rest.kind === "assumption").map((rest) => (rest as { at?: Value }).at);
+  assert.deepEqual(at(first), [a1]);
+  assert.deepEqual(at(both), [a1, a2], "each assumption is named, though one module made both");
+  // The list of claims says the same, so a tool can list what rests on one assumption.
+  const resting = both.claims.find((c) => c.claim === onBoth);
+  assert.equal(resting?.assumed, 1);
+  assert.equal(resting?.restsOn.filter((rest) => rest.kind === "assumption").length, 2);
+});
+
+test("a withdrawn assumption is not taken on trust: it is evaluated as a claim", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const [holds, fails] = [call(kp("assume"), call(isZero, byte(k, 0))), call(kp("assume"), call(isZero, byte(k, 3)))];
+  assert.equal(k.outcomeOf(k.evaluate(fails, scope).value), "assumed", "taken on trust, though it is false");
+  (k as Kernel2).withdraw(holds);
+  (k as Kernel2).withdraw(fails);
+  const checked = k.evaluate(holds, scope);
+  assert.equal(k.outcomeOf(checked.value), "decided", "checked, and it holds");
+  assert.deepEqual(k.restsOn(checked.value).filter((rest) => rest.kind === "assumption"), []);
+  const wrong = k.evaluate(fails, scope);
+  assert.equal(wrong.refuted, true, "checked, and it does not hold");
+  assert.equal(wrong.claims[0].claim, fails, "it is listed among the claims, as written");
+  // An assumption that was not withdrawn is still an assumption.
+  assert.equal(k.outcomeOf(k.evaluate(call(kp("assume"), call(isZero, byte(k, 3))), scope).value), "assumed");
+  // By module: every assumption its code makes.
+  const key = k.param("key");
+  const m = (k as Kernel2).module(k.composedFunction([key], call(kp("assume"), call(isZero, byte(k, 3)))), 1);
+  assert.equal(k.outcomeOf(k.evaluate(call(m), scope).value), "assumed");
+  (k as Kernel2).withdraw((k as Kernel2).moduleOf(m) as string);
+  const other = (k as Kernel2).module(k.composedFunction([key], call(kp("assume"), call(isZero, byte(k, 4)))), 1);
+  (k as Kernel2).withdraw((k as Kernel2).moduleOf(other) as string);
+  assert.equal(k.evaluate(call(other), scope).refuted, true);
+  assert.throws(() => (k as Kernel2).withdraw(call(kp("claim"), byte(k, 1))), /assume primitive/);
+  assert.throws(() => (k as Kernel2).withdraw("M"), /identity/);
+});
+
+test("then waits for everything its first started, and also does not", () => {
+  const { k, add, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  // leaves(c) = also(say(c), 42): it gives 42 and leaves say(c) going.
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(say, c), byte(k, 42)));
+  // then(leaves(c1), say(2)): the 2 is said only when what leaves() started is over.
+  const c1 = k.cell();
+  const r = k.evaluate(call(kp("then"), call(leaves, c1), call(say, byte(k, 2))), scope);
+  assert.deepEqual(said, [], "the first has given its value, and is not over");
+  assert.equal(k.kind(r.value), "expression");
+  k.fill(c1, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2]);
+  assert.equal(num(k, k.current(r.value)), 2);
+  assert.deepEqual(k.waiting(), []);
+  // also(leaves(c2), say(4)): the caller did not ask to wait.
+  said.length = 0;
+  const c2 = k.cell();
+  k.evaluate(call(kp("also"), call(leaves, c2), call(say, byte(k, 4))), scope);
+  assert.deepEqual(said, [4]);
+  k.fill(c2, byte(k, 3));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [4, 3]);
+  // A value computed from the first is still only the first's value: the wait is the then's.
+  said.length = 0;
+  const c3 = k.cell();
+  assert.equal(num(k, k.evaluate(call(add, call(leaves, c3), byte(k, 1)), scope).value), 43);
+  k.fill(c3, byte(k, 0));
+  k.advance({ steps: 100 });
+});
+
+test("a refutation in what a then's first started refutes the then, and the second is not done", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const fails = k.primitiveFunction({ ...pure("fails", 62, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(fails, c), byte(k, 42)));
+  const c1 = k.cell();
+  const r = k.evaluate(call(kp("then"), call(leaves, c1), call(say, byte(k, 2))), scope);
+  assert.equal(r.refuted, false);
+  k.fill(c1, byte(k, 0));
+  const advanced = k.advance({ steps: 100 });
+  assert.equal(advanced.refuted.length, 1, "one refutation, reported once");
+  assert.deepEqual(said, [], "the second was not done");
+  assert.equal(k.outcomeOf(k.current(r.value)), "refuted");
+});
+
+test("a then inside a then: each waits for what its own first started", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(say, c), byte(k, 42)));
+  const [c1, c2] = [k.cell(), k.cell()];
+  // then(then(leaves(c1), leaves(c2)), say(9))
+  k.evaluate(call(kp("then"), call(kp("then"), call(leaves, c1), call(leaves, c2)), call(say, byte(k, 9))), scope);
+  k.fill(c1, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1], "the inner then goes on to its second, which leaves say(c2) going; the outer still waits");
+  k.fill(c2, byte(k, 2));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2, 9]);
 });

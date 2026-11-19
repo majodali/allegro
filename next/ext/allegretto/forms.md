@@ -149,6 +149,10 @@ statement wait:
 - it is written after a statement whose value is dropped and whose
   answer has not come (see "Failures" below);
 - the block is written `sync`, or the two are written `then(a, b)`.
+  `then` waits for more than a value: `b` is started when `a`'s value
+  is known and nothing that `a` started still goes on. So
+  `then(body(), files.close(f))` closes the file after everything the
+  body did, whatever functions it called.
 
 So what runs at once is a statement whose value is bound, as
 `a <- fetch(x)` followed by `b <- fetch(y)`, and the arguments of a
@@ -392,3 +396,6 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    whose first entry is keyed `failure`. `is_failure` and `handle` are
    Allegretto's functions for it, and no primitive. A statement whose
    value is dropped stands for a claim that the value is no failure.
+11. **`then` waits for all of its first** (2026-11-19). A function may
+   give its value and leave work going; a caller who writes `then` or
+   `sync` waits for that work too, and one who does not, does not.
