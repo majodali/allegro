@@ -905,6 +905,20 @@ runs after everything the body started.
 
 Built in the reference kernel: all three.
 
+### Cluster 12: the wording of Allegretto's forms (2026-11-19)
+
+Fixed in `next/ext/allegretto/forms.md`, with no ruling needed: the
+name `count` and the four primitives that have a form and no name; a
+row for `export`; where an indented block may stand; that `read` in
+the examples is no shipped operation; how emptiness and a number as a
+condition are written. The example `is_int` had gone with cluster 11.
+
+Put to the maintainer and not yet ruled: `x <- e` as a binding of its
+block's one group; "a notation only adds" as a claim that a check
+decides; the boundary at a statement that changes the grammar; the
+engine's table keyed by state; dotted names as structures, what
+`attempt` answers, and four primitives.
+
 ## Terms introduced
 
 No terms introduced.

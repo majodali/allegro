@@ -72,8 +72,10 @@ text chosen by type.
 
 The kernel's other primitives are reached as names Allegretto binds:
 `then`, `also`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
-`assume(x)`, `undecided(reason)`, and those ruled and not yet
-built. What `describe` gives is a program that means the same as the
+`assume(x)`, `undecided(reason)`, `count(s)` for the number of entries
+of a structure, and those ruled and not yet built. Four primitives have
+a form and no name: `get` is written `p.a` and `p[i]`, `same` is `==`,
+`if` is `if c then a else b`, and `block` is the indented block. What `describe` gives is a program that means the same as the
 function: where the function reads names of a block, or holds an
 argument used more than once and not yet evaluated, the description is
 a block around the function that binds them. A check the standard
@@ -118,7 +120,10 @@ operators: `float.add(a, b)`.
 
 `==` compares bits. `1 == 1.0` is false, and two structures are not
 compared: that is a refutation. Equality by type is the standard
-language's.
+language's. So whether a structure is empty is asked with
+`count(s) == 0`, never with `s == []`. A truth value is one bit and a
+number is 64, and nothing converts between them: `if n then a else b` on
+a number is a refutation, and the test is written `n != 0`.
 
 ### Bindings and blocks
 
@@ -126,6 +131,7 @@ language's.
 |---|---|
 | `x = e` | a binding of `x` in the enclosing block |
 | `f(x, y) => e` | the binding `f = (x, y) => e` |
+| `export x = e`, `export f(x, y) => e` | the same binding, marked as one the module yields (see "The module") |
 | `x <- e` | a statement: `e` is started here, and `x` is bound to its value for the rest of the block |
 | an indented block | a block of bindings around a chain of `also` |
 | `sync` and an indented block | the same block around a chain of `then`: each statement is over before the next is started |
@@ -134,6 +140,8 @@ A block's bindings are one group, whatever lines they are written on.
 Each may use any other, and itself. A binding's value is evaluated when
 something needs it, at most once. So a binding is never the place where
 an effect happens: `line = read()` reads when `line` is first needed.
+(`read` in these examples stands for an operation of a capability the
+text declares. No shipped capability has one of that name.)
 
 A block's statements are started in written order, and the block's value
 is its last statement's. A statement does not wait for the one before it
@@ -203,6 +211,9 @@ value and goes to the caller, a failure or not. A failure handed to a
 primitive function is outside its domain, which is a refutation, so
 nothing computes with one unseen. A name is bound once in a block; an inner block may
 bind it again.
+
+An indented block may stand where the value of a binding or the body of
+a function is written: after `=`, after `=>` and after `<-`.
 
 A block with bindings stands for the kernel's block of bindings (section
 4). A block with none is the chain of `also` alone.
