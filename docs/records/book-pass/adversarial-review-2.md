@@ -762,23 +762,90 @@ Ruled ("I agree on 1, 2 & 5"):
 
 Built: the first step of point 2, with point 1.
 
-Open with the maintainer:
+Point 3, whether `fill` takes up the waiters itself. The maintainer:
+a waiter that is a suspended evaluation "could include a reference to
+the step budget and timing counter(s) so an active `fill` would
+continue to use the current budget"; asynchronous work is mostly done
+at run time and budgets mostly at check time; the reasons for `fill`
+then `advance` look like batching and transactions, in which case "use
+of passive `fill` plus `advance` may be opt-in only". The review
+session found three more reasons, none needing the passive form by
+default: an answer must not be taken up in the middle of another
+computation; a host bounds one call's time at run time too; results
+need one place to land. Transactions are no reason: answers are acted
+on in the order of the fills, so filling several and then advancing
+does what advancing after each does.
 
-3. Whether `fill` takes up the waiters itself. The maintainer: a
-   waiter that is a suspended evaluation "could include a reference to
-   the step budget and timing counter(s) so an active `fill` would
-   continue to use the current budget"; asynchronous work is mostly
-   done at run time and budgets mostly at check time; the reasons for
-   `fill` then `advance` look like batching and transactions, in which
-   case "use of passive `fill` plus `advance` may be opt-in only".
-4. A failure that nothing reads. The maintainer: "`check` asserts
-   program correctness, it does not handle runtime exceptions. My
-   assumption is that operations that may return a catchable exception
-   will have a return type that is a union of the success result type
-   and all exception types, rather than having a separate 'throw'
-   mechanism as other languages do. So a `check` on the return type
-   would be useful to refute code that doesn't handle declared
-   exceptions. I'm open on this point."
+Ruled ("I agree with the four recommendations for point 3"):
+
+- `fill` takes up what waits on the cell and returns what `advance`
+  returns. Called while the kernel is evaluating, it is queued and
+  taken up before that call returns.
+- Each evaluation carries the budget it was started with.
+- `advance` stays for going on after a limit, and for filling several
+  cells before any is acted on.
+- It is made when the interface's two versions are made one, with the
+  acceptance stream, whose launcher calls `fill` and then `advance`.
+
+Two gaps the maintainer named. How a budget is filled up again at run
+time: "This is thread management, we should cover this and other
+details in a separate discussion on that." Open. And how what `fill`
+returns is used: only the launcher fills, since the kernel object
+stays with it, and a capability's host code hands the launcher the
+promise of its answer. A refutation ends the phase; claim records go
+into its report.
+
+Point 4, a failure that nothing reads. The maintainer: "`check`
+asserts program correctness, it does not handle runtime exceptions. My
+assumption is that operations that may return a catchable exception
+will have a return type that is a union of the success result type and
+all exception types, rather than having a separate 'throw' mechanism
+as other languages do." Then two alternatives: "have `then(a,b)` and
+`also(a,b)` claim their respective `a`s return a non-exception value",
+or have them test the result and return the exception. The second
+cannot work for `also`: by the time a late failure arrives the second
+has started and the block may have given its value.
+
+Whether that claim holds what follows: "(a) having the claim on the
+first not hold evaluation on the second - reversing a previous
+decision to have claims always hold; (b) if the claim is cleared at
+runtime then the two statements run at once, if not, then the `also`
+behaves like a `then`." The review session had argued for (a), and
+withdrew it: only a statement whose value is dropped is held, a bound
+one and the arguments of a call still run at once, and (b) needs
+nothing of the kernel.
+
+What a failure is. The review session first proposed a mark of the
+kernel's. The maintainer: "not sure why it has to be private. If
+`kind` is going to return a distinct value, it would be odd if it's
+inconsistent with the set of Value kinds", and "I tend to think
+metadata fields should only by information that is likely removed by
+PE and doesn't have to be present in a fully optimized program at
+runtime. Having exceptions denoted by a kernel authored mark also
+makes metadata mandatory at runtime. Perhaps we need to look at pros
+and cons of the different approaches before overriding the previous
+decision." Three forms were compared: plain data of one shape, a mark
+of the kernel's, and the ruled field an extension owns.
+
+Ruled ("I agree on all four"):
+
+1. A failure is plain data of one shape.
+2. Option (b), written by the notation: a statement whose value is
+   dropped is claimed to be no failure.
+3. `is_failure(x)` and `handle(x, name, handler)` are Allegretto
+   functions and no primitives. `handle` names the failure it handles,
+   as the maintainer asked in place of a function that ignores one.
+4. The ruled entry is reworded and retitled "A failure a program can
+   handle is plain data of one shape".
+
+The maintainer on the standard language: "I would have an extension
+type hierarchy in the standard language, but it would also include the
+`failure` field to remain compatible with Allegretto." So the shape is
+a structure whose first entry is keyed `failure`, where the review
+session had proposed the bare symbol as the first entry.
+
+Built: nothing in the kernel. Its tests hold that the two functions
+and the claim need no primitive.
 
 Still to rule in this cluster, proposed and not yet answered: that a
 call of `advance` that meets a refutation performs no further effect;

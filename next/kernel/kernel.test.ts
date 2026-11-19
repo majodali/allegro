@@ -1843,3 +1843,85 @@ test("an evaluation that comes to wait on a new cell is taken up when that cell 
   k.advance({ steps: 100 });
   assert.equal(num(k, k.current(r.value)), 9);
 });
+
+// ---- A failure is plain data (the second review's cluster 8) -----------------
+//
+// The kernel has nothing for a failure. These tests hold that the two functions
+// Allegretto ships for one, and the claim a notation writes for a statement whose value is
+// dropped, need no primitive beyond those the kernel has.
+
+function failures() {
+  const base = sayer();
+  const { k, call, kp } = base;
+  const sd = (name: string) => k.symbolData(name);
+  const [T, F] = [truth(k, true), truth(k, false)];
+  const [x, name, handler] = [k.param("x"), k.param("name"), k.param("handler")];
+  const firstKey = call(kp("key"), x, byte(k, 0));
+  // is_failure(x): a structure whose first entry is keyed `failure`.
+  const isFailure = k.composedFunction(
+    [x],
+    call(kp("if"), call(kp("same"), call(kp("kind"), x), sd("structure")),
+      call(kp("if"), call(kp("same"), call(kp("count"), x), call(kp("count"), k.structure([]))), F,
+        call(kp("if"), call(kp("same"), call(kp("kind"), firstKey), sd("symbol")), call(kp("same"), firstKey, sd("failure")), F)),
+      F),
+  );
+  // handle(x, name, handler): handler(x) where x is a failure of that name, and x otherwise.
+  const handle = k.composedFunction(
+    [x, name, handler],
+    call(kp("if"), call(isFailure, x), call(kp("if"), call(kp("same"), call(kp("get"), x, sd("failure")), name), call(handler, x), x), x),
+  );
+  const failure = (what: string) => k.structure([[k.symbol("failure"), sd(what)], [k.symbol("code"), byte(k, 7)]]);
+  // What a notation writes for a statement whose value is dropped: claim(!is_failure(a)).
+  const dropped = (a: Value) => call(kp("claim"), call(kp("if"), call(isFailure, a), F, T));
+  return { ...base, sd, isFailure, handle, failure, dropped };
+}
+
+test("a failure is plain data of one shape, told by a function written with the kernel's primitives", () => {
+  const { k, call, sd, isFailure, failure } = failures();
+  const scope = k.scope();
+  const is = (v: Value) => k.bitsOf(k.evaluate(call(isFailure, v), scope).value).bytes[0] === 1;
+  assert.equal(is(failure("file_missing")), true);
+  assert.equal(is(byte(k, 1)), false, "bits");
+  assert.equal(is(sd("failure")), false, "the symbol alone");
+  assert.equal(is(k.structure([])), false, "an empty structure");
+  assert.equal(is(k.structure([[null, sd("failure")]])), false, "an entry with no key");
+  assert.equal(is(k.structure([[k.symbol("code"), byte(k, 1)], [k.symbol("failure"), sd("late")]])), false, "the entry is not the first");
+});
+
+test("handle names the failure it handles, and lets any other through", () => {
+  const { k, call, sd, isFailure, handle, failure } = failures();
+  const scope = k.scope();
+  const x = k.param("x");
+  const nine = k.composedFunction([x], byte(k, 9));
+  assert.equal(num(k, k.evaluate(call(handle, failure("file_missing"), sd("file_missing"), nine), scope).value), 9);
+  assert.equal(num(k, k.evaluate(call(handle, byte(k, 3), sd("file_missing"), nine), scope).value), 3, "what is no failure is itself");
+  const other = call(handle, failure("no_permission"), sd("file_missing"), nine);
+  assert.equal(k.bitsOf(k.evaluate(call(isFailure, other), scope).value).bytes[0], 1, "a failure of another name is still a failure");
+});
+
+test("a statement whose value is dropped holds what follows until its answer comes, and a failure refutes it", () => {
+  const { k, call, kp, said, say, dropped, failure, isFailure } = failures();
+  const scope = k.scope();
+  const cells: Value[] = [];
+  const write = k.primitiveFunction({ purity: "effectful", capability: "files", part: "write", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  // write(); say(2), with the write's answer dropped.
+  k.evaluate(call(kp("also"), dropped(call(write)), call(say, byte(k, 2))), scope);
+  assert.deepEqual(said, [], "held: nobody has looked at the write's answer yet");
+  k.fill(cells[0] as never, k.structure([]));
+  assert.deepEqual(k.advance({ steps: 200 }).refuted, []);
+  assert.deepEqual(said, [2], "the write succeeded");
+  // The same, and the write fails.
+  said.length = 0;
+  k.evaluate(call(kp("also"), dropped(call(write)), call(say, byte(k, 2))), scope);
+  k.fill(cells[1] as never, failure("disk_full"));
+  assert.equal(k.advance({ steps: 200 }).refuted.length, 1, "a failure nothing handled");
+  assert.deepEqual(said, [], "and nothing written after it happened");
+  // r <- write(); say(2): the answer is bound, so nothing holds, and a failure is r's to handle.
+  said.length = 0;
+  const r = k.symbol("t.r");
+  const bound = k.evaluate(within(k, [[r, call(write)]], call(kp("also"), r, call(kp("also"), call(say, byte(k, 2)), call(isFailure, r)))), scope);
+  assert.deepEqual(said, [2], "at once");
+  k.fill(cells[2] as never, failure("disk_full"));
+  assert.deepEqual(k.advance({ steps: 200 }).refuted, [], "no refutation: the program reads the answer");
+  assert.equal(k.bitsOf(k.current(bound.value)).bytes[0], 1);
+});

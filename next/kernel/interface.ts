@@ -382,6 +382,12 @@ export interface Kernel {
    * `advance`, after what waited on cells filled before this one. So the
    * order of the calls to `fill` is the order in which answers are acted
    * on.
+   *
+   * Only the launcher fills. A capability's host code does not hold the
+   * kernel: it returns a cell and hands the launcher the promise of its
+   * answer, and the launcher fills the cell when the answer comes. So
+   * every refutation and every claim record that an answer leads to
+   * reaches the launcher, in one place.
    */
   fill(cell: Cell, value: Value): void;
   /** True when the cell has been filled. */

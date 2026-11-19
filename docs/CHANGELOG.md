@@ -586,7 +586,10 @@ name.
   One entry retitled, one added: 249 decisions. And for late answers:
   a waiting evaluation knows its cells, and `advance` takes up only
   what waited on a cell that was filled, in the order the cells were
-  filled.
+  filled. And for failures: a failure is plain data of one shape, with
+  `is_failure` and `handle` as Allegretto functions; a statement whose
+  value is dropped stands for a claim that it is no failure. One more
+  entry retitled.
 - **2026-11-18 — Recursion, loops and strength (the second review's
   cluster 9).** Ruled: the kernel never assumes a claim at a recursive
   call and gets no induction rule; the standard language's analysis

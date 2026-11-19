@@ -83,7 +83,7 @@
     {"title":"A refutation marks everything computed from it","part":"II","chapter":"Correctness","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A refutation on a path that may be taken refutes the program","part":"II","chapter":"Correctness","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"An evaluation can be returned as data","part":"II","chapter":"Correctness","type":"capability","present":"open","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
-    {"title":"A failure a program can handle is supplied by an extension","part":"II","chapter":"Correctness","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"A failure a program can handle is plain data of one shape","part":"II","chapter":"Correctness","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[],"was":["A failure a program can handle is supplied by an extension"]},
     {"title":"Evaluation stops early for two reasons only","part":"II","chapter":"Correctness","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Parsing is evaluation","part":"III","chapter":"Parsing","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"No parser is privileged","part":"III","chapter":"Parsing","type":"capability","present":"open","owner":"R","state":"none","unit":null,"cases":[]},

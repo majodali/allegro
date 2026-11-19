@@ -137,22 +137,67 @@ an effect happens: `line = read()` reads when `line` is first needed.
 
 A block's statements are started in written order, and the block's value
 is its last statement's. A statement does not wait for the one before it
-to be over. Where an effect's answer comes late, the statements after it
-are started all the same, and the block gives its value as soon as its
-last statement's is known, while what it started goes on. Three things
-make a statement wait:
+to be over, and the block gives its value as soon as its last
+statement's is known, while what it started goes on. Four things make a
+statement wait:
 
 - it uses the value of an earlier one, as `name <- read()` followed by
   `write(name)`;
 - it is written after a claim: a claim holds every statement after it in
   its block until it is decided, and if it is refuted none of them
   happens;
+- it is written after a statement whose value is dropped and whose
+  answer has not come (see "Failures" below);
 - the block is written `sync`, or the two are written `then(a, b)`.
 
-With no late answer, statements happen in the order written. What must
-happen in an order is best written so that it cannot be forgotten: the
-second takes what the first returns, or the capability offers the pair
-as one operation. A name is bound once in a block; an inner block may
+So what runs at once is a statement whose value is bound, as
+`a <- fetch(x)` followed by `b <- fetch(y)`, and the arguments of a
+call, as `price(fetch(x)) + price(fetch(y))`. With no late answer,
+statements happen in the order written. What must happen in an order is
+best written so that it cannot be forgotten: the second takes what the
+first returns, or the capability offers the pair as one operation.
+
+### Failures
+
+A failure is plain data of one shape: a structure whose first entry is
+keyed `failure` and holds a symbol naming what failed, with details
+after it.
+
+```
+{failure: `file_missing, path: p}
+```
+
+The kernel has nothing for a failure. A capability's operation that can
+fail answers with its result or with a failure, and the caller tells
+them apart. Allegretto ships two functions for that, written in
+Allegretto:
+
+| Name | Gives |
+|---|---|
+| `is_failure(x)` | true where `x` is a failure |
+| `handle(x, name, handler)` | `handler(x)` where `x` is a failure named `name`; otherwise `x`. A failure of another name comes through as it is |
+
+```
+is_failure(x) =>
+  if kind(x) == `structure
+  then if count(x) == 0 then false
+       else if kind(key(x, 0)) == `symbol then key(x, 0) == `failure else false
+  else false
+
+handle(x, name, handler) =>
+  if is_failure(x) && x.failure == name then handler(x) else x
+```
+
+A failure that nothing handles is a refutation. A statement whose value
+is dropped stands for a claim: the line `files.write(f, t)` is
+`claim(!is_failure(files.write(f, t)))`. Being a claim, it holds the
+statements after it until the write's answer is known, and if the
+answer is a failure none of them happens. A statement that binds its
+value, `r <- files.write(f, t)`, stands for no claim and holds nothing:
+`r` is the program's to look at. The last statement of a block is its
+value and goes to the caller, a failure or not. A failure handed to a
+primitive function is outside its domain, which is a refutation, so
+nothing computes with one unseen. A name is bound once in a block; an inner block may
 bind it again.
 
 A block with bindings stands for the kernel's block of bindings (section
@@ -343,3 +388,7 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    before a block makes its statements a chain of `then`. The maintainer
    wants effects that do not depend on each other to run at once, and
    sequence to be asked for.
+10. **Failures** (2026-11-19). A failure is plain data: a structure
+   whose first entry is keyed `failure`. `is_failure` and `handle` are
+   Allegretto's functions for it, and no primitive. A statement whose
+   value is dropped stands for a claim that the value is no failure.

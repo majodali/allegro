@@ -42,7 +42,7 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
-   - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; An evaluation can be returned as data; A failure a program can handle is supplied by an extension; Evaluation stops early for two reasons only.
+   - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; An evaluation can be returned as data; A failure a program can handle is plain data of one shape; Evaluation stops early for two reasons only.
 
 **Part III: Syntax and modules**
 
@@ -137,7 +137,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Phases are hard-coded in the pipeline | The platform ships three phases: check, run and export | Phases | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | Every program is evaluated the same way, however it arrives | Modules and programs | DR1, rulings of 2026-11-11 |
-| Effects are not gated on decided claims | The terminal and the browser ship output, timers and HTTP; A failure a program can handle is supplied by an extension | The launchers we ship; Correctness | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | The terminal and the browser ship output, timers and HTTP; A failure a program can handle is plain data of one shape | The launchers we ship; Correctness | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | Startup, step by step | Tools | DR1, rulings of 2026-11-11 |
 | Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Extensions | DR1, rulings of 2026-11-11 |
@@ -1199,8 +1199,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### A statement does not wait for the one before it
-- Decides: the kernel primitive `also(first, second)` starts its first argument, then starts its second, and its value is the second's. A block's statements are a chain of it. The second does not wait for the first to be over: where the first waits on a late answer, an effect in the second is performed all the same. Where the second's value is known it is given at once, and what the first started goes on as work of the evaluation; a refutation in that work is reported when it is met. Two things hold the second back: a first that is refuted, and a first that waits on a claim, so a claim holds what is written after it in its block. The arguments of a primitive function and the entries of a structure needed in full are started the same way, in the order written, and none waits for one before it. With nothing late, effects happen in the order written, and the same program with the same information performs the same effects in the same order.
-- Status: partly built (the reference kernel; the translator of Allegretto still writes a block as a chain of `then`); ruled 2026-11-19
+- Decides: the kernel primitive `also(first, second)` starts its first argument, then starts its second, and its value is the second's. A block's statements are a chain of it. The second does not wait for the first to be over: where the first waits on a late answer, an effect in the second is performed all the same. Where the second's value is known it is given at once, and what the first started goes on as work of the evaluation; a refutation in that work is reported when it is met. Two things hold the second back: a first that is refuted, and a first that waits on a claim, so a claim holds what is written after it in its block. The arguments of a primitive function and the entries of a structure needed in full are started the same way, in the order written, and none waits for one before it. With nothing late, effects happen in the order written, and the same program with the same information performs the same effects in the same order. A notation writes a statement whose value is dropped as a claim that the value is no failure. So such a statement holds what is written after it until its answer is known, and what runs at once is a statement whose value is bound, and the arguments of a call.
+- Status: partly built (the reference kernel; the translator of Allegretto still writes a block as a chain of `then`, and writes no claim for a dropped value); ruled 2026-11-19
 - Type: capability
 - Rationale kind: technical
 - Depends on: Sequence is one kernel primitive; An expression is evaluated when its value is needed
@@ -1210,6 +1210,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-19 (../records/book-pass/adversarial-review-2.md, Rulings taken, cluster 8)
 - Use case: `price(fetch(a)) + price(fetch(b))` has both requests in flight; a handler gives its reply and then checks whether to close its socket.
 - Notes: new, by ruling. The maintainer on what unordered means: "lack of explicit effect order doesn't mean indeterminacy. Two executions with the same information and inputs will still result in the same output including order of effects." On a block's value: "There may be some value in a function returning its value and allowing its calling expression to continue evaluation, while kicking off some asynchronous cleanup. An example might be an websocket request that returns a response and then checks if it should close the socket." On a claim: "refuted claims should block all effects written later in the same block". This reverses what the reference kernel did since 2026-11-16, when an argument or an entry that waited held back the effects of those after it.
+- Notes (2026-11-19, the second adversarial review, cluster 8): the last two sentences are added the same day, by the ruling on failures. The maintainer weighed a check that holds nothing against a claim that holds like any other, "if the claim is cleared at runtime then the two statements run at once, if not, then the `also` behaves like a `then`", and the second was ruled. It needs nothing of the kernel: the claim is an ordinary one.
 - Chapter: Evaluation
 
 #### A block of bindings is one kernel primitive
@@ -1537,19 +1538,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-18, the second adversarial review, cluster 7): extended by ruling. Where steps run out differs with sharing, with the order answers arrive and with the kernel, and a program could branch on the answer, so a claim could come out two ways. A reviewer also recovered secret bytes from a function that compared them one at a time, by counting steps. The maintainer kept the primitive generally available, as with describing: step counts are observable as time is in any language; the kernel's comparison of two values takes steps by their size and not by their content; a project may claim that a module does not use the primitive. Set aside: attempting as a right code must be handed, which a check phase, holding no capability, could not give to the searches and proposal loops that run there.
 - Chapter: Correctness
 
-#### A failure a program can handle is supplied by an extension
-- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
+#### A failure a program can handle is plain data of one shape
+- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. It is plain data of one shape, which every capability's definition and every notation uses: a structure whose first entry is keyed `failure` and holds a symbol naming what failed, with details after it. The kernel has nothing for it: telling a failure and handling one are functions written in Allegro. Nothing carries a failure along: handed to a primitive function it is outside the function's domain, which is a refutation. A notation claims of a statement whose value is dropped that the value is no failure, so a failure nothing handled is refuted, and where a check decides the claim from the statement's type it is decided before the program runs. How a language writes and handles a failure is that language's choice; the shape is shared.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
 - Depends on: An extension is made of functions and metadata fields; A refutation marks everything computed from it
 - Significance: 3 — keeps recoverable failure out of the kernel
 - Label: swappable — one extension's field and functions
-- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it)
+- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it); a field an extension owns, carried to every result computed from the failure (the ruling of 2026-11-11, replaced: the field has to be kept at run time and in an exported program, and it lets code go on computing with a failed value); a mark only the kernel can write, told by the kernel (weighed on 2026-11-19 and not taken: a primitive and a mark that must be kept at run time, where an agreed shape needs neither)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Errors as a viral metadata field". The maintainer: "exception" probably fits better than "error", and the choice is left to each extension. To be placed with the standard language in Part IV when that part is reviewed.
 - Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
 - Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
+- Notes (2026-11-19, the second adversarial review, cluster 8): replaced by ruling, and retitled from "A failure a program can handle is supplied by an extension". It began with a failure that nothing reads: with statements that do not wait, `files.write(f, x)` on a line of its own gets its answer late, and a failure in it was lost. The maintainer's assumption: "operations that may return a catchable exception will have a return type that is a union of the success result type and all exception types, rather than having a separate 'throw' mechanism as other languages do. So a `check` on the return type would be useful to refute code that doesn't handle declared exceptions." And on the field this entry had: "I tend to think metadata fields should only by information that is likely removed by PE and doesn't have to be present in a fully optimized program at runtime." Three forms were compared: plain data of one shape, a mark of the kernel's, and the field. Ruled: plain data. The maintainer on the standard language: "I would have an extension type hierarchy in the standard language, but it would also include the `failure` field to remain compatible with Allegretto." Allegretto's two functions are `is_failure(x)` and `handle(x, name, handler)`; the reference kernel's tests hold that they need no primitive.
 - Chapter: Correctness
 
 #### Evaluation stops early for two reasons only
@@ -2095,13 +2097,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (the code has an error value in a kernel field); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A failure a program can handle is supplied by an extension; Types are values that constrain values; Metadata fields are independent
+- Depends on: A failure a program can handle is plain data of one shape; Types are values that constrain values; Metadata fields are independent
 - Significance: 3 — how a program reports and recovers
 - Label: swappable — another language on the kernel may choose otherwise
 - Options recorded: an error value in a field of the kernel (what the code does; rejected in the Part II review)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling: the standard language's choice under Part II's decision. The maintainer preferred "exception" to "error".
 - Held finding (2026-11-12, DR4): `make_error` and the `error` field are kernel primitives (`src/primitives.ts:1107`).
+- Notes (2026-11-19, the second adversarial review, cluster 8): to be reworked with Part IV. By ruling, a failure is plain data of one shape and nothing carries it to later results ("A failure a program can handle is plain data of one shape"), so "carried to every result computed from it, in a field the standard extension owns" no longer stands. The maintainer's direction: an operation that may fail has a return type that is a union of its result and each failure; the failures are a hierarchy of types of the standard language, each with the `failure` entry Allegretto's shape has; a check refutes code that does not handle a declared failure.
 - Chapter: Types as values
 
 #### The core types are built over bits
@@ -3314,6 +3317,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: auto-escalation (today)
 - Sources: docs/book/vivace/planning-dsl.md convention 9, §8
 - Book home (fragments' proposal): The planning DSL
+- Notes (2026-11-19, the second adversarial review, cluster 8): to be reworked with Part IV, with "The standard language's handled failure is an exception": a failure is returned as a value of a union type, with no separate way to throw.
 - Chapter: Plans as outcome graphs
 
 ### Finding solutions to a plan
@@ -4065,7 +4069,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The launchers we ship
 
 #### A late answer or its failure fills a cell as plain data
-- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. The standard language wraps each capability it ships so that a failure becomes an exception; another language may wrap it otherwise. A call on a capability the phase lacks stays residual; it does not fail.
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. A capability's definition gives the failure the shape every failure has ("A failure a program can handle is plain data of one shape"), so the launcher may fill the cell with it as it stands. A call on a capability the phase lacks stays residual; it does not fail.
 - Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -4080,7 +4084,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
 - Notes (2026-11-13, after the adversarial review): the title is kept for now, though the launcher no longer makes the exception: a corpus file of the acceptance stream cites decisions by title, so a retitle is that stream's to coordinate. Answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
 - Notes (2026-11-15, titles made accurate): retitled from "A value that arrives later fills a cell, and a failure fills it with an exception": the launcher fills a cell with plain data, for an answer and for a failure alike, and the exception is the standard language's wrapper.
-- Notes (2026-11-19, the second adversarial review, cluster 8): two rulings. How much is in flight at once is the capability's business: the kernel starts everything it may, the capability's host code queues what it cannot run at once, and a capability may offer a pattern of use with a stated limit. And two questions are open with the maintainer: whether `fill` takes up the waiters itself, with `fill` and then `advance` as an option for filling several at once; and how a failure that nothing reads is caught. On the second the maintainer's assumption is a return type that is a union of the result and each failure, with no separate way to throw, so that a check on the type refutes code that does not handle a declared failure ("The standard language's handled failure is an exception" says otherwise today).
+- Notes (2026-11-19, the second adversarial review, cluster 8): two rulings. How much is in flight at once is the capability's business: the kernel starts everything it may, the capability's host code queues what it cannot run at once, and a capability may offer a pattern of use with a stated limit. Two more were ruled the same day. `fill` is to take up what waits on the cell itself and return what `advance` returns; each evaluation carries the budget it was started with; `advance` stays for going on after a limit and for filling several cells before any is acted on, which never changes what happens, only how fast; the change is made when the interface's two versions are made one. Only the launcher fills: a capability's host code hands the launcher the promise of its answer. A refutation that a fill returns ends the phase, and its claim records go into the phase's report. And a failure nothing reads is caught by a claim ("A failure a program can handle is plain data of one shape"). How a budget is filled up again at run time is left to a discussion of threads.
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle
