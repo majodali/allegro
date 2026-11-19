@@ -931,13 +931,20 @@ Built: the four primitives; the forms document. `attempt`'s answer is
 built in a pull request of its own, because a test of the acceptance
 stream reads the answer's present shape.
 
+2. "A notation only adds" is kept by three rules, checked on the
+   grammar when the notation is brought in. The maintainer asked what
+   an owner's alternative is (one in force before the `use`), what
+   state a terminal owns (what its own grammar declares), and
+   "couldn't analysis of the grammar additions directly tell us if it
+   breaks those rules?" It can: with the rules every earlier parse is
+   still a parse, so a change shows as a second parse, which the
+   engine reports. The review session withdrew its proposal to parse
+   the text twice. A fourth case was found on the way and the second
+   rule widened to it: an alternative appended to what a rule in force
+   tests negatively. Ruled: "I agree with point 2 as it stands."
+
 Agreed in principle, with questions the maintainer asked:
 
-2. "A notation only adds." What an owner's alternative is; what it
-   means to add reserved words only to a set one owns; whether a
-   terminal's own state is state the new grammar declares; and
-   "couldn't analysis of the grammar additions directly tell us if it
-   breaks those rules?"
 3. The boundary at a statement that changes the grammar: "Is this
    regarding grammars that create a new statement for changing
    grammar? If it's a wholly new grammar, can we use 'statement
