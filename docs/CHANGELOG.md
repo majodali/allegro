@@ -581,6 +581,8 @@ name.
   `float.eq`, `float.gt`, `float.ge` and `bits.int`, 26 shipped. The
   forms document's wording gaps are closed. Ruled for the parser
   engine, not built: its table is kept by rule, position and state.
+  And `attempt` answers the value itself, or a failure named `refuted`
+  or `limit`, where it answered a tagged structure.
 - **2026-11-19 — `then` waits for all of its first; an assumption is
   named and can be withdrawn.** Three rulings after cluster 8. In
   `next/kernel/kernel.ts`: `then` starts its second when its first's

@@ -145,9 +145,12 @@
 //               key reads it. It has no place, is not counted, and is
 //               not handed to a primitive function.
 //   "attempt"   attempt(x, budget). Evaluates its first argument under a
-//               budget of steps and answers how that ended, as data: a
-//               value, a refutation with its reason, or the limit
-//               reached. A refutation inside marks nothing outside.
+//               budget of steps. Its answer is the value where there is
+//               one. Where what was attempted was refuted, or reached
+//               the limit, the answer is a failure, in the shape every
+//               failure a program handles has: {failure: refuted,
+//               reason: <text>} or {failure: limit}. A refutation
+//               inside marks nothing outside.
 // The truth values are the bits of length one: 1 is true, 0 is false.
 // There is no quotation, and no argument can be inspected. A symbol that
 // is data comes from a description, from a cell or from a primitive
@@ -935,14 +938,14 @@ export const createKernel: CreateKernel2 = () => {
           // either way the answer is "limit", and what goes on from it rests on a limit.
           if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
             rest({ kind: "limit" });
-            return data("limit");
+            return failure("limit");
           }
           throw e;
         } finally {
           budget = outer;
         }
-        if (r instanceof Refuted) return data("refuted", text(r.reason));
-        if (known(r)) return data("value", r);
+        if (r instanceof Refuted) return failure("refuted", text(r.reason));
+        if (known(r)) return r;
         // It waits on something. What is left is attempted again, so nothing done so far is done twice.
         return new Expr(fn, [r, steps]);
       }
@@ -1544,6 +1547,18 @@ export const createKernel: CreateKernel2 = () => {
   /** A structure of plain data whose first entry is a symbol naming its form. */
   const data = (form: string, ...parts: V[]): V => {
     const s = new Struct([[null, new Quoted(intern(`description.${form}`))], ...parts.map((p) => [null, p] as const)]);
+    settled.add(s);
+    return s;
+  };
+  /**
+   * A failure a program can handle, in the one shape every failure has: a structure whose
+   * first entry is keyed `failure` and holds a symbol naming what failed. An attempt answers
+   * with one where what it attempted was refuted or reached its limit.
+   */
+  const failure = (name: string, reason?: V): V => {
+    const entries: (readonly [V | null, V])[] = [[intern("failure"), new Quoted(intern(name))]];
+    if (reason !== undefined) entries.push([intern("reason"), reason]);
+    const s = new Struct(entries);
     settled.add(s);
     return s;
   };

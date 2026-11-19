@@ -62,6 +62,12 @@ text chosen by type.
 | `p.a` | reading the entry of `p` keyed by the symbol `a` |
 | `p[i]` | `get(p, i)`: the entry of `p` at place `i`, counted from 0; or, where `i` is a key, the private entry keyed by it |
 
+`attempt(e, n)` evaluates `e` with at most `n` steps. Its value is `e`'s
+value where there is one. Where `e` is refuted it is the failure
+``{failure: `refuted, reason: "…"}``, and where the steps run out it is
+``{failure: `limit}``. So an attempt is handled as any failure is:
+``handle(attempt(e, 1000), `limit, x => fallback)``.
+
 `int`, `float`, `text` and `bits` are structures Allegretto binds, and
 their entries are the primitives of section 3 and the kernel's
 primitives on bits. So `int.add(a, b)` reads the entry `add` of `int` and
