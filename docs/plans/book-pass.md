@@ -1607,8 +1607,9 @@ its approval.
   kernel; one title changed.
 - **2026-11-19 — the second review's cluster 8, the order of effects,
   ruled and built** (the review session): statements do not wait;
-  `also` beside `then`. Four points of the cluster wait for a ruling.
-  249 decisions.
+  `also` beside `then`; late answers taken up in the order they
+  arrive. Three points of the cluster wait for a ruling. 249
+  decisions.
 
 ## 8. Sessions
 

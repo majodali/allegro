@@ -378,8 +378,10 @@ export interface Kernel {
   /**
    * Fills a cell with plain data: bits, symbols and structures of them,
    * carrying no metadata. Once only. Filling records the value and
-   * evaluates nothing: what waited on the cell is evaluated again by the
-   * next `advance`.
+   * evaluates nothing: what waited on the cell is taken up by the next
+   * `advance`, after what waited on cells filled before this one. So the
+   * order of the calls to `fill` is the order in which answers are acted
+   * on.
    */
   fill(cell: Cell, value: Value): void;
   /** True when the cell has been filled. */
@@ -396,16 +398,25 @@ export interface Kernel {
   /** Evaluates an expression in a scope, as far as the information allows and within the limits. */
   evaluate(expression: Value, scope: Scope, limits?: Limits): Result;
   /**
-   * Evaluates again everything in this kernel that waited on a cell
-   * filled since the last call, and whatever waited on that in turn,
-   * within the limits. The kernel tracks what waits on what; the host
-   * says when the work happens and how much of it. Several cells may be
-   * filled before one call: each waiter is then evaluated once, after
-   * all it depends on. With nothing ready it does nothing.
+   * Takes up every evaluation in this kernel that waited on a cell filled
+   * since the last call, within the limits. The kernel knows which
+   * evaluations wait on which cells; the host says when the work happens
+   * and how much of it. An evaluation that waits on none of the cells
+   * filled is left alone. With nothing ready it does nothing.
    *
-   * The order in which effects that became ready are performed is not
-   * stated in this version; it waits on a ruling (issue 17 of
-   * docs/records/book-pass/adversarial-review.md).
+   * Evaluations are taken up in the order their cells were filled, each
+   * once. Several cells may be filled before one call: the effects are
+   * then the same, in the same order, as with a call after each fill. An
+   * evaluation is the one a call of `evaluate` left waiting, or work
+   * that an `also` left going after its value was given.
+   *
+   * Where a limit stops the call, the next call goes on with what was
+   * being taken up, and then with the rest.
+   *
+   * In this version what is taken up is a whole evaluation, walked again
+   * from its top, so steps already spent on it are spent again. Taking
+   * up the computation at the point where it stopped comes with the
+   * evaluator that keeps its own stack.
    */
   advance(limits?: Limits): Advance;
   /**

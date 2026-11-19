@@ -583,7 +583,10 @@ name.
   the arguments of a primitive function and the entries of a structure
   needed in full no longer wait for one before them. Allegretto's
   block is a chain of `also`, and `sync` writes a block in sequence.
-  One entry retitled, one added: 249 decisions.
+  One entry retitled, one added: 249 decisions. And for late answers:
+  a waiting evaluation knows its cells, and `advance` takes up only
+  what waited on a cell that was filled, in the order the cells were
+  filled.
 - **2026-11-18 — Recursion, loops and strength (the second review's
   cluster 9).** Ruled: the kernel never assumes a claim at a recursive
   call and gets no induction rule; the standard language's analysis

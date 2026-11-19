@@ -1787,3 +1787,59 @@ test("ahead of what is done, also starts nothing: each effect is performed once 
   k.advance({ steps: 100 });
   assert.deepEqual(said, [4, 5]);
 });
+
+test("answers are acted on in the order they arrive, and what waits on another cell is left alone", () => {
+  const { k, add, call, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  // Three evaluations, started in this order, each waiting on its own cell.
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(say, c2), scope);
+  // The third has three applications left to do, and no effect.
+  const sum = k.evaluate(call(add, c3, call(add, c3, call(add, c3, byte(k, 1)))), scope);
+  // The second's answer arrives first.
+  k.fill(c2, byte(k, 2));
+  k.fill(c1, byte(k, 1));
+  const both = k.advance({ steps: 100 });
+  assert.deepEqual(said, [2, 1], "the order the answers arrived, not the order the evaluations were started");
+  assert.equal(both.steps, 2, "the third evaluation waits on neither cell and is not walked again");
+  assert.deepEqual(k.advance({ steps: 100 }), { ended: "complete", steps: 0, refuted: [], claims: [] }, "nothing new has arrived");
+  k.fill(c3, byte(k, 5));
+  assert.equal(k.advance({ steps: 100 }).steps, 3);
+  assert.equal(num(k, k.current(sum.value)), 16);
+  assert.deepEqual(k.waiting(), []);
+});
+
+test("an advance that a limit stops is gone on with by the next, and nothing is taken up twice", () => {
+  const { k, call, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2] = [k.cell(), k.cell()];
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(say, c2), scope);
+  k.fill(c1, byte(k, 1));
+  k.fill(c2, byte(k, 2));
+  const first = k.advance({ steps: 1 });
+  assert.equal(first.ended, "limit");
+  assert.deepEqual(said, [1]);
+  const second = k.advance({ steps: 10 });
+  assert.equal(second.ended, "complete");
+  assert.deepEqual(said, [1, 2]);
+});
+
+test("an evaluation that comes to wait on a new cell is taken up when that cell is filled", () => {
+  const { k, call, kp } = setup();
+  const cells: Value[] = [];
+  const late = k.primitiveFunction({ purity: "effectful", capability: "net", part: "read", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  // then(late(), then(late(), 9)): the second answer is asked for only when the first has come.
+  const r = k.evaluate(call(kp("then"), call(late), call(kp("then"), call(late), byte(k, 9))), k.scope());
+  assert.equal(cells.length, 1);
+  k.fill(cells[0] as never, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.equal(cells.length, 2, "now it waits on a cell that did not exist before");
+  // An answer nothing waits on wakes nothing: the evaluation is known to wait on the new cell only.
+  k.fill(k.cell(), byte(k, 0));
+  assert.equal(k.advance({ steps: 100 }).steps, 0);
+  k.fill(cells[1] as never, byte(k, 2));
+  k.advance({ steps: 100 });
+  assert.equal(num(k, k.current(r.value)), 9);
+});

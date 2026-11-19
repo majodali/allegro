@@ -1352,6 +1352,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a single pass, leaving anything unknown permanently residual (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Evaluation resumes on new information by forward chaining".
+- Notes (2026-11-19, the second adversarial review, cluster 8): with statements that do not wait, a late answer is the common way a body goes on after it has given its value, and the maintainer asked for the mechanism in detail. As it stood, each call of `advance` walked every unfinished evaluation from its top, in the order they were started, and spent their steps again. Ruled: a cell knows what waits on it; `advance` takes up only the waiters of cells filled since the last call, in the order the cells were filled, each once. Built in two steps: now the waiter is a whole unfinished evaluation; with the evaluator that keeps its own stack it is the computation at the point where it stopped, taken up there, with nothing walked or charged twice. The first step is built in the reference kernel.
 - Chapter: Evaluation
 
 #### The same program and the same information give the same result
@@ -4079,6 +4080,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
 - Notes (2026-11-13, after the adversarial review): the title is kept for now, though the launcher no longer makes the exception: a corpus file of the acceptance stream cites decisions by title, so a retitle is that stream's to coordinate. Answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
 - Notes (2026-11-15, titles made accurate): retitled from "A value that arrives later fills a cell, and a failure fills it with an exception": the launcher fills a cell with plain data, for an answer and for a failure alike, and the exception is the standard language's wrapper.
+- Notes (2026-11-19, the second adversarial review, cluster 8): two rulings. How much is in flight at once is the capability's business: the kernel starts everything it may, the capability's host code queues what it cannot run at once, and a capability may offer a pattern of use with a stated limit. And two questions are open with the maintainer: whether `fill` takes up the waiters itself, with `fill` and then `advance` as an option for filling several at once; and how a failure that nothing reads is caught. On the second the maintainer's assumption is a return type that is a union of the result and each failure, with no separate way to throw, so that a check on the type refutes code that does not handle a declared failure ("The standard language's handled failure is an exception" says otherwise today).
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle

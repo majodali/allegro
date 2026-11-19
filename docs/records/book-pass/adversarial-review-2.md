@@ -734,8 +734,53 @@ value and not for work the body chose to leave going; steps that work
 spends are charged to the `advance` that takes it up, not to an
 attempt that has answered.
 
-Still to rule in this cluster, proposed and not yet answered: that
-`advance` takes waiters up in the order their answers arrived; that a
+#### Late answers (2026-11-19)
+
+The maintainer, on the work that goes on after a value is given: "we
+should go into detail on the mechanism used when a capability's effect
+returns an asynchronous value, such as a file or network read or
+waiting for a write to complete. That's going to be the more common
+case for a body to continue processing after returning a value."
+
+The mechanism as it stood: an effectful primitive's host code starts
+the operation and returns a cell; the launcher fills the cell when the
+answer arrives and calls `advance`; `advance` walked every unfinished
+evaluation from its top, in the order they were started. Five
+shortfalls for a common path: every arrival walked everything; steps
+were spent again; the order was not the order of arrival; a failure
+nothing reads is lost; nothing bounds how much is in flight.
+
+Ruled ("I agree on 1, 2 & 5"):
+
+1. A cell knows what waits on it. `advance` takes up only the waiters
+   of cells filled since the last call, in the order the cells were
+   filled, each once.
+2. Two steps. Now the waiter is a whole unfinished evaluation. With
+   the evaluator that keeps its own stack, it is the computation at
+   the point where it stopped.
+5. How much is in flight is the capability's business.
+
+Built: the first step of point 2, with point 1.
+
+Open with the maintainer:
+
+3. Whether `fill` takes up the waiters itself. The maintainer: a
+   waiter that is a suspended evaluation "could include a reference to
+   the step budget and timing counter(s) so an active `fill` would
+   continue to use the current budget"; asynchronous work is mostly
+   done at run time and budgets mostly at check time; the reasons for
+   `fill` then `advance` look like batching and transactions, in which
+   case "use of passive `fill` plus `advance` may be opt-in only".
+4. A failure that nothing reads. The maintainer: "`check` asserts
+   program correctness, it does not handle runtime exceptions. My
+   assumption is that operations that may return a catchable exception
+   will have a return type that is a union of the success result type
+   and all exception types, rather than having a separate 'throw'
+   mechanism as other languages do. So a `check` on the return type
+   would be useful to refute code that doesn't handle declared
+   exceptions. I'm open on this point."
+
+Still to rule in this cluster, proposed and not yet answered: that a
 call of `advance` that meets a refutation performs no further effect;
 that the kernel evaluates ahead after a refuted statement to report
 more refutations; and one meaning for "halts".

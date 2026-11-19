@@ -289,6 +289,10 @@ interface Root {
   readonly scope: ScopeV;
   value: V;
   done: boolean;
+  /** The unfilled cells it waits on, as they stood when it was last evaluated. */
+  waits: Set<unknown>;
+  /** True while it stands in the list of what `advance` is to take up. */
+  queued: boolean;
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
@@ -326,7 +330,14 @@ export const createKernel: CreateKernel2 = () => {
   const pureByHash = new Map<string, Prim>();
   const keys = new Map<string, Key>();
   const VARIANT = "reference-k3";
-  let dirty = false;
+  /**
+   * What `advance` is to take up, in order: an evaluation is put here when a cell it waits
+   * on is filled, so answers are acted on in the order they arrive, and an evaluation that
+   * waits on none of the cells filled is left alone.
+   */
+  const ready: Root[] = [];
+  /** How many cells have been filled: an evaluation that a fill overtook is taken up again. */
+  let fills = 0;
   let spent = 0;
   let budget = Infinity;
   /** What the evaluations now under way rest on: one collector for each claim or binding being evaluated. */
@@ -832,9 +843,7 @@ export const createKernel: CreateKernel2 = () => {
         // goes on as work of this evaluation. Ahead of what is done nothing was started, so
         // nothing goes on: the whole is evaluated again when it is really reached.
         if (!held && !ahead && known(second)) {
-          const root: Root = { scope, value: first, done: false };
-          roots.push(root);
-          rootOf.set(first, root);
+          started(first, scope);
           return second;
         }
         return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
@@ -1135,6 +1144,15 @@ export const createKernel: CreateKernel2 = () => {
    * and means there what it meant here. What needs no evaluation is
    * handed on as it is.
    */
+  /** Keeps an evaluation that waits, with the cells it waits on. */
+  const started = (value: V, scope: ScopeV): Root => {
+    const root: Root = { scope, value, done: false, waits: new Set(), queued: false };
+    waitsOn(value, root.waits as Set<V>, new Set());
+    roots.push(root);
+    rootOf.set(value, root);
+    return root;
+  };
+
   /** True where what is left of a statement waits on a claim: such a statement holds what is written after it. */
   const heldByClaim = (r: V): boolean => {
     if (r instanceof Lazy) return !r.done && heldByClaim(r.value);
@@ -1195,6 +1213,10 @@ export const createKernel: CreateKernel2 = () => {
       if (!settled.has(v)) v.entries.forEach(([, e]) => waitsOn(e, found, visited));
     } else if (v instanceof Decided) waitsOn(v.inner, found, visited);
     else if (v instanceof Lazy) waitsOn(v.value, found, visited);
+    else if (v instanceof NameRef) {
+      const at = bindingOf(v);
+      if (at !== undefined) waitsOn(at.binding.memo ?? at.binding.value, found, visited);
+    }
   };
 
   // ---- Reading ------------------------------------------------------------
@@ -1692,7 +1714,14 @@ export const createKernel: CreateKernel2 = () => {
       if (c.filled) throw new InterfaceError("fill: the cell is already filled");
       c.value = asData(into(value, "the value"), "what a cell is filled with");
       c.filled = true;
-      dirty = true;
+      fills++;
+      // What waits on this cell is taken up by the next `advance`, after what waits on cells
+      // filled before it. An evaluation with no cell in sight is taken up too, to be safe.
+      for (const root of roots) {
+        if (root.done || root.queued || !(root.waits.has(c) || root.waits.size === 0)) continue;
+        root.queued = true;
+        ready.push(root);
+      }
     },
     filled: (cell) => {
       const c = into(cell, "the cell");
@@ -1712,29 +1741,37 @@ export const createKernel: CreateKernel2 = () => {
       tallies = new Map();
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
-      if (r.ended === "complete" && !known(value)) {
-        const root: Root = { scope: s, value, done: false };
-        roots.push(root);
-        rootOf.set(value, root);
-      }
+      if (r.ended === "complete" && !known(value)) started(value, s);
       return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords() };
     },
     advance: (limits): Advance => {
-      if (!dirty) return { ended: "complete", steps: 0, refuted: [], claims: [] };
-      dirty = false;
+      if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies = new Map();
       const refuted: Value[] = [];
       const r = within(limits, () => {
-        for (const root of roots) {
-          if (root.done) continue;
-          const next = evaluate(root.value, root.scope);
-          root.value = next;
-          rootOf.set(next, root);
-          if (next instanceof Refuted) refuted.push(out(next));
-          if (known(next)) root.done = true;
+        // Each is taken up once, in the order its answer arrived. One that a limit stops stays
+        // first in the list, so the next call goes on with it.
+        while (ready.length > 0) {
+          const root = ready[0];
+          const before = fills;
+          if (!root.done) {
+            const next = evaluate(root.value, root.scope);
+            root.value = next;
+            rootOf.set(next, root);
+            if (next instanceof Refuted) refuted.push(out(next));
+            if (known(next)) root.done = true;
+            root.waits = new Set();
+            if (!root.done) waitsOn(next, root.waits as Set<V>, new Set());
+          }
+          ready.shift();
+          root.queued = false;
+          // A cell filled while it was being evaluated may have been passed already.
+          if (!root.done && fills !== before) {
+            root.queued = true;
+            ready.push(root);
+          }
         }
       });
-      if (r.ended === "limit") dirty = true;
       return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords() };
     },
     current: (value) => {
