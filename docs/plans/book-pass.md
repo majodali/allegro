@@ -1605,6 +1605,16 @@ its approval.
 - **2026-11-18 — the second review's cluster 9 ruled; two rules of
   evaluation built** (the review session): no induction in the
   kernel; one title changed.
+- **2026-11-19 — the second review's cluster 8, the order of effects,
+  ruled and built** (the review session): statements do not wait;
+  `also` beside `then`; late answers taken up in the order they
+  arrive; a failure is plain data. 249 decisions.
+- **2026-11-19 — the second review's cluster 8 closed** (the review
+  session): what a refutation halts, ruled and built. Clusters 12 and
+  14 remain.
+- **2026-11-19 — three rulings after cluster 8, built** (the review
+  session): `then` waits for all of its first; an assumption is named
+  and can be withdrawn; two discussions filed.
 
 ## 8. Sessions
 

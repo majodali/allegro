@@ -21,8 +21,9 @@ and the maintainer's rulings of 2026-11-16:
 - An operator stands for exactly one primitive function. More operators
   may be added for readability.
 - A block is bindings and statements. Bindings are order-free and may
-  refer to each other and to themselves. Statements happen in written
-  order. Bindings may be written among the statements.
+  refer to each other and to themselves. Statements are started in
+  written order, and none waits for the one before it to be over.
+  Bindings may be written among the statements.
 - A primitive function applied outside its domain is a refutation.
 - The present tree's parser engine reads Allegretto, with a grammar
   written for it, until the engine written in Allegretto reads itself.
@@ -70,7 +71,7 @@ text chosen by type.
 | `claim(e)` | the kernel's claim |
 
 The kernel's other primitives are reached as names Allegretto binds:
-`then`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
+`then`, `also`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
 `assume(x)`, `undecided(reason)`, and those ruled and not yet
 built. What `describe` gives is a program that means the same as the
 function: where the function reads names of a block, or holds an
@@ -125,19 +126,86 @@ language's.
 |---|---|
 | `x = e` | a binding of `x` in the enclosing block |
 | `f(x, y) => e` | the binding `f = (x, y) => e` |
-| `x <- e` | a statement: `e` happens here, and `x` is bound to its value for the rest of the block |
-| an indented block | a block of bindings around a chain of `then` |
+| `x <- e` | a statement: `e` is started here, and `x` is bound to its value for the rest of the block |
+| an indented block | a block of bindings around a chain of `also` |
+| `sync` and an indented block | the same block around a chain of `then`: each statement is over before the next is started |
 
 A block's bindings are one group, whatever lines they are written on.
 Each may use any other, and itself. A binding's value is evaluated when
 something needs it, at most once. So a binding is never the place where
-an effect happens: `line = read()` reads when `line` is first needed. A
-block's statements happen in written order, and the block's value is its
-last statement's. A name is bound once in a block; an inner block may
+an effect happens: `line = read()` reads when `line` is first needed.
+
+A block's statements are started in written order, and the block's value
+is its last statement's. A statement does not wait for the one before it
+to be over, and the block gives its value as soon as its last
+statement's is known, while what it started goes on. Four things make a
+statement wait:
+
+- it uses the value of an earlier one, as `name <- read()` followed by
+  `write(name)`;
+- it is written after a claim: a claim holds every statement after it in
+  its block until it is decided, and if it is refuted none of them
+  happens;
+- it is written after a statement whose value is dropped and whose
+  answer has not come (see "Failures" below);
+- the block is written `sync`, or the two are written `then(a, b)`.
+  `then` waits for more than a value: `b` is started when `a`'s value
+  is known and nothing that `a` started still goes on. So
+  `then(body(), files.close(f))` closes the file after everything the
+  body did, whatever functions it called.
+
+So what runs at once is a statement whose value is bound, as
+`a <- fetch(x)` followed by `b <- fetch(y)`, and the arguments of a
+call, as `price(fetch(x)) + price(fetch(y))`. With no late answer,
+statements happen in the order written. What must happen in an order is
+best written so that it cannot be forgotten: the second takes what the
+first returns, or the capability offers the pair as one operation.
+
+### Failures
+
+A failure is plain data of one shape: a structure whose first entry is
+keyed `failure` and holds a symbol naming what failed, with details
+after it.
+
+```
+{failure: `file_missing, path: p}
+```
+
+The kernel has nothing for a failure. A capability's operation that can
+fail answers with its result or with a failure, and the caller tells
+them apart. Allegretto ships two functions for that, written in
+Allegretto:
+
+| Name | Gives |
+|---|---|
+| `is_failure(x)` | true where `x` is a failure |
+| `handle(x, name, handler)` | `handler(x)` where `x` is a failure named `name`; otherwise `x`. A failure of another name comes through as it is |
+
+```
+is_failure(x) =>
+  if kind(x) == `structure
+  then if count(x) == 0 then false
+       else if kind(key(x, 0)) == `symbol then key(x, 0) == `failure else false
+  else false
+
+handle(x, name, handler) =>
+  if is_failure(x) && x.failure == name then handler(x) else x
+```
+
+A failure that nothing handles is a refutation. A statement whose value
+is dropped stands for a claim: the line `files.write(f, t)` is
+`claim(!is_failure(files.write(f, t)))`. Being a claim, it holds the
+statements after it until the write's answer is known, and if the
+answer is a failure none of them happens. A statement that binds its
+value, `r <- files.write(f, t)`, stands for no claim and holds nothing:
+`r` is the program's to look at. The last statement of a block is its
+value and goes to the caller, a failure or not. A failure handed to a
+primitive function is outside its domain, which is a refutation, so
+nothing computes with one unseen. A name is bound once in a block; an inner block may
 bind it again.
 
 A block with bindings stands for the kernel's block of bindings (section
-4). A block with none is the chain of `then` alone.
+4). A block with none is the chain of `also` alone.
 
 ### The module
 
@@ -175,7 +243,7 @@ withholds, is a finding when the text is read. `with` and `without` may
 both appear, each with a comma-separated list.
 
 Being a binding, an import is evaluated when something first needs it.
-The imported module's top-level statements happen then, in written
+The imported module's top-level statements are started then, in written
 order, and once: two imports of one module with the same arguments are
 one instance. An import nothing needs is never instantiated.
 
@@ -213,7 +281,8 @@ is not a number.
    group, each may use any other and itself, and a recursive function is
    one value with one identity. In the data form a block is an
    application of the primitive, so it needs no node of its own. `x <- e`
-   is `block({x: e}, then(x, rest))`. *Built.*
+   is `block({x: e}, also(x, rest))`, and in a `sync` block
+   `block({x: e}, then(x, rest))`. *Built.*
 2. **The kernel's primitives on bits**: `same` tells two bits values or
    two symbols apart; `join`, `length` and `slice` join two bits values,
    measure one and take a part of one. Allegretto binds the last three
@@ -293,7 +362,7 @@ The maintainer approved each proposal on 2026-11-16, with one change.
 1. **The symbol literal** is `` `name ``.
 2. **`++` joins bits.** It is the first operator added for readability.
 3. **A binding that happens at its place** is written `line <- read()`.
-   It is a statement: it happens in written order, and the name is
+   It is a statement: it is started at its place, and the name is
    bound to its value for the rest of the block. A binding written with
    `=` is never where an effect happens.
 4. **The header words** are `capability`, `input` and `import`. The
@@ -317,3 +386,16 @@ The maintainer approved each proposal on 2026-11-16, with one change.
 8. **Building data** (2026-11-18). Five names: `put`, `key`, `kind`,
    `symbol` and `spelling`. The brackets of a structure literal take
    any expression. `kind`'s answers are plain symbols.
+9. **Statements do not wait** (2026-11-19). A block's statements are a
+   chain of the kernel's `also`: started in written order, none waiting
+   for the one before it. A claim holds what is written after it. `sync`
+   before a block makes its statements a chain of `then`. The maintainer
+   wants effects that do not depend on each other to run at once, and
+   sequence to be asked for.
+10. **Failures** (2026-11-19). A failure is plain data: a structure
+   whose first entry is keyed `failure`. `is_failure` and `handle` are
+   Allegretto's functions for it, and no primitive. A statement whose
+   value is dropped stands for a claim that the value is no failure.
+11. **`then` waits for all of its first** (2026-11-19). A function may
+   give its value and leave work going; a caller who writes `then` or
+   `sync` waits for that work too, and one who does not, does not.

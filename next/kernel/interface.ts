@@ -176,9 +176,12 @@ export type Rest =
   /**
    * An assumption: the module whose code wrote it, by identity, taken by
    * the kernel from the mark on that code. Empty where the code that
-   * assumed belongs to no module.
+   * assumed belongs to no module. `at` is the assumption as written, the
+   * application of the kernel's `assume`, so that everything resting on
+   * one assumption can be listed and that assumption withdrawn. It is
+   * a handle of this kernel and is no part of a stored outcome.
    */
-  | { readonly kind: "assumption"; readonly by: string }
+  | { readonly kind: "assumption"; readonly by: string; readonly at?: Value }
   /**
    * A limit: an attempt inside the evaluation ran out of steps, and the
    * program went on from that answer. Where steps run out may differ
@@ -378,8 +381,16 @@ export interface Kernel {
   /**
    * Fills a cell with plain data: bits, symbols and structures of them,
    * carrying no metadata. Once only. Filling records the value and
-   * evaluates nothing: what waited on the cell is evaluated again by the
-   * next `advance`.
+   * evaluates nothing: what waited on the cell is taken up by the next
+   * `advance`, after what waited on cells filled before this one. So the
+   * order of the calls to `fill` is the order in which answers are acted
+   * on.
+   *
+   * Only the launcher fills. A capability's host code does not hold the
+   * kernel: it returns a cell and hands the launcher the promise of its
+   * answer, and the launcher fills the cell when the answer comes. So
+   * every refutation and every claim record that an answer leads to
+   * reaches the launcher, in one place.
    */
   fill(cell: Cell, value: Value): void;
   /** True when the cell has been filled. */
@@ -396,16 +407,31 @@ export interface Kernel {
   /** Evaluates an expression in a scope, as far as the information allows and within the limits. */
   evaluate(expression: Value, scope: Scope, limits?: Limits): Result;
   /**
-   * Evaluates again everything in this kernel that waited on a cell
-   * filled since the last call, and whatever waited on that in turn,
-   * within the limits. The kernel tracks what waits on what; the host
-   * says when the work happens and how much of it. Several cells may be
-   * filled before one call: each waiter is then evaluated once, after
-   * all it depends on. With nothing ready it does nothing.
+   * Takes up every evaluation in this kernel that waited on a cell filled
+   * since the last call, within the limits. The kernel knows which
+   * evaluations wait on which cells; the host says when the work happens
+   * and how much of it. An evaluation that waits on none of the cells
+   * filled is left alone. With nothing ready it does nothing.
    *
-   * The order in which effects that became ready are performed is not
-   * stated in this version; it waits on a ruling (issue 17 of
-   * docs/records/book-pass/adversarial-review.md).
+   * Evaluations are taken up in the order their cells were filled, each
+   * once. Several cells may be filled before one call: the effects are
+   * then the same, in the same order, as with a call after each fill. An
+   * evaluation is the one a call of `evaluate` left waiting, or work
+   * that an `also` left going after its value was given.
+   *
+   * Where a limit stops the call, the next call goes on with what was
+   * being taken up, and then with the rest.
+   *
+   * Once an evaluation comes out refuted, the call performs no further
+   * effect: the evaluations still to be taken up are evaluated ahead, so
+   * their refutations are reported in `refuted` too, and they stay for a
+   * later call. A launcher that ends its phase at a refutation does not
+   * call again; one that goes on calls again, and what was held is done.
+   *
+   * In this version what is taken up is a whole evaluation, walked again
+   * from its top, so steps already spent on it are spent again. Taking
+   * up the computation at the point where it stopped comes with the
+   * evaluator that keeps its own stack.
    */
   advance(limits?: Limits): Advance;
   /**
@@ -499,6 +525,17 @@ export interface Kernel2 extends Kernel {
    * only the functions of a module whose key it holds.
    */
   inspectionRight(): Value;
+  /**
+   * Withdraws an assumption: from then on it is not taken on trust. The
+   * kernel evaluates what was assumed as a claim, which comes out
+   * decided, refuted or undecided like any other and is listed among a
+   * result's claims. `what` is one assumption as written (the `at` of
+   * what a result rests on), or the identity of a module, for every
+   * assumption its code makes. A launcher calls this for what its
+   * configuration does not accept. It does not reach back: a result
+   * already given keeps the word it was given with.
+   */
+  withdraw(what: Value | string): void;
   /** True for a key: a structure carrying the kernel's mark. False for a structure with the same entries and no mark. */
   isKey(value: Value): boolean;
   /** Reads a key. An InterfaceError for a value that is not one. */

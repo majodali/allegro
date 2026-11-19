@@ -64,8 +64,10 @@
 //               else fully known is a refutation. Unknown stays a residual.
 //   "assume"    assume(x). Records the outcome "assumed" and does not
 //               evaluate x. The record names the module whose code wrote
-//               the call, from the mark on it. A claim that rests on an
-//               assumption comes out assumed, never decided.
+//               the call, from the mark on it, and the call itself. A
+//               claim that rests on an assumption comes out assumed,
+//               never decided. An assumption that `withdraw` has named
+//               is evaluated as a claim.
 //   "undecided" undecided(reason). The answer of what decides a claim when
 //               it cannot tell. A claim on it is done, with the outcome
 //               "undecided" and that reason; it refutes nothing, and what
@@ -93,11 +95,26 @@
 //               function is one value. A binding's value is evaluated
 //               when needed, at most once. The block's value is its
 //               body's. No value of the language is or holds a scope.
-//   "then"      then(first, second). It needs its first argument, and then
-//               its value is the second. This is the one way a text's
+//   "then"      then(first, second). It needs its first argument to be
+//               over, and then its value is the second. Over: the first's
+//               value is known, and nothing evaluating it started still
+//               goes on. This is the one way a text's
 //               order becomes an order of effects. While the first
 //               waits, the second is evaluated ahead with no effect
 //               performed, so a refutation in it is found at once.
+//               Where the first is refuted the second is not done; it
+//               is evaluated ahead all the same, so a further refutation
+//               in it is found and counted. The same holds for "also".
+//   "also"      also(first, second). It starts the first, then starts the
+//               second, and its value is the second's. The second does
+//               not wait for the first to be over: an effect in it is
+//               performed while the first still waits. What a block's
+//               statements are a chain of. Where the second's value is
+//               known and the first still waits, the value is given and
+//               the first goes on as work of the evaluation, taken up by
+//               `advance`. Two things hold the second back as `then`
+//               does: a first that is refuted, and a first that waits
+//               on a claim, so a claim holds what is written after it.
 //   "same"      same(a, b). Tells two bits values apart, or two symbols:
 //               true where they are the same. Anything else is a
 //               refutation; the kernel gives bits no other meaning.
@@ -279,10 +296,25 @@ interface Root {
   readonly scope: ScopeV;
   value: V;
   done: boolean;
+  /** The unfilled cells it waits on, as they stood when it was last evaluated. */
+  waits: Set<unknown>;
+  /** True while it stands in the list of what `advance` is to take up. */
+  queued: boolean;
+  /** The sequences whose first part started it: each waits for it to be over. */
+  groups: readonly Group[];
+  /** True where what it holds includes a sequence that waits for work its first part started. */
+  grouped: boolean;
+}
+
+/** What the first part of one `then` started and left going. The `then` waits until none is left. */
+interface Group {
+  readonly pending: Set<Root>;
+  /** The first refutation any of that work came to. */
+  refuted: Refuted | undefined;
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["also", 2], ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
   ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["slice", 3], ["spelling", 1],
   ["symbol", 1], ["then", 2], ["undecided", 1],
 ];
@@ -316,7 +348,14 @@ export const createKernel: CreateKernel2 = () => {
   const pureByHash = new Map<string, Prim>();
   const keys = new Map<string, Key>();
   const VARIANT = "reference-k3";
-  let dirty = false;
+  /**
+   * What `advance` is to take up, in order: an evaluation is put here when a cell it waits
+   * on is filled, so answers are acted on in the order they arrive, and an evaluation that
+   * waits on none of the cells filled is left alone.
+   */
+  const ready: Root[] = [];
+  /** How many cells have been filled: an evaluation that a fill overtook is taken up again. */
+  let fills = 0;
   let spent = 0;
   let budget = Infinity;
   /** What the evaluations now under way rest on: one collector for each claim or binding being evaluated. */
@@ -327,11 +366,30 @@ export const createKernel: CreateKernel2 = () => {
   let ahead = false;
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
+  /** The sequences whose first part is being evaluated now, outermost first. */
+  const groups: Group[] = [];
+  /** What is left of a `then` that waits, with what its first part started. */
+  const thenGroups = new WeakMap<Expr, Group>();
+  /** Set by `waitsOn` when it passes a `then` that waits for work its first part started. */
+  let sawGroup = false;
+  /** The assumptions a configuration does not accept: by module, and one by one. */
+  const withdrawnModules = new Set<string>();
+  const withdrawnSites = new WeakSet<Expr>();
+  /** A number for each assumption as written, so two assumptions of one module are told apart. */
+  const assumptionNumbers = new WeakMap<object, number>();
+  let assumptionCount = 0;
 
   const restKey = (r: Rest): string =>
     r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : r.kind === "limit" ? "limit" : `builder ${r.builder}`;
+  /** The key within one kernel: it tells two assumptions of one module apart, which the stored key does not. */
+  const localKey = (r: Rest): string => {
+    if (r.kind !== "assumption" || r.at === undefined) return restKey(r);
+    let n = assumptionNumbers.get(r.at as object);
+    if (n === undefined) assumptionNumbers.set(r.at as object, (n = ++assumptionCount));
+    return `${restKey(r)} #${n}`;
+  };
   const rest = (r: Rest): void => {
-    for (const c of collectors) c.set(restKey(r), r);
+    for (const c of collectors) c.set(localKey(r), r);
   };
   /** Evaluates under a fresh collector and returns what the evaluation rested on. */
   const collecting = <T>(body: () => T): { value: T; rests: Rest[] } => {
@@ -455,8 +513,13 @@ export const createKernel: CreateKernel2 = () => {
     if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
       to.owner = from.owner;
     // What a copy or an evaluation leaves of a claim is still that claim, as written.
-    if (to !== from && to instanceof Expr && from instanceof Expr && to.site === undefined && (from.site !== undefined || from.fn === kernelPrims.get("claim")))
+    if (to !== from && to instanceof Expr && from instanceof Expr && to.site === undefined && (from.site !== undefined || from.fn === kernelPrims.get("claim") || from.fn === kernelPrims.get("assume")))
       to.site = from.site ?? from;
+    // What is left of a sequence that waits keeps what its first part started.
+    if (to !== from && to instanceof Expr && from instanceof Expr) {
+      const group = thenGroups.get(from);
+      if (group !== undefined && !thenGroups.has(to)) thenGroups.set(to, group);
+    }
     return to;
   };
 
@@ -470,6 +533,8 @@ export const createKernel: CreateKernel2 = () => {
   /** How many evaluations of each written claim wait now, and which residuals they are. */
   const waitingAt = new Map<Expr, number>();
   const waitingClaims = new WeakSet<Expr>();
+  /** The refutations a claim has been counted for. */
+  const counted = new WeakSet<Refuted>();
   const tallyOf = (site: Expr): Tally => {
     let t = tallies.get(site);
     if (t === undefined) tallies.set(site, (t = { decided: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
@@ -478,18 +543,22 @@ export const createKernel: CreateKernel2 = () => {
   /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
   const tallied = (from: Expr, result: V, rests: readonly Rest[]): V => {
     const site = from.site ?? from;
-    const t = tallyOf(site);
     if (waitingClaims.has(from)) {
       waitingClaims.delete(from);
       waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
     }
+    // A claim that only receives a refutation met before is not refuted over again: each
+    // refutation is counted once, where it arose or at the first claim it reached.
+    if (result instanceof Refuted && counted.has(result)) return result;
+    const t = tallyOf(site);
     if (result instanceof Refuted) {
+      counted.add(result);
       t.refuted++;
       t.reasons.add(result.reason);
     } else if (result instanceof Decided) {
       t[result.outcome]++;
       if (result.reason !== undefined) t.reasons.add(result.reason);
-      for (const r of [...result.rests, ...rests]) t.rests.set(restKey(r), r);
+      for (const r of [...result.rests, ...rests]) t.rests.set(localKey(r), r);
     } else if (result instanceof Expr) {
       result.site = site;
       waitingClaims.add(result);
@@ -720,7 +789,9 @@ export const createKernel: CreateKernel2 = () => {
 
     if (fn instanceof KernelPrim) {
       if (v.args.length !== fn.arity) return new Refuted(`"${fn.name}" takes ${fn.arity} argument(s) and was given ${v.args.length}`, undefined);
-      if (fn.name === "claim") {
+      // An assumption a configuration has withdrawn is not taken on trust: it is a claim.
+      const withdrawn = fn.name === "assume" && (withdrawnSites.has(v.site ?? v) || withdrawnModules.has(v.owner?.module ?? ""));
+      if (fn.name === "claim" || withdrawn) {
         const { value: claimed, rests } = collecting(() => evaluate(v.args[0], scope));
         rests.forEach(rest);
         if (claimed instanceof Refuted) return tallied(v, claimed, rests);
@@ -736,8 +807,9 @@ export const createKernel: CreateKernel2 = () => {
         return tallied(v, new Expr(fn, [claimed]), rests);
       }
       if (fn.name === "assume") {
-        // The claim is not evaluated. The record says who assumed it: the module whose code this is.
-        const by: Rest = { kind: "assumption", by: v.owner?.module ?? "" };
+        // The claim is not evaluated. The record says who assumed it, the module whose code
+        // this is, and which assumption it is: the one written here.
+        const by: Rest = { kind: "assumption", by: v.owner?.module ?? "", at: out(v.site ?? v) };
         rest(by);
         return new Decided(TRUE, [by], "assumed");
       }
@@ -786,11 +858,25 @@ export const createKernel: CreateKernel2 = () => {
         return made;
       }
       if (fn.name === "then") {
-        // The first is needed, and only then the second. While the first waits, the second
-        // is evaluated ahead with no effect performed, so a refutation in it is found now.
-        const first = evaluate(v.args[0], scope);
-        if (first instanceof Refuted) return first;
-        if (known(first)) return evaluate(v.args[1], scope);
+        // The first is over, and only then the second. Over means its value is known and
+        // nothing that evaluating it started still goes on: a caller who writes `then` cannot
+        // see what a function it calls left going. While the first is not over, the second is
+        // evaluated ahead with no effect performed, so a refutation in it is found now.
+        const group: Group = thenGroups.get(v) ?? { pending: new Set(), refuted: undefined };
+        groups.push(group);
+        let first: V;
+        try {
+          first = evaluate(v.args[0], scope);
+        } finally {
+          groups.pop();
+        }
+        // A refutation in what the first started is a refutation of the first.
+        const wrong = first instanceof Refuted ? first : group.refuted;
+        if (wrong !== undefined) {
+          lookAhead(v.args[1], scope);
+          return wrong;
+        }
+        if (known(first) && group.pending.size === 0) return evaluate(v.args[1], scope);
         const before = ahead;
         ahead = true;
         let second: V;
@@ -800,6 +886,36 @@ export const createKernel: CreateKernel2 = () => {
           ahead = before;
         }
         if (second instanceof Refuted) return second;
+        const left = new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+        thenGroups.set(left, group);
+        return left;
+      }
+      if (fn.name === "also") {
+        // The first is started, and then the second; the second does not wait for the first.
+        const first = evaluate(v.args[0], scope);
+        if (first instanceof Refuted) {
+          lookAhead(v.args[1], scope);
+          return first;
+        }
+        if (known(first)) return evaluate(v.args[1], scope);
+        // A claim that waits holds what is written after it: no effect of it is performed.
+        const held = heldByClaim(first);
+        const before = ahead;
+        if (held) ahead = true;
+        let second: V;
+        try {
+          second = evaluate(v.args[1], scope);
+        } finally {
+          ahead = before;
+        }
+        if (second instanceof Refuted) return second;
+        // The second is known and nothing holds it: its value is given now, and the first
+        // goes on as work of this evaluation. Ahead of what is done nothing was started, so
+        // nothing goes on: the whole is evaluated again when it is really reached.
+        if (!held && !ahead && known(second)) {
+          started(first, scope);
+          return second;
+        }
         return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
       }
       if (fn.name === "attempt") {
@@ -1042,21 +1158,15 @@ export const createKernel: CreateKernel2 = () => {
       if (known(fn)) return new Refuted("a call on something that is not a function", fn);
       return new Expr(fn, v.args.map((a) => later(a, scope)));
     }
-    // A primitive function needs every argument, in full and left to right: its host code
-    // cannot evaluate, so a structure it is handed has every entry evaluated first.
-    // Once one argument waits, those after it are evaluated ahead with no effect performed,
-    // so the effects of two arguments never happen out of the order written.
+    // A primitive function needs every argument, in full: its host code cannot evaluate, so
+    // a structure it is handed has every entry evaluated first. The arguments are started
+    // left to right, and none waits for one before it: where one waits on a late answer, an
+    // effect in a later one is performed all the same. Need and `then` order effects.
     const args: V[] = [];
-    const before = ahead;
-    try {
-      for (const a of v.args) {
-        const r = inFull(a, scope);
-        if (r instanceof Refuted) return r;
-        if (!knownInFull(r)) ahead = true;
-        args.push(r);
-      }
-    } finally {
-      ahead = before;
+    for (const a of v.args) {
+      const r = inFull(a, scope);
+      if (r instanceof Refuted) return r;
+      args.push(r);
     }
     {
       if (fn.declaration.arity !== args.length)
@@ -1087,18 +1197,12 @@ export const createKernel: CreateKernel2 = () => {
     if (r instanceof Refuted) return r;
     const s = seen(r);
     if (s instanceof Struct && !settled.has(s)) {
-      // Once one entry waits, those after it are evaluated ahead with no effect performed.
-      const before = ahead;
-      try {
-        for (const [k, e] of s.entries) {
-          if (hidden(k)) continue;
-          step(); // a structure handed over whole costs a step for each entry
-          const x = inFull(e, scope);
-          if (x instanceof Refuted) return x;
-          if (!knownInFull(x)) ahead = true;
-        }
-      } finally {
-        ahead = before;
+      // The entries are started in order, and none waits for one before it.
+      for (const [k, e] of s.entries) {
+        if (hidden(k)) continue;
+        step(); // a structure handed over whole costs a step for each entry
+        const x = inFull(e, scope);
+        if (x instanceof Refuted) return x;
       }
     }
     return r;
@@ -1110,6 +1214,64 @@ export const createKernel: CreateKernel2 = () => {
    * and means there what it meant here. What needs no evaluation is
    * handed on as it is.
    */
+  /**
+   * After a refutation, what was written after it is still evaluated, ahead of what is done
+   * and with no effect, so that a further refutation in it is found and counted now. What it
+   * comes to is dropped. It is given half of the steps that are left, so that looking can
+   * never be what ends the evaluation at its limit.
+   */
+  const lookAhead = (rest: V, scope: ScopeV): void => {
+    const [outer, before] = [budget, ahead];
+    budget = spent + Math.floor((outer - spent) / 2);
+    ahead = true;
+    try {
+      evaluate(rest, scope);
+    } catch (e) {
+      if (!(e instanceof LimitReached || e instanceof RangeError)) throw e;
+    } finally {
+      budget = outer;
+      ahead = before;
+    }
+  };
+
+  /** Keeps an evaluation that waits, with the cells it waits on. */
+  const started = (value: V, scope: ScopeV): Root => {
+    const root: Root = { scope, value, done: false, waits: new Set(), queued: false, groups: [...groups], grouped: false };
+    for (const g of root.groups) g.pending.add(root);
+    settle(root);
+    roots.push(root);
+    rootOf.set(value, root);
+    return root;
+  };
+  /** Finds again what an evaluation waits on, after it was evaluated. */
+  const settle = (root: Root): void => {
+    root.waits = new Set();
+    sawGroup = false;
+    if (!root.done) waitsOn(root.value, root.waits as Set<V>, new Set());
+    root.grouped = sawGroup;
+  };
+  /** An evaluation is over: every sequence that waited for it is told, and may now go on. */
+  const finished = (root: Root): void => {
+    if (root.groups.length === 0) return;
+    for (const g of root.groups) {
+      g.pending.delete(root);
+      if (root.value instanceof Refuted && g.refuted === undefined) g.refuted = root.value;
+    }
+    for (const r of roots) {
+      if (r.done || r.queued || !r.grouped) continue;
+      r.queued = true;
+      ready.push(r);
+    }
+  };
+
+  /** True where what is left of a statement waits on a claim: such a statement holds what is written after it. */
+  const heldByClaim = (r: V): boolean => {
+    if (r instanceof Lazy) return !r.done && heldByClaim(r.value);
+    if (!(r instanceof Expr)) return false;
+    if (r.site !== undefined || r.fn === kernelPrims.get("claim")) return true;
+    return (r.fn === kernelPrims.get("also") || r.fn === kernelPrims.get("then")) && r.args.some(heldByClaim);
+  };
+
   /** The kernel's primitives that compute on data and do nothing else. */
   const ONE_STEP = new Set(["join", "length", "slice", "same", "count", "kind", "key", "symbol", "spelling"]);
   /** True for a pure primitive function, or such a kernel primitive, applied to values already known. */
@@ -1158,10 +1320,20 @@ export const createKernel: CreateKernel2 = () => {
     } else if (v instanceof Expr) {
       waitsOn(v.fn, found, visited);
       v.args.forEach((a) => waitsOn(a, found, visited));
+      // A sequence that waits for what its first part started waits on what that waits on.
+      const group = thenGroups.get(v);
+      if (group !== undefined && group.pending.size > 0) {
+        sawGroup = true;
+        for (const r of group.pending) waitsOn(r.value, found, visited);
+      }
     } else if (v instanceof Struct) {
       if (!settled.has(v)) v.entries.forEach(([, e]) => waitsOn(e, found, visited));
     } else if (v instanceof Decided) waitsOn(v.inner, found, visited);
     else if (v instanceof Lazy) waitsOn(v.value, found, visited);
+    else if (v instanceof NameRef) {
+      const at = bindingOf(v);
+      if (at !== undefined) waitsOn(at.binding.memo ?? at.binding.value, found, visited);
+    }
   };
 
   // ---- Reading ------------------------------------------------------------
@@ -1659,7 +1831,14 @@ export const createKernel: CreateKernel2 = () => {
       if (c.filled) throw new InterfaceError("fill: the cell is already filled");
       c.value = asData(into(value, "the value"), "what a cell is filled with");
       c.filled = true;
-      dirty = true;
+      fills++;
+      // What waits on this cell is taken up by the next `advance`, after what waits on cells
+      // filled before it. An evaluation with no cell in sight is taken up too, to be safe.
+      for (const root of roots) {
+        if (root.done || root.queued || !(root.waits.has(c) || root.waits.size === 0)) continue;
+        root.queued = true;
+        ready.push(root);
+      }
     },
     filled: (cell) => {
       const c = into(cell, "the cell");
@@ -1679,29 +1858,62 @@ export const createKernel: CreateKernel2 = () => {
       tallies = new Map();
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
-      if (r.ended === "complete" && !known(value)) {
-        const root: Root = { scope: s, value, done: false };
-        roots.push(root);
-        rootOf.set(value, root);
-      }
+      if (r.ended === "complete" && !known(value)) started(value, s);
       return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords() };
     },
     advance: (limits): Advance => {
-      if (!dirty) return { ended: "complete", steps: 0, refuted: [], claims: [] };
-      dirty = false;
+      if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies = new Map();
       const refuted: Value[] = [];
+      // Once one comes out refuted, no further effect is performed in this call: the rest
+      // are evaluated ahead, so their refutations are reported too, and they stay in the list
+      // for a later call to take up in earnest. Whether there is one is the launcher's to say.
+      let halted = false;
+      const held: Root[] = [];
       const r = within(limits, () => {
-        for (const root of roots) {
-          if (root.done) continue;
-          const next = evaluate(root.value, root.scope);
-          root.value = next;
-          rootOf.set(next, root);
-          if (next instanceof Refuted) refuted.push(out(next));
-          if (known(next)) root.done = true;
+        // Each is taken up once, in the order its answer arrived. One that a limit stops stays
+        // first in the list, so the next call goes on with it.
+        try {
+          while (ready.length > 0) {
+            const root = ready[0];
+            const before = fills;
+            const onlyAhead = halted;
+            if (!root.done) {
+              const was = ahead;
+              if (onlyAhead) ahead = true;
+              let next: V;
+              try {
+                next = evaluate(root.value, root.scope);
+              } finally {
+                ahead = was;
+              }
+              root.value = next;
+              rootOf.set(next, root);
+              if (next instanceof Refuted) {
+                if (!refuted.includes(out(next))) refuted.push(out(next));
+                halted = true;
+              }
+              if (known(next)) root.done = true;
+              settle(root);
+              if (root.done) finished(root);
+            }
+            ready.shift();
+            root.queued = false;
+            if (root.done) continue;
+            if (onlyAhead) held.push(root);
+            // A cell filled while it was being evaluated may have been passed already.
+            else if (fills !== before) {
+              root.queued = true;
+              ready.push(root);
+            }
+          }
+        } finally {
+          for (const root of held) {
+            root.queued = true;
+            ready.push(root);
+          }
         }
       });
-      if (r.ended === "limit") dirty = true;
       return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords() };
     },
     current: (value) => {
@@ -1787,6 +1999,16 @@ export const createKernel: CreateKernel2 = () => {
     moduleOf: (value) => {
       const v = into(value, "the value");
       return v instanceof Fn ? moduleIds.get(v) : undefined;
+    },
+    withdraw: (what) => {
+      if (typeof what === "string") {
+        if (!/^sha256:[0-9a-f]{64}$/.test(what)) throw new InterfaceError("withdraw: a module is named by its identity, as sha256: and 64 hex digits");
+        withdrawnModules.add(what);
+        return;
+      }
+      const e = into(what, "the assumption");
+      if (!(e instanceof Expr) || e.fn !== kernelPrims.get("assume")) throw new InterfaceError("withdraw: not an application of the kernel's assume primitive");
+      withdrawnSites.add(e.site ?? e);
     },
     inspectionRight: () => {
       let key = keys.get(INSPECT);

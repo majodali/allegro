@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
+import type { Kernel, Kernel2, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { createKernel, InterfaceError } from "./kernel.js";
 import { Refusal } from "./interface.js";
 import { load, type SavedProgram } from "./saved-program.js";
@@ -73,7 +73,7 @@ test("the kernel is passive and states its interface", () => {
   assert.deepEqual(k.waiting(), []);
   // The record of claims was added on 2026-11-18 (cluster 13 of the second review): with nothing to do, there are none.
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "slice", "spelling", "symbol", "then", "undecided"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["also", "assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "slice", "spelling", "symbol", "then", "undecided"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -539,8 +539,13 @@ test("ahead of what is done, a call with the same information is not opened agai
   assert.ok(said.length > 10 && said.every((n) => n === 1));
 });
 
-test("once an entry or an argument waits, what follows it performs no effect until it is done", () => {
-  const { k, add, call } = setup();
+// Until the ruling of 2026-11-19 on cluster 8 of the second review this test was "once an
+// entry or an argument waits, what follows it performs no effect until it is done", and
+// asserted that the second effect waited for the first. The maintainer ruled that effects are
+// not ordered unless need or `then` orders them, so that independent effects run at once:
+// the second effect is now performed while the first waits. The values are as before.
+test("entries and arguments are started in order and none waits for one before it", () => {
+  const { k, add, call, kp } = setup();
   const said: number[] = [];
   const say = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
   // A structure handed to a primitive function, whose first entry waits on a cell.
@@ -551,20 +556,32 @@ test("once an entry or an argument waits, what follows it performs no effect unt
   assert.equal(waits.ended, "complete", "a value that waits is not a limit and not a refutation");
   assert.equal(waits.refuted, false);
   assert.equal(k.waiting().length, 1, "the caller is told what it waits on");
-  assert.deepEqual(said, [], "the second entry's effect does not overtake the first's");
+  assert.deepEqual(said, [2], "the second entry's effect does not wait for the first's");
   k.fill(c, byte(k, 1));
   k.advance({ steps: 100 });
-  assert.deepEqual(said, [1, 2]);
+  assert.deepEqual(said, [2, 1], "each is performed once");
   assert.equal(num(k, k.current(waits.value)), 2);
   // The arguments of a primitive function, the same way.
   said.length = 0;
   const d = k.cell();
   const sum = k.evaluate(call(add, call(say, d), call(say, byte(k, 4))), scope);
-  assert.deepEqual(said, []);
+  assert.deepEqual(said, [4]);
   k.fill(d, byte(k, 3));
   k.advance({ steps: 100 });
-  assert.deepEqual(said, [3, 4]);
+  assert.deepEqual(said, [4, 3]);
   assert.equal(num(k, k.current(sum.value)), 7);
+  // With nothing late, the order is the order written, every time.
+  said.length = 0;
+  k.evaluate(call(add, call(say, byte(k, 5)), call(say, byte(k, 6))), scope);
+  assert.deepEqual(said, [5, 6]);
+  // `then` is what makes the second wait.
+  said.length = 0;
+  const e = k.cell();
+  k.evaluate(call(kp("then"), call(say, e), call(say, byte(k, 8))), scope);
+  assert.deepEqual(said, []);
+  k.fill(e, byte(k, 7));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [7, 8]);
 });
 
 test("a description made by code is read in full when it is built", () => {
@@ -974,10 +991,12 @@ test("an assumption is recorded as assumed, with the module that made it, and is
   const scope = k.scope();
   // module(out) => then(assume(isZero(out(5))), out(1)): the assumed claim would write 5 and is false.
   const out = k.param("out");
-  const m = k.module(k.composedFunction([out], k.structure([[null, call(kp("assume"), call(isZero, call(out, byte(k, 5))))], [null, call(out, byte(k, 1))]])), 0, [{ role: "capability", name: "output" }]);
+  const written = call(kp("assume"), call(isZero, call(out, byte(k, 5))));
+  const m = k.module(k.composedFunction([out], k.structure([[null, written], [null, call(out, byte(k, 1))]])), 0, [{ role: "capability", name: "output" }]);
   const [assumed, after] = k.entriesOf(k.evaluate(call(m, say), scope).value).map(([, v]) => k.evaluate(v, scope).value);
   assert.equal(k.outcomeOf(assumed), "assumed");
-  assert.deepEqual(k.restsOn(assumed), [{ kind: "assumption", by: k.moduleOf(m) }], "the record names the module, from the mark on its code");
+  // Since the ruling of 2026-11-19 the record also names the assumption itself, as written.
+  assert.deepEqual(k.restsOn(assumed), [{ kind: "assumption", by: k.moduleOf(m), at: written }], "the record names the module, from the mark on its code, and the assumption as written");
   assert.deepEqual(said, [1], "what was assumed was not evaluated; what follows goes ahead");
   assert.equal(num(k, after), 1);
   // A claim that rests on an assumption is no stronger than assumed.
@@ -985,7 +1004,8 @@ test("an assumption is recorded as assumed, with the module that made it, and is
   assert.equal(k.outcomeOf(resting.value), "assumed");
   assert.ok(k.restsOn(resting.value).some((r) => r.kind === "assumption"));
   // Code that belongs to no module assumes under no name.
-  assert.deepEqual(k.restsOn(k.evaluate(call(kp("assume"), byte(k, 0)), scope).value), [{ kind: "assumption", by: "" }]);
+  const bare = call(kp("assume"), byte(k, 0));
+  assert.deepEqual(k.restsOn(k.evaluate(bare, scope).value), [{ kind: "assumption", by: "", at: bare }]);
   // Nothing an assumption does makes a claim decided, and a claim that is simply true is still decided.
   assert.equal(k.outcomeOf(k.evaluate(call(kp("claim"), call(isZero, byte(k, 0))), scope).value), "decided");
 });
@@ -1658,4 +1678,417 @@ test("an argument that is one step of work on known values is evaluated at the c
   const r = k.evaluate(within(k, [[count, countFn]], call(count, byte(k, 250), byte(k, 0))), scope);
   assert.equal(r.ended, "complete");
   assert.equal(num(k, r.value), 250);
+});
+
+// ---- Statements that do not wait (the second review's cluster 8) --------------
+
+function sayer() {
+  const base = setup();
+  const said: number[] = [];
+  const say = base.k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a, c) => (said.push(c.bitsOf(a[0]).bytes[0]), a[0]) });
+  return { ...base, said, say };
+}
+
+test("also starts its first and then its second, and the second does not wait", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  // Nothing late: the order written.
+  assert.equal(num(k, k.evaluate(call(kp("also"), call(say, byte(k, 1)), call(say, byte(k, 2))), scope).value), 2);
+  assert.deepEqual(said, [1, 2]);
+  // The first waits on a late answer: the second is performed, and its value is given now.
+  said.length = 0;
+  const c = k.cell();
+  const r = k.evaluate(call(kp("also"), call(say, c), call(say, byte(k, 4))), scope);
+  assert.deepEqual(said, [4]);
+  assert.equal(k.kind(r.value), "bits", "the value is given, not held for the first");
+  assert.equal(num(k, r.value), 4);
+  assert.equal(k.waiting().length, 1, "the first goes on as work of the evaluation");
+  k.fill(c, byte(k, 3));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [4, 3], "the first is taken up when its answer arrives, once");
+  assert.deepEqual(k.waiting(), []);
+});
+
+test("a function gives its value while work it started goes on, and a refutation in that work is reported", () => {
+  const { k, add, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const c = k.cell();
+  // f() = also(say(c), 42): the caller goes on with 42.
+  const f = k.composedFunction([], call(kp("also"), call(say, c), byte(k, 42)));
+  assert.equal(num(k, k.evaluate(call(add, call(f), byte(k, 1)), scope).value), 43);
+  assert.deepEqual(said, []);
+  k.fill(c, byte(k, 9));
+  assert.deepEqual(k.advance({ steps: 100 }).refuted, []);
+  assert.deepEqual(said, [9]);
+  // Work that comes to a refutation after the value was given: the advance reports it.
+  const fails = k.primitiveFunction({ ...pure("fails", 61, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  const d = k.cell();
+  const r = k.evaluate(call(kp("also"), call(fails, d), byte(k, 5)), scope);
+  assert.equal(r.refuted, false);
+  assert.equal(num(k, r.value), 5);
+  k.fill(d, byte(k, 0));
+  assert.equal(k.advance({ steps: 100 }).refuted.length, 1);
+});
+
+test("a claim holds what is written after it: no later effect until it is decided, and none if it is refuted", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const x = k.param("x");
+  const run = (first: (c: Value) => Value) => {
+    const c = k.cell();
+    said.length = 0;
+    const r = k.evaluate(call(kp("also"), first(c), call(say, byte(k, 2))), scope);
+    return { c, r };
+  };
+  // A claim written as the statement.
+  const direct = run((c) => call(kp("claim"), call(isZero, c)));
+  assert.deepEqual(said, [], "held while the claim waits");
+  assert.equal(k.kind(direct.r.value), "expression", "and so is the value");
+  k.fill(direct.c, byte(k, 0));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [2], "decided: what follows goes on");
+  // Refuted: what follows is not performed.
+  const refuted = run((c) => call(kp("claim"), call(isZero, c)));
+  k.fill(refuted.c, byte(k, 7));
+  assert.equal(k.advance({ steps: 100 }).refuted.length, 1);
+  assert.deepEqual(said, []);
+  // A claim inside a function the statement calls, with a statement of the function's own after it, holds the same way.
+  const check = k.composedFunction([x], call(kp("also"), call(kp("claim"), call(isZero, x)), byte(k, 1)));
+  const nested = run((c) => call(check, c));
+  assert.deepEqual(said, []);
+  k.fill(nested.c, byte(k, 0));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [2]);
+  // A claim already refuted, or a statement already refuted, stops the block at once.
+  said.length = 0;
+  assert.equal(k.evaluate(call(kp("also"), call(kp("claim"), call(isZero, byte(k, 3))), call(say, byte(k, 2))), scope).refuted, true);
+  assert.deepEqual(said, []);
+});
+
+test("ahead of what is done, also starts nothing: each effect is performed once when it is reached", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const [c, d] = [k.cell(), k.cell()];
+  // then(say(c), also(say(d), say(2))): the whole second part is ahead while say(c) waits.
+  const r = k.evaluate(call(kp("then"), call(say, c), call(kp("also"), call(say, d), call(say, byte(k, 2)))), scope);
+  assert.deepEqual(said, []);
+  k.fill(c, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2], "reached: the second statement does not wait for say(d)");
+  assert.equal(num(k, k.current(r.value)), 2);
+  k.fill(d, byte(k, 3));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2, 3], "and say(d) is performed once");
+  // The same where the second's value is known ahead: the first is not started early.
+  said.length = 0;
+  const [e, f] = [k.cell(), k.cell()];
+  k.evaluate(call(kp("then"), call(say, e), call(kp("also"), call(say, f), byte(k, 9))), scope);
+  k.fill(f, byte(k, 5));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [], "say(f) is written after a `then` that still waits");
+  k.fill(e, byte(k, 4));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [4, 5]);
+});
+
+test("answers are acted on in the order they arrive, and what waits on another cell is left alone", () => {
+  const { k, add, call, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  // Three evaluations, started in this order, each waiting on its own cell.
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(say, c2), scope);
+  // The third has three applications left to do, and no effect.
+  const sum = k.evaluate(call(add, c3, call(add, c3, call(add, c3, byte(k, 1)))), scope);
+  // The second's answer arrives first.
+  k.fill(c2, byte(k, 2));
+  k.fill(c1, byte(k, 1));
+  const both = k.advance({ steps: 100 });
+  assert.deepEqual(said, [2, 1], "the order the answers arrived, not the order the evaluations were started");
+  assert.equal(both.steps, 2, "the third evaluation waits on neither cell and is not walked again");
+  assert.deepEqual(k.advance({ steps: 100 }), { ended: "complete", steps: 0, refuted: [], claims: [] }, "nothing new has arrived");
+  k.fill(c3, byte(k, 5));
+  assert.equal(k.advance({ steps: 100 }).steps, 3);
+  assert.equal(num(k, k.current(sum.value)), 16);
+  assert.deepEqual(k.waiting(), []);
+});
+
+test("an advance that a limit stops is gone on with by the next, and nothing is taken up twice", () => {
+  const { k, call, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2] = [k.cell(), k.cell()];
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(say, c2), scope);
+  k.fill(c1, byte(k, 1));
+  k.fill(c2, byte(k, 2));
+  const first = k.advance({ steps: 1 });
+  assert.equal(first.ended, "limit");
+  assert.deepEqual(said, [1]);
+  const second = k.advance({ steps: 10 });
+  assert.equal(second.ended, "complete");
+  assert.deepEqual(said, [1, 2]);
+});
+
+test("an evaluation that comes to wait on a new cell is taken up when that cell is filled", () => {
+  const { k, call, kp } = setup();
+  const cells: Value[] = [];
+  const late = k.primitiveFunction({ purity: "effectful", capability: "net", part: "read", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  // then(late(), then(late(), 9)): the second answer is asked for only when the first has come.
+  const r = k.evaluate(call(kp("then"), call(late), call(kp("then"), call(late), byte(k, 9))), k.scope());
+  assert.equal(cells.length, 1);
+  k.fill(cells[0] as never, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.equal(cells.length, 2, "now it waits on a cell that did not exist before");
+  // An answer nothing waits on wakes nothing: the evaluation is known to wait on the new cell only.
+  k.fill(k.cell(), byte(k, 0));
+  assert.equal(k.advance({ steps: 100 }).steps, 0);
+  k.fill(cells[1] as never, byte(k, 2));
+  k.advance({ steps: 100 });
+  assert.equal(num(k, k.current(r.value)), 9);
+});
+
+// ---- A failure is plain data (the second review's cluster 8) -----------------
+//
+// The kernel has nothing for a failure. These tests hold that the two functions
+// Allegretto ships for one, and the claim a notation writes for a statement whose value is
+// dropped, need no primitive beyond those the kernel has.
+
+function failures() {
+  const base = sayer();
+  const { k, call, kp } = base;
+  const sd = (name: string) => k.symbolData(name);
+  const [T, F] = [truth(k, true), truth(k, false)];
+  const [x, name, handler] = [k.param("x"), k.param("name"), k.param("handler")];
+  const firstKey = call(kp("key"), x, byte(k, 0));
+  // is_failure(x): a structure whose first entry is keyed `failure`.
+  const isFailure = k.composedFunction(
+    [x],
+    call(kp("if"), call(kp("same"), call(kp("kind"), x), sd("structure")),
+      call(kp("if"), call(kp("same"), call(kp("count"), x), call(kp("count"), k.structure([]))), F,
+        call(kp("if"), call(kp("same"), call(kp("kind"), firstKey), sd("symbol")), call(kp("same"), firstKey, sd("failure")), F)),
+      F),
+  );
+  // handle(x, name, handler): handler(x) where x is a failure of that name, and x otherwise.
+  const handle = k.composedFunction(
+    [x, name, handler],
+    call(kp("if"), call(isFailure, x), call(kp("if"), call(kp("same"), call(kp("get"), x, sd("failure")), name), call(handler, x), x), x),
+  );
+  const failure = (what: string) => k.structure([[k.symbol("failure"), sd(what)], [k.symbol("code"), byte(k, 7)]]);
+  // What a notation writes for a statement whose value is dropped: claim(!is_failure(a)).
+  const dropped = (a: Value) => call(kp("claim"), call(kp("if"), call(isFailure, a), F, T));
+  return { ...base, sd, isFailure, handle, failure, dropped };
+}
+
+test("a failure is plain data of one shape, told by a function written with the kernel's primitives", () => {
+  const { k, call, sd, isFailure, failure } = failures();
+  const scope = k.scope();
+  const is = (v: Value) => k.bitsOf(k.evaluate(call(isFailure, v), scope).value).bytes[0] === 1;
+  assert.equal(is(failure("file_missing")), true);
+  assert.equal(is(byte(k, 1)), false, "bits");
+  assert.equal(is(sd("failure")), false, "the symbol alone");
+  assert.equal(is(k.structure([])), false, "an empty structure");
+  assert.equal(is(k.structure([[null, sd("failure")]])), false, "an entry with no key");
+  assert.equal(is(k.structure([[k.symbol("code"), byte(k, 1)], [k.symbol("failure"), sd("late")]])), false, "the entry is not the first");
+});
+
+test("handle names the failure it handles, and lets any other through", () => {
+  const { k, call, sd, isFailure, handle, failure } = failures();
+  const scope = k.scope();
+  const x = k.param("x");
+  const nine = k.composedFunction([x], byte(k, 9));
+  assert.equal(num(k, k.evaluate(call(handle, failure("file_missing"), sd("file_missing"), nine), scope).value), 9);
+  assert.equal(num(k, k.evaluate(call(handle, byte(k, 3), sd("file_missing"), nine), scope).value), 3, "what is no failure is itself");
+  const other = call(handle, failure("no_permission"), sd("file_missing"), nine);
+  assert.equal(k.bitsOf(k.evaluate(call(isFailure, other), scope).value).bytes[0], 1, "a failure of another name is still a failure");
+});
+
+test("a statement whose value is dropped holds what follows until its answer comes, and a failure refutes it", () => {
+  const { k, call, kp, said, say, dropped, failure, isFailure } = failures();
+  const scope = k.scope();
+  const cells: Value[] = [];
+  const write = k.primitiveFunction({ purity: "effectful", capability: "files", part: "write", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  // write(); say(2), with the write's answer dropped.
+  k.evaluate(call(kp("also"), dropped(call(write)), call(say, byte(k, 2))), scope);
+  assert.deepEqual(said, [], "held: nobody has looked at the write's answer yet");
+  k.fill(cells[0] as never, k.structure([]));
+  assert.deepEqual(k.advance({ steps: 200 }).refuted, []);
+  assert.deepEqual(said, [2], "the write succeeded");
+  // The same, and the write fails.
+  said.length = 0;
+  k.evaluate(call(kp("also"), dropped(call(write)), call(say, byte(k, 2))), scope);
+  k.fill(cells[1] as never, failure("disk_full"));
+  assert.equal(k.advance({ steps: 200 }).refuted.length, 1, "a failure nothing handled");
+  assert.deepEqual(said, [], "and nothing written after it happened");
+  // r <- write(); say(2): the answer is bound, so nothing holds, and a failure is r's to handle.
+  said.length = 0;
+  const r = k.symbol("t.r");
+  const bound = k.evaluate(within(k, [[r, call(write)]], call(kp("also"), r, call(kp("also"), call(say, byte(k, 2)), call(isFailure, r)))), scope);
+  assert.deepEqual(said, [2], "at once");
+  k.fill(cells[2] as never, failure("disk_full"));
+  assert.deepEqual(k.advance({ steps: 200 }).refuted, [], "no refutation: the program reads the answer");
+  assert.equal(k.bitsOf(k.current(bound.value)).bytes[0], 1);
+});
+
+// ---- What a refutation halts (the second review's cluster 8) -----------------
+
+test("after a refuted statement the rest is evaluated ahead: a further refutation is counted, and no effect happens", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const v = k.symbol("t.v");
+  for (const order of ["then", "also"]) {
+    said.length = 0;
+    const [first, second] = [call(kp("claim"), call(isZero, byte(k, 3))), call(kp("claim"), call(isZero, byte(k, 4)))];
+    // claim(isZero(3)); say(1); claim(isZero(4))
+    const r = k.evaluate(call(kp(order), first, call(kp(order), call(say, byte(k, 1)), second)), scope);
+    assert.equal(r.refuted, true, order);
+    assert.deepEqual(said, [], "nothing written after the refuted claim is performed");
+    assert.deepEqual(r.claims.map((c) => [c.claim === first || c.claim === second, c.refuted]), [[true, 1], [true, 1]], "both refutations are reported");
+  }
+  // A claim that only receives the first refutation is not counted as a second one.
+  const made = call(kp("claim"), call(isZero, byte(k, 3)));
+  const rests = call(kp("claim"), call(isZero, v));
+  const one = k.evaluate(within(k, [[v, made]], call(kp("then"), v, rests)), scope);
+  assert.equal(one.refuted, true);
+  assert.deepEqual(one.claims.map((c) => c.refuted), [1], "one refutation, one record");
+});
+
+test("looking ahead after a refutation never ends the evaluation at its limit", () => {
+  const { k, add, isZero, call, kp } = setup();
+  // After the refuted claim, a sum of a hundred additions: more than all the steps that are left.
+  let sum: Value = byte(k, 0);
+  for (let i = 0; i < 100; i++) sum = call(add, sum, byte(k, 1));
+  const r = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 80 });
+  assert.equal(r.ended, "complete", "the refutation is the answer, not the limit");
+  assert.equal(r.refuted, true);
+  assert.ok(r.steps <= 45, `looking ahead takes at most half of what is left: ${r.steps}`);
+});
+
+test("a call of advance that meets a refutation performs no further effect, and a later call goes on", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(kp("claim"), call(isZero, c2)), scope);
+  k.evaluate(call(say, c3), scope);
+  // The answers arrive in this order: an effect, then what refutes, then another effect.
+  k.fill(c1, byte(k, 1));
+  k.fill(c2, byte(k, 7));
+  k.fill(c3, byte(k, 3));
+  const first = k.advance({ steps: 100 });
+  assert.equal(first.refuted.length, 1);
+  assert.deepEqual(said, [1], "what arrived before the refutation was done; what arrived after it is held");
+  // The launcher may end the phase here. If it calls again, what was held is done.
+  const second = k.advance({ steps: 100 });
+  assert.deepEqual(second.refuted, []);
+  assert.deepEqual(said, [1, 3]);
+  assert.deepEqual(k.waiting(), []);
+});
+
+// ---- Assumptions named and withdrawn; a sequence that waits for all (2026-11-19) ----
+
+test("what rests on an assumption names that assumption, and two of one module are told apart", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const [a1, a2] = [call(kp("assume"), call(isZero, byte(k, 0))), call(kp("assume"), call(isZero, byte(k, 3)))];
+  const [onFirst, onBoth] = [call(kp("claim"), a1), call(kp("claim"), call(kp("then"), a1, a2))];
+  const r = k.evaluate(k.structure([[null, onFirst], [null, onBoth]]), scope);
+  const [first, both] = k.entriesOf(r.value).map(([, v]) => k.evaluate(v, scope));
+  const at = (x: ReturnType<Kernel["evaluate"]>) => k.restsOn(x.value).filter((rest) => rest.kind === "assumption").map((rest) => (rest as { at?: Value }).at);
+  assert.deepEqual(at(first), [a1]);
+  assert.deepEqual(at(both), [a1, a2], "each assumption is named, though one module made both");
+  // The list of claims says the same, so a tool can list what rests on one assumption.
+  const resting = both.claims.find((c) => c.claim === onBoth);
+  assert.equal(resting?.assumed, 1);
+  assert.equal(resting?.restsOn.filter((rest) => rest.kind === "assumption").length, 2);
+});
+
+test("a withdrawn assumption is not taken on trust: it is evaluated as a claim", () => {
+  const { k, isZero, call, kp } = setup();
+  const scope = k.scope();
+  const [holds, fails] = [call(kp("assume"), call(isZero, byte(k, 0))), call(kp("assume"), call(isZero, byte(k, 3)))];
+  assert.equal(k.outcomeOf(k.evaluate(fails, scope).value), "assumed", "taken on trust, though it is false");
+  (k as Kernel2).withdraw(holds);
+  (k as Kernel2).withdraw(fails);
+  const checked = k.evaluate(holds, scope);
+  assert.equal(k.outcomeOf(checked.value), "decided", "checked, and it holds");
+  assert.deepEqual(k.restsOn(checked.value).filter((rest) => rest.kind === "assumption"), []);
+  const wrong = k.evaluate(fails, scope);
+  assert.equal(wrong.refuted, true, "checked, and it does not hold");
+  assert.equal(wrong.claims[0].claim, fails, "it is listed among the claims, as written");
+  // An assumption that was not withdrawn is still an assumption.
+  assert.equal(k.outcomeOf(k.evaluate(call(kp("assume"), call(isZero, byte(k, 3))), scope).value), "assumed");
+  // By module: every assumption its code makes.
+  const key = k.param("key");
+  const m = (k as Kernel2).module(k.composedFunction([key], call(kp("assume"), call(isZero, byte(k, 3)))), 1);
+  assert.equal(k.outcomeOf(k.evaluate(call(m), scope).value), "assumed");
+  (k as Kernel2).withdraw((k as Kernel2).moduleOf(m) as string);
+  const other = (k as Kernel2).module(k.composedFunction([key], call(kp("assume"), call(isZero, byte(k, 4)))), 1);
+  (k as Kernel2).withdraw((k as Kernel2).moduleOf(other) as string);
+  assert.equal(k.evaluate(call(other), scope).refuted, true);
+  assert.throws(() => (k as Kernel2).withdraw(call(kp("claim"), byte(k, 1))), /assume primitive/);
+  assert.throws(() => (k as Kernel2).withdraw("M"), /identity/);
+});
+
+test("then waits for everything its first started, and also does not", () => {
+  const { k, add, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  // leaves(c) = also(say(c), 42): it gives 42 and leaves say(c) going.
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(say, c), byte(k, 42)));
+  // then(leaves(c1), say(2)): the 2 is said only when what leaves() started is over.
+  const c1 = k.cell();
+  const r = k.evaluate(call(kp("then"), call(leaves, c1), call(say, byte(k, 2))), scope);
+  assert.deepEqual(said, [], "the first has given its value, and is not over");
+  assert.equal(k.kind(r.value), "expression");
+  k.fill(c1, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2]);
+  assert.equal(num(k, k.current(r.value)), 2);
+  assert.deepEqual(k.waiting(), []);
+  // also(leaves(c2), say(4)): the caller did not ask to wait.
+  said.length = 0;
+  const c2 = k.cell();
+  k.evaluate(call(kp("also"), call(leaves, c2), call(say, byte(k, 4))), scope);
+  assert.deepEqual(said, [4]);
+  k.fill(c2, byte(k, 3));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [4, 3]);
+  // A value computed from the first is still only the first's value: the wait is the then's.
+  said.length = 0;
+  const c3 = k.cell();
+  assert.equal(num(k, k.evaluate(call(add, call(leaves, c3), byte(k, 1)), scope).value), 43);
+  k.fill(c3, byte(k, 0));
+  k.advance({ steps: 100 });
+});
+
+test("a refutation in what a then's first started refutes the then, and the second is not done", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const fails = k.primitiveFunction({ ...pure("fails", 62, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(fails, c), byte(k, 42)));
+  const c1 = k.cell();
+  const r = k.evaluate(call(kp("then"), call(leaves, c1), call(say, byte(k, 2))), scope);
+  assert.equal(r.refuted, false);
+  k.fill(c1, byte(k, 0));
+  const advanced = k.advance({ steps: 100 });
+  assert.equal(advanced.refuted.length, 1, "one refutation, reported once");
+  assert.deepEqual(said, [], "the second was not done");
+  assert.equal(k.outcomeOf(k.current(r.value)), "refuted");
+});
+
+test("a then inside a then: each waits for what its own first started", () => {
+  const { k, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const c = k.param("c");
+  const leaves = k.composedFunction([c], call(kp("also"), call(say, c), byte(k, 42)));
+  const [c1, c2] = [k.cell(), k.cell()];
+  // then(then(leaves(c1), leaves(c2)), say(9))
+  k.evaluate(call(kp("then"), call(kp("then"), call(leaves, c1), call(leaves, c2)), call(say, byte(k, 9))), scope);
+  k.fill(c1, byte(k, 1));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1], "the inner then goes on to its second, which leaves say(c2) going; the outer still waits");
+  k.fill(c2, byte(k, 2));
+  k.advance({ steps: 100 });
+  assert.deepEqual(said, [1, 2, 9]);
 });

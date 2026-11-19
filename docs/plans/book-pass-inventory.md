@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 248 decisions in 6 parts and 38 chapters (231 when the phase closed; seventeen added by rulings since) after the preface and the tour. Part I: 23; Part II: 58; Part III: 26; Part IV: 64; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 214, implementation 18. By significance: 5: 38, 4: 70, 3: 78, 2: 40, 1: 6. By label: foundational 121, swappable 111. By status against the code: settled 93, partly built 62, open 77. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 249 decisions in 6 parts and 38 chapters (231 when the phase closed; eighteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 59; Part III: 26; Part IV: 64; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 215, implementation 18. By significance: 5: 38, 4: 71, 3: 78, 2: 40, 1: 6. By label: foundational 122, swappable 111. By status against the code: settled 93, partly built 64, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -37,12 +37,12 @@ As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed o
    - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; Describing a function requires authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
-7. **Evaluation** (12 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A block of bindings is one kernel primitive; A free name never gets a value; Effects on one capability keep their order; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; A loop written as a recursion runs in constant space.
+7. **Evaluation** (13 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A statement does not wait for the one before it; A block of bindings is one kernel primitive; A free name never gets a value; Need and `then` order effects, and nothing else does; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; A loop written as a recursion runs in constant space.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
-   - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; An evaluation can be returned as data; A failure a program can handle is supplied by an extension; Evaluation stops early for two reasons only.
+   - Decisions: Only the kernel records the outcome of a claim; A refutation marks everything computed from it; A refutation on a path that may be taken refutes the program; An evaluation can be returned as data; A failure a program can handle is plain data of one shape; Evaluation stops early for two reasons only.
 
 **Part III: Syntax and modules**
 
@@ -137,7 +137,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | Phases are hard-coded in the pipeline | The platform ships three phases: check, run and export | Phases | DR1, rulings of 2026-11-11 |
 | A failed return type does not halt | Type annotations on parameters and returns | The surface language | DR1, rulings of 2026-11-11 |
 | A refuted proof halts only after the program has run | Every program is evaluated the same way, however it arrives | Modules and programs | DR1, rulings of 2026-11-11 |
-| Effects are not gated on decided claims | The terminal and the browser ship output, timers and HTTP; A failure a program can handle is supplied by an extension | The launchers we ship; Correctness | DR1, rulings of 2026-11-11 |
+| Effects are not gated on decided claims | The terminal and the browser ship output, timers and HTTP; A failure a program can handle is plain data of one shape | The launchers we ship; Correctness | DR1, rulings of 2026-11-11 |
 | The standard language is host code holding writers; install operations, the `typed` flag, grammar lowering and 54 primitives are privileged | the decisions of Parts II to IV named on "Everything above the kernel is an extension, and there is one way to extend" | several | DR1, rulings of 2026-11-11 |
 | The platform with no extension loaded cannot load one | Startup, step by step | Tools | DR1, rulings of 2026-11-11 |
 | Installed hooks are opaque to partial evaluation | An extension is made of functions and metadata fields | Extensions | DR1, rulings of 2026-11-11 |
@@ -448,7 +448,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### Claims are evaluated like everything else
-- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
+- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the claim is refuted and its phase halts ("A refuted value never reaches an effect" says what that means). If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -461,13 +461,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every result says how strongly it holds"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
 - Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
 - Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "Every program is evaluated the same way, however it arrives".
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording made exact: "the phase halts" now points to the one meaning of the word.
 - Chapter: Keep it simple
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
 - Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
 
 #### A refuted value never reaches an effect
-- Decides: a value carrying a refuted claim never reaches an effect. A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it. A value carries only what was claimed of it and what its computation used, never its type's laws wholesale. After a phase has refuted a claim, it performs no further effect, though it goes on evaluating to report every refutation that does not rest on an earlier one. The result holds every undecided claim; whether a tool shows them is configuration.
+- Decides: a value carrying a refuted claim never reaches an effect. A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it. A value carries only what was claimed of it and what its computation used, never its type's laws wholesale. A refuted claim halts its phase, and that word has one meaning: the phase's result is refuted; nothing that needs the refuted value is performed, and nothing written after the refuted statement in its block; the launcher performs no further effect in that phase; and evaluation goes on, with no effect, to report every refutation that does not rest on an earlier one. A refutation comes before every effect only where a phase that holds no capability decided the claim first. In one run with late information, an effect written earlier, or one whose answer arrived earlier, is performed before a later claim is refuted. The result holds every undecided claim; whether a tool shows them is configuration.
 - Status: partly built; ruled 2026-11-11 (DR1); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -480,6 +481,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: a failed claim might not apply to an effect, though no example is known; the rule stands until a valid counter-example is found. A single phase with both the information and an output capability (a script run, the REPL) may perform an effect before it reaches a later false claim.
 - Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
 - Notes (2026-11-16, hand-off from the acceptance stream): reworded and retitled from "An effect consumes only values whose claims are decided", by the maintainer's ruling of 2026-11-15 in the acceptance stream's session (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 1 and ruling D): "In general the decision strength doesn't prevent effects, without some policy/configuration to require it." This settles issues 17 and 19 of the adversarial review: an effect no longer waits for a claim a run can never decide, and which effects precede a refutation is fixed by the check that runs before them.
+- Notes (2026-11-19, the second adversarial review, cluster 8): a claim written as a statement holds the statements written after it in its block: none of their effects is performed while the claim waits, and none at all if it is refuted ("A statement does not wait for the one before it"). The maintainer's case for it: an answer read at run time, `claim(answer == "yes")`, then a delete that takes none of the claimed values. An operation that needs authorization takes the token, and is checked earlier, so most such claims are decided before the capability is there.
+- Notes (2026-11-19, the second adversarial review, cluster 8): "halts" is given one meaning, by ruling. A reviewer found three: stop at the claim, go on and perform nothing, and the kernel never stops. Another ran two evaluations in one kernel, filled both their cells and called `advance` once: one was refuted and the other's write was performed in the same call. The kernel knows no phase, so the rule is put where it can be kept. The kernel's part: a call of `advance` that meets a refutation performs no further effect in that call and evaluates the rest ahead, so their refutations are reported too; what it held stays for a later call. After a refuted statement, `then` and `also` evaluate what was written after it ahead, with half of the steps left, so a further refutation is counted and looking never ends an evaluation at its limit; a claim that only receives an earlier refutation is not counted again. The launcher's part: it ends the phase, by not calling again. Built in the reference kernel.
 - Chapter: Keep it simple
 
 #### Correctness and safety are one kind of claim
@@ -1179,12 +1182,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: evaluating whatever the available information determines, needed or not (what "One operation: partial evaluation" could be read to say: it would perform effects nobody asked for)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. The maintainer asked whether "an argument is evaluated when it is needed" is a corollary of a broader rule, and the inventory had none. Open: whether a structure needs its entries. The maintainer prefers that entries are evaluated when needed too, and holds that the order of effects is to be settled another way: a way to determine the order of effects, and optionally to declare an order for particular effects, which is a topic of its own. Until then the reference kernel evaluates a structure's entries in order.
-- Notes (2026-11-16, the order of effects): the question this entry left open is ruled: a structure's entries are evaluated when needed, and the order of effects is settled by "Sequence is one kernel primitive" and "Effects on one capability keep their order". The alternative, a statement that needs its value in full, entries included, was set aside: it forces work nobody asked for and never returns for a structure without end. The standard language's check at the end of a text reports an effect that nothing needs, as it reports a name nothing binds. The reference kernel still evaluates a structure's entries when the structure is built; it changes with the primitive that reads an entry.
-- Notes (2026-11-16, entries evaluated when read, built): the reference kernel no longer evaluates a structure's entries when the structure is built. Three things came with building it. A primitive function needs its arguments in full: its host code cannot evaluate, so a structure it is handed has every entry evaluated first, in order. A caller of the interface is given the value it asked for and no more; a caller that wants a whole value evaluates the entries it reads. A refutation in an entry nothing reads refutes nothing, as the rule says of a refutation that stays where it arose. The kernel's own primitives are not under the rule for primitive functions: each needs only what it says, so reading one entry evaluates that entry and counting entries evaluates none. One of them, building a function from a description, reads its argument whole and so needs it in full. Where an entry or an argument waits, those after it perform no effect until it is done, which keeps the order of "Effects on one capability keep their order".
+- Notes (2026-11-16, the order of effects): the question this entry left open is ruled: a structure's entries are evaluated when needed, and the order of effects is settled by "Sequence is one kernel primitive" and "Need and `then` order effects, and nothing else does". The alternative, a statement that needs its value in full, entries included, was set aside: it forces work nobody asked for and never returns for a structure without end. The standard language's check at the end of a text reports an effect that nothing needs, as it reports a name nothing binds. The reference kernel still evaluates a structure's entries when the structure is built; it changes with the primitive that reads an entry.
+- Notes (2026-11-16, entries evaluated when read, built): the reference kernel no longer evaluates a structure's entries when the structure is built. Three things came with building it. A primitive function needs its arguments in full: its host code cannot evaluate, so a structure it is handed has every entry evaluated first, in order. A caller of the interface is given the value it asked for and no more; a caller that wants a whole value evaluates the entries it reads. A refutation in an entry nothing reads refutes nothing, as the rule says of a refutation that stays where it arose. The kernel's own primitives are not under the rule for primitive functions: each needs only what it says, so reading one entry evaluates that entry and counting entries evaluates none. One of them, building a function from a description, reads its argument whole and so needs it in full. Where an entry or an argument waits, those after it perform no effect until it is done, which keeps the order of "Need and `then` order effects, and nothing else does".
 - Chapter: Evaluation
 
 #### Sequence is one kernel primitive
-- Decides: the kernel primitive `then(first, second)` needs its first argument, and then its value is the second. It is the one way the order of a text becomes an order of evaluation: a body of statements is a chain of it. While the first waits, the second is evaluated ahead with no effect performed, so a refutation in it is found at once.
+- Decides: the kernel primitive `then(first, second)` needs its first argument to be over, and then its value is the second. Over means that the first's value is known and that nothing which evaluating it started still goes on: a caller who writes `then` cannot see what a function it calls left going. A refutation in that work refutes the `then`. It is the one way a text says that one thing is over before another starts. A body of statements is not a chain of it: its statements do not wait for each other. A notation offers a form whose statements are a chain of `then`; Allegretto writes it `sync`. While the first waits, the second is evaluated ahead with no effect performed, so a refutation in it is found at once.
 - Status: partly built (the reference kernel); ruled 2026-11-16
 - Type: capability
 - Rationale kind: technical
@@ -1194,6 +1197,24 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a body written as a structure, relying on the order of its entries (what the reference kernel did; it stops working when entries are evaluated when needed); a function of one unused parameter applied to the first statement (an unused argument is never evaluated); a shipped pure primitive that returns its second argument (its reference definition, a composed function, would not need the first)
 - Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. A function has one body expression, so "a body needs its statements in written order" had nothing to stand on; the acceptance stream's first-notation proposal met the gap and wrote statements as a structure's entries.
+- Notes (2026-11-19, the second adversarial review, cluster 8): the second and third sentences are changed by ruling. A body of statements was a chain of `then`, so the text ordered every effect; the maintainer ruled that nothing is ordered unless need or `then` orders it ("A statement does not wait for the one before it"), and that a block in sequence is offered as an option.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): "to be over" is added by ruling. A function may give its value and leave work going ("A statement does not wait for the one before it"), and `then` waited for the value only, so `then(save_all(docs), exit())` could exit with a write still going, and a cleanup written after a body could run before the body's work was over. The maintainer asked: "Should `then(a, b)` wait for `a` to finish all async effects before calling `b`?" Ruled: yes. A caller who writes `also`, or nothing, does not wait, so a handler still gives its reply and goes on to close its socket. Built in the reference kernel.
+- Chapter: Evaluation
+
+#### A statement does not wait for the one before it
+- Decides: the kernel primitive `also(first, second)` starts its first argument, then starts its second, and its value is the second's. A block's statements are a chain of it. The second does not wait for the first to be over: where the first waits on a late answer, an effect in the second is performed all the same. Where the second's value is known it is given at once, and what the first started goes on as work of the evaluation; a refutation in that work is reported when it is met. Two things hold the second back: a first that is refuted, and a first that waits on a claim, so a claim holds what is written after it in its block. The arguments of a primitive function and the entries of a structure needed in full are started the same way, in the order written, and none waits for one before it. With nothing late, effects happen in the order written, and the same program with the same information performs the same effects in the same order. A notation writes a statement whose value is dropped as a claim that the value is no failure. So such a statement holds what is written after it until its answer is known, and what runs at once is a statement whose value is bound, and the arguments of a call.
+- Status: partly built (the reference kernel; the translator of Allegretto still writes a block as a chain of `then`, and writes no claim for a dropped value); ruled 2026-11-19
+- Type: capability
+- Rationale kind: technical
+- Depends on: Sequence is one kernel primitive; An expression is evaluated when its value is needed
+- Significance: 4 — effects that do not depend on each other run at once, without the writer asking
+- Label: foundational — every block, and every call of a primitive function
+- Options recorded: statements in sequence by default, with running at once asked for (weighed on 2026-11-19 and not taken "until we've seen evidence it's necessarily better"; forgetting an order is then a fault, where the other way round forgetting costs speed); a block that is over only when everything it started is over (not taken: a function may give its value and leave work going)
+- Sources: the maintainer's rulings of 2026-11-19 (../records/book-pass/adversarial-review-2.md, Rulings taken, cluster 8)
+- Use case: `price(fetch(a)) + price(fetch(b))` has both requests in flight; a handler gives its reply and then checks whether to close its socket.
+- Notes: new, by ruling. The maintainer on what unordered means: "lack of explicit effect order doesn't mean indeterminacy. Two executions with the same information and inputs will still result in the same output including order of effects." On a block's value: "There may be some value in a function returning its value and allowing its calling expression to continue evaluation, while kicking off some asynchronous cleanup. An example might be an websocket request that returns a response and then checks if it should close the socket." On a claim: "refuted claims should block all effects written later in the same block". This reverses what the reference kernel did since 2026-11-16, when an argument or an entry that waited held back the effects of those after it.
+- Notes (2026-11-19, the second adversarial review, cluster 8): the last two sentences are added the same day, by the ruling on failures. The maintainer weighed a check that holds nothing against a claim that holds like any other, "if the claim is cleared at runtime then the two statements run at once, if not, then the `also` behaves like a `then`", and the second was ruled. It needs nothing of the kernel: the claim is an ordinary one.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): what a block leaves going is waited for by a `then` around it, and by nothing else ("Sequence is one kernel primitive").
 - Chapter: Evaluation
 
 #### A block of bindings is one kernel primitive
@@ -1222,17 +1243,18 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-17 (../records/book-pass/adversarial-review-2.md, Rulings taken)
 - Notes: new, by ruling. What once needed a free name no longer does: a name used before its definition is bound by the same block; a solver's unknown is a parameter; a value that arrives later is a cell a block binds the name to; a name in a description is data until it is built. The maintainer asked whether a free name can appear in a correct program; it cannot, except where it is never needed.
 - Chapter: Evaluation
-#### Effects on one capability keep their order
-- Decides: where need alone orders two effects, the order is fixed: a primitive function needs its arguments left to right. Effects on one capability keep the order that sequence and need give them, and no rewrite may change it. Effects on different capabilities are unordered unless an order between the two is declared; a capability's definition may also declare parts of itself unordered. An effect is performed only when every effect ordered before it has been performed, and otherwise stays in the residual, so a phase that holds one capability and lacks another cannot perform an order in part. The order is read from the residual of a phase that holds no capability, and a claim about it is stated over that residual's description. Two chains that each wait on a different late answer are not ordered: they act in the order the answers arrive, which is information like any other, unless an order is declared.
-- Status: open (the reference kernel performs nothing after a statement that waits, whatever the capability; declared orders are not built); ruled 2026-11-16
+#### Need and `then` order effects, and nothing else does
+- Decides: two effects are ordered where one needs the other's value, or where `then` orders them, and by nothing else: not by the capability they are on, and not by the text beyond the order in which its statements are started. A rewrite may swap two effects that neither orders, and never two that one of them orders. A capability's definition does not mark itself ordered. It offers patterns of use that order what must be ordered, written in Allegro with `then`: a prompt that writes and then reads, a block that takes a lock, does its work and releases it, a transaction, a timer or a log entry that waits for the work it times or reports. An operation that must follow another takes something the other returns. A project may claim an order over the description of a residual, read from the residual of a phase that holds no capability, and a tool may warn where nothing orders a combination of effects. A phase that holds one capability and lacks another performs what need and `then` allow. Two chains that each wait on a different late answer act in the order the answers arrive, which is information like any other.
+- Status: partly built (the reference kernel; the patterns of use, claims over an order and warnings are not built); ruled 2026-11-16, replaced 2026-11-19
 - Type: capability
 - Rationale kind: technical
 - Depends on: Sequence is one kernel primitive; An expression is evaluated when its value is needed; Authority is an unforgeable value; Phases are configuration
 - Significance: 4 — what an author, an optimiser and a pipeline of phases can each rely on
 - Label: foundational — every program that acts, every rewrite and every phase
-- Options recorded: need alone as the order (a rewrite by commutativity would swap two reads); one total order over all effects (no phase could perform some and leave others, and nothing could run in parallel); holding back every chain behind the first late answer (one slow answer blocks everything)
+- Options recorded: one total order over all effects (no phase could perform some and leave others, and nothing could run in parallel); holding back every chain behind the first late answer (one slow answer blocks everything); effects on one capability ordered and effects on different ones not, unless declared (the ruling of 2026-11-16, replaced: no one default fits inside a capability, where a console is ordered whole, a file store by path and web requests not at all); a capability marked ordered whole, by a key, or not at all (not taken: patterns of use say more and need no mark)
 - Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. The maintainer on 2026-11-15: "we need a way to determine effect ordering, and optionally declare ordering for specific effects". This settles what remained of issue 17 of the adversarial review.
+- Notes (2026-11-19, the second adversarial review, cluster 8): replaced by ruling, and retitled from "Effects on one capability keep their order". Two reviewers showed the decisions gave two answers for one program: this entry left effects on different capabilities unordered, while the text of a block and the reference kernel ordered everything. The review session proposed ordering everything unless a capability said otherwise. The maintainer: "my main reason for keeping ordering undefined is to allow concurrent execution wherever possible. My preference is for `then` to be only be used when two effects need ordering and evaluation order doesn't determine the required order. I would even allow undefined ordering on effects in a single capability". Twenty-two use cases were weighed (../records/book-pass/adversarial-review-2.md, cluster 8). Where an order is easy to forget, the maintainer ruled that "it's a stronger argument for designing those capabilities with more intuitive APIs - e.g. console `prompt` operation; file lock/operation/release blocks and mutexes and transactions more generally; timers and loggers that wait for the operations they are timing or logging to complete", and: "I don't think capabilities will be marked as wholly ordered or not." Sequence by default is not taken "until we've seen evidence it's necessarily better".
 - Chapter: Evaluation
 
 #### No argument can be inspected
@@ -1335,6 +1357,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a single pass, leaving anything unknown permanently residual (rejected)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Evaluation resumes on new information by forward chaining".
+- Notes (2026-11-19, the second adversarial review, cluster 8): with statements that do not wait, a late answer is the common way a body goes on after it has given its value, and the maintainer asked for the mechanism in detail. As it stood, each call of `advance` walked every unfinished evaluation from its top, in the order they were started, and spent their steps again. Ruled: a cell knows what waits on it; `advance` takes up only the waiters of cells filled since the last call, in the order the cells were filled, each once. Built in two steps: now the waiter is a whole unfinished evaluation; with the evaluator that keeps its own stack it is the computation at the point where it stopped, taken up there, with nothing walked or charged twice. The first step is built in the reference kernel.
 - Chapter: Evaluation
 
 #### The same program and the same information give the same result
@@ -1349,8 +1372,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken); docs/book/concepts.md §15, §28
 - Notes: replaces "Determinism and confluence of evaluation", which was open. It holds only if every cell is filled exactly once.
 - Notes (2026-11-16, the adversarial review's remaining issues): the second sentence is added by the maintainer's ruling of 2026-11-16 on issue 20.
-- Notes (2026-11-16, the order of effects): the order in which late answers arrive is information: two chains of effects that wait on different answers act in the order of arrival unless an order is declared ("Effects on one capability keep their order").
+- Notes (2026-11-16, the order of effects): the order in which late answers arrive is information: two chains of effects that wait on different answers act in the order of arrival unless an order is declared ("Need and `then` order effects, and nothing else does").
 - Notes (2026-11-18, the second adversarial review, cluster 7): an attempt's answer "limit" counts as information, like the order in which late answers arrive: what rests on it says so and is not carried to another evaluation.
+- Notes (2026-11-19, the second adversarial review, cluster 8): effects that nothing orders are still performed in one order, the order in which their statements are started; the order of late answers is information. The maintainer: "lack of explicit effect order doesn't mean indeterminacy."
 - Chapter: Evaluation
 
 #### Scopes layer by parent chain
@@ -1518,23 +1542,24 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-18, the second adversarial review, cluster 7): extended by ruling. Where steps run out differs with sharing, with the order answers arrive and with the kernel, and a program could branch on the answer, so a claim could come out two ways. A reviewer also recovered secret bytes from a function that compared them one at a time, by counting steps. The maintainer kept the primitive generally available, as with describing: step counts are observable as time is in any language; the kernel's comparison of two values takes steps by their size and not by their content; a project may claim that a module does not use the primitive. Set aside: attempting as a right code must be handed, which a check phase, holding no capability, could not give to the searches and proposal loops that run there.
 - Chapter: Correctness
 
-#### A failure a program can handle is supplied by an extension
-- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. An extension supplies it, as a field carried to every result with a writer anyone may use. Whether it is called an error or an exception, and how it is handled, is each extension's choice.
+#### A failure a program can handle is plain data of one shape
+- Decides: a failure that a program raises, inspects and recovers from is not a refutation: the program is not wrong, it is reporting an outcome. It is plain data of one shape, which every capability's definition and every notation uses: a structure whose first entry is keyed `failure` and holds a symbol naming what failed, with details after it. The kernel has nothing for it: telling a failure and handling one are functions written in Allegro. Nothing carries a failure along: handed to a primitive function it is outside the function's domain, which is a refutation. A notation claims of a statement whose value is dropped that the value is no failure, so a failure nothing handled is refuted, and where a check decides the claim from the statement's type it is decided before the program runs. How a language writes and handles a failure is that language's choice; the shape is shared.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
 - Depends on: An extension is made of functions and metadata fields; A refutation marks everything computed from it
 - Significance: 3 — keeps recoverable failure out of the kernel
 - Label: swappable — one extension's field and functions
-- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it)
+- Options recorded: an `error` field and `make_error` in the kernel (what the code does today; rejected by the kernel's own criterion: an extension can supply it); a field an extension owns, carried to every result computed from the failure (the ruling of 2026-11-11, replaced: the field has to be kept at run time and in an exported program, and it lets code go on computing with a failed value); a mark only the kernel can write, told by the kernel (weighed on 2026-11-19 and not taken: a primitive and a mark that must be kept at run time, where an agreed shape needs neither)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Errors as a viral metadata field". The maintainer: "exception" probably fits better than "error", and the choice is left to each extension. To be placed with the standard language in Part IV when that part is reviewed.
 - Held finding (2026-11-11, DR2): `error` is registered by the kernel and `make_error` is a base primitive (`src/capability.ts:182`).
 - Held finding (2026-11-10, from the pilot's review §7 item 3): a user-registered `viral` field stops computation (`src/evaluator.ts:745`–`746`).
+- Notes (2026-11-19, the second adversarial review, cluster 8): replaced by ruling, and retitled from "A failure a program can handle is supplied by an extension". It began with a failure that nothing reads: with statements that do not wait, `files.write(f, x)` on a line of its own gets its answer late, and a failure in it was lost. The maintainer's assumption: "operations that may return a catchable exception will have a return type that is a union of the success result type and all exception types, rather than having a separate 'throw' mechanism as other languages do. So a `check` on the return type would be useful to refute code that doesn't handle declared exceptions." And on the field this entry had: "I tend to think metadata fields should only by information that is likely removed by PE and doesn't have to be present in a fully optimized program at runtime." Three forms were compared: plain data of one shape, a mark of the kernel's, and the field. Ruled: plain data. The maintainer on the standard language: "I would have an extension type hierarchy in the standard language, but it would also include the `failure` field to remain compatible with Allegretto." Allegretto's two functions are `is_failure(x)` and `handle(x, name, handler)`; the reference kernel's tests hold that they need no primitive.
 - Chapter: Correctness
 
 #### Evaluation stops early for two reasons only
-- Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
+- Decides: the kernel stops an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1544,6 +1569,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: five classes of abort, capability denial and ill-formed application among them (what the inventory listed; three of the five are refutations or cannot arise)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: "halts" is kept for what a refuted claim does to its phase, so the kernel "stops" here.
 - Chapter: Correctness
 
 ### Parsing
@@ -2076,13 +2102,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (the code has an error value in a kernel field); ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A failure a program can handle is supplied by an extension; Types are values that constrain values; Metadata fields are independent
+- Depends on: A failure a program can handle is plain data of one shape; Types are values that constrain values; Metadata fields are independent
 - Significance: 3 — how a program reports and recovers
 - Label: swappable — another language on the kernel may choose otherwise
 - Options recorded: an error value in a field of the kernel (what the code does; rejected in the Part II review)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr4-part-4-the-standard-language.md, Rulings taken)
 - Notes: new, by ruling: the standard language's choice under Part II's decision. The maintainer preferred "exception" to "error".
 - Held finding (2026-11-12, DR4): `make_error` and the `error` field are kernel primitives (`src/primitives.ts:1107`).
+- Notes (2026-11-19, the second adversarial review, cluster 8): to be reworked with Part IV. By ruling, a failure is plain data of one shape and nothing carries it to later results ("A failure a program can handle is plain data of one shape"), so "carried to every result computed from it, in a field the standard extension owns" no longer stands. The maintainer's direction: an operation that may fail has a return type that is a union of its result and each failure; the failures are a hierarchy of types of the standard language, each with the `failure` entry Allegretto's shape has; a check refutes code that does not handle a declared failure.
 - Chapter: Types as values
 
 #### The core types are built over bits
@@ -2304,7 +2331,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written
-- Decides: private, protected, read-only and caller-based rules are claims about where an access was written. Each part of an expression carries a mark the kernel writes: the function it was written in, and through that the module. The mark stays with the part when a call is opened, and what a notation's form supplies carries the notation's mark while what the user wrote inside the form keeps the user's. No phase drops it and nothing can forge it. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
+- Decides: private, protected, read-only and caller-based rules are claims about where an access was written. Each part of an expression carries a mark the kernel writes: the function it was written in, and through that the module. The mark stays with the part when a call is opened, and what a notation's form supplies carries the notation's mark while what the user wrote inside the form keeps the user's. No phase drops it and nothing can forge it. Such a claim is refuted like any other; where a phase that holds no capability decides it, that is before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
 - Status: open, a design to prove; ruled 2026-11-12 (DR4); reworded 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -2316,6 +2343,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: these access patterns "are not really privacy concerns", they are "about interface, encapsulation and design discipline". To prove: an accessor reading the origin of its call; the four access patterns restated as claims; the cost of deciding such claims on real programs. A trusted module can still be led to access on another's behalf, which is why the key stays the foundation.
 - Notes (2026-11-17, the adversarial review's last issues): reworded by ruling, for issue 28. The entry rested on origins, which a phase may now drop, and "where it was written" had several answers once a call is opened or a form expands. The mark is the one "Describing a function requires authority" keeps on each part of a residual, made finer: the function, not only the module, because a protected member asks whether the access was written inside a method of a conforming type.
 - Notes (2026-11-17, the second adversarial review, cluster 4): the kernel now keeps the mark, with the function as well as the module. How a claim reads it is settled when the standard language's member rules are built.
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: "before any effect" holds for a pipeline with a check phase first, not for every run.
 - Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
@@ -2443,7 +2471,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### Statement forms that declare a binding
-- Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement halts when its check fails.
+- Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement is refuted when its check fails.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -2455,6 +2483,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/extension/grammar.md §4 (B-151 B1); docs/book/vivace/planning-dsl.md §6
 - Book home (fragments' proposal): Grammar and parser / cited from The planning DSL
 - Notes: added at stage B1 as one of three engine gaps closed for the first offside fragment, with layout terminals by name and labels as string literals.
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: a statement is refuted; it is a phase that halts.
 - Chapter: The surface language
 
 #### `when / is / then` pattern matching
@@ -2504,7 +2533,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Claims and proofs
 
 #### Nothing is a claim until someone makes it
-- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
+- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts its phase. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
 - Status: partly built; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
@@ -2898,7 +2927,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: When a check fails
 
 #### An assumption is always on the record
-- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired.
+- Decides: a trust boundary is a recorded assumption, with the strength assumed: `Law.assume`, `assume terminates`. A form that attaches a fact without recording it is retired. What rests on an assumption names the module whose code made it and the assumption itself, as written, so everything that rests on one assumption can be listed. A configuration may withdraw an assumption, one by one or every one a module makes: a withdrawn assumption is not taken on trust but evaluated as a claim, and comes out decided, refuted or undecided. Nothing assumes a claim false: the kernel derives nothing from an assumption, so there would be nothing to see; whoever doubts a claim withdraws it, or supplies a value that makes it false.
 - Status: partly built; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: vision
@@ -2911,6 +2940,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): standard/contracts
 - Notes: `assume_invariant` is still registered (`src/primitives.ts:4566`).
 - Notes (2026-11-18, the second adversarial review, cluster 5): the kernel writes the record: who assumed is the module whose code asked, taken from the mark on that code, so an assumption cannot be made under another's name or under none.
+- Notes (2026-11-19, rulings after the second adversarial review's cluster 8): the last three sentences are added by ruling. The maintainer asked whether a claim could be assumed false, or another's assumption overridden: "a user may decide claim assumed by a module is unreliable or concerning and want to analyze a program with that claim assumed false, to see the effect." Ruled: no way to assume a claim false; the record names the assumption; a configuration withdraws one. Built in the reference kernel: what a result rests on carries the assumption as written, and `withdraw` takes an assumption or a module's identity. The launcher's configuration for it is not built.
 - Chapter: When a check fails
 
 #### Every failure carries a legible counterexample
@@ -3183,7 +3213,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Plans as outcome graphs
 
 #### Two enforcement shapes for a well-formed plan
-- Decides: the plan constructor yields an error value in domain terms when a check fails (guarded construction, weaker than a halt), while a binding annotated `WellFormedPlan`, which the `plan` statement expands to, halts compilation.
+- Decides: the plan constructor yields an error value in domain terms when a check fails (guarded construction, weaker than a refutation), while a binding annotated `WellFormedPlan`, which the `plan` statement expands to, is refuted where its check fails.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -3195,6 +3225,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vivace/planning-dsl.md §7 (Two enforcement shapes); docs/plans/planning-pilot.md §2 item 4; CE-R8; D32
 - Book home (fragments' proposal): The planning DSL
 - Notes: every node-tree walk inside the predicate is `assume terminates`, since no verified `decreases` metric fits a walk into a child list (§6 table).
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: there is no compile time to halt ("Phases are configuration").
 - Chapter: Plans as outcome graphs
 
 #### Planning surface conventions
@@ -3295,6 +3326,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: auto-escalation (today)
 - Sources: docs/book/vivace/planning-dsl.md convention 9, §8
 - Book home (fragments' proposal): The planning DSL
+- Notes (2026-11-19, the second adversarial review, cluster 8): to be reworked with Part IV, with "The standard language's handled failure is an exception": a failure is returned as a value of a union type, with no separate way to throw.
 - Chapter: Plans as outcome graphs
 
 ### Finding solutions to a plan
@@ -3794,7 +3826,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/plans/release-track.md §3 D5; B-063; the maintainer's rulings of 2026-11-12 and 2026-11-13 (../records/book-pass/dr6-part-6-building-and-running.md, Rulings taken)
 - Use case: a library proves that mapping twice equals mapping once with the composed function; the optimiser fuses the two loops.
 - Notes: replaces "Laws licence rewrites"; answers the question two earlier reviews sent here, whether a capability's declared laws may license rewrites around its body.
-- Notes (2026-11-16, the order of effects): a rewrite never changes the order of effects on one capability ("Effects on one capability keep their order").
+- Notes (2026-11-16, the order of effects): a rewrite never changes the order of effects on one capability ("Need and `then` order effects, and nothing else does").
 - Chapter: Saved programs and export
 
 #### How extensions are distributed
@@ -4046,7 +4078,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The launchers we ship
 
 #### A late answer or its failure fills a cell as plain data
-- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. The standard language wraps each capability it ships so that a failure becomes an exception; another language may wrap it otherwise. A call on a capability the phase lacks stays residual; it does not fail.
+- Decides: a capability whose answer takes time returns a cell, which the launcher fills when the answer arrives. The launcher fills a cell with plain data: the answer, or a description of the failure, in the form the capability's definition states. A capability's definition gives the failure the shape every failure has ("A failure a program can handle is plain data of one shape"), so the launcher may fill the cell with it as it stands. A call on a capability the phase lacks stays residual; it does not fail.
 - Status: partly built; reworded 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
@@ -4061,6 +4093,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-13, DR6): a failed request fills the cell with an error value, and a call without the runtime for asynchronous values throws.
 - Notes (2026-11-13, after the adversarial review): the title is kept for now, though the launcher no longer makes the exception: a corpus file of the acceptance stream cites decisions by title, so a retitle is that stream's to coordinate. Answers issue 29 of the adversarial review: host code cannot write a field the standard language owns.
 - Notes (2026-11-15, titles made accurate): retitled from "A value that arrives later fills a cell, and a failure fills it with an exception": the launcher fills a cell with plain data, for an answer and for a failure alike, and the exception is the standard language's wrapper.
+- Notes (2026-11-19, the second adversarial review, cluster 8): two rulings. How much is in flight at once is the capability's business: the kernel starts everything it may, the capability's host code queues what it cannot run at once, and a capability may offer a pattern of use with a stated limit. Two more were ruled the same day. `fill` is to take up what waits on the cell itself and return what `advance` returns; each evaluation carries the budget it was started with; `advance` stays for going on after a limit and for filling several cells before any is acted on, which never changes what happens, only how fast; the change is made when the interface's two versions are made one. Only the launcher fills: a capability's host code hands the launcher the promise of its answer. A refutation that a fill returns ends the phase, and its claim records go into the phase's report. And a failure nothing reads is caught by a claim ("A failure a program can handle is plain data of one shape"). How a budget is filled up again at run time is left to a discussion of threads.
 - Chapter: The launchers we ship
 
 #### The browser launcher is one bundle

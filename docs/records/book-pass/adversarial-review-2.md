@@ -630,6 +630,281 @@ Ruled ("Ok - go ahead with those rulings"):
 Built: points 4 and 6. Point 7 comes with the evaluator's move off the
 host's stack.
 
+### Cluster 8: the order of effects (2026-11-19)
+
+The review session proposed that sequence and need order every effect,
+with "unordered" as a licence a capability's definition grants. The
+maintainer asked which finding wanted a default order. None did: two
+findings said the decisions gave two answers for one program.
+
+The maintainer: "my main reason for keeping ordering undefined is to
+allow concurrent execution wherever possible. My preference is for
+`then` to be only be used when two effects need ordering and
+evaluation order doesn't determine the required order. I would even
+allow undefined ordering on effects in a single capability - e.g.
+reading and writing files could happen asynchronously. What we need is
+a set of use cases to determine when ordering is and isn't necessary,
+in a single capability and across multiple."
+
+The use cases. "Decides" is need (the second uses the first's
+answer), the capability (its definition knows), or the writer.
+
+| # | Case | Order needed | Decides |
+|---|---|---|---|
+| 1 | Two lines written to the console | yes | the capability |
+| 2 | Two reads from standard input | yes | the capability |
+| 3 | Writes to two different files | no | nothing |
+| 4 | Write a file, then read it; two writes to one file | yes | the capability, by path |
+| 5 | Make a directory, then write a file in it; write a temporary file, then rename it | yes | the writer |
+| 6 | Two requests to different web addresses | no | nothing |
+| 7 | Send data to a service, then read it back | yes | the writer, or need |
+| 8 | Read a counter, then write it plus one | yes | need |
+| 9 | Read many module files at load | no | nothing |
+| 10 | Replies on one connection; requests on different ones | yes; no | the capability, by connection |
+| 11 | Write a prompt, then read the answer | yes | the writer |
+| 12 | Read a file, send its content over the network | yes | need |
+| 13 | Log "deleting", delete, log "deleted" | yes | the writer; need for the second log if it takes the delete's answer |
+| 14 | Read the clock, do work, read the clock | yes | the writer |
+| 15 | Take a lock, write, release it | yes | the writer, or need |
+| 16 | Charge a card, then ship | yes | need, if shipping takes the receipt |
+| 17 | Send an email and a text message | no | nothing |
+| 18 | Record a metric beside any other effect | no | nothing |
+| 19 | Fetch two pages, print both | fetches no; prints yes | the console; need |
+| 20 | Close a file after all writes to it | yes, after all of a set | need, if the close takes their answers |
+| 21 | Read an answer at run time, claim it is "yes", delete everything | yes | the writer: the delete takes none of the claimed value |
+| 22 | Try, catch and finally | catch by need; finally by `then` | the writer |
+
+What they showed: need settles many cases, and a capability's design
+can make it settle more; no one default fits inside a capability;
+across capabilities a short list needs an order with no data flowing
+(11, 13, 14, 15, 21).
+
+The maintainer's answers:
+
+- "lack of explicit effect order doesn't mean indeterminacy. Two
+  executions with the same information and inputs will still result in
+  the same output including order of effects."
+- On the cases where an order is easy to forget: "it's a stronger
+  argument for designing those capabilities with more intuitive APIs -
+  e.g. console `prompt` operation; file lock/operation/release blocks
+  and mutexes and transactions more generally; timers and loggers that
+  wait for the operations they are timing or logging to complete. I'm
+  in favor of having a synchronous block form as an option, and even
+  configurable warnings for when certain effect combinations are not
+  strictly ordered. I don't want to go down the synchronous by default
+  path until we've seen evidence it's necessarily better."
+- "I don't think capabilities will be marked as wholly ordered or
+  not."
+- On case 21: an operation that needs authorization takes the token
+  and is checked far earlier, and such claims are mostly decided
+  before the capability is there. "Nevertheless, I agree with your
+  recommendation - refuted claims should block all effects written
+  later in the same block."
+
+Ruled ("I agree with the other six"), of seven points:
+
+1. Unordered means the kernel starts statements in the order written
+   and none waits for an earlier one to be over. A statement waits
+   where it uses an earlier one's value, where `then` says so, or
+   behind a claim.
+2. A second kernel primitive, `also(first, second)`, is what a block's
+   statements are a chain of. `then` stays as the ordered one.
+3. Not taken as proposed. The review session proposed that a block is
+   over only when everything it started is over. The maintainer:
+   "There may be some value in a function returning its value and
+   allowing its calling expression to continue evaluation, while
+   kicking off some asynchronous cleanup. An example might be an
+   websocket request that returns a response and then checks if it
+   should close the socket." Built to that: a block gives its value as
+   soon as its last statement's value is known, and what it started
+   goes on as work of the evaluation.
+4. The arguments of a primitive function and the entries of a
+   structure needed in full are started in order and none waits. This
+   reverses what was built on 2026-11-16.
+5. A claim holds what is written after it in its block.
+6. A block in sequence is written `sync` in Allegretto.
+7. No capability is marked ordered. Its definition offers patterns of
+   use, written in Allegro with `then`. A project may claim an order
+   over a residual's description, and a tool may warn. Not built.
+
+What follows from the third point as built, put to the maintainer on
+the PR: a refutation in work that goes on after a value was given is
+reported by the `advance` that meets it; "finally" waits for a body's
+value and not for work the body chose to leave going; steps that work
+spends are charged to the `advance` that takes it up, not to an
+attempt that has answered.
+
+#### Late answers (2026-11-19)
+
+The maintainer, on the work that goes on after a value is given: "we
+should go into detail on the mechanism used when a capability's effect
+returns an asynchronous value, such as a file or network read or
+waiting for a write to complete. That's going to be the more common
+case for a body to continue processing after returning a value."
+
+The mechanism as it stood: an effectful primitive's host code starts
+the operation and returns a cell; the launcher fills the cell when the
+answer arrives and calls `advance`; `advance` walked every unfinished
+evaluation from its top, in the order they were started. Five
+shortfalls for a common path: every arrival walked everything; steps
+were spent again; the order was not the order of arrival; a failure
+nothing reads is lost; nothing bounds how much is in flight.
+
+Ruled ("I agree on 1, 2 & 5"):
+
+1. A cell knows what waits on it. `advance` takes up only the waiters
+   of cells filled since the last call, in the order the cells were
+   filled, each once.
+2. Two steps. Now the waiter is a whole unfinished evaluation. With
+   the evaluator that keeps its own stack, it is the computation at
+   the point where it stopped.
+5. How much is in flight is the capability's business.
+
+Built: the first step of point 2, with point 1.
+
+Point 3, whether `fill` takes up the waiters itself. The maintainer:
+a waiter that is a suspended evaluation "could include a reference to
+the step budget and timing counter(s) so an active `fill` would
+continue to use the current budget"; asynchronous work is mostly done
+at run time and budgets mostly at check time; the reasons for `fill`
+then `advance` look like batching and transactions, in which case "use
+of passive `fill` plus `advance` may be opt-in only". The review
+session found three more reasons, none needing the passive form by
+default: an answer must not be taken up in the middle of another
+computation; a host bounds one call's time at run time too; results
+need one place to land. Transactions are no reason: answers are acted
+on in the order of the fills, so filling several and then advancing
+does what advancing after each does.
+
+Ruled ("I agree with the four recommendations for point 3"):
+
+- `fill` takes up what waits on the cell and returns what `advance`
+  returns. Called while the kernel is evaluating, it is queued and
+  taken up before that call returns.
+- Each evaluation carries the budget it was started with.
+- `advance` stays for going on after a limit, and for filling several
+  cells before any is acted on.
+- It is made when the interface's two versions are made one, with the
+  acceptance stream, whose launcher calls `fill` and then `advance`.
+
+Two gaps the maintainer named. How a budget is filled up again at run
+time: "This is thread management, we should cover this and other
+details in a separate discussion on that." Open. And how what `fill`
+returns is used: only the launcher fills, since the kernel object
+stays with it, and a capability's host code hands the launcher the
+promise of its answer. A refutation ends the phase; claim records go
+into its report.
+
+Point 4, a failure that nothing reads. The maintainer: "`check`
+asserts program correctness, it does not handle runtime exceptions. My
+assumption is that operations that may return a catchable exception
+will have a return type that is a union of the success result type and
+all exception types, rather than having a separate 'throw' mechanism
+as other languages do." Then two alternatives: "have `then(a,b)` and
+`also(a,b)` claim their respective `a`s return a non-exception value",
+or have them test the result and return the exception. The second
+cannot work for `also`: by the time a late failure arrives the second
+has started and the block may have given its value.
+
+Whether that claim holds what follows: "(a) having the claim on the
+first not hold evaluation on the second - reversing a previous
+decision to have claims always hold; (b) if the claim is cleared at
+runtime then the two statements run at once, if not, then the `also`
+behaves like a `then`." The review session had argued for (a), and
+withdrew it: only a statement whose value is dropped is held, a bound
+one and the arguments of a call still run at once, and (b) needs
+nothing of the kernel.
+
+What a failure is. The review session first proposed a mark of the
+kernel's. The maintainer: "not sure why it has to be private. If
+`kind` is going to return a distinct value, it would be odd if it's
+inconsistent with the set of Value kinds", and "I tend to think
+metadata fields should only by information that is likely removed by
+PE and doesn't have to be present in a fully optimized program at
+runtime. Having exceptions denoted by a kernel authored mark also
+makes metadata mandatory at runtime. Perhaps we need to look at pros
+and cons of the different approaches before overriding the previous
+decision." Three forms were compared: plain data of one shape, a mark
+of the kernel's, and the ruled field an extension owns.
+
+Ruled ("I agree on all four"):
+
+1. A failure is plain data of one shape.
+2. Option (b), written by the notation: a statement whose value is
+   dropped is claimed to be no failure.
+3. `is_failure(x)` and `handle(x, name, handler)` are Allegretto
+   functions and no primitives. `handle` names the failure it handles,
+   as the maintainer asked in place of a function that ignores one.
+4. The ruled entry is reworded and retitled "A failure a program can
+   handle is plain data of one shape".
+
+The maintainer on the standard language: "I would have an extension
+type hierarchy in the standard language, but it would also include the
+`failure` field to remain compatible with Allegretto." So the shape is
+a structure whose first entry is keyed `failure`, where the review
+session had proposed the bare symbol as the first entry.
+
+Built: nothing in the kernel. Its tests hold that the two functions
+and the claim need no primitive.
+
+#### What a refutation halts (2026-11-19)
+
+The last three points of the cluster, ruled as proposed ("Agreed and
+confirmed on all three asks"):
+
+1. A call of `advance` that meets a refutation performs no further
+   effect in that call. The rest are evaluated ahead and stay for a
+   later call; the launcher says whether there is one.
+2. After a refuted statement the kernel evaluates what was written
+   after it ahead, to report further refutations. A claim that only
+   receives an earlier refutation is not counted again.
+3. "Halts" has one meaning, stated in "A refuted value never reaches
+   an effect": a refuted claim halts its phase. Six other entries used
+   the word, or "before any effect", otherwise and are corrected.
+
+Settled in building: looking ahead is given half of the steps that
+are left, so it never ends an evaluation at its limit. The maintainer
+on PR #258: "Halving the remaining budget is ok, but arbitrary. We
+could change it so that an evaluation that uses its budget but has a
+refutation, would still return the refutation. Not a high priority
+though." Filed with B-202 (threads and budgets at run time). The
+definition of "halts" was confirmed as written.
+
+The maintainer also confirmed the shape of a failure, a block giving
+its value early with what follows from it, and that a claim inside a
+called function holds as one written in the block does.
+
+With this cluster 8 is ruled. Two remain: notation (12) and wording
+(14). Open beside them, filed in the backlog: B-202 (threads and
+budgets at run time) and B-203 (streams, large data and asynchronous
+iteration).
+
+### Three questions after cluster 8 (2026-11-19)
+
+The maintainer asked three things before cluster 12.
+
+Whether a claim can be assumed false, or another's assumption
+overridden: "a user may decide claim assumed by a module is unreliable
+or concerning and want to analyze a program with that claim assumed
+false, to see the effect." The review session: the kernel derives
+nothing from an assumption, so assuming one false would show nothing.
+Ruled: no way to assume a claim false; what rests on an assumption
+names the assumption as written; a configuration may withdraw an
+assumption, which is then evaluated as a claim.
+
+Streams, large data and asynchronous iteration: a discussion of its
+own, filed as B-203 (streams, large data and asynchronous
+iteration) beside B-202 (threads and budgets at run time).
+
+"Should `then(a, b)` wait for `a` to finish all async effects before
+calling `b`?" Ruled: yes. `then` is the one word for "over", and a
+caller cannot see what a function it calls left going. A caller who
+does not write `then` does not wait. This replaces what PR #257 said
+of "finally": a cleanup written `then(attempt(body, n), cleanup)` now
+runs after everything the body started.
+
+Built in the reference kernel: all three.
+
 ## Terms introduced
 
 No terms introduced.

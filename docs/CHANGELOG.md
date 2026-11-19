@@ -574,6 +574,37 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-19 — `then` waits for all of its first; an assumption is
+  named and can be withdrawn.** Three rulings after cluster 8. In
+  `next/kernel/kernel.ts`: `then` starts its second when its first's
+  value is known and nothing the first started still goes on; what
+  rests on an assumption names the assumption as written; `withdraw`
+  makes the kernel evaluate an assumption as a claim. Two discussions
+  are filed in the backlog: threads and budgets at run time, and
+  streams, large data and asynchronous iteration.
+- **2026-11-19 — What a refutation halts (the second review's cluster
+  8, closed).** "Halts" has one meaning, in "A refuted value never
+  reaches an effect"; seven entries reworded. In
+  `next/kernel/kernel.ts`: a call of `advance` that meets a refutation
+  performs no further effect in that call; after a refuted statement
+  the rest is evaluated ahead, so a further refutation is counted, and
+  one that only rests on an earlier one is not.
+- **2026-11-19 — Statements do not wait (the second review's cluster
+  8, the order of effects).** Ruled: need and `then` order effects,
+  and nothing else does, so that effects which do not depend on each
+  other run at once. In `next/kernel/kernel.ts`: a new primitive,
+  `also(first, second)`, starts both and gives the second's value
+  while the first goes on; a claim holds what is written after it;
+  the arguments of a primitive function and the entries of a structure
+  needed in full no longer wait for one before them. Allegretto's
+  block is a chain of `also`, and `sync` writes a block in sequence.
+  One entry retitled, one added: 249 decisions. And for late answers:
+  a waiting evaluation knows its cells, and `advance` takes up only
+  what waited on a cell that was filled, in the order the cells were
+  filled. And for failures: a failure is plain data of one shape, with
+  `is_failure` and `handle` as Allegretto functions; a statement whose
+  value is dropped stands for a claim that it is no failure. One more
+  entry retitled.
 - **2026-11-18 — Recursion, loops and strength (the second review's
   cluster 9).** Ruled: the kernel never assumes a claim at a recursive
   call and gets no induction rule; the standard language's analysis
