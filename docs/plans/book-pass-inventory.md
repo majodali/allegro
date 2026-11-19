@@ -1007,6 +1007,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-13, DR6): was "Machine arithmetic is a capability that ships with the platform": it performs no effect, so it is a set of pure primitives.
 - Notes (2026-11-16, Allegretto's forms): a primitive function applied outside its domain gives a refutation, by ruling: division by zero, a place outside a structure. A handled failure does not exist below the standard language, whose operators may wrap a primitive to raise an exception.
 - Notes (2026-11-16, the shipped primitives built): 22 primitives in `next/prims/index.ts`: signed 64-bit integer arithmetic, wrapping, with division truncated toward zero; the signed orderings; an integer's decimal text and back; binary64 float arithmetic, two orderings and text; the two conversions. Integer division by zero refuses; float division by zero follows IEEE 754.
+- Notes (2026-11-19, the second adversarial review, cluster 12): four are added by ruling, for gaps a reviewer found in ordinary programs: `float.eq`, `float.gt` and `float.ge`, since comparing two floats by their bits answers wrongly for the two zeros and for what is not a number; and `bits.int`, which reads at most 64 bits as a whole number, so that one byte of a text can be compared as a number. 26 shipped.
 - Chapter: Authority
 
 ### Metadata
@@ -1228,6 +1229,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: recursion by handing a function to itself as an argument (the acceptance stream's first emitter: the public function is a wrapper, so a repeated call cannot be recognised and the function has two identities); a primitive that makes a scope as a value (removed by the rulings on values and descriptions); a node of its own in the saved-program data form (not needed: a block is an application of the primitive to a structure keyed by names)
 - Sources: the maintainer's rulings of 2026-11-16 (../records/book-pass/adversarial-review.md, Rulings taken); next/ext/allegretto/forms.md §4
 - Notes: new, by ruling: Allegretto's forms, as ruled, name the block of bindings as what a block stands for. A binding at a place, `x <- e`, is a block that binds `x` around a sequence that needs `x` first.
+- Notes (2026-11-19, the second adversarial review, cluster 12): Allegretto's `x <- e` opened a block of its own, so a binding written after it, `y = x + 1`, was outside that block and waited for ever, or took an outer `x`; a reviewer ran it, and the acceptance stream's reader refused such a text. Ruled: `x <- e` is a binding of the one group of the block it stands in, and a statement at its place; a statement above it that needs the name is refused by the reader.
 - Chapter: Evaluation
 
 
@@ -1689,7 +1691,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### A terminal is a function, so a grammar can define its own
-- Decides: a terminal is a function from the parser's position and state to a match or a failure. The terminals the engine's package ships, those for indentation among them, have no special standing.
+- Decides: a terminal is a function from the parser's position and state to a match or a failure. The terminals the engine's package ships, those for indentation among them, have no special standing. The state has an equality, and the engine keeps what it has tried by rule, position and state. A rule that recurses on the left and is entered again at the same position with a changed state is refused by the engine, since such a recursion need not end.
 - Status: open (terminals are cases of the host engine); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
@@ -1700,6 +1702,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling.
 - Held finding (2026-11-12, DR3): the terminals are a closed set implemented in the engine (`src/grammar2/engine.ts`).
+- Notes (2026-11-19, the second adversarial review, cluster 12): the last two sentences are added by ruling. A terminal may change the state and match no text, as the indentation terminals do, so the usual argument that left recursion ends, finitely many pairs of rule and position, fails. The maintainer: "Agreed - or the parser engine simply prevents it." Not built: the engine written in Allegretto does not exist yet.
 - Chapter: Parsing
 
 #### Offside rule through stateful indent terminals

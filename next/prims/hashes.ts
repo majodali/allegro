@@ -1,7 +1,11 @@
 // Written by `npx tsx next/prims/hash-source.ts --write`. Do not edit: a test compares it with the source.
 export const HASHES: Readonly<Record<string, string>> = {
+  "bits.int": "sha256:805ce816a8d1d29b0b0f1bb0a882a0dfb7dcad05e1948a4800549dfd6862d0ab",
   "float.add": "sha256:e516ff409c3576c6ec4d953a355127b70f013bb945663a984b150a6d01c7bd88",
   "float.div": "sha256:aff62015e8a125453591103be11657400f858c7773fc092def868541c83ca969",
+  "float.eq": "sha256:d6390b6eb6c924803092ba752f7741f826310a2cc9fcc1ede2ad0d776f04700c",
+  "float.ge": "sha256:baf1e836094df7a95f7658b9b3f6c9d76f9f49b07ae023f05714731f510535e5",
+  "float.gt": "sha256:f79d58764e2d98df37ebd294e3b04f623e813f0f95dc60d75452b8e84cfaf52a",
   "float.int": "sha256:b40d5fc9492cfd6a5a664914e36de1e91af446a01e99aaf6bcd04debfcdb7f18",
   "float.le": "sha256:5957dcc0d2f9108b0da674306d4445daaeea2a4b82de63389f16480d2fba2372",
   "float.lt": "sha256:f5242830e827c0ed725f52665d813a53c794d29791985b7020998baaeb29d5ac",

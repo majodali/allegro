@@ -41,7 +41,8 @@ test("the shipped primitives are listed in name order, each with its own content
   for (const p of shipped) assert.match(p.hash, /^sha256:[0-9a-f]{64}$/);
   // The names Allegretto's forms give, section 3.
   assert.deepEqual(names, [
-    "float.add", "float.div", "float.int", "float.le", "float.lt", "float.mul", "float.neg", "float.sub", "float.text",
+    "bits.int",
+    "float.add", "float.div", "float.eq", "float.ge", "float.gt", "float.int", "float.le", "float.lt", "float.mul", "float.neg", "float.sub", "float.text",
     "int.add", "int.div", "int.float", "int.ge", "int.gt", "int.le", "int.lt", "int.mod", "int.mul", "int.neg", "int.sub", "int.text", "text.int",
   ]);
 });
@@ -118,6 +119,25 @@ test("float arithmetic and orderings follow IEEE 754", () => {
   assert.equal(asTruth("float.le", float(1.5), float(1.5)), true);
   assert.equal(asTruth("float.lt", float(NaN), float(1)), false);
   assert.equal(asTruth("float.le", float(NaN), float(NaN)), false);
+  // Added on 2026-11-19: `==` compares bits, so a float needs comparisons of its own.
+  assert.equal(asTruth("float.eq", float(1.5), float(1.5)), true);
+  assert.equal(asTruth("float.eq", float(0), float(-0)), true, "zero equals negative zero, though their bits differ");
+  assert.equal(asTruth("float.eq", float(NaN), float(NaN)), false, "what is not a number equals nothing, though its bits equal themselves");
+  assert.equal(asTruth("float.gt", float(2), float(1.5)), true);
+  assert.equal(asTruth("float.gt", float(1.5), float(1.5)), false);
+  assert.equal(asTruth("float.ge", float(1.5), float(1.5)), true);
+  assert.equal(asTruth("float.ge", float(NaN), float(1)), false);
+});
+
+test("bits.int reads up to 64 bits as a whole number", () => {
+  const bits = (bytes: number[], length?: number): Value => k.bits(Uint8Array.from(bytes), length);
+  assert.equal(asInt("bits.int", bits([0x41])), 65n, "one byte of a text: the letter A");
+  assert.equal(asInt("bits.int", bits([0xff])), 255n, "widened with zeros, never with the sign");
+  assert.equal(asInt("bits.int", bits([0x01, 0x00])), 256n);
+  assert.equal(asInt("bits.int", bits([])), 0n, "no bits is zero");
+  assert.equal(asInt("bits.int", bits([0x05], 3)), 5n, "three bits");
+  assert.equal(asInt("bits.int", int(-1n)), -1n, "64 bits are the integer they are");
+  assert.match(refusal("bits.int", bits([1, 2, 3, 4, 5, 6, 7, 8, 9])), /at most 64 bits/);
 });
 
 test("a float's text is the shortest that reads back, and floats and integers convert", () => {

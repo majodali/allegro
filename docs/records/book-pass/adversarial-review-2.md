@@ -913,11 +913,35 @@ row for `export`; where an indented block may stand; that `read` in
 the examples is no shipped operation; how emptiness and a number as a
 condition are written. The example `is_int` had gone with cluster 11.
 
-Put to the maintainer and not yet ruled: `x <- e` as a binding of its
-block's one group; "a notation only adds" as a claim that a check
-decides; the boundary at a statement that changes the grammar; the
-engine's table keyed by state; dotted names as structures, what
-`attempt` answers, and four primitives.
+Five points were put to the maintainer. Ruled on 2026-11-19:
+
+1. `x <- e` is a binding of its block's one group and a statement at
+   its place. A statement above the arrow that needs the name is
+   refused by the reader. ("Agreed")
+4. The parser's state has an equality and the engine keeps what it has
+   tried by rule, position and state. A left-recursive rule entered
+   again at one position with a changed state is refused: "Agreed - or
+   the parser engine simply prevents it."
+5. `int`, `float`, `text` and `bits` are structures Allegretto binds.
+   `attempt` answers the value itself, or a failure named `refuted` or
+   `limit`. Four primitives are added: `float.eq`, `float.gt`,
+   `float.ge` and `bits.int`. ("Agreed on all")
+
+Built: the four primitives; the forms document. `attempt`'s answer is
+built in a pull request of its own, because a test of the acceptance
+stream reads the answer's present shape.
+
+Agreed in principle, with questions the maintainer asked:
+
+2. "A notation only adds." What an owner's alternative is; what it
+   means to add reserved words only to a set one owns; whether a
+   terminal's own state is state the new grammar declares; and
+   "couldn't analysis of the grammar additions directly tell us if it
+   breaks those rules?"
+3. The boundary at a statement that changes the grammar: "Is this
+   regarding grammars that create a new statement for changing
+   grammar? If it's a wholly new grammar, can we use 'statement
+   boundary'?"
 
 ## Terms introduced
 

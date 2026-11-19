@@ -90,8 +90,18 @@ function floatText(x: number): string {
 
 /** Every shipped primitive, in name order. */
 export const shipped: readonly Pure[] = [
+  primitive("bits.int", 1, "the bits of a value of at most 64 bits, read as a whole number with the most significant bit first, as a signed 64-bit integer; a value of 64 bits is that integer; refused for more than 64 bits", (a, c) => {
+    const b = c.bitsOf(a[0]);
+    if (b.bitLength > 64) throw new Refusal("bits.int takes at most 64 bits");
+    let n = 0n;
+    for (const byte of b.bytes) n = (n << 8n) | BigInt(byte);
+    return fromInt(BigInt.asIntN(64, n & ((1n << BigInt(b.bitLength)) - 1n)), c);
+  }),
   float2("float.add", "the sum of two binary64 floats, rounded to nearest, ties to even", (a, b) => a + b),
   float2("float.div", "the quotient of two binary64 floats, rounded to nearest, ties to even; division by zero follows IEEE 754", (a, b) => a / b),
+  floatTest("float.eq", "true where two binary64 floats are equal as numbers: zero equals negative zero, and what is not a number equals nothing", (a, b) => a === b),
+  floatTest("float.ge", "true where the first binary64 float is greater than or equal to the second; false where either is not a number", (a, b) => a >= b),
+  floatTest("float.gt", "true where the first binary64 float is greater than the second; false where either is not a number", (a, b) => a > b),
   primitive("float.int", 1, "a binary64 float truncated toward zero to a signed 64-bit integer; refused where it is not a number or does not fit", (a, c) => {
     const x = float("float.int", a[0], c);
     if (!Number.isFinite(x)) throw new Refusal("float.int takes a finite float");
