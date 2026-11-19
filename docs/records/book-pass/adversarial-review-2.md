@@ -847,10 +847,31 @@ session had proposed the bare symbol as the first entry.
 Built: nothing in the kernel. Its tests hold that the two functions
 and the claim need no primitive.
 
-Still to rule in this cluster, proposed and not yet answered: that a
-call of `advance` that meets a refutation performs no further effect;
-that the kernel evaluates ahead after a refuted statement to report
-more refutations; and one meaning for "halts".
+#### What a refutation halts (2026-11-19)
+
+The last three points of the cluster, ruled as proposed ("Agreed and
+confirmed on all three asks"):
+
+1. A call of `advance` that meets a refutation performs no further
+   effect in that call. The rest are evaluated ahead and stay for a
+   later call; the launcher says whether there is one.
+2. After a refuted statement the kernel evaluates what was written
+   after it ahead, to report further refutations. A claim that only
+   receives an earlier refutation is not counted again.
+3. "Halts" has one meaning, stated in "A refuted value never reaches
+   an effect": a refuted claim halts its phase. Six other entries used
+   the word, or "before any effect", otherwise and are corrected.
+
+Settled in building: looking ahead is given half of the steps that
+are left, so it never ends an evaluation at its limit.
+
+The maintainer also confirmed the shape of a failure, a block giving
+its value early with what follows from it, and that a claim inside a
+called function holds as one written in the block does.
+
+With this cluster 8 is ruled. Two remain: notation (12) and wording
+(14). Open beside them: how a budget is filled up again at run time,
+for a discussion of threads.
 
 ## Terms introduced
 

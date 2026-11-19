@@ -419,6 +419,12 @@ export interface Kernel {
    * Where a limit stops the call, the next call goes on with what was
    * being taken up, and then with the rest.
    *
+   * Once an evaluation comes out refuted, the call performs no further
+   * effect: the evaluations still to be taken up are evaluated ahead, so
+   * their refutations are reported in `refuted` too, and they stay for a
+   * later call. A launcher that ends its phase at a refutation does not
+   * call again; one that goes on calls again, and what was held is done.
+   *
    * In this version what is taken up is a whole evaluation, walked again
    * from its top, so steps already spent on it are spent again. Taking
    * up the computation at the point where it stopped comes with the

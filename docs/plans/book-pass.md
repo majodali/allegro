@@ -1608,8 +1608,10 @@ its approval.
 - **2026-11-19 — the second review's cluster 8, the order of effects,
   ruled and built** (the review session): statements do not wait;
   `also` beside `then`; late answers taken up in the order they
-  arrive. Three points of the cluster wait for a ruling. 249
-  decisions.
+  arrive; a failure is plain data. 249 decisions.
+- **2026-11-19 — the second review's cluster 8 closed** (the review
+  session): what a refutation halts, ruled and built. Clusters 12 and
+  14 remain.
 
 ## 8. Sessions
 

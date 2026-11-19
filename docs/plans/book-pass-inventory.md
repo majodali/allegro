@@ -448,7 +448,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### Claims are evaluated like everything else
-- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the phase halts. If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
+- Decides: a claim about a program (a type, a contract, a theorem) is an expression, and a phase evaluates it. If it comes out true, the claim is discharged and disappears from the residual. If it comes out false, the claim is refuted and its phase halts ("A refuted value never reaches an effect" says what that means). If the phase's information cannot decide it, the claim stays in the residual, visibly undecided, for a later phase. A claim is never reported as refuted because it could not be decided. A claim is written in whichever language on the platform suits it best: the language of the program it is about, or another, such as one with logical quantifiers that the program's own language lacks; it needs no separate specification system.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -461,13 +461,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Compile-time first: failures halt the build" and merges the review's proposals "A pending claim never halts; a refuted one does" and, in part, "Performance is never traded for safety" (its remainder, never silently weakened, goes to "Every result says how strongly it holds"). The two weaker paths of CE-R8 (construction-path invariant failure, non-exhaustive match) are re-read against this decision in their parts.
 - Held finding (2026-11-11, DR1): a declared return type that fails does not halt: `f(x: Int): Bool => x + 1` runs and exits 0 (`src/runtime.ts:864`–`877`). Held on "Type annotations on parameters and returns".
 - Held finding (2026-11-11, DR1): a refuted proof halts only after the whole evaluation loop (`src/runtime.ts:1686`–`1703`). Held on "Every program is evaluated the same way, however it arrives".
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording made exact: "the phase halts" now points to the one meaning of the word.
 - Chapter: Keep it simple
 
 - Notes (2026-11-11, chapter 3 folded in): absorbs "Formal claims written in the program's own syntax" (the maintainer: writing a claim in its target's language is an important feature, not a requirement; a claim uses the model and language that best suit it) and "Analyzer silence over guessing".
 - Held finding (2026-11-11, DR1): the return check compares type names and reports a refined return that conforms to its declared base type as a mismatch (`src/runtime.ts:870`, `tests/refinements.alg:20`). Held on "Type annotations on parameters and returns".
 
 #### A refuted value never reaches an effect
-- Decides: a value carrying a refuted claim never reaches an effect. A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it. A value carries only what was claimed of it and what its computation used, never its type's laws wholesale. After a phase has refuted a claim, it performs no further effect, though it goes on evaluating to report every refutation that does not rest on an earlier one. The result holds every undecided claim; whether a tool shows them is configuration.
+- Decides: a value carrying a refuted claim never reaches an effect. A strength short of decided (assumed, sampled, undecided) prevents no effect unless a policy or a configuration requires it. A value carries only what was claimed of it and what its computation used, never its type's laws wholesale. A refuted claim halts its phase, and that word has one meaning: the phase's result is refuted; nothing that needs the refuted value is performed, and nothing written after the refuted statement in its block; the launcher performs no further effect in that phase; and evaluation goes on, with no effect, to report every refutation that does not rest on an earlier one. A refutation comes before every effect only where a phase that holds no capability decided the claim first. In one run with late information, an effect written earlier, or one whose answer arrived earlier, is performed before a later claim is refuted. The result holds every undecided claim; whether a tool shows them is configuration.
 - Status: partly built; ruled 2026-11-11 (DR1); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
@@ -481,6 +482,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): effects are not gated on the claims of the values they consume. Held on "Environment capabilities outside the base, effect-labelled" and "Errors as a viral metadata field".
 - Notes (2026-11-16, hand-off from the acceptance stream): reworded and retitled from "An effect consumes only values whose claims are decided", by the maintainer's ruling of 2026-11-15 in the acceptance stream's session (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 1 and ruling D): "In general the decision strength doesn't prevent effects, without some policy/configuration to require it." This settles issues 17 and 19 of the adversarial review: an effect no longer waits for a claim a run can never decide, and which effects precede a refutation is fixed by the check that runs before them.
 - Notes (2026-11-19, the second adversarial review, cluster 8): a claim written as a statement holds the statements written after it in its block: none of their effects is performed while the claim waits, and none at all if it is refuted ("A statement does not wait for the one before it"). The maintainer's case for it: an answer read at run time, `claim(answer == "yes")`, then a delete that takes none of the claimed values. An operation that needs authorization takes the token, and is checked earlier, so most such claims are decided before the capability is there.
+- Notes (2026-11-19, the second adversarial review, cluster 8): "halts" is given one meaning, by ruling. A reviewer found three: stop at the claim, go on and perform nothing, and the kernel never stops. Another ran two evaluations in one kernel, filled both their cells and called `advance` once: one was refuted and the other's write was performed in the same call. The kernel knows no phase, so the rule is put where it can be kept. The kernel's part: a call of `advance` that meets a refutation performs no further effect in that call and evaluates the rest ahead, so their refutations are reported too; what it held stays for a later call. After a refuted statement, `then` and `also` evaluate what was written after it ahead, with half of the steps left, so a further refutation is counted and looking never ends an evaluation at its limit; a claim that only receives an earlier refutation is not counted again. The launcher's part: it ends the phase, by not calling again. Built in the reference kernel.
 - Chapter: Keep it simple
 
 #### Correctness and safety are one kind of claim
@@ -1555,7 +1557,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Correctness
 
 #### Evaluation stops early for two reasons only
-- Decides: the kernel halts an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
+- Decides: the kernel stops an evaluation midway when one of its own invariants is broken, which is a fault in the kernel, or when a resource limit is reached. Nothing a program does makes the kernel stop midway. A claim whose evaluation hits a limit is left undecided, not refuted. An evaluation that hits a limit elsewhere ends with the limit named and everything unfinished reported as undecided.
 - Status: partly built; ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -1565,6 +1567,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: five classes of abort, capability denial and ill-formed application among them (what the inventory listed; three of the five are refutations or cannot arise)
 - Sources: the maintainer's rulings of 2026-11-11 (../records/book-pass/dr2-part-2-the-kernel.md, Rulings taken)
 - Notes: replaces "Specified aborts" and absorbs "Capability denial is an abort, not an error value" (with authority a held value there is nothing to deny at run time) and "Evaluation depth bound" (one resource limit, 10,000 levels today).
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: "halts" is kept for what a refuted claim does to its phase, so the kernel "stops" here.
 - Chapter: Correctness
 
 ### Parsing
@@ -2326,7 +2329,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Reaching a member
 
 #### Who may use a member is a claim about where the access was written
-- Decides: private, protected, read-only and caller-based rules are claims about where an access was written. Each part of an expression carries a mark the kernel writes: the function it was written in, and through that the module. The mark stays with the part when a call is opened, and what a notation's form supplies carries the notation's mark while what the user wrote inside the form keeps the user's. No phase drops it and nothing can forge it. Such a claim is refuted like any other, before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
+- Decides: private, protected, read-only and caller-based rules are claims about where an access was written. Each part of an expression carries a mark the kernel writes: the function it was written in, and through that the module. The mark stays with the part when a call is opened, and what a notation's form supplies carries the notation's mark while what the user wrote inside the form keeps the user's. No phase drops it and nothing can forge it. Such a claim is refuted like any other; where a phase that holds no capability decides it, that is before any effect. For strict control the two mechanisms combine: the type's module keeps the key and hands out an accessor whose body makes the claim.
 - Status: open, a design to prove; ruled 2026-11-12 (DR4); reworded 2026-11-17
 - Type: capability
 - Rationale kind: technical
@@ -2338,6 +2341,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. The maintainer: these access patterns "are not really privacy concerns", they are "about interface, encapsulation and design discipline". To prove: an accessor reading the origin of its call; the four access patterns restated as claims; the cost of deciding such claims on real programs. A trusted module can still be led to access on another's behalf, which is why the key stays the foundation.
 - Notes (2026-11-17, the adversarial review's last issues): reworded by ruling, for issue 28. The entry rested on origins, which a phase may now drop, and "where it was written" had several answers once a call is opened or a form expands. The mark is the one "Describing a function requires authority" keeps on each part of a residual, made finer: the function, not only the module, because a protected member asks whether the access was written inside a method of a conforming type.
 - Notes (2026-11-17, the second adversarial review, cluster 4): the kernel now keeps the mark, with the function as well as the module. How a claim reads it is settled when the standard language's member rules are built.
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: "before any effect" holds for a pipeline with a check phase first, not for every run.
 - Chapter: Reaching a member
 
 #### Export marks the binding, and a module with no exports is open
@@ -2465,7 +2469,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: The surface language
 
 #### Statement forms that declare a binding
-- Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement halts when its check fails.
+- Decides: a library's `stmt_form` may expand to `binding_decl(name, value[, type])`, which becomes a binding checked like `name: type = value`, so a declaration statement is refuted when its check fails.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -2477,6 +2481,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/extension/grammar.md §4 (B-151 B1); docs/book/vivace/planning-dsl.md §6
 - Book home (fragments' proposal): Grammar and parser / cited from The planning DSL
 - Notes: added at stage B1 as one of three engine gaps closed for the first offside fragment, with layout terminals by name and labels as string literals.
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: a statement is refuted; it is a phase that halts.
 - Chapter: The surface language
 
 #### `when / is / then` pattern matching
@@ -2526,7 +2531,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Claims and proofs
 
 #### Nothing is a claim until someone makes it
-- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
+- Decides: a type annotation, a refinement, a contract, an assertion, a law, a theorem, a bound on capabilities and a declaration that a function terminates are all claims, and a refuted one halts its phase. A finding about code that claimed nothing is a report. A project may make claims wholesale, such as "every function terminates". It may not soften a refutation.
 - Status: partly built; ruled 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
@@ -3205,7 +3210,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Plans as outcome graphs
 
 #### Two enforcement shapes for a well-formed plan
-- Decides: the plan constructor yields an error value in domain terms when a check fails (guarded construction, weaker than a halt), while a binding annotated `WellFormedPlan`, which the `plan` statement expands to, halts compilation.
+- Decides: the plan constructor yields an error value in domain terms when a check fails (guarded construction, weaker than a refutation), while a binding annotated `WellFormedPlan`, which the `plan` statement expands to, is refuted where its check fails.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -3217,6 +3222,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/vivace/planning-dsl.md §7 (Two enforcement shapes); docs/plans/planning-pilot.md §2 item 4; CE-R8; D32
 - Book home (fragments' proposal): The planning DSL
 - Notes: every node-tree walk inside the predicate is `assume terminates`, since no verified `decreases` metric fits a walk into a child list (§6 table).
+- Notes (2026-11-19, the second adversarial review, cluster 8): a wording corrected: there is no compile time to halt ("Phases are configuration").
 - Chapter: Plans as outcome graphs
 
 #### Planning surface conventions

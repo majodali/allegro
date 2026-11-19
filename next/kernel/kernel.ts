@@ -98,6 +98,9 @@
 //               order becomes an order of effects. While the first
 //               waits, the second is evaluated ahead with no effect
 //               performed, so a refutation in it is found at once.
+//               Where the first is refuted the second is not done; it
+//               is evaluated ahead all the same, so a further refutation
+//               in it is found and counted. The same holds for "also".
 //   "also"      also(first, second). It starts the first, then starts the
 //               second, and its value is the second's. The second does
 //               not wait for the first to be over: an effect in it is
@@ -491,6 +494,8 @@ export const createKernel: CreateKernel2 = () => {
   /** How many evaluations of each written claim wait now, and which residuals they are. */
   const waitingAt = new Map<Expr, number>();
   const waitingClaims = new WeakSet<Expr>();
+  /** The refutations a claim has been counted for. */
+  const counted = new WeakSet<Refuted>();
   const tallyOf = (site: Expr): Tally => {
     let t = tallies.get(site);
     if (t === undefined) tallies.set(site, (t = { decided: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
@@ -499,12 +504,16 @@ export const createKernel: CreateKernel2 = () => {
   /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
   const tallied = (from: Expr, result: V, rests: readonly Rest[]): V => {
     const site = from.site ?? from;
-    const t = tallyOf(site);
     if (waitingClaims.has(from)) {
       waitingClaims.delete(from);
       waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
     }
+    // A claim that only receives a refutation met before is not refuted over again: each
+    // refutation is counted once, where it arose or at the first claim it reached.
+    if (result instanceof Refuted && counted.has(result)) return result;
+    const t = tallyOf(site);
     if (result instanceof Refuted) {
+      counted.add(result);
       t.refuted++;
       t.reasons.add(result.reason);
     } else if (result instanceof Decided) {
@@ -810,7 +819,10 @@ export const createKernel: CreateKernel2 = () => {
         // The first is needed, and only then the second. While the first waits, the second
         // is evaluated ahead with no effect performed, so a refutation in it is found now.
         const first = evaluate(v.args[0], scope);
-        if (first instanceof Refuted) return first;
+        if (first instanceof Refuted) {
+          lookAhead(v.args[1], scope);
+          return first;
+        }
         if (known(first)) return evaluate(v.args[1], scope);
         const before = ahead;
         ahead = true;
@@ -826,7 +838,10 @@ export const createKernel: CreateKernel2 = () => {
       if (fn.name === "also") {
         // The first is started, and then the second; the second does not wait for the first.
         const first = evaluate(v.args[0], scope);
-        if (first instanceof Refuted) return first;
+        if (first instanceof Refuted) {
+          lookAhead(v.args[1], scope);
+          return first;
+        }
         if (known(first)) return evaluate(v.args[1], scope);
         // A claim that waits holds what is written after it: no effect of it is performed.
         const held = heldByClaim(first);
@@ -1144,6 +1159,26 @@ export const createKernel: CreateKernel2 = () => {
    * and means there what it meant here. What needs no evaluation is
    * handed on as it is.
    */
+  /**
+   * After a refutation, what was written after it is still evaluated, ahead of what is done
+   * and with no effect, so that a further refutation in it is found and counted now. What it
+   * comes to is dropped. It is given half of the steps that are left, so that looking can
+   * never be what ends the evaluation at its limit.
+   */
+  const lookAhead = (rest: V, scope: ScopeV): void => {
+    const [outer, before] = [budget, ahead];
+    budget = spent + Math.floor((outer - spent) / 2);
+    ahead = true;
+    try {
+      evaluate(rest, scope);
+    } catch (e) {
+      if (!(e instanceof LimitReached || e instanceof RangeError)) throw e;
+    } finally {
+      budget = outer;
+      ahead = before;
+    }
+  };
+
   /** Keeps an evaluation that waits, with the cells it waits on. */
   const started = (value: V, scope: ScopeV): Root => {
     const root: Root = { scope, value, done: false, waits: new Set(), queued: false };
@@ -1748,25 +1783,50 @@ export const createKernel: CreateKernel2 = () => {
       if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies = new Map();
       const refuted: Value[] = [];
+      // Once one comes out refuted, no further effect is performed in this call: the rest
+      // are evaluated ahead, so their refutations are reported too, and they stay in the list
+      // for a later call to take up in earnest. Whether there is one is the launcher's to say.
+      let halted = false;
+      const held: Root[] = [];
       const r = within(limits, () => {
         // Each is taken up once, in the order its answer arrived. One that a limit stops stays
         // first in the list, so the next call goes on with it.
-        while (ready.length > 0) {
-          const root = ready[0];
-          const before = fills;
-          if (!root.done) {
-            const next = evaluate(root.value, root.scope);
-            root.value = next;
-            rootOf.set(next, root);
-            if (next instanceof Refuted) refuted.push(out(next));
-            if (known(next)) root.done = true;
-            root.waits = new Set();
-            if (!root.done) waitsOn(next, root.waits as Set<V>, new Set());
+        try {
+          while (ready.length > 0) {
+            const root = ready[0];
+            const before = fills;
+            const onlyAhead = halted;
+            if (!root.done) {
+              const was = ahead;
+              if (onlyAhead) ahead = true;
+              let next: V;
+              try {
+                next = evaluate(root.value, root.scope);
+              } finally {
+                ahead = was;
+              }
+              root.value = next;
+              rootOf.set(next, root);
+              if (next instanceof Refuted) {
+                refuted.push(out(next));
+                halted = true;
+              }
+              if (known(next)) root.done = true;
+              root.waits = new Set();
+              if (!root.done) waitsOn(next, root.waits as Set<V>, new Set());
+            }
+            ready.shift();
+            root.queued = false;
+            if (root.done) continue;
+            if (onlyAhead) held.push(root);
+            // A cell filled while it was being evaluated may have been passed already.
+            else if (fills !== before) {
+              root.queued = true;
+              ready.push(root);
+            }
           }
-          ready.shift();
-          root.queued = false;
-          // A cell filled while it was being evaluated may have been passed already.
-          if (!root.done && fills !== before) {
+        } finally {
+          for (const root of held) {
             root.queued = true;
             ready.push(root);
           }

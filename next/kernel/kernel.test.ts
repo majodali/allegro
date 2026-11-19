@@ -1925,3 +1925,58 @@ test("a statement whose value is dropped holds what follows until its answer com
   assert.deepEqual(k.advance({ steps: 200 }).refuted, [], "no refutation: the program reads the answer");
   assert.equal(k.bitsOf(k.current(bound.value)).bytes[0], 1);
 });
+
+// ---- What a refutation halts (the second review's cluster 8) -----------------
+
+test("after a refuted statement the rest is evaluated ahead: a further refutation is counted, and no effect happens", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const v = k.symbol("t.v");
+  for (const order of ["then", "also"]) {
+    said.length = 0;
+    const [first, second] = [call(kp("claim"), call(isZero, byte(k, 3))), call(kp("claim"), call(isZero, byte(k, 4)))];
+    // claim(isZero(3)); say(1); claim(isZero(4))
+    const r = k.evaluate(call(kp(order), first, call(kp(order), call(say, byte(k, 1)), second)), scope);
+    assert.equal(r.refuted, true, order);
+    assert.deepEqual(said, [], "nothing written after the refuted claim is performed");
+    assert.deepEqual(r.claims.map((c) => [c.claim === first || c.claim === second, c.refuted]), [[true, 1], [true, 1]], "both refutations are reported");
+  }
+  // A claim that only receives the first refutation is not counted as a second one.
+  const made = call(kp("claim"), call(isZero, byte(k, 3)));
+  const rests = call(kp("claim"), call(isZero, v));
+  const one = k.evaluate(within(k, [[v, made]], call(kp("then"), v, rests)), scope);
+  assert.equal(one.refuted, true);
+  assert.deepEqual(one.claims.map((c) => c.refuted), [1], "one refutation, one record");
+});
+
+test("looking ahead after a refutation never ends the evaluation at its limit", () => {
+  const { k, add, isZero, call, kp } = setup();
+  // After the refuted claim, a sum of a hundred additions: more than all the steps that are left.
+  let sum: Value = byte(k, 0);
+  for (let i = 0; i < 100; i++) sum = call(add, sum, byte(k, 1));
+  const r = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 80 });
+  assert.equal(r.ended, "complete", "the refutation is the answer, not the limit");
+  assert.equal(r.refuted, true);
+  assert.ok(r.steps <= 45, `looking ahead takes at most half of what is left: ${r.steps}`);
+});
+
+test("a call of advance that meets a refutation performs no further effect, and a later call goes on", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  k.evaluate(call(say, c1), scope);
+  k.evaluate(call(kp("claim"), call(isZero, c2)), scope);
+  k.evaluate(call(say, c3), scope);
+  // The answers arrive in this order: an effect, then what refutes, then another effect.
+  k.fill(c1, byte(k, 1));
+  k.fill(c2, byte(k, 7));
+  k.fill(c3, byte(k, 3));
+  const first = k.advance({ steps: 100 });
+  assert.equal(first.refuted.length, 1);
+  assert.deepEqual(said, [1], "what arrived before the refutation was done; what arrived after it is held");
+  // The launcher may end the phase here. If it calls again, what was held is done.
+  const second = k.advance({ steps: 100 });
+  assert.deepEqual(second.refuted, []);
+  assert.deepEqual(said, [1, 3]);
+  assert.deepEqual(k.waiting(), []);
+});

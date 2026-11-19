@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-19 — What a refutation halts (the second review's cluster
+  8, closed).** "Halts" has one meaning, in "A refuted value never
+  reaches an effect"; seven entries reworded. In
+  `next/kernel/kernel.ts`: a call of `advance` that meets a refutation
+  performs no further effect in that call; after a refuted statement
+  the rest is evaluated ahead, so a further refutation is counted, and
+  one that only rests on an earlier one is not.
 - **2026-11-19 — Statements do not wait (the second review's cluster
   8, the order of effects).** Ruled: need and `then` order effects,
   and nothing else does, so that effects which do not depend on each
