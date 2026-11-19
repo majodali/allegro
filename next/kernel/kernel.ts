@@ -98,6 +98,16 @@
 //               order becomes an order of effects. While the first
 //               waits, the second is evaluated ahead with no effect
 //               performed, so a refutation in it is found at once.
+//   "also"      also(first, second). It starts the first, then starts the
+//               second, and its value is the second's. The second does
+//               not wait for the first to be over: an effect in it is
+//               performed while the first still waits. What a block's
+//               statements are a chain of. Where the second's value is
+//               known and the first still waits, the value is given and
+//               the first goes on as work of the evaluation, taken up by
+//               `advance`. Two things hold the second back as `then`
+//               does: a first that is refuted, and a first that waits
+//               on a claim, so a claim holds what is written after it.
 //   "same"      same(a, b). Tells two bits values apart, or two symbols:
 //               true where they are the same. Anything else is a
 //               refutation; the kernel gives bits no other meaning.
@@ -282,7 +292,7 @@ interface Root {
 }
 
 const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["also", 2], ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
   ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["slice", 3], ["spelling", 1],
   ["symbol", 1], ["then", 2], ["undecided", 1],
 ];
@@ -802,6 +812,33 @@ export const createKernel: CreateKernel2 = () => {
         if (second instanceof Refuted) return second;
         return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
       }
+      if (fn.name === "also") {
+        // The first is started, and then the second; the second does not wait for the first.
+        const first = evaluate(v.args[0], scope);
+        if (first instanceof Refuted) return first;
+        if (known(first)) return evaluate(v.args[1], scope);
+        // A claim that waits holds what is written after it: no effect of it is performed.
+        const held = heldByClaim(first);
+        const before = ahead;
+        if (held) ahead = true;
+        let second: V;
+        try {
+          second = evaluate(v.args[1], scope);
+        } finally {
+          ahead = before;
+        }
+        if (second instanceof Refuted) return second;
+        // The second is known and nothing holds it: its value is given now, and the first
+        // goes on as work of this evaluation. Ahead of what is done nothing was started, so
+        // nothing goes on: the whole is evaluated again when it is really reached.
+        if (!held && !ahead && known(second)) {
+          const root: Root = { scope, value: first, done: false };
+          roots.push(root);
+          rootOf.set(first, root);
+          return second;
+        }
+        return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+      }
       if (fn.name === "attempt") {
         // The budget is needed; what is attempted is evaluated inside the attempt.
         const steps = evaluate(v.args[1], scope);
@@ -1042,21 +1079,15 @@ export const createKernel: CreateKernel2 = () => {
       if (known(fn)) return new Refuted("a call on something that is not a function", fn);
       return new Expr(fn, v.args.map((a) => later(a, scope)));
     }
-    // A primitive function needs every argument, in full and left to right: its host code
-    // cannot evaluate, so a structure it is handed has every entry evaluated first.
-    // Once one argument waits, those after it are evaluated ahead with no effect performed,
-    // so the effects of two arguments never happen out of the order written.
+    // A primitive function needs every argument, in full: its host code cannot evaluate, so
+    // a structure it is handed has every entry evaluated first. The arguments are started
+    // left to right, and none waits for one before it: where one waits on a late answer, an
+    // effect in a later one is performed all the same. Need and `then` order effects.
     const args: V[] = [];
-    const before = ahead;
-    try {
-      for (const a of v.args) {
-        const r = inFull(a, scope);
-        if (r instanceof Refuted) return r;
-        if (!knownInFull(r)) ahead = true;
-        args.push(r);
-      }
-    } finally {
-      ahead = before;
+    for (const a of v.args) {
+      const r = inFull(a, scope);
+      if (r instanceof Refuted) return r;
+      args.push(r);
     }
     {
       if (fn.declaration.arity !== args.length)
@@ -1087,18 +1118,12 @@ export const createKernel: CreateKernel2 = () => {
     if (r instanceof Refuted) return r;
     const s = seen(r);
     if (s instanceof Struct && !settled.has(s)) {
-      // Once one entry waits, those after it are evaluated ahead with no effect performed.
-      const before = ahead;
-      try {
-        for (const [k, e] of s.entries) {
-          if (hidden(k)) continue;
-          step(); // a structure handed over whole costs a step for each entry
-          const x = inFull(e, scope);
-          if (x instanceof Refuted) return x;
-          if (!knownInFull(x)) ahead = true;
-        }
-      } finally {
-        ahead = before;
+      // The entries are started in order, and none waits for one before it.
+      for (const [k, e] of s.entries) {
+        if (hidden(k)) continue;
+        step(); // a structure handed over whole costs a step for each entry
+        const x = inFull(e, scope);
+        if (x instanceof Refuted) return x;
       }
     }
     return r;
@@ -1110,6 +1135,14 @@ export const createKernel: CreateKernel2 = () => {
    * and means there what it meant here. What needs no evaluation is
    * handed on as it is.
    */
+  /** True where what is left of a statement waits on a claim: such a statement holds what is written after it. */
+  const heldByClaim = (r: V): boolean => {
+    if (r instanceof Lazy) return !r.done && heldByClaim(r.value);
+    if (!(r instanceof Expr)) return false;
+    if (r.site !== undefined || r.fn === kernelPrims.get("claim")) return true;
+    return (r.fn === kernelPrims.get("also") || r.fn === kernelPrims.get("then")) && r.args.some(heldByClaim);
+  };
+
   /** The kernel's primitives that compute on data and do nothing else. */
   const ONE_STEP = new Set(["join", "length", "slice", "same", "count", "kind", "key", "symbol", "spelling"]);
   /** True for a pure primitive function, or such a kernel primitive, applied to values already known. */

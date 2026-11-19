@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-19 — Statements do not wait (the second review's cluster
+  8, the order of effects).** Ruled: need and `then` order effects,
+  and nothing else does, so that effects which do not depend on each
+  other run at once. In `next/kernel/kernel.ts`: a new primitive,
+  `also(first, second)`, starts both and gives the second's value
+  while the first goes on; a claim holds what is written after it;
+  the arguments of a primitive function and the entries of a structure
+  needed in full no longer wait for one before them. Allegretto's
+  block is a chain of `also`, and `sync` writes a block in sequence.
+  One entry retitled, one added: 249 decisions.
 - **2026-11-18 — Recursion, loops and strength (the second review's
   cluster 9).** Ruled: the kernel never assumes a claim at a recursive
   call and gets no induction rule; the standard language's analysis

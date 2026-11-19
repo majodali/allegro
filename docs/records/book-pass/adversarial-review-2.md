@@ -630,6 +630,116 @@ Ruled ("Ok - go ahead with those rulings"):
 Built: points 4 and 6. Point 7 comes with the evaluator's move off the
 host's stack.
 
+### Cluster 8: the order of effects (2026-11-19)
+
+The review session proposed that sequence and need order every effect,
+with "unordered" as a licence a capability's definition grants. The
+maintainer asked which finding wanted a default order. None did: two
+findings said the decisions gave two answers for one program.
+
+The maintainer: "my main reason for keeping ordering undefined is to
+allow concurrent execution wherever possible. My preference is for
+`then` to be only be used when two effects need ordering and
+evaluation order doesn't determine the required order. I would even
+allow undefined ordering on effects in a single capability - e.g.
+reading and writing files could happen asynchronously. What we need is
+a set of use cases to determine when ordering is and isn't necessary,
+in a single capability and across multiple."
+
+The use cases. "Decides" is need (the second uses the first's
+answer), the capability (its definition knows), or the writer.
+
+| # | Case | Order needed | Decides |
+|---|---|---|---|
+| 1 | Two lines written to the console | yes | the capability |
+| 2 | Two reads from standard input | yes | the capability |
+| 3 | Writes to two different files | no | nothing |
+| 4 | Write a file, then read it; two writes to one file | yes | the capability, by path |
+| 5 | Make a directory, then write a file in it; write a temporary file, then rename it | yes | the writer |
+| 6 | Two requests to different web addresses | no | nothing |
+| 7 | Send data to a service, then read it back | yes | the writer, or need |
+| 8 | Read a counter, then write it plus one | yes | need |
+| 9 | Read many module files at load | no | nothing |
+| 10 | Replies on one connection; requests on different ones | yes; no | the capability, by connection |
+| 11 | Write a prompt, then read the answer | yes | the writer |
+| 12 | Read a file, send its content over the network | yes | need |
+| 13 | Log "deleting", delete, log "deleted" | yes | the writer; need for the second log if it takes the delete's answer |
+| 14 | Read the clock, do work, read the clock | yes | the writer |
+| 15 | Take a lock, write, release it | yes | the writer, or need |
+| 16 | Charge a card, then ship | yes | need, if shipping takes the receipt |
+| 17 | Send an email and a text message | no | nothing |
+| 18 | Record a metric beside any other effect | no | nothing |
+| 19 | Fetch two pages, print both | fetches no; prints yes | the console; need |
+| 20 | Close a file after all writes to it | yes, after all of a set | need, if the close takes their answers |
+| 21 | Read an answer at run time, claim it is "yes", delete everything | yes | the writer: the delete takes none of the claimed value |
+| 22 | Try, catch and finally | catch by need; finally by `then` | the writer |
+
+What they showed: need settles many cases, and a capability's design
+can make it settle more; no one default fits inside a capability;
+across capabilities a short list needs an order with no data flowing
+(11, 13, 14, 15, 21).
+
+The maintainer's answers:
+
+- "lack of explicit effect order doesn't mean indeterminacy. Two
+  executions with the same information and inputs will still result in
+  the same output including order of effects."
+- On the cases where an order is easy to forget: "it's a stronger
+  argument for designing those capabilities with more intuitive APIs -
+  e.g. console `prompt` operation; file lock/operation/release blocks
+  and mutexes and transactions more generally; timers and loggers that
+  wait for the operations they are timing or logging to complete. I'm
+  in favor of having a synchronous block form as an option, and even
+  configurable warnings for when certain effect combinations are not
+  strictly ordered. I don't want to go down the synchronous by default
+  path until we've seen evidence it's necessarily better."
+- "I don't think capabilities will be marked as wholly ordered or
+  not."
+- On case 21: an operation that needs authorization takes the token
+  and is checked far earlier, and such claims are mostly decided
+  before the capability is there. "Nevertheless, I agree with your
+  recommendation - refuted claims should block all effects written
+  later in the same block."
+
+Ruled ("I agree with the other six"), of seven points:
+
+1. Unordered means the kernel starts statements in the order written
+   and none waits for an earlier one to be over. A statement waits
+   where it uses an earlier one's value, where `then` says so, or
+   behind a claim.
+2. A second kernel primitive, `also(first, second)`, is what a block's
+   statements are a chain of. `then` stays as the ordered one.
+3. Not taken as proposed. The review session proposed that a block is
+   over only when everything it started is over. The maintainer:
+   "There may be some value in a function returning its value and
+   allowing its calling expression to continue evaluation, while
+   kicking off some asynchronous cleanup. An example might be an
+   websocket request that returns a response and then checks if it
+   should close the socket." Built to that: a block gives its value as
+   soon as its last statement's value is known, and what it started
+   goes on as work of the evaluation.
+4. The arguments of a primitive function and the entries of a
+   structure needed in full are started in order and none waits. This
+   reverses what was built on 2026-11-16.
+5. A claim holds what is written after it in its block.
+6. A block in sequence is written `sync` in Allegretto.
+7. No capability is marked ordered. Its definition offers patterns of
+   use, written in Allegro with `then`. A project may claim an order
+   over a residual's description, and a tool may warn. Not built.
+
+What follows from the third point as built, put to the maintainer on
+the PR: a refutation in work that goes on after a value was given is
+reported by the `advance` that meets it; "finally" waits for a body's
+value and not for work the body chose to leave going; steps that work
+spends are charged to the `advance` that takes it up, not to an
+attempt that has answered.
+
+Still to rule in this cluster, proposed and not yet answered: that
+`advance` takes waiters up in the order their answers arrived; that a
+call of `advance` that meets a refutation performs no further effect;
+that the kernel evaluates ahead after a refuted statement to report
+more refutations; and one meaning for "halts".
+
 ## Terms introduced
 
 No terms introduced.
