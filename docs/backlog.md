@@ -3895,6 +3895,27 @@ table and the stream plans.
   (`docs/records/book-pass/adversarial-review.md`, issue 31). To
   decide when the tools are rebuilt: whether the summary sets the
   platform's own assumptions apart from a project's.
+- [ ] **B-202** (threads and budgets at run time) · L0 · A discussion
+  to hold before the evaluator is rebuilt to keep its own stack. A
+  launcher bounds one call's time at run time by a budget of steps, so
+  that a page can yield and a server stay fair. Not designed: how that
+  budget is filled up again, so that work a limit paused does not pause
+  at once when it is gone on with; who decides which paused work goes
+  on first; and whether an evaluation that uses up its budget after
+  meeting a refutation returns the refutation (today looking ahead
+  after a refutation is given half of the steps left, which the
+  maintainer called "ok, but arbitrary"). Raised by the maintainer on
+  2026-11-19 (`docs/records/book-pass/adversarial-review-2.md`,
+  cluster 8, "Late answers").
+- [ ] **B-203** (streams, large data and asynchronous iteration) · L0 ·
+  A discussion to hold with B-202 (threads and budgets at run time).
+  A late answer fills one cell, once. Not designed: a stream of
+  answers, read item by item, and what keeps its reads in order; a
+  loop over late answers and how many of its turns are in flight; data
+  too large to hold as one bits value or one structure, where `put`
+  copies the entries it is given; and whether a structure whose
+  entries are evaluated when read serves as a stream. Raised by the
+  maintainer on 2026-11-19.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

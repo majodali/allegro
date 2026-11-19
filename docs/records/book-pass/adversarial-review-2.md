@@ -863,15 +863,21 @@ confirmed on all three asks"):
    the word, or "before any effect", otherwise and are corrected.
 
 Settled in building: looking ahead is given half of the steps that
-are left, so it never ends an evaluation at its limit.
+are left, so it never ends an evaluation at its limit. The maintainer
+on PR #258: "Halving the remaining budget is ok, but arbitrary. We
+could change it so that an evaluation that uses its budget but has a
+refutation, would still return the refutation. Not a high priority
+though." Filed with B-202 (threads and budgets at run time). The
+definition of "halts" was confirmed as written.
 
 The maintainer also confirmed the shape of a failure, a block giving
 its value early with what follows from it, and that a claim inside a
 called function holds as one written in the block does.
 
 With this cluster 8 is ruled. Two remain: notation (12) and wording
-(14). Open beside them: how a budget is filled up again at run time,
-for a discussion of threads.
+(14). Open beside them, filed in the backlog: B-202 (threads and
+budgets at run time) and B-203 (streams, large data and asynchronous
+iteration).
 
 ## Terms introduced
 
