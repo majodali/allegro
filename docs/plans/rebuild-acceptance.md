@@ -2059,5 +2059,5 @@ policy is the gate ruled there.
   going; a claim that waits and holds the line after it; and `each`,
   `each_at_once`, `each_within` and `all` over waits.
   Measured: 475 tests pass, none waits; 84 programs pass;
-  `milestone 2: programs 10 (passing 10, failing 0) · cases due 10 · realised 9, named only by a failing program 0, not yet named 1 · up to 2: 15 of 35 realised`;
-  `milestone 3: programs 67 (passing 67, failing 0) · cases due 132 · realised 117, named only by a failing program 0, not yet named 15 · up to 3: 132 of 167 realised`.
+  `milestone 2: programs 10 (passing 10, failing 0) · cases due 9 · realised 9, named only by a failing program 0, not yet named 0 · up to 2: 15 of 34 realised`;
+  `milestone 3: programs 67 (passing 67, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.

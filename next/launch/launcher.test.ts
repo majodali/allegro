@@ -513,7 +513,8 @@ test("the terminal entry runs the committed fixture: it prints the line and exit
 
 test("the terminal entry never loads a stand-in kernel", () => {
   const source = fs.readFileSync(path.join(here, "terminal.ts"), "utf8");
-  assert.doesNotMatch(source, /import[^;]*stand-in/);
+  // The code alone: the header comment names the stand-in kernel to say it is never loaded.
+  assert.doesNotMatch(source.replace(/^\s*\/\/.*$/gm, ""), /import[^;]*stand-in/);
   assert.match(source, /KERNEL_MODULE = "next\/kernel\/create\.ts"/);
 });
 
