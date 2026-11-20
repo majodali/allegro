@@ -19,6 +19,10 @@
 // which the runner grants on a virtual clock (`virtualClock` of
 // next/launch/clock.ts), the programs of milestone 2 under m2/, and the
 // programs under m3/ that show the forms over answers that arrive late.
+// Chunk Q16 (the capabilities the launchers ship), part 1, added the HTTP
+// capability, which the runner grants on a scripted transport that serves
+// a program's `// serves:` lines (`scriptedTransport` of
+// next/launch/scripted-transport.ts), and the programs `m3/http-*.alg`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -39,7 +43,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPins, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPins, readServes, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -85,6 +89,68 @@ test("the runner grants timer on a virtual clock: the lines print in the order t
     "// end: completed",
   ].join("\n");
   assert.deepEqual((await runProgram(program)).problems, []);
+});
+
+test("the programs that make requests are there, in milestone 3's directory", () => {
+  for (const name of ["get", "not-found", "unreachable-handled", "unreachable-dropped", "at-once", "each", "headers-body", "outside-domain"])
+    assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/http-${name}.alg`), name);
+});
+
+test("the serves lines are read as the convention states: each answers one request, its body the literal's bytes, with no headers", () => {
+  const r = readServes([
+    "capability http",
+    '// serves: GET https://example.org/?a=1 = 200 "hello"',
+    '//serves:POST u = 404 ""',
+    "// expect: x",
+  ].join("\n"));
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.served, [
+    { method: "GET", url: "https://example.org/?a=1", answer: { status: 200, headers: [], body: new TextEncoder().encode("hello") } },
+    { method: "POST", url: "u", answer: { status: 404, headers: [], body: new Uint8Array(0) } },
+  ]);
+});
+
+test("a malformed serves line, a body that is no text literal, and two lines for one request each fail the program, which is not launched", async () => {
+  const body = 'capability output\ncapability http\noutput.write("launched")\n// expect: launched\n// end: completed\n';
+  for (const [line, problem] of [
+    ["// serves: GET u", 'the line "// serves: GET u" is not of the form <METHOD> <url> = <status> <literal>'],
+    ['// serves: GET u = 2000 "x"', 'the line "// serves: GET u = 2000 \\"x\\"" is not of the form <METHOD> <url> = <status> <literal>'],
+    ["// serves: GET u = 200 42", 'the line "// serves: GET u = 200 42" serves a body that is no text literal'],
+    ['// serves: GET u = 200 "a"\n// serves: GET u = 201 "b"', "the request GET u has two `// serves:` lines"],
+  ] as const) {
+    const run = await runProgram(body + line + "\n");
+    assert.ok(run.problems.includes(problem), `${line}: ${JSON.stringify(run.problems)}`);
+    assert.deepEqual(run.lines, [], line);
+  }
+  const notLiteral = await runProgram(body + "// serves: GET u = 200 x\n");
+  assert.ok(notLiteral.problems.some((p) => /^an input's value is a literal: .*; "x" holds the name x$/.test(p)), JSON.stringify(notLiteral.problems));
+});
+
+test("the runner grants http on a scripted transport: a served request is answered, any other is unreachable, and the requests are part of the run", async () => {
+  const program = [
+    "capability output",
+    "capability http",
+    'a <- http.request({method: "GET", url: "https://example.org/served"})',
+    'b <- http.request({method: "GET", url: "https://example.org/unserved"})',
+    "output.write(int.text(a.status) ++ \" \" ++ a.body)",
+    'output.write(handle(b, `unreachable, f => {reason: "unreachable: " ++ f.reason}).reason)',
+    '// serves: GET https://example.org/served = 503 "busy"',
+    "// expect: 503 busy",
+    "// expect: unreachable: nothing serves GET https://example.org/unserved",
+    "// end: completed",
+  ].join("\n");
+  const run = await runProgram(program);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.requests.map((r) => r.url), ["https://example.org/served", "https://example.org/unserved"]);
+});
+
+test("program m3/http-headers-body.alg hands the transport both headers, in the order written, and the body's bytes", async () => {
+  const file = `${PROGRAMS_DIR}/m3/http-headers-body.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.requests, [
+    { method: "POST", url: "https://example.org/notes", headers: [["content-type", "text/plain"], ["x-trace", "7"]], body: new TextEncoder().encode("a note") },
+  ]);
 });
 
 test("the input lines are read as the convention states: at the start, and each later phase with the expect lines above it", () => {

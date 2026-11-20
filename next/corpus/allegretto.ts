@@ -2,7 +2,8 @@
 // acceptance side), chunk Q6 (the comparison harness), part 2; chunk Q7
 // (the minimal launcher and the output capability), part 3, for the
 // inputs, part 4, for imports and the expected refusal, and part 5, for
-// the timer capability): how a
+// the timer capability; chunk Q16 (the capabilities the launchers ship),
+// part 1, for the HTTP capability and the `// serves:` lines): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -28,7 +29,14 @@
 //                             it is printed before that phase is applied, one
 //                             below it in that phase or after, as the
 //                             launcher's count of lines before each phase
-//                             (`linesBeforePhase`) shows.
+//                             (`linesBeforePhase`) shows;
+//   // serves: GET <url> = <status> <literal>
+//                             the network answers the request of this
+//                             method and URL with this status and, as the
+//                             body, the bytes of the text literal, read by
+//                             next/bootstrap/literal.ts; one line per
+//                             request served. Any other request is
+//                             unreachable.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
 // next/launch/launcher.ts on the reference kernel, the imported ones
@@ -37,13 +45,18 @@
 // the lines printed before each later phase and, where stated, its yielded
 // keys are the expected ones.
 //
-// The ceiling grants `output` and `timer`. The timer capability
+// The ceiling grants `output`, `timer` and `http`. The timer capability
 // (next/launch/timer.ts) is made, for each run, with a new virtual clock
 // (`virtualClock` of next/launch/clock.ts): it runs no real time, and
 // answers the waits in the order they fall due, the earlier asked first
 // among waits due at the same time. So a program's printed order under
 // waits is the order its waits fall due, and a run takes no wall-clock
-// time for them.
+// time for them. The HTTP capability (next/launch/http.ts) is made, for
+// each run, with a new scripted transport (`scriptedTransport` of
+// next/launch/scripted-transport.ts) that serves the program's
+// `// serves:` lines and reaches no network. It answers in the order the
+// requests were asked, so two runs print the same. The requests it was
+// handed are part of what a run gives (`ProgramRun.requests`).
 //
 // Where a program is, and where its imported texts are: a program is a
 // `.alg` file directly in a directory `m<milestone>`, or the file
@@ -64,6 +77,8 @@ import { launch, plainValue, type Inputs, type LaunchEnd, type Plain } from "../
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
 import { virtualClock } from "../launch/clock.js";
+import { http, type HttpRequest } from "../launch/http.js";
+import { scriptedTransport, type Served } from "../launch/scripted-transport.js";
 import { shipped, shippedByName } from "../prims/index.js";
 
 /** Where the programs are, relative to the repository root. */
@@ -84,7 +99,7 @@ export function readUnder(root: string): ReadText {
 export const STEPS = 1_000_000;
 
 /** The capabilities the ceiling grants every program. */
-export const CEILING: readonly string[] = ["output", "timer"];
+export const CEILING: readonly string[] = ["output", "timer", "http"];
 
 /** What a program's comments say it must do, and the cases it names. */
 export interface Pins {
@@ -146,6 +161,44 @@ export function inputsOf(pins: Pins): { inputs: Inputs; later: Inputs[] } | { pr
     if (v !== undefined) later.push({ [l.name]: v });
   }
   return problems.length > 0 ? { problems } : { inputs, later };
+}
+
+/**
+ * A program's `// serves:` lines: each the answer to one request, as the
+ * scripted transport takes it, and the problems of the lines that cannot
+ * be read. A line is `<METHOD> <url> = <status> <literal>`: the status a
+ * whole number of three digits, the literal a text literal, whose bytes are
+ * the body. The answer has no headers. Two lines for one method and URL are
+ * a problem.
+ */
+export function readServes(text: string): { served: Served[]; problems: string[] } {
+  const served: Served[] = [];
+  const problems: string[] = [];
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*serves:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    const s = /^(\S+)\s+(\S+)\s*=\s*([1-9][0-9][0-9])\s+(.*?)\s*$/.exec(m[1]);
+    if (s === null) {
+      problems.push(`the line ${JSON.stringify(line.trim())} is not of the form <METHOD> <url> = <status> <literal>`);
+      continue;
+    }
+    const [, method, url, status, literal] = s;
+    const r = readLiteral(literal);
+    if (!r.ok) {
+      problems.push(r.finding);
+      continue;
+    }
+    if (!literal.startsWith('"') || !("bits" in r.value)) {
+      problems.push(`the line ${JSON.stringify(line.trim())} serves a body that is no text literal`);
+      continue;
+    }
+    if (served.some((x) => x.method === method && x.url === url)) {
+      problems.push(`the request ${method} ${url} has two \`// serves:\` lines`);
+      continue;
+    }
+    served.push({ method, url, answer: { status: Number(status), headers: [], body: r.value.bits } });
+  }
+  return { served, problems };
 }
 
 /** A run's end as a program's `// end:` line writes it. */
@@ -224,6 +277,8 @@ export interface ProgramRun {
   readonly end: string | null;
   /** The yielded keys, when the program states `// yields:`. */
   readonly yields: (string | null)[] | undefined;
+  /** The requests the program handed the HTTP capability's transport, in the order asked; empty when it was not launched. */
+  readonly requests: HttpRequest[];
   /** Each way the run differs from the pins; empty when the program passes. */
   readonly problems: string[];
 }
@@ -249,19 +304,21 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
-    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, problems };
+    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], problems };
   }
   const given = inputsOf(pins);
-  if ("problems" in given) {
-    problems.push(...given.problems);
-    return { pins, findings: [], lines: [], end: null, yields: undefined, problems };
+  const network = readServes(text);
+  if ("problems" in given || network.problems.length > 0) {
+    problems.push(...("problems" in given ? given.problems : []), ...network.problems);
+    return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], problems };
   }
+  const transport = scriptedTransport(network.served);
   const outcome = await launch({
     createKernel,
     program: e.program,
     imports: e.imports,
     configuration: { ceiling: CEILING, steps: STEPS, inputs: given.inputs, later: given.later },
-    target: { capabilities: [output, timer(virtualClock().clock)], primitives: shipped },
+    target: { capabilities: [output, timer(virtualClock().clock), http(transport.transport)], primitives: shipped },
   });
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
@@ -283,7 +340,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
       if (JSON.stringify(y.keys) !== JSON.stringify(pins.yields)) problems.push(`yields ${JSON.stringify(y.keys)}, expected ${JSON.stringify(pins.yields)}`);
     }
   }
-  return { pins, findings: [], lines: outcome.lines, end, yields, problems };
+  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, problems };
 }
 
 /**

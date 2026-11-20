@@ -251,7 +251,7 @@
     {"title":"A trace is read from origins","part":"VI","chapter":"Tools","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"The platform's default configuration is the standard language","part":"VI","chapter":"The launchers we ship","type":"capability","present":"settled","owner":"Q","state":"none","unit":null},
     {"title":"The terminal and the browser ship output, timers and HTTP","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null},
-    {"title":"A late answer or its failure fills a cell as plain data","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null,"was":["A value that arrives later fills a cell, and a failure fills it with an exception"]},
+    {"title":"A late answer or its failure fills a cell as plain data","part":"VI","chapter":"The launchers we ship","type":"capability","present":"partly built","owner":"Q","state":"written","unit":"next/launch/launcher.ts","was":["A value that arrives later fills a cell, and a failure fills it with an exception"]},
     {"title":"The browser launcher is one bundle","part":"VI","chapter":"The launchers we ship","type":"implementation","present":"settled","owner":"Q","state":"none","unit":null},
     {"title":"The core runs in a browser","part":"VI","chapter":"The launchers we ship","type":"implementation","present":"partly built","owner":"Q","state":"none","unit":null}
   ]

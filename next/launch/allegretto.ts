@@ -20,9 +20,10 @@
 // imported text is `name.alg` in the directory of the text that imports
 // it (`importedFile` of the driver).
 //
-// The target is the terminal's: `output`, and `timer` on the host's real
-// timer, and the shipped pure primitives. The ceiling grants `output` and
-// `timer` (`TERMINAL_CEILING` of next/launch/terminal.ts). `--steps`
+// The target is the terminal's: `output`, `timer` on the host's real
+// timer, `http` on the host's `fetch` (chunk Q16 (the capabilities the
+// launchers ship), part 1), and the shipped pure primitives. The ceiling
+// grants all three (`TERMINAL_CEILING` of next/launch/terminal.ts). `--steps`
 // sets a step budget. Each `--input name=<literal>` supplies the
 // input `name` at the start. Each `--later name=<literal>` is one later
 // phase that supplies it, in the order written. The value is one
