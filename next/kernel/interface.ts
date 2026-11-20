@@ -1,4 +1,4 @@
-// The kernel's interface, first and second versions.
+// The kernel's interface.
 //
 // One of the three contracts between the two streams of the rebuild
 // (docs/plans/rebuild.md §8 rule 2): a change to this file is a pull
@@ -18,18 +18,18 @@
 // this interface; what Allegro code may do is the kernel's primitives,
 // which are Part II's and are not stated here.
 //
-// Two versions are stated here. `Kernel` is the first: what a launcher
-// needs to run a program. `Kernel2` adds what the rulings of 2026-11-15
-// on identity and on strength made possible
-// (docs/records/book-pass/adversarial-review.md, issues 8 to 12):
-//   - modules and their keys: `module`, `keyOf`, `moduleOf`;
-//   - what a result rests on, beside how strongly it holds: `restsOn`;
-//   - restore: a stored outcome recorded under its builder's name;
-//   - three calls the first version lacked: `isCell`, `reasonOf`, and
-//     real classes for the two errors.
-// The two are kept apart so that code written against the first keeps
-// compiling. They become one interface when nothing implements only the
-// first.
+// One interface, `Kernel`. Until 2026-11-20 it was stated in two
+// versions, `Kernel` and `Kernel2`, so that code written against the
+// first kept compiling. Nothing implements only the first any more, and
+// they are one. Four things of the older shape are still accepted, each
+// marked deprecated where it is declared, until the acceptance stream's
+// launcher has stopped using them:
+//   - the names `Kernel2` and `CreateKernel2`, now other names for
+//     `Kernel` and `CreateKernel`;
+//   - `scope()` and the scope argument of `evaluate`;
+//   - `fill` that only records, where `hold` is left out;
+//   - `steps` given to `advance`.
+// When they go, `INTERFACE_VERSION` becomes 2.
 //
 // The kernel is passive. Creating one does nothing but create it. It
 // reads no file, no text, no environment and no clock. Every effect a
@@ -140,14 +140,15 @@ export type PrimitiveDeclaration =
  * A count of steps is given in two ways (ruled on 2026-11-20).
  *
  * A budget, `steps`, bounds the whole work of an evaluation and is never
- * filled up again. On the kernel variant that keeps its own stack the
- * budget given to `evaluate` is the evaluation's: the work `advance`
- * later does for that evaluation is counted against what is left of it.
- * When it is spent the evaluation is over, at its limit: what it had
- * paused or waiting is dropped, and an answer that arrives for it later
- * is ignored. Given to `advance`, `steps` bounds that call, as it always
- * did; a call it ends has ended "limit", and the evaluation it stopped is
- * over.
+ * filled up again. The budget given to `evaluate` is the evaluation's:
+ * the work `advance` and `fill` later do for that evaluation is counted
+ * against what is left of it. When it is spent the evaluation is over, at
+ * its limit: what it had paused or waiting is dropped, and an answer that
+ * arrives for it later is ignored.
+ *
+ * Deprecated: `steps` given to `advance` or `fill` bounds that call, and
+ * a call it ends has ended "limit". A launcher gives its budget once, to
+ * `evaluate`.
  *
  * A slice, `slice`, bounds one call. When it is spent nothing is over:
  * the call returns "paused", the task that was running is the first to go
@@ -354,6 +355,14 @@ export interface Declaration {
   readonly identity?: string;
 }
 
+/** What `Kernel.keyOf` reads of a key. */
+export interface KeyDescription {
+  /** The identity of the module the key was made with. */
+  readonly module: string;
+  /** Which of that module's keys it is, from 0. */
+  readonly slot: number;
+}
+
 /**
  * The kernel, as host code sees it.
  *
@@ -385,7 +394,7 @@ export interface Kernel {
    * symbol; a fully-qualified name is a spelling, and the kernel reads
    * nothing into it. In an expression the symbol is a name and is looked
    * up. As the key of a structure's entry it names the entry and is not
-   * evaluated. For a symbol as data, see `Kernel2.symbolData`.
+   * evaluated. For a symbol as data, see `symbolData`.
    */
   symbol(fqn: string): Value;
   /** A new positional parameter. Its name is for reports; a function owns it by listing it. */
@@ -421,8 +430,9 @@ export interface Kernel {
    * be put in it: a name means the binding of the innermost block that
    * binds it, and a host gives a program a value by passing it as an
    * argument, or by building a block that binds a name to it. This call and
-   * `evaluate`'s scope argument go when the interface's two versions are
-   * made one.
+   * `evaluate`'s scope argument go with the other deprecated forms.
+   *
+   * @deprecated `evaluate` needs no scope.
    */
   scope(parent?: Scope): Scope;
 
@@ -432,11 +442,25 @@ export interface Kernel {
   cell(): Cell;
   /**
    * Fills a cell with plain data: bits, symbols and structures of them,
-   * carrying no metadata. Once only. Filling records the value and
-   * evaluates nothing: what waited on the cell is taken up by the next
-   * `advance`, after what waited on cells filled before this one. So the
-   * order of the calls to `fill` is the order in which answers are acted
-   * on.
+   * carrying no metadata. Once only.
+   *
+   * With `hold: false` it then takes up what waited on the cell, as
+   * `advance` does and within the same limits, and returns what `advance`
+   * returns: a refutation the answer leads to, and its claim records,
+   * come back from the call that brought the answer.
+   *
+   * With `hold: true` it records the value and evaluates nothing: what
+   * waited on the cell is taken up by the next `advance`, or by the next
+   * `fill` that does not hold, after what waited on cells filled before
+   * this one. That is for filling several cells before any is acted on.
+   * It never changes what happens, only how much is done in one call.
+   * What it returns then says that nothing was done.
+   *
+   * Either way the order of the calls to `fill` is the order in which
+   * answers are acted on.
+   *
+   * Where `hold` is left out, this version holds. That is the deprecated
+   * form: when it goes, leaving `hold` out will mean `hold: false`.
    *
    * Only the launcher fills. A capability's host code does not hold the
    * kernel: it returns a cell and hands the launcher the promise of its
@@ -444,7 +468,7 @@ export interface Kernel {
    * every refutation and every claim record that an answer leads to
    * reaches the launcher, in one place.
    */
-  fill(cell: Cell, value: Value): void;
+  fill(cell: Cell, value: Value, how?: Limits & { readonly hold?: boolean }): Advance;
   /** True when the cell has been filled. */
   filled(cell: Cell): boolean;
   /**
@@ -456,7 +480,14 @@ export interface Kernel {
 
   // ---- Evaluating -----------------------------------------------------
 
-  /** Evaluates an expression in a scope, as far as the information allows and within the limits. */
+  /**
+   * Evaluates an expression, as far as the information allows and within
+   * the limits. A budget given here is the evaluation's: what `advance`
+   * and `fill` later do for this evaluation counts against what is left of
+   * it.
+   */
+  evaluate(expression: Value, limits?: Limits): Result;
+  /** @deprecated The scope is ignored. */
   evaluate(expression: Value, scope: Scope, limits?: Limits): Result;
   /**
    * Takes up every evaluation in this kernel that waited on a cell filled
@@ -471,19 +502,20 @@ export interface Kernel {
    * evaluation is the one a call of `evaluate` left waiting, or work
    * that an `also` left going after its value was given.
    *
-   * Where a limit stops the call, the next call goes on with what was
-   * being taken up, and then with the rest.
+   * Where a slice pauses the call, the next call goes on with what was
+   * paused, and then with the rest.
    *
    * Once an evaluation comes out refuted, the call performs no further
-   * effect: the evaluations still to be taken up are evaluated ahead, so
-   * their refutations are reported in `refuted` too, and they stay for a
-   * later call. A launcher that ends its phase at a refutation does not
-   * call again; one that goes on calls again, and what was held is done.
+   * effect: the evaluations still to be taken up stay for a later call. A
+   * launcher that ends its phase at a refutation does not call again; one
+   * that goes on calls again, and what was held is done. The reference
+   * kernel also evaluates what is held ahead, and reports a refutation
+   * it finds there in the same call.
    *
-   * In this version what is taken up is a whole evaluation, walked again
-   * from its top, so steps already spent on it are spent again. Taking
-   * up the computation at the point where it stopped comes with the
-   * evaluator that keeps its own stack.
+   * The reference kernel takes up a whole evaluation, walked again from
+   * its top, so it counts again steps already counted. The variant that
+   * keeps its own stack takes a computation up at the point where it
+   * stopped.
    */
   advance(limits?: Limits): Advance;
   /**
@@ -511,21 +543,6 @@ export interface Kernel {
   outcomeOf(value: Value): Outcome | undefined;
   /** The expression this value came from, where the kernel kept one. */
   originOf(value: Value): Value | undefined;
-}
-
-/** What `Kernel2.keyOf` reads of a key. */
-export interface KeyDescription {
-  /** The identity of the module the key was made with: `sha256:` and 64 hex digits. */
-  readonly module: string;
-  /** Which of that module's keys it is, from 0. */
-  readonly slot: number;
-}
-
-/**
- * The second version: everything of `Kernel`, and modules, keys, what a
- * result rests on, and restore.
- */
-export interface Kernel2 extends Kernel {
   /**
    * A symbol as data. Evaluating it gives the symbol itself, where the
    * value `symbol` makes is a name and is looked up. It is what a
@@ -643,5 +660,7 @@ export interface Kernel2 extends Kernel {
 
 /** How a host obtains a kernel. Creating one performs nothing else. */
 export type CreateKernel = () => Kernel;
-/** How a host obtains a kernel of the second version. */
-export type CreateKernel2 = () => Kernel2;
+/** @deprecated Another name for `Kernel`, kept until the acceptance stream's code has stopped using it. */
+export type Kernel2 = Kernel;
+/** @deprecated Another name for `CreateKernel`. */
+export type CreateKernel2 = CreateKernel;

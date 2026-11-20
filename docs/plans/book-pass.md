@@ -595,7 +595,7 @@ are:
 | K9 (the machine: evaluation) | rebuild | a second variant that evaluates with a stack of its own: calls, blocks, conditionals, values evaluated when needed, claims, unknown parameters; no limit on depth; a loop in constant space. `next/kernel/create.ts` chooses the variant, and the kernel's tests run against both | done 2026-11-20: the kernel's 141 tests pass on both variants with the same step counts, and the acceptance stream's 66 programs pass on both. A computation that waits is still what is left of it as an expression; the next chunk changes that |
 | K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | done 2026-11-20: every test passes on both variants, and the acceptance stream's 66 programs pass on both. Seven tests say where the two differ and by which decision. A task that a limit stops is dropped until slices exist |
 | K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | done 2026-11-20 on the machine: eight new tests. The contract gains `Limits.slice`, the end "paused" and `Advance.limited`; the reference ignores a slice |
-| K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | with the acceptance stream; a contract change |
+| K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | first half done 2026-11-20: one interface `Kernel` on both variants, with `evaluate` that needs no scope, `fill` that takes up what waited where `hold` is false, and a budget that is the evaluation's on the reference too. Four older forms stay, marked deprecated, until the acceptance stream's launcher has stopped using them. The second half removes them and makes the version 2 |
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | new tests |
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | cost tests: building a list by `put` costs about its size |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | the acceptance stream's speed tests: time per step does not grow with the size of the run |
@@ -1681,6 +1681,12 @@ its approval.
   the opposite to the acceptance stream, and that ruling stands: no
   default, and a run with no budget goes on. The inventory's note is
   corrected.
+- **2026-11-20 — the interface made one, first half** (the review
+  session): `Kernel` and `Kernel2` are one interface. New forms are
+  added beside the old, which are deprecated and go when the
+  acceptance stream has moved: `evaluate` with no scope, and `fill`
+  with `hold`. The reference kernel now keeps a budget for each
+  evaluation, as the machine does, so a launcher gives its budget once.
 
 ## 8. Sessions
 
