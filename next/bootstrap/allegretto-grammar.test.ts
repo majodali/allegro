@@ -35,14 +35,18 @@ test("every form of forms.md §2 parses", () => {
     "x", "x => x", "(x, y) => x", "() => 1", "f(a, b)", "f()", "a |> f", "p.a", "p[0]",
     // Control and claims.
     "if c then a else b", "a && b", "a || b", "!a", "claim(e)", "then(a, b)", "attempt(e, 100)", "describe(k, f)", "build(d)",
+    "also(a, b)", "refuse(r)", "assume(x)", "undecided(r)", "put(s, k, v)", "key(s, 0)", "kind(x)", "symbol(t)", "spelling(s)",
+    "{a: e, [k]: f}", "{[f(k)]: e}",
     // Operators.
     "a + b", "a - b", "a * b", "a / b", "a % b", "-a", "a < b", "a > b", "a <= b", "a >= b", "a == b", "a != b", "a ++ b",
     "float.add(a, b)", "int.text(42)", "bits.join(a, b)",
     // Bindings and blocks.
     "x = e", "f(x, y) => e", "x <- e", "export x = 1", "export f(x) => x",
     "f(x) =>\n  y = x\n  g(y)\n  z <- h(y)\n  z",
+    "f(x) => sync\n  g(x)\n  x", "x = sync\n  g()\n  1", "x <- sync\n  g()\n  1",
     // The module's header lines.
     "capability output\ninput name\nimport other\noutput.write(\"hello\")",
+    "key secret\ncapability output\nx = 1\ninput n",
     // Comments.
     "// a line\nx /* between */ = 1",
   ];
@@ -95,6 +99,15 @@ test("x <- e is a statement; inside an expression a < -b is still a comparison",
 test("the header words are not reserved: they stay names elsewhere", () => {
   assert.ok(tagsOf("capability output").includes("capability_decl"));
   assert.ok(tagsOf("input name").includes("input_decl"));
+  assert.ok(tagsOf("key name").includes("key_decl"));
   assert.ok(tagsOf("input = 1").includes("binding"));
   assert.ok(!tagsOf("capability(1)").includes("capability_decl"));
+  assert.ok(!tagsOf("key(s, 0)").includes("key_decl"));
+  assert.ok(tagsOf("key(s, 0)").includes("call"));
+});
+
+test("sync is a word before an indented block and a name elsewhere; a computed key is an entry of a structure literal", () => {
+  assert.ok(tagsOf("f() => sync\n  a\n  b").includes("sync_block"));
+  assert.ok(!tagsOf("x = sync").includes("sync_block"));
+  assert.ok(tagsOf("{[k]: 1}").includes("computed_field"));
 });

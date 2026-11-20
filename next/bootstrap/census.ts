@@ -142,7 +142,7 @@ function typedUses(items: readonly Item[]): string[] {
       case "apply": expr(e.fn); e.args.forEach(expr); break;
       case "pipe": expr(e.value); expr(e.fn); break;
       case "if": expr(e.condition); expr(e.then); expr(e.else); break;
-      case "record": e.fields.forEach((f) => expr(f.value)); break;
+      case "record": e.fields.forEach((f) => { if (f.k === "computed") expr(f.key); expr(f.value); }); break;
       case "list": e.items.forEach(expr); break;
       case "block": block(e.items); break;
       default: break;
