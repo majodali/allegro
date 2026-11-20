@@ -964,6 +964,36 @@ stream reads the answer's present shape.
 With this cluster 12 is ruled. What of it is for the parser engine is
 recorded and not built. One cluster remains: wording (14).
 
+### Cluster 14: wording (2026-11-20)
+
+Seven points were put to the maintainer. Ruled ("Agreed") on five:
+
+1. Bits. The kernel reads bits as a count or a place where one of its
+   primitives takes one, as a whole number with the most significant
+   bit first, and gives them no other meaning. The entry is reworded
+   and retitled.
+4. A text that does not parse is a failure the parser answers; the
+   loader claims a program's own text parsed, and there it is a
+   refutation.
+5. The order of the four strengths is stated where they are defined;
+   refuted is an outcome and no strength.
+6. Entries not to build from as written are marked in the inventory's
+   header: five that decide "open" and seven in the present tree's
+   vocabulary. None is rewritten now and none is split.
+7. The tour introduces ten terms, each in one sentence, before Part I
+   uses them. Drafted in the inventory for the maintainer to correct.
+
+Asked about, and not yet ruled:
+
+2. Symbols. The maintainer: "The text needs to clearly define what a
+   symbol is in terms of function. 'A symbol is its spelling' states
+   how symbol identity works, but not what it does. Have we given up
+   fully-qualified names for symbols? Perhaps I'm missing the
+   difference between symbols and keys for private field access."
+3. Expressions and what a parser returns. The maintainer: "Should we
+   be clearer on what the parser returns? Is 'a description' defined
+   well enough?"
+
 ## Terms introduced
 
 - **`unambiguous`**: a mark on a production. Where a parse of it is

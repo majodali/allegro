@@ -6,6 +6,8 @@
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
+> **Entries not to build from as written** (marked 2026-11-20, after the second adversarial review). Five entries decide "open": they are questions kept at their place in the book, and no decision yet. They are "The user-facing generics surface and parameter kinds", "Unification in patterns", "Conversion sugar with `in`", "How extensions are distributed" and "A trace is read from origins". Seven entries are written in the vocabulary of the present tree's host code and say how it does a thing, where the rebuild has not yet said how it will: "Structures immutable by default; derive, never mutate", "Value as a contract, seven kind units and an assembly", "Construction only through factories, one host class", "Metadata supplied at construction, one attachment operation", "Metadata slot mixed in from the metadata unit", "Kinds are types, and Type is its own type" and "One construction surface". Each is restated when its chapter is written.
+
 ## The proposed table of contents
 
 The order binds by dependency: every decision comes after the decisions it depends on, and no decision depends on a later chapter. Within a chapter, among decisions with no dependency between them, the more significant comes first. Chapters keep tightly related decisions together, so significance breaks ties inside a chapter and between chapters only where dependency leaves the choice free.
@@ -30,7 +32,7 @@ Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded i
 As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
 
 3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
-   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it computes nothing on them; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
+   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
 4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
 5. **Authority** (7 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
@@ -183,6 +185,21 @@ The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pas
 - **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
 
 Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "A missing value is a cell that is filled once". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
+
+## Ten terms the tour introduces
+
+A reader who did not know the project found these ten used before the entry that defines them. By the maintainer's ruling of 2026-11-20 the tour introduces each in one sentence, before Part I uses it. These are drafts for the maintainer to correct. They are not book text yet.
+
+1. **Claim.** A claim is an expression that someone states to be true of a program, such as a type, a contract or a law; nothing is a claim until someone makes it, and the kernel decides it by evaluating it.
+2. **Configuration.** A configuration is everything that determines one execution and is not the program: the kernel, the extensions, the capabilities and inputs handed over, the limits, and what must be decided.
+3. **Capability.** A capability is the right to perform an effect, held as a value: a named set of operations, such as writing output, that code can use only if it was handed it.
+4. **Refutation and halting.** A refutation is the kernel's record that a claim came out false, which means the program is wrong; a refuted claim halts its phase, so the phase's result is refuted and it performs no further effect, though evaluation goes on to report other refutations.
+5. **Strength.** A strength says how a claim was settled: decided (the kernel evaluated it in full), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (not yet settled), from strongest to weakest.
+6. **Policy.** A policy is a requirement on what a result may rest on before it is used: what a phase must leave decided, or what the inputs of a capability must rest on.
+7. **Cell.** A cell is a value that is not known yet and is filled once, when it arrives: the answer of an operation that takes time, or an input supplied later.
+8. **Scope.** A scope is the part of a text in which a name means one binding: a block and everything written inside it; no value of the language is a scope.
+9. **Description and right.** A description is plain data that says what a function is made of; getting one takes a right, which is a key of the module that made the function or the inspection right a configuration grants.
+10. **Module and key.** A module is a function of its capabilities and inputs whose value is a structure of its bindings; a key is a value the kernel makes for one module and nothing can forge, and what is stored under a key is read only with it.
 
 ## The author's motivations, for the tour
 
@@ -358,7 +375,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Why a new language
 
 #### Order of definition carries no meaning
-- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body happen in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
+- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body are started in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -372,6 +389,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
 - Notes (2026-11-16, the order of effects): the order of a body's statements is carried by sequence ("Sequence is one kernel primitive"); bindings stay order-free.
 - Notes (2026-11-17, the adversarial review's issue 16): reworded by ruling. The entry said only effects have an order, and later decisions made two more exceptions it did not state. The first is carried by sequence, the second by "A text can change the grammar it is read in", the third by "Running a program is evaluating its main module with a configuration's capabilities". Knowledge from an `assert` holds for the statements after it, which is the first exception again.
+- Notes (2026-11-20, the second adversarial review, cluster 14): one sentence corrected: statements are started in the order written and do not wait for each other ("A statement does not wait for the one before it"). A reader found the title and the text apart; a new title is put to the maintainer.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
@@ -580,7 +598,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### Every result says how strongly it holds
-- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). The word says how the claim itself was settled. A claim that rests on a weaker claim is itself reported at the weaker strength; nothing else lowers it. What a result rests on is recorded beside the word and never changes it: the kernel variant, the primitive functions that ran, the capabilities whose answers were read, the extensions, the builders of restored outcomes. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently.
+- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). The four are ordered, strongest first, as listed here: decided, sampled, assumed, undecided. Refuted is an outcome and no strength: a refuted claim holds at none. The word says how the claim itself was settled. A claim that rests on a weaker claim is itself reported at the weaker strength; nothing else lowers it. What a result rests on is recorded beside the word and never changes it: the kernel variant, the primitive functions that ran, the capabilities whose answers were read, the extensions, the builders of restored outcomes. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
@@ -597,6 +615,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR4): the verdict is assembled by a walk of top-level bindings outside evaluation (`buildVerdict`), where the decision makes it the result's own metadata; and contracts that stay undecided reach `inspect` only, not the verdict or the record of assumptions. Formerly the entries "The verdict as accumulated metadata" and "Contracts in the verdict and the ledger".
 - Notes (2026-11-15, the rulings on strength and on identity): reworded: strength and what a result rests on are two things, where the decisions had treated them as one (issues 8 to 10). The weakest-link rule applies among claims only, so a claim that used arithmetic is decided and names its primitives.
 - Notes (2026-11-18, the second adversarial review, cluster 5): "undecided" covers two cases, told apart by whether the claim is done: it waits for a value, or it was evaluated and what decides it could not tell. A claim that rests on an assumed claim is assumed.
+- Notes (2026-11-20, the second adversarial review, cluster 14): the order of the four is stated here by ruling, where "the weaker strength" first needs it; it had appeared only in a later entry's list. That refuted is an outcome and not a strength is said in the same place.
 - Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
@@ -661,8 +680,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the ruling on identity): the kinds stay seven. A key is a structure that the kernel marks ("A key is made with the module that holds it"), not a kind of its own.
 - Chapter: Values
 
-#### The kernel's plain data is a sequence of bits, and it computes nothing on them
-- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart and does nothing else with them. What the bits mean, and every operation on them, comes from extensions and from capabilities.
+#### The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
+- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart, join two, measure one and take a part of one. It reads bits as a number in one case only: where one of its primitives takes a count or a place, as a whole number with the most significant bit first. A place outside what it is a place in is a refutation. The kernel gives bits no other meaning: what they mean, and arithmetic on them, comes from extensions and from capabilities.
 - Status: partly built (arithmetic and the scalar encodings are kernel primitives today); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -674,6 +693,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Bits is the only scalar" and "Scalar encodings inside Bits". The 64-bit width, the IEEE float and the UTF-8 text encoding become choices of the standard language and of the arithmetic capability.
 - Held finding (2026-11-11, DR2): arithmetic, comparison and the scalar encodings are base primitives (`src/primitives.ts`).
 - Notes (2026-11-16, Allegretto's forms): the kernel also joins two bits values, measures one and takes a part of one. It still gives the bits no meaning: no arithmetic and no order.
+- Notes (2026-11-20, the second adversarial review, cluster 14): reworded and retitled by ruling, from "The kernel's plain data is a sequence of bits, and it computes nothing on them". A reader found that the kernel joins, measures and slices bits and answers a length as 64 bits, so it had chosen an encoding the entry said it did not have, and no decision said which.
 - Chapter: Values
 
 #### One composite kind: Structure
@@ -712,7 +732,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
 - Significance: 2 — local to the structure unit
 - Label: swappable — collection types choose representations above
 - Units: structure
@@ -998,7 +1018,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (to prove); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
 - Significance: 4 — shrinks the kernel to what no capability could supply
 - Label: swappable — another arithmetic can be supplied in its place
 - Options recorded: machine arithmetic in the kernel (rejected, see the bits decision)
@@ -1577,7 +1597,7 @@ They came together over years of exploration into most of what Allegro is today.
 ### Parsing
 
 #### Parsing is evaluation
-- Decides: a parser is a function from a grammar and a text to an expression. A text that does not parse is a refutation.
+- Decides: a parser is a function from a grammar and a text to an expression. A text that does not parse is a failure the parser answers, as plain data in the shape every failure has, so a program that parses a text it was sent may handle bad input. The loader claims that a program's own text parsed, so there a text that does not parse is a refutation.
 - Status: open (the engine is host code called by a fixed pipeline); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
@@ -1588,6 +1608,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling. When a parser runs follows from the partial-evaluation decisions: a text that is known is parsed, and a text or grammar that is missing leaves a residual.
 - Held finding (2026-11-12, DR3): parsing is a host stage: the engine is TypeScript (`src/grammar2/engine.ts`) and no Allegro function parses a program's text.
+- Notes (2026-11-20, the second adversarial review, cluster 14): the last two sentences replace "A text that does not parse is a refutation", by ruling. A reader saw that a program which parses text it receives would be wrong on bad input unless it wrapped the parser in an attempt. With a failure as plain data ("A failure a program can handle is plain data of one shape") the parser answers one, and only the loader's claim makes it a refutation. What a parser returns for a text that does parse is under discussion.
 - Chapter: Parsing
 
 #### No parser is privileged
@@ -2123,7 +2144,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
+- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
 - Significance: 3 — what every program starts with
 - Label: swappable — the roster
 - Units: core-types, type-primitives
@@ -4458,7 +4479,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | S2d | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | S4b | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | SC-1 | concepts.md: Seven representation kinds |
-| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it computes nothing on them |
+| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it gives them no meaning but a count |
 | SC-3 | concepts.md: Expressions are values |
 | SC-4 | concepts.md: Symbol identity is fully-qualified, not spelling |
 | SC-5 | concepts.md: One composite kind rather than two |

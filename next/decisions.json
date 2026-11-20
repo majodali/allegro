@@ -26,7 +26,7 @@
     {"title":"Each decision lives in one replaceable unit of code","part":"I","chapter":"Keep it simple","type":"implementation","present":"partly built","owner":"none","state":"none","unit":null,"cases":[]},
     {"title":"One value universe","part":"II","chapter":"Values","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Seven representation kinds","part":"II","chapter":"Values","type":"capability","present":"settled","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[]},
-    {"title":"The kernel's plain data is a sequence of bits, and it computes nothing on them","part":"II","chapter":"Values","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"The kernel's plain data is a sequence of bits, and it gives them no meaning but a count","part":"II","chapter":"Values","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[],"was":["The kernel's plain data is a sequence of bits, and it computes nothing on them"]},
     {"title":"One composite kind: Structure","part":"II","chapter":"Values","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Structures immutable by default; derive, never mutate","part":"II","chapter":"Values","type":"capability","present":"partly built","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Arrays are structures with unkeyed entries","part":"II","chapter":"Values","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
