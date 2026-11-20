@@ -9,7 +9,7 @@
 // says: the imported text is emitted first, and its record's `declares`
 // are its declarations; the record is loaded into a kernel with `load`
 // (next/kernel/saved-program.ts), which constructs and evaluates nothing;
-// and `Kernel2.moduleOf` of what `load` returns is the identity. One
+// and `Kernel.moduleOf` of what `load` returns is the identity. One
 // kernel serves a whole drive.
 //
 // Where an imported text is found. `import name` in a text read from the
@@ -38,7 +38,7 @@
 // next/bootstrap/driver.test.ts.
 
 import * as path from "path";
-import type { CreateKernel2, Kernel2, Value } from "../kernel/interface.js";
+import type { CreateKernel, Kernel, Value } from "../kernel/interface.js";
 import { createKernel as referenceKernel } from "../kernel/create.js";
 import { load, type SavedProgram } from "../kernel/saved-program.js";
 import { shippedByName } from "../prims/index.js";
@@ -88,8 +88,8 @@ const nameOf = (file: string): string => path.basename(file, ".alg");
  * text. The kernel identities are taken in a kernel `createKernel` makes,
  * the reference kernel unless the caller passes another.
  */
-export function drive(text: string, file: string, readText: ReadText, createKernel: CreateKernel2 = referenceKernel): DriveResult {
-  const kernel: Kernel2 = createKernel();
+export function drive(text: string, file: string, readText: ReadText, createKernel: CreateKernel = referenceKernel): DriveResult {
+  const kernel: Kernel = createKernel();
   const primitives = new Map<string, Value>();
   const records: DrivenRecord[] = [];
   const findings: DriveFinding[] = [];

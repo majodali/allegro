@@ -318,9 +318,8 @@ policy is the gate ruled there.
   proposed at PR #194 are input to its specification, not chunks.
   Default: as written.
 
-**Put at the amendment's PR (2026-11-20)**, for the work after
-milestone 3. Each has a default, taken at the merge unless the
-maintainer rules otherwise.
+**Put at the amendment's PR, each default taken** at the merge of
+PR #283 on 2026-11-20, for the work after milestone 3.
 
 - **B1 — How a text in the standard language is read at milestones 4
   to 7.** The parser engine written in Allegro replaces the bootstrap
@@ -2402,3 +2401,27 @@ maintainer rules otherwise.
       anything is evaluated, where the decision says a refutation.
   - **From here** each chunk moves its rows in its own pull request.
   - `decision-map: 253 rows · R 161 · Q 69 · none 23 · state none 233, carried 0, adapted 0, written 20, proved 0 — consistent`.
+- **2026-11-20 — The amendment merged; Q9: the launcher on the one interface.**
+  The maintainer merged PR #283 the day it was opened, so questions B1
+  to B5 of §6 stand at their defaults and chunks Q9 to Q22 are the
+  plan. The same hour the kernel stream merged PR #282, the first half
+  of its chunk K12 (the interface made one). It adds the new forms
+  beside the old, names the launcher's lines to move, and waits for
+  this stream before a third pull request removes the old forms.
+  - **What moved**, as PR #282 lists it. The launcher
+    (`next/launch/launcher.ts`) gives its step budget once, to
+    `evaluate`. The kernel counts later work against it, so `advance`
+    takes no steps, and an evaluation named in an advance's `limited`
+    list ends the launch at its limit. Every `fill` states `hold`: the
+    launcher and the corpus runner (`next/corpus/allegretto.ts`) fill
+    the cells whose answers arrived and then call `advance`, as before.
+    `evaluate` takes no scope. `Kernel2` and `CreateKernel2` give way
+    to `Kernel` and `CreateKernel` in every file of this stream.
+  - **One check removed.** The launcher refused a kernel that lacked
+    the calls of the second interface version. The interface is one,
+    so the check is gone; the version constant is still compared.
+  - **Measured.** `npm run test:next`: 670 pass on the reference and
+    671 with `ALLEGRO_KERNEL=machine`. The 84 programs pass on both.
+    No assertion of this stream's tests changed; the test kernel that
+    stops by itself reads the limits as the second argument of
+    `evaluate`.

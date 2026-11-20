@@ -203,13 +203,13 @@ test("what a module yields, read through the kernel's interface: all its binding
     const fn = load(k, doc, primitives);
     assert.equal(typeof k.moduleOf(fn), "string", `${file}: the record is a module, with an identity`);
     const capability = k.structure([[k.symbol("write"), k.primitiveFunction(outputWrite(() => {}))]]);
-    const r = k.evaluate(k.expression(fn, [capability]), k.scope(), { steps: STEPS });
+    const r = k.evaluate(k.expression(fn, [capability]), { steps: STEPS });
     assert.equal(r.refuted, false, file);
     // A yielded function is the module's own value: apply it through the interface.
     const double = k.entriesOf(r.value).find(([key]) => key !== null && k.symbolName(key) === "double");
     if (double !== undefined) {
       const seven = k.bits(Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 7));
-      const applied = k.evaluate(k.expression(double[1] as Value, [seven]), k.scope());
+      const applied = k.evaluate(k.expression(double[1] as Value, [seven]));
       assert.deepEqual([...k.bitsOf(applied.value).bytes], [0, 0, 0, 0, 0, 0, 0, 14], file);
     }
   }

@@ -1487,6 +1487,15 @@ first, directly below this line.
 
 
 
+### 2026-11 — The launcher on the one interface (B-196, chunk Q9 (the launcher on the one interface))
+
+B-196 (the rebuild's acceptance side). The kernel's interface became
+one, and this stream's files moved to it: the launcher gives its step
+budget once, to the evaluation; every `fill` says whether it holds;
+`evaluate` takes no scope; and the names of the second version are gone
+from the launcher, the corpus runner and the bootstrap. The plan's
+amendment merged the same day, with each of its five defaults taken.
+
 ### 2026-11 — The decision map made current (B-196, chunk Q10 (the decision map made current))
 
 B-196 (the rebuild's acceptance side). The map's rows no longer store
