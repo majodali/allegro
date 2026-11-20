@@ -1630,6 +1630,33 @@ policy is the gate ruled there.
   merged with main (350 tests, none failing). Nothing else of this
   stream reads an attempt's answer: the programs of the corpus, the
   speed tests, the scenarios and the specifications were searched.
+- **2026-11-20 — The corpus follows two retitles, and 30 new results wait for Part IV.**
+  Two decisions were retitled between 2026-11-18 and 2026-11-19.
+  "Tail calls by sentinel and loop" is "A loop written as a recursion
+  runs in constant space" (PR #256): 19 cases, all class survives, and
+  none states anything the reworded decision changes. "A failure a
+  program can handle is supplied by an extension" is "A failure a
+  program can handle is plain data of one shape" (PR #257): 16 cases.
+  `--follow-renames` of `next/tools/corpus.ts` moved the 35. The second
+  decision was replaced, and it says nothing carries a failure to later
+  results: a failure handed to a primitive function is a refutation. A
+  note of 2026-11-19 on "The standard language's handled failure is an
+  exception" says its sentence "carried to every result computed from
+  it, in a field the standard extension owns" no longer stands, and
+  that the decision is reworked with Part IV. Of the 73 cases that cite
+  that decision, 30 state a new result or a restatement that rests on
+  the carrying: 15 pins of `tests/logical-error-demo.alg`, 3 of
+  `tests/metadata-channels-demo.alg`, 1 of `tests/arrays.alg`, and 11
+  tests of `src/boundary-tests.ts`, `src/test/equality-laws.ts`,
+  `src/test/grammar2-language.ts` and
+  `src/test/types-construction.ts`. They sit at milestones 4 (15) and
+  5 (15). Each now carries a note that says so. No class and no new
+  result is changed here: the cases are restated when the decision is
+  reworked, since the maintainer's direction for it (a failure is
+  returned as a value of a union type, and a check refutes code that
+  does not handle a declared failure) is not yet a decision's text.
+  Measured:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
 - **2026-11-20 — Q5, part 4: the grammar, reader and emitter follow the forms as they stand.**
   The kernel stream's PRs #245 to #260 grew `next/ext/allegretto/forms.md`,
   and the waiting test of `next/bootstrap/emit.test.ts` named the kernel

@@ -1411,6 +1411,16 @@ a structure literal takes computed keys and private entries, `key`
 header lines declare keys, header lines stand anywhere at the top
 level, and the least integer can be written. Ten programs show the new
 forms. Imports are left for a later part.
+### 2026-11 — The corpus follows two retitles; 30 new results wait for Part IV (B-196)
+
+B-196 (the rebuild's acceptance side). 35 corpus cases move to the new
+titles of two decisions: "A loop written as a recursion runs in constant
+space" (19) and "A failure a program can handle is plain data of one
+shape" (16). The second was replaced by ruling on 2026-11-19: nothing
+carries a failure to later results. 30 cases state a new result that
+rests on an exception being carried. Each is marked to be restated when
+"The standard language's handled failure is an exception" is reworked
+with Part IV. No class changes.
 
 ### 2026-11 — The emitter's test no longer reads what an attempt answers (B-196)
 
