@@ -34,7 +34,7 @@
 // budget, and without it there is none.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
-// exporting `createKernel` of type `CreateKernel2`
+// exporting `createKernel` of type `CreateKernel`
 // (next/kernel/interface.ts). Until that file exists the entry prints
 // one line saying so and exits 2. It never loads the stand-in kernel of
 // the launcher's tests.
@@ -42,7 +42,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import type { CreateKernel2 } from "../kernel/interface.js";
+import type { CreateKernel } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
 import { describe, launch, type Configuration } from "./launcher.js";
 import { output } from "./output.js";
@@ -60,12 +60,12 @@ function fail(message: string, code = 1): never {
   process.exit(code);
 }
 
-async function kernelFactory(): Promise<CreateKernel2> {
+async function kernelFactory(): Promise<CreateKernel> {
   const file = path.join(root, KERNEL_MODULE);
   if (!fs.existsSync(file)) fail(`no kernel is built yet: ${KERNEL_MODULE} does not exist`, 2);
   const mod = (await import(pathToFileURL(file).href)) as { createKernel?: unknown };
   if (typeof mod.createKernel !== "function") fail(`${KERNEL_MODULE} does not export a function createKernel`);
-  return mod.createKernel as CreateKernel2;
+  return mod.createKernel as CreateKernel;
 }
 
 /** Reads the arguments every terminal entry takes: one file, and `--steps <n>`. */

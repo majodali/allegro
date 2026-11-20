@@ -331,7 +331,7 @@ export interface Finding {
 /**
  * What the emitter needs of an imported module: what it declares, in its
  * order (the `declares` of its record), and its identity, as
- * `Kernel2.moduleOf` gives it for the loaded record.
+ * `Kernel.moduleOf` gives it for the loaded record.
  */
 export interface ImportedModule {
   readonly declares: ReadonlyArray<Pick<Declared, "role" | "name">>;
