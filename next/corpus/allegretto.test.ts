@@ -23,12 +23,16 @@
 // capability, which the runner grants on a scripted transport that serves
 // a program's `// serves:` lines (`scriptedTransport` of
 // next/launch/scripted-transport.ts), and the programs `m3/http-*.alg`.
+// Chunk Q13 (check and run as configurations, and what a result holds),
+// part 1, added the launcher's result to a run (`ProgramRun.result`), the
+// `// summary:` line, and the program `m3/result-assumed.alg`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
-// `--next` uses too, and its lines, end and yielded keys are compared with
-// its `// expect:`, `// end:` and `// yields:` lines, and the lines printed
-// before each later phase with the place of its `// later:` line.
+// `--next` uses too, and its lines, end, yielded keys and summary are
+// compared with its `// expect:`, `// end:`, `// yields:` and `// summary:`
+// lines, and the lines printed before each later phase with the place of
+// its `// later:` line.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -43,7 +47,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPins, readServes, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPins, readServes, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -358,4 +362,35 @@ test("npm run allegretto emits and launches in one step: it prints the lines, an
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+
+// ── The result of a run and the summary line (chunk Q13, part 1) ──────
+
+test("the summary line is read as the convention states: one word, a strength", () => {
+  assert.deepEqual(readSummary("capability output\n//summary:   assumed  \n"), { summary: "assumed", problems: [] });
+  assert.deepEqual(readSummary("capability output\n"), { summary: undefined, problems: [] });
+  assert.deepEqual(readSummary("// summary: proven\n").problems, ['the line "// summary: proven" states no summary: the words are refuted, undecided, assumed, sampled, decided']);
+  assert.deepEqual(readSummary("// summary: decided\n// summary: refuted\n").problems, ["the program has two `// summary:` lines"]);
+});
+
+test("a run gives the launcher's result, and a program that states a summary passes only with that word", async () => {
+  const program = "capability output\nassume(1 == 1)\noutput.write(\"after\")\n// expect: after\n// end: completed\n";
+  const plain = await runProgram(program);
+  assert.deepEqual(plain.problems, [], "a program that states no summary is not compared on it");
+  assert.equal(plain.result?.summary, "assumed");
+  assert.ok(plain.result?.claims.some((c) => c.assumed > 0));
+  assert.deepEqual((await runProgram(program + "// summary: assumed\n")).problems, []);
+  assert.deepEqual((await runProgram(program + "// summary: decided\n")).problems, ['the summary is "assumed", expected "decided"']);
+  const bad = await runProgram(program + "// summary: fine\n");
+  assert.deepEqual(bad.problems, ['the line "// summary: fine" states no summary: the words are refuted, undecided, assumed, sampled, decided']);
+  assert.deepEqual(bad.lines, [], "a program whose lines cannot be read is not launched");
+});
+
+test("a summary line where nothing is launched, or where the launcher refuses, fails the program", async () => {
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// summary: decided\n");
+  assert.deepEqual(notEmitted.problems, ["nothing was launched, and the program states a `// summary:` line"]);
+  assert.equal(notEmitted.result, undefined);
+  const refusedRun = await runProgram("capability output\ninput a\noutput.write(a)\n// input: b = 1\n// end: refused: the configuration supplies the input b at the start, which the module does not declare\n// summary: decided\n");
+  assert.deepEqual(refusedRun.problems, ["the launcher refused the run, and the program states the summary decided"]);
 });
