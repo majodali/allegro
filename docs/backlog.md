@@ -3914,7 +3914,15 @@ table and the stream plans.
   maintainer called "ok, but arbitrary"). Raised by the maintainer on
   2026-11-19 (`docs/records/book-pass/adversarial-review-2.md`,
   cluster 8, "Late answers").
-- [ ] **B-203** (streams, large data and asynchronous iteration) · L0 ·
+- [x] **B-203** (streams, large data and asynchronous iteration) · L0 ·
+  HELD AND RULED 2026-11-20: a stream is a value, `{item, rest}` with
+  the rest evaluated when read; iteration is recursion, with library
+  functions and no primitive; the kernel shares what an operation does
+  not change; `first` cancels only what nothing else can need.
+  Recorded in the inventory and in
+  `docs/records/book-pass/adversarial-review-2.md`. Nothing in the
+  kernel had to change for streams; sharing is built with the kernel
+  that keeps its own stack. As filed:
   A discussion to hold with B-202 (threads and budgets at run time).
   A late answer fills one cell, once. Not designed: a stream of
   answers, read item by item, and what keeps its reads in order; a
