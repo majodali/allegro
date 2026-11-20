@@ -10,11 +10,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Kernel, Kernel2, PrimitiveDeclaration, Rest, Value } from "./interface.js";
-import { createKernel, InterfaceError } from "./kernel.js";
+import { chosenVariant, createKernel } from "./create.js";
+import { InterfaceError } from "./interface.js";
 import { Refusal } from "./interface.js";
 import { load, type SavedProgram } from "./saved-program.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
+
+/**
+ * True where these tests run on the kernel variant that evaluates with a stack of its own
+ * (docs/plans/book-pass.md section 9). The two variants answer alike, and every test here runs
+ * on both. The few places where a ruled decision makes them differ test this, and say which
+ * decision.
+ */
+const MACHINE = chosenVariant() === "machine";
 
 const hash = (n: number) => "sha256:" + n.toString(16).padStart(64, "0");
 
@@ -686,7 +695,15 @@ test("a recursion that never ends is ended by the budget, and is not a fault", (
   const n = k.param("n");
   const program = within(k, [[loop, k.composedFunction([n], call(loop, n))]], call(loop, byte(k, 1)));
   assert.equal(k.evaluate(program, scope, { steps: 500 }).ended, "limit");
-  assert.equal(k.evaluate(program, scope).ended, "limit", "with no budget, the depth it can reach is the limit");
+  if (MACHINE) {
+    // "A loop written as a recursion runs in constant space": this one goes round as long as
+    // its budget lasts, and with no budget it would not end. A hundred thousand turns here.
+    const long = k.evaluate(program, scope, { steps: 100_000 });
+    assert.equal(long.ended, "limit");
+    assert.equal(long.steps, 100_000, "every step of the budget was a turn of the loop");
+  } else {
+    assert.equal(k.evaluate(program, scope).ended, "limit", "with no budget, the depth it can reach is the limit");
+  }
 });
 
 test("an effect is performed once, when its arguments are known", () => {
@@ -1353,6 +1370,30 @@ test("what an evaluation leaves in place of a part keeps the part's mark", () =>
   assert.equal(body.form, "apply", "the module still sees its own part");
 });
 
+test("what a call leaves is the caller's, where the function called is nobody's", () => {
+  const { k, add, call, kp } = setup();
+  const scope = k.scope();
+  const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
+  // Two functions no module made, one calling the other: y => add(y, 1) and x => add(inner(x), 1).
+  const [x, y] = [k.param("x"), k.param("y")];
+  const inner = k.composedFunction([y], call(add, y, byte(k, 1)));
+  const plain = k.composedFunction([x], call(add, call(inner, x), byte(k, 1)));
+  // One module: (key, c, g) => [ (a => (() => a))(g(c)),  f => describe(key, f) ]
+  const [key, c, g, a, f] = [k.param("key"), k.param("c"), k.param("g"), k.param("a"), k.param("f")];
+  const m = k.module(k.composedFunction([key, c, g], k.structure([
+    [null, call(k.composedFunction([a], k.composedFunction([], a)), call(g, c))],
+    [null, k.composedFunction([f], call(kp("describe"), key, f))],
+  ])), 1, [{ role: "input", name: "c" }, { role: "input", name: "g" }]);
+  const made = k.evaluate(call(m, k.cell(), plain), scope).value;
+  const [closure, look] = [entry(made, 0), entry(made, 1)];
+  // The call g(c) is the module's. While c is unknown what it leaves is add(add(c, 1), 1),
+  // written by nobody: it stands where the module's call stood, so it is the module's to see.
+  // The calls inside it are nobody's, and the value passes back through each of them.
+  k.evaluate(call(closure), scope);
+  const body = form(k, form(k, k.evaluate(call(look, closure), scope).value).parts[1]);
+  assert.equal(body.form, "apply", "the module sees what its own call left");
+});
+
 test("a built function is its builder's: the module whose code built it may describe it", () => {
   const { k, add, call, kp } = setup();
   const scope = k.scope();
@@ -1483,9 +1524,13 @@ test("the kernel's own limit inside an attempt is the attempt's limit, not the e
   const [deep, n] = [k.symbol("t.deep"), k.param("n")];
   // deep(n) = add(1, deep(n)): it never ends, and each call sits inside the one before.
   const deepFn = k.composedFunction([n], call(add, byte(k, 1), call(deep, n)));
-  const r = k.evaluate(call(kp("attempt"), within(k, [[deep, deepFn]], call(deep, byte(k, 1))), steps(k, 50_000_000)), k.scope());
+  // "Limits are step budgets": on the variant with a stack of its own nothing but the budget
+  // and memory bounds the depth, so there the attempt is given a budget it can reach. On the
+  // reference the host's stack runs out long before fifty million steps.
+  const r = k.evaluate(call(kp("attempt"), within(k, [[deep, deepFn]], call(deep, byte(k, 1))), steps(k, MACHINE ? 60_000 : 50_000_000)), k.scope());
   assert.equal(r.ended, "complete", "the attempt answers; the evaluation goes on");
   assert.equal(form(k, r.value).form, "limit");
+  if (MACHINE) assert.ok(r.steps >= 60_000, "it went as deep as its budget, far past where the host's stack ends");
 });
 
 test("a structure is built an entry at a time: put adds or replaces, and never changes what it was given", () => {
@@ -2250,4 +2295,52 @@ test("every entry of a list is started at once, and a then around them waits for
   k.advance({ steps: 200 });
   assert.deepEqual(said, [3]);
   assert.equal(cells.length, 2, "each entry was evaluated once");
+});
+
+// ---- Depth and loops (chunk K9) ------------------------------------------------
+
+/** Whole numbers of 32 bits, for counts past what one byte holds. */
+function counting() {
+  const base = setup();
+  const { k } = base;
+  const read = (c: { bitsOf(v: Value): { bytes: Uint8Array } }, v: Value) => c.bitsOf(v).bytes.reduce((n, b) => n * 256 + b, 0);
+  const n32 = (n: number) => k.bits(Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255));
+  const make = (name: string, n: number, f: (x: number) => number | boolean) =>
+    k.primitiveFunction({
+      purity: "pure",
+      hash: hash(n),
+      name,
+      arity: 1,
+      run: (a, c) => {
+        const r = f(read(c, a[0]));
+        return typeof r === "boolean" ? c.bits(Uint8Array.of(r ? 1 : 0), 1) : c.bits(Uint8Array.of(r >>> 24, (r >>> 16) & 255, (r >>> 8) & 255, r & 255));
+      },
+    });
+  return { ...base, n32, value: (v: Value) => read(k, v), less: make("less32", 81, (x) => x - 1), more: make("more32", 82, (x) => x + 1), none: make("none32", 83, (x) => x === 0) };
+}
+
+test("a recursion is as deep as its budget and memory allow: twenty thousand calls, each inside the one before", () => {
+  const { k, call, kp, n32, value, less, more, none } = counting();
+  const [down, n] = [k.symbol("t.down"), k.param("n")];
+  // down(n) = if n == 0 then 0 else 1 + down(n - 1): no call is the value of the body.
+  const downFn = k.composedFunction([n], call(kp("if"), call(none, n), n32(0), call(more, call(down, call(less, n)))));
+  const r = k.evaluate(within(k, [[down, downFn]], call(down, n32(20_000))), k.scope());
+  if (MACHINE) {
+    assert.equal(r.ended, "complete");
+    assert.equal(value(r.value), 20_000);
+  } else {
+    // The reference evaluates on the host's stack, which ends first.
+    assert.equal(r.ended, "limit");
+  }
+});
+
+test("a loop written as a recursion goes round as often as asked: a hundred thousand turns", () => {
+  const { k, call, kp, n32, value, less, more, none } = counting();
+  const [loop, n, acc] = [k.symbol("t.loop"), k.param("n"), k.param("acc")];
+  // loop(n, acc) = if n == 0 then acc else loop(n - 1, acc + 1): the call is the value of the body.
+  const loopFn = k.composedFunction([n, acc], call(kp("if"), call(none, n), acc, call(loop, call(less, n), call(more, acc))));
+  const r = k.evaluate(within(k, [[loop, loopFn]], call(loop, n32(MACHINE ? 100_000 : 200), n32(0))), k.scope());
+  assert.equal(r.ended, "complete");
+  assert.equal(value(r.value), MACHINE ? 100_000 : 200);
+  assert.equal(r.steps, (MACHINE ? 100_000 : 200) * 5 + 4, "five steps a turn on either variant: the two count alike");
 });

@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Value } from "../kernel/interface.js";
-import { createKernel } from "../kernel/kernel.js";
+import { createKernel } from "../kernel/create.js";
 import { shipped, shippedByName } from "./index.js";
 import { HASHES } from "./hashes.js";
 import { readSource, sourceHashes } from "./hash-source.js";

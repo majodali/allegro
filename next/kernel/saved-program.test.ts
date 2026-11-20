@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Kernel, Value } from "./interface.js";
 import { check, check2, encode, load, outcomeKeys, type SavedProgram } from "./saved-program.js";
-import { createKernel } from "./kernel.js";
+import { createKernel } from "./create.js";
 
 const ADD = "sha256:" + "ab".repeat(32);
 
