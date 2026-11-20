@@ -2,9 +2,11 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 249 decisions in 6 parts and 38 chapters (231 when the phase closed; eighteen added by rulings since) after the preface and the tour. Part I: 23; Part II: 59; Part III: 26; Part IV: 64; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 215, implementation 18. By significance: 5: 38, 4: 71, 3: 78, 2: 40, 1: 6. By label: foundational 122, swappable 111. By status against the code: settled 93, partly built 64, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 249 decisions in 6 parts and 38 chapters (231 when the phase closed; nineteen added by rulings since and one withdrawn) after the preface and the tour. Part I: 23; Part II: 59; Part III: 26; Part IV: 64; Part V: 27; Part VI: 45. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 216, implementation 17. By significance: 5: 38, 4: 71, 3: 79, 2: 39, 1: 6. By label: foundational 123, swappable 110. By status against the code: settled 92, partly built 65, open 76. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
+
+> **Entries not to build from as written** (marked 2026-11-20, after the second adversarial review). Five entries decide "open": they are questions kept at their place in the book, and no decision yet. They are "The user-facing generics surface and parameter kinds", "Unification in patterns", "Conversion sugar with `in`", "How extensions are distributed" and "A trace is read from origins". Seven entries are written in the vocabulary of the present tree's host code and say how it does a thing, where the rebuild has not yet said how it will: "Structures immutable by default; derive, never mutate", "Value as a contract, seven kind units and an assembly", "Construction only through factories, one host class", "Metadata supplied at construction, one attachment operation", "Metadata slot mixed in from the metadata unit", "Kinds are types, and Type is its own type" and "One construction surface". Each is restated when its chapter is written.
 
 ## The proposed table of contents
 
@@ -20,7 +22,7 @@ The order binds by dependency: every decision comes after the decisions it depen
 Chapters 1 and 2 as ruled in DR1 (2026-11-11), with the titles the maintainer gave on PR #185; all wording is reviewed for style in a later pass. The part opens with the thesis statement "Why a new language, now", which is not a decision. The demo ladder and the three-part positioning are narrative, told in the tour.
 
 1. **Why a new language** (10 decisions). Why Allegro exists, and the platform that follows from it: trust from the kernel, domain languages that grow, one way to extend, a kernel with no language.
-   - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Order of definition carries no meaning; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
+   - Decisions: Trust comes from the kernel, not the author; A system is described in the language of its domain, and that language grows with the understanding; Everything above the kernel is an extension, and there is one way to extend; The kernel contains only what no extension could supply; Meaning comes before notation; The kernel holds no language; Bindings and extensions may be written in any order; A language inherits every check of what it is built on; A mapping between models is itself a checked value; A paradigm is a library.
 2. **Keep it simple** (13 decisions). Partial evaluation as the one operation; phases, claims, effects and trust stated in its terms; host code and optimization; the code's units.
    - Decisions: One operation: partial evaluation; Phases are configuration; Claims are evaluated like everything else; A refuted value never reaches an effect; Correctness and safety are one kind of claim; The kernel trusts only what it has evaluated; Anyone may propose, and the record shows who; A decided claim can be translated into a proof an outside checker accepts; Host code reaches a program only as primitive functions; No interface limits optimization; Every result says how strongly it holds; From experiment to proof without rewriting; Each decision lives in one replaceable unit of code.
 Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded into chapters 1 and 2. Chapters are numbered as phase 1 left them, 2026-11-13.
@@ -30,11 +32,11 @@ Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded i
 As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
 
 3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
-   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it computes nothing on them; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; Symbol identity is a fully-qualified name; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
-4. **Programs as values** (5 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
-   - Decisions: Expressions are values, forming a DAG; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context; Transient reference symbols resolved by base name.
-5. **Authority** (7 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
-   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; Describing a function requires authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
+   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; A symbol names something, and the same spelling is the same symbol; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
+4. **Programs as values** (4 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
+   - Decisions: An expression is the kernel's value, and a program holds a description of one; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context.
+5. **Authority** (8 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
+   - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A description is plain data in a fixed set of forms; Describing a function requires authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
 7. **Evaluation** (13 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
@@ -55,7 +57,7 @@ As ruled in DR3 (2026-11-12), with the chapter titles the maintainer confirmed o
 12. **The parser engine** (2 decisions). What any parsing algorithm must do, and how the first engine arrives.
    - Decisions: Any parsing algorithm will do that meets five conditions; The platform's parser engine ships already built.
 13. **Modules and programs** (5 decisions). Modules as extensions that arrive as files, running a program, and the one evaluation every program gets.
-   - Decisions: A module is an extension that arrives as a file; Allegretto is a small language for the kernel and nothing else; The parser engine and the module loader are written in Allegretto; A key is made with the module that holds it; The loader reaches files through a capability; Running a program is evaluating its main module with a configuration's capabilities; Every program is evaluated the same way, however it arrives.
+   - Decisions: A module is an extension that arrives as a file; Allegretto is a small language for the kernel and nothing else; The parser engine and the module loader are written in Allegretto; A key is made with the module that holds it; The loader reaches files through a capability; There is no separate act of running, and a session at a prompt is a module; Every program is evaluated the same way, however it arrives.
 
 **Part IV: Allegro Standard**
 
@@ -70,7 +72,7 @@ As ruled in DR4 (2026-11-12), with the chapter titles the maintainer confirmed o
 17. **The surface language** (10 decisions). The spellings a programmer writes: blocks, declarations, conditionals, annotations, pattern matching.
    - Decisions: Indentation blocks, with brace and offside both as the goal; Refinement types written `T & predicate` with `_` as the value; Function declarations with `=>`; Expression-valued `if then else`; The `Y of x` component-access form; Type annotations on parameters and returns; Statement forms that declare a binding; `when / is / then` pattern matching; Combinators before keyword declaration syntax; String interpolation with braces.
 18. **Claims and proofs** (8 decisions). Nothing is a claim until someone makes it; claims about every value, proof terms as proposals, deciding without search, sampling, and the four strengths.
-   - Decisions: Nothing is a claim until someone makes it; A claim is needed where it is made; A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; Discharge mechanisms without search; Bounded sampling for universal claims; Four strengths, one vocabulary; Tactics as a pure Allegro library.
+   - Decisions: Nothing is a claim until someone makes it; A claim is needed where it is made; A claim about every value is decided by evaluating it with the value unknown; A proof term is a proposal; The standard extension decides without search, and a proposer searches; Bounded sampling for universal claims; Four strengths, one vocabulary; Tactics as a pure Allegro library.
 19. **Equality and laws** (4 decisions). Equality by shape, the default equality, lawful interfaces and the strength of a law.
    - Decisions: Lawful interfaces; Equality dispatches on shape, then coerces, else not-equal; Default equality belongs to the standard extension; Law strengths and the transitivity gate.
 20. **Effects** (3 decisions). An effect is the use of a capability; parts and narrowed forms; how a bound is written.
@@ -153,7 +155,7 @@ A **held finding** is a defect a review finds in a decision the pass has not rea
 | The engine commits to the first matching alternative, reports one parse and cannot change grammar during a parse; terminals are a closed set | Any parsing algorithm will do that meets five conditions; A terminal is a function, so a grammar can define its own; Ambiguity is a claim | Parsing; The parser engine | DR3, rulings of 2026-11-12 |
 | Replacing a base production only warns; appended and front-spliced alternatives take meaning from position | Grammars combine without regard to order; The `grammar { … }` block | Changing the grammar; Parsing | DR3, rulings of 2026-11-12 |
 | The loader is host code with a host file-reader option; the browser has its own scanner and loading code; the load-once cache is per process | A module is an extension that arrives as a file; The loader reaches files through a capability; What the kernel requires of an extension | Modules and programs; Extensions | DR3, rulings of 2026-11-12 |
-| A grammar change does not reach the prompt | Running a program is evaluating its main module with a configuration's capabilities | Modules and programs | DR3, rulings of 2026-11-12 |
+| A grammar change does not reach the prompt | There is no separate act of running, and a session at a prompt is a module | Modules and programs | DR3, rulings of 2026-11-12 |
 | The pipeline has fixed host stages and writes in place into built values, with a guard for library values | Every program is evaluated the same way, however it arrives | Modules and programs | DR3, rulings of 2026-11-12 |
 | Member access is mediated through an installed path with a policy hook; privacy asks what a scope can reach | A private member is one whose key not all code holds | Reaching a member | DR4, rulings of 2026-11-12 |
 | Typed calls are checked by the evaluator; body clauses are lowered by host steps | A typed function claims its parameter types on entry and its return type on exit; A body clause is a notation | Types as values; Contracts | DR4, rulings of 2026-11-12 |
@@ -179,10 +181,25 @@ The maintainer's comment on PR #163 ruled the proposal. In short, with [book-pas
 - **The chapters leaving the book** leave as proposed. Units and layers are discussed early as architectural principles, in appendices, not chapters.
 - **Every decision is worked through in order.** Any decision may change, be removed, or gain new neighbours, and the resulting code and test changes are made. The process is strictly monotonic: once a decision is approved and its code changes made, every decision up to it, and the code stemming from them, is final and correct. A point of non-monotonicity is a process failure: the pass goes back, reorders or revises, and repeats until the list is fully ordered and monotonic.
 - **Two types of decision.** Each decision is about language capability or about implementation. No capability decision may depend on an implementation decision. The three cycles the merge broke looked like decisions whose type was unclear. Capability decisions that necessarily depend on each other are stated as one decision.
-- **Order of definition carries no meaning.** A new decision, below in "Why a new language". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
+- **Bindings and extensions may be written in any order.** A new decision, below in "Why a new language". The parser algorithm stays swappable, except that ordered choice must not be required; the shipped ordered choice is an expedient, to be replaced by GLL or a similar algorithm.
 - **`eval_when` and PE Rule 2** need careful review and analysis; decisions may change to make them coherent and consistent.
 
 Applied in chunk P1b (2026-11-05): every entry carries its type, 202 capability and 54 implementation decisions of 256. The check found 21 dependencies of a capability decision on an implementation decision, in 20 entries. In 19 the dependency was misread and now points at the capability the entry rests on, or is removed; one entry, "Post-passes registered by layers", is implementation and was retyped (2 edges). No entry was split. Two capability decisions that each state the other became one, "A missing value is a cell that is filled once". Four entries moved within their chapters. The record is "The type check, 2026-11-05", before the open questions.
+
+## Ten terms the tour introduces
+
+A reader who did not know the project found these ten used before the entry that defines them. By the maintainer's ruling of 2026-11-20 the tour introduces each in one sentence, before Part I uses it. These are drafts for the maintainer to correct. They are not book text yet.
+
+1. **Claim.** A claim is an expression that someone states to be true of a program, such as a type, a contract or a law; nothing is a claim until someone makes it, and the kernel decides it by evaluating it.
+2. **Configuration.** A configuration is everything that determines one execution and is not the program: the kernel, the extensions, the capabilities and inputs handed over, the limits, and what must be decided.
+3. **Capability.** A capability provides the right and ability to perform a set of effects, held as a value: a named set of operations, such as writing output, that code can use only if it was handed it.
+4. **Refutation and halting.** A refutation is the kernel's record that a claim came out false, which means the program is wrong; a refuted claim halts its phase, so the phase's result is refuted and it performs no further effect, though evaluation goes on to report other refutations.
+5. **Strength.** A strength says how a claim was settled: decided (the kernel evaluated it in full), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (not yet settled), from strongest to weakest.
+6. **Policy.** A policy is a requirement on what a result may rest on before it is used: what a phase must leave decided, or what the inputs of a capability must rest on.
+7. **Cell.** A cell is a value that is not known yet and is filled once, when it arrives: the answer of an operation that takes time, or an input supplied later.
+8. **Scope.** A scope is the part of a text in which a name means one binding: a block and everything written inside it; no value of the language is a scope.
+9. **Description and right.** A description is plain data that says what a function is made of; getting one takes a right, which is a key of the module that made the function or the inspection right a configuration grants.
+10. **Module and key.** A module is a function of its capabilities and inputs whose value is a structure of its bindings; a key is a value the kernel makes for one module and nothing can forge, and what is stored under a key is read only with it.
 
 ## The author's motivations, for the tour
 
@@ -357,8 +374,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Allegretto is syntax-free; the parser lives above the base"; the clause on re-hosting the parser on Vivace's generator is dropped, since it names no decision.
 - Chapter: Why a new language
 
-#### Order of definition carries no meaning
-- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body happen in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
+#### Bindings and extensions may be written in any order
+- Decides: the order in which bindings and extensions are written or loaded changes nothing. Two definitions that conflict are an error, reported before either is used. Replacing a definition is an explicit operation. Three things have an order: the statements of a body are started in the order written; a grammar change acts from the place where it is written; and at a prompt a later entry may bind a name an earlier entry bound.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: mixed
@@ -371,7 +388,9 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-11, DR1): a name bound twice takes the later value silently; a fragment's `add` over an existing production replaces it with a warning (`src/grammar2/fragments.ts:154`–`168`); alternation is ordered choice (`src/grammar2/engine.ts:945`). Held on the grammar, module and binding decisions of Parts III and IV.
 - Notes (2026-11-15, arguments are evaluated when needed): on effects, ruled 2026-11-15: an effect happens when its value is needed, and the statements of a body are needed in written order. So top-level effects keep their written order, and an effect inside an argument follows need: it happens when the function uses the argument, and never if it does not.
 - Notes (2026-11-16, the order of effects): the order of a body's statements is carried by sequence ("Sequence is one kernel primitive"); bindings stay order-free.
-- Notes (2026-11-17, the adversarial review's issue 16): reworded by ruling. The entry said only effects have an order, and later decisions made two more exceptions it did not state. The first is carried by sequence, the second by "A text can change the grammar it is read in", the third by "Running a program is evaluating its main module with a configuration's capabilities". Knowledge from an `assert` holds for the statements after it, which is the first exception again.
+- Notes (2026-11-17, the adversarial review's issue 16): reworded by ruling. The entry said only effects have an order, and later decisions made two more exceptions it did not state. The first is carried by sequence, the second by "A text can change the grammar it is read in", the third by "There is no separate act of running, and a session at a prompt is a module". Knowledge from an `assert` holds for the statements after it, which is the first exception again.
+- Notes (2026-11-20, the second adversarial review, cluster 14): one sentence corrected: statements are started in the order written and do not wait for each other ("A statement does not wait for the one before it"). A reader found the title and the text apart; a new title is put to the maintainer.
+- Notes (2026-11-20, the second adversarial review, cluster 14): retitled by ruling, from "Order of definition carries no meaning". The text names three things whose order has meaning, which the old title denied.
 - Chapter: Why a new language
 
 #### A language inherits every check of what it is built on
@@ -406,7 +425,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
-- Depends on: A language inherits every check of what it is built on; Order of definition carries no meaning
+- Depends on: A language inherits every check of what it is built on; Bindings and extensions may be written in any order
 - Significance: 4 — multi-paradigm systems without multiple languages
 - Label: foundational — solution finding and search rest on it
 - Options recorded: several languages on one runtime; mapping libraries between languages (both need a language builder's investment)
@@ -580,7 +599,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Keep it simple
 
 #### Every result says how strongly it holds
-- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). The word says how the claim itself was settled. A claim that rests on a weaker claim is itself reported at the weaker strength; nothing else lowers it. What a result rests on is recorded beside the word and never changes it: the kernel variant, the primitive functions that ran, the capabilities whose answers were read, the extensions, the builders of restored outcomes. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently.
+- Decides: a claim's result is reported in one vocabulary, used everywhere: decided (the kernel evaluated it in full, which includes checking every case of a finite set), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (still in the residual). The four are ordered, strongest first, as listed here: decided, sampled, assumed, undecided. Refuted is an outcome and no strength: a refuted claim holds at none. The word says how the claim itself was settled. A claim that rests on a weaker claim is itself reported at the weaker strength; nothing else lowers it. What a result rests on is recorded beside the word and never changes it: the kernel variant, the primitive functions that ran, the capabilities whose answers were read, the extensions, the builders of restored outcomes. No keyword, grade or report uses a stronger word than the result earned. A cheaper check is allowed only under its own name, never silently.
 - Status: partly built; ruled 2026-11-11 (DR1)
 - Type: capability
 - Rationale kind: vision
@@ -597,6 +616,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR4): the verdict is assembled by a walk of top-level bindings outside evaluation (`buildVerdict`), where the decision makes it the result's own metadata; and contracts that stay undecided reach `inspect` only, not the verdict or the record of assumptions. Formerly the entries "The verdict as accumulated metadata" and "Contracts in the verdict and the ledger".
 - Notes (2026-11-15, the rulings on strength and on identity): reworded: strength and what a result rests on are two things, where the decisions had treated them as one (issues 8 to 10). The weakest-link rule applies among claims only, so a claim that used arithmetic is decided and names its primitives.
 - Notes (2026-11-18, the second adversarial review, cluster 5): "undecided" covers two cases, told apart by whether the claim is done: it waits for a value, or it was evaluated and what decides it could not tell. A claim that rests on an assumed claim is assumed.
+- Notes (2026-11-20, the second adversarial review, cluster 14): the order of the four is stated here by ruling, where "the weaker strength" first needs it; it had appeared only in a later entry's list. That refuted is an outcome and not a strength is said in the same place.
 - Chapter: Keep it simple
 
 #### From experiment to proof without rewriting
@@ -661,8 +681,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-15, the ruling on identity): the kinds stay seven. A key is a structure that the kernel marks ("A key is made with the module that holds it"), not a kind of its own.
 - Chapter: Values
 
-#### The kernel's plain data is a sequence of bits, and it computes nothing on them
-- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart and does nothing else with them. What the bits mean, and every operation on them, comes from extensions and from capabilities.
+#### The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
+- Decides: the kernel's one kind of plain data is a sequence of bits. The kernel can tell two sequences apart, join two, measure one and take a part of one. It reads bits as a number in one case only: where one of its primitives takes a count or a place, as a whole number with the most significant bit first. A place outside what it is a place in is a refutation. The kernel gives bits no other meaning: what they mean, and arithmetic on them, comes from extensions and from capabilities.
 - Status: partly built (arithmetic and the scalar encodings are kernel primitives today); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
@@ -674,6 +694,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Bits is the only scalar" and "Scalar encodings inside Bits". The 64-bit width, the IEEE float and the UTF-8 text encoding become choices of the standard language and of the arithmetic capability.
 - Held finding (2026-11-11, DR2): arithmetic, comparison and the scalar encodings are base primitives (`src/primitives.ts`).
 - Notes (2026-11-16, Allegretto's forms): the kernel also joins two bits values, measures one and takes a part of one. It still gives the bits no meaning: no arithmetic and no order.
+- Notes (2026-11-20, the second adversarial review, cluster 14): reworded and retitled by ruling, from "The kernel's plain data is a sequence of bits, and it computes nothing on them". A reader found that the kernel joins, measures and slices bits and answers a length as 64 bits, so it had chosen an encoding the entry said it did not have, and no decision said which.
 - Chapter: Values
 
 #### One composite kind: Structure
@@ -712,7 +733,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
 - Significance: 2 — local to the structure unit
 - Label: swappable — collection types choose representations above
 - Units: structure
@@ -722,8 +743,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: the collection half of D9 (encapsulated `Array[T]`, `Map`, `Set`) is open under B-041 and belongs to the L2 fragment.
 - Chapter: Values
 
-#### Symbol identity is a fully-qualified name
-- Decides: a registered symbol's identity is its defining scope's FQN plus base name (default FQN is the module path), the base name is only a projection for printing, serialisation and loose matching, and an ambiguous base name requires explicit qualification or is an error.
+#### A symbol names something, and the same spelling is the same symbol
+- Decides: a symbol is a value that carries nothing but which symbol it is. Code can do two things with one: ask whether it is the same as another, and read its spelling. So a symbol is what code names things with, and it names three kinds of thing. As a name in an expression it names a binding. As the key of a structure's entry it names the entry, and is not evaluated. As data it names one case among several, such as which failure this is. The same spelling is the same symbol. A fully-qualified name is a spelling that includes where the symbol was defined, and it is a language's reader that writes it so: Allegretto does not qualify, and the standard language qualifies the symbols a module defines, so that two modules' members are told apart. Anyone can make a symbol of any spelling, so symbols keep things apart by accident only. What must not be read or forged from outside takes a key: a key is made by the kernel for one module, an entry under it is read only with it, and a count or a place passes over it.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
@@ -736,6 +757,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): symbols chapter (proposed, within the kinds chapter)
 - Notes: the qualification syntax `x[ns.name]` is deferred (C5.2-R4); ambiguity is a detected error.
 - Notes (2026-11-18, the second adversarial review, cluster 11): a program makes the symbol of a name from a text, and reads a symbol's name as text. A symbol made so is the same as one written with that name.
+- Notes (2026-11-20, the second adversarial review, cluster 14): retitled by ruling, from "Symbol identity is a fully-qualified name". The entry said how a symbol's identity is found in the present tree, by its defining scope, and the rebuilt kernel has no scope values and names a module by content. The review session proposed "A symbol is its spelling". The maintainer: "The text needs to clearly define what a symbol is in terms of function. 'A symbol is its spelling' states how symbol identity works, but not what it does. Have we given up fully-qualified names for symbols? Perhaps I'm missing the difference between symbols and keys for private field access." Fully-qualified names are kept and move out of the kernel, to the language's reader. Left to Part IV: what the standard language qualifies with. A module's identity changes with every edit, so the review session would use a name the module declares for itself.
+- Notes (2026-11-20, the second adversarial review, cluster 14): the entry "Transient reference symbols resolved by base name" is withdrawn by the same ruling. It said how the present tree's parser hands a name to resolution; in the rebuild a name is a symbol that stands where a value is expected, and "A free name never gets a value" says what it means.
 - Chapter: Values
 
 #### Value as a contract, seven kind units and an assembly
@@ -801,19 +824,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — concepts.md files it as an implementation choice; it realises symbol identity by name
 - Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name
+- Depends on: A symbol names something, and the same spelling is the same symbol
 - Significance: 2 — hot-path comparison cost
 - Label: swappable — invisible above the symbol unit
 - Units: symbol
 - Options recorded: compare FQN strings at each site; for metadata on a Symbol, error versus warn (warn ruled, removable later)
 - Sources: docs/book/concepts.md IC-4; docs/plans/metadata-on-values.md §6 ruling 2
 - Book home (fragments' proposal): symbols chapter (proposed)
+- Notes (2026-11-20, the second adversarial review, cluster 14): "FQN" here is a symbol's spelling: the same spelling is the same object ("A symbol names something, and the same spelling is the same symbol").
 - Chapter: Values
 
 ### Programs as values
 
-#### Expressions are values, forming a DAG
-- Decides: an unevaluated application (a function value plus arguments) is an ordinary value, so a partially evaluated program is also a value, and expressions form a shared DAG rather than a tree.
+#### An expression is the kernel's value, and a program holds a description of one
+- Decides: an unevaluated application, a function value with its arguments, is a value of the kernel, so a partially evaluated program is one too. The kernel holds expressions, and so does host code through the interface. No program holds one: there is no quotation. What a program holds is a description of an expression, which is plain data, or a function. Two places that share one part mean no more than two equal parts would: what says "once" is a parameter or a block's binding.
 - Status: settled
 - Type: capability — a partially evaluated program is a value a user can hold
 - Rationale kind: technical
@@ -825,6 +849,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md SC-3, T0 §6
 - Book home (fragments' proposal): concepts.md Part 0 (SC-3) / kinds chapter (planned)
 - Notes: Significance calibrated from 5.
+- Notes (2026-11-20, the second adversarial review, cluster 14): retitled by ruling, from "Expressions are values, forming a DAG". A reader took the old title to promise quotation, built toward it, and met the entries that take it away twenty decisions later. "Forming a DAG" had also lost its meaning: since cluster 10 of the same review, sharing one part in two places says nothing.
 - Chapter: Programs as values
 
 #### Positional parameters owned by membership
@@ -847,7 +872,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG; Positional parameters owned by membership
+- Depends on: An expression is the kernel's value, and a program holds a description of one; Positional parameters owned by membership
 - Significance: 4 — specialising a function is substituting into a value
 - Label: foundational — precompile, unfolding and analyser properties rest on it
 - Units: composed-function
@@ -864,7 +889,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: implementation — concepts.md files it as an implementation choice
 - Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG
+- Depends on: An expression is the kernel's value, and a program holds a description of one
 - Significance: 2 — PE cost
 - Label: swappable — invisible above the expression unit
 - Units: expression
@@ -872,21 +897,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md IC-6, T0 §6; docs/plans/metadata-on-values.md §3.3 (the clone shares the memo)
 - Book home (fragments' proposal): kinds chapter (planned)
 - Notes (2026-11-18, the second adversarial review, cluster 10): this entry gives meaning to one node standing in two places. In the rebuild it has none: what says "once" is a parameter or a block's binding. To settle when the entry is written.
-- Chapter: Programs as values
-
-#### Transient reference symbols resolved by base name
-- Decides: the parser mints a transient Symbol per identifier occurrence, with no identity beyond it, resolved by base name against the enclosing scope, so resolution is not folded into parsing; scope binding keys may stay strings.
-- Status: settled
-- Type: implementation — how the parser hands names to resolution; the scoping is unchanged
-- Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name
-- Significance: 2 — local to symbol resolution
-- Label: swappable — resolution policy inside the symbol and scope units
-- Units: symbol, scope
-- Options recorded: the parser decides what an identifier refers to (rejected)
-- Sources: docs/book/concepts.md T0 §4; docs/decisions.md D14, D29
-- Book home (fragments' proposal): symbols chapter (proposed)
-- Notes (2026-11-17, the second adversarial review, cluster 1): this entry describes the present tree. In the rebuilt kernel a name means the innermost block's binding, and a free name gets no value.
 - Chapter: Programs as values
 
 ### Authority
@@ -911,7 +921,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-11 (DR4), reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Authority is an unforgeable value; Expressions are values, forming a DAG; A composed function is parameters and a body
+- Depends on: Authority is an unforgeable value; An expression is the kernel's value, and a program holds a description of one; A composed function is parameters and a body
 - Significance: 5 — without it no capability can be narrowed and no key kept
 - Label: foundational — effects, privacy and every field's writer
 - Options recorded: a function's body closed to readers, opened by a key from its owner (rejected: analyses in extensions are functions evaluated over a program's expression)
@@ -919,6 +929,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling, placed in Part II with the maintainer's agreement. It answers the question "Authority is an unforgeable value" left open: what an expression shows of a key to code that does not hold it. The same holds when an expression is reached through a value's origin.
 - Notes (2026-11-15, values and descriptions): reworded by ruling, reversing "any code can read an expression's structure". The adversarial review's cluster 1 showed what that sentence allowed: a reader could take the part of a function that applies a capability and evaluate it without the guard around it (issue 1); a result computed from a private value carried that value in its origin (issue 4); and if any code can tell `a + 0` from `a`, no optimisation is invisible (issue 3). What survives is that a description never yields authority.
 - Notes (2026-11-15, titles made accurate): this entry and "Describing a function requires authority" were one entry after the rulings on values and descriptions. The maintainer: the change of title "seems like creating a completely new distinct rule". They are two rules, and this one keeps its title.
+- Chapter: Authority
+
+#### A description is plain data in a fixed set of forms
+- Decides: a description is a structure whose first entry is a symbol naming its form. Nine forms say what a part is, and can be built again: bits; a symbol as data; a name; a parameter, by which function around it owns it and its place among that function's parameters; an application of a function to arguments; a function, by the number of its parameters and its body; a structure, by its entries; one of the kernel's primitives, by name; a shipped primitive, by content hash. Four say only what was there, and cannot be built: a capability, by its name and part; a key, by its module and its place among that module's keys; a part another module wrote, with the parameters it mentions; and something unknown. The description of a function that reads names of a block, or holds an argument used more than once and not yet evaluated, is a block around the function that binds them. A parser returns descriptions. For the text of a module it returns three things: the description of the module's function, the module's declarations in order, and the number of its keys, which is what the kernel takes to make a module. Where a part was written is to have a form of its own, which wraps a part with its place in the text.
+- Status: partly built (the reference kernel has the thirteen forms; no parser written in Allegro returns them yet, and the form for a place in the text is not designed); ruled 2026-11-20
+- Type: capability
+- Rationale kind: technical
+- Depends on: Reading an expression never yields authority; One composite kind: Structure
+- Significance: 3 — what every parser, solver and export reads and writes
+- Label: foundational — parsers, loaders, solvers and export
+- Options recorded: none recorded
+- Sources: the maintainer's ruling of 2026-11-20 (../records/book-pass/adversarial-review-2.md, Rulings taken, cluster 14)
+- Use case: a parser written in Allegretto returns the description of a module's function; the loader builds the function from it and hands the kernel the declarations.
+- Notes: new, by ruling. The maintainer: "Should we be clearer on what the parser returns? Is 'a description' defined well enough?" It was not. Four entries used the word, one said it is "plain data that says what an expression looks like", and the forms stood only in a comment of the reference kernel's source. A saved program holds the same things as a file. The form for where a part was written is designed with the parser engine: reports are to say where in a text a refutation arose, and a description had no place for it.
 - Chapter: Authority
 
 #### Describing a function requires authority
@@ -943,7 +967,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Reading an expression never yields authority; Authority is an unforgeable value; Expressions are values, forming a DAG
+- Depends on: Reading an expression never yields authority; Authority is an unforgeable value; An expression is the kernel's value, and a program holds a description of one
 - Significance: 4 — the one way from data to something that can act
 - Label: foundational — loaders, solvers that work on a description, and every transformation of code
 - Options recorded: rebuilding a changed expression against the original under rules the kernel checks (rejected: a rebuilt part can leave out the guard that the original put around a capability)
@@ -998,7 +1022,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (to prove); ruled 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it computes nothing on them
+- Depends on: A capability is supplied per target; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
 - Significance: 4 — shrinks the kernel to what no capability could supply
 - Label: swappable — another arithmetic can be supplied in its place
 - Options recorded: machine arithmetic in the kernel (rejected, see the bits decision)
@@ -1085,7 +1109,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-11 (DR2), reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Expressions are values, forming a DAG; An extension registers its own fields
+- Depends on: An expression is the kernel's value, and a program holds a description of one; An extension registers its own fields
 - Significance: 4 — analyses, diagnostics and proof translation read it
 - Label: foundational — every analysis of a program and every report about one rest on it
 - Options recorded: attaching the expression on demand, at calls of functions that ask for it, and reading it under an `observe` effect (what the code does today; rejected: attach always and let partial evaluation drop what nothing reads)
@@ -1147,7 +1171,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: One operation: partial evaluation; Expressions are values, forming a DAG
+- Depends on: One operation: partial evaluation; An expression is the kernel's value, and a program holds a description of one
 - Significance: 5 — without it compile and run would separate again
 - Label: foundational — residuals, futures and staged discharge rest on it
 - Units: evaluator
@@ -1264,7 +1288,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open, a design to prove on the conditional first; ruled 2026-11-15, replacing the ruling of 2026-11-11 (DR2)
 - Type: capability
 - Rationale kind: technical
-- Depends on: An expression is evaluated when its value is needed; Expressions are values, forming a DAG; The environment is not a value; Authority is an unforgeable value
+- Depends on: An expression is evaluated when its value is needed; An expression is the kernel's value, and a program holds a description of one; The environment is not a value; Authority is an unforgeable value
 - Significance: 4 — what lets control forms be built by extensions
 - Label: foundational — `if` with branch knowledge, pattern matching and every analysis of an expression rest on it
 - Options recorded: laziness as a privilege of kernel primitives (what the code does today); passing a partly evaluated form (not needed: the function asks the kernel to evaluate what it wants evaluated)
@@ -1367,7 +1391,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: to prove; ruled 2026-11-11 (DR2); extended 2026-11-16
 - Type: capability
 - Rationale kind: technical
-- Depends on: When information arrives, what waited on it is evaluated again; Order of definition carries no meaning
+- Depends on: When information arrives, what waited on it is evaluated again; Bindings and extensions may be written in any order
 - Significance: 5 — order-free definitions and replayable evaluation both need it
 - Label: foundational — translation of proofs and every re-check rest on it
 - Options recorded: leaving it open (rejected: determinism is built in)
@@ -1577,17 +1601,19 @@ They came together over years of exploration into most of what Allegro is today.
 ### Parsing
 
 #### Parsing is evaluation
-- Decides: a parser is a function from a grammar and a text to an expression. A text that does not parse is a refutation.
+- Decides: a parser is a function from a grammar and a text to a description ("A description is plain data in a fixed set of forms"). A text that does not parse is a failure the parser answers, as plain data in the shape every failure has, so a program that parses a text it was sent may handle bad input. The loader claims that a program's own text parsed, so there a text that does not parse is a refutation.
 - Status: open (the engine is host code called by a fixed pipeline); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: One operation: partial evaluation; The kernel holds no language; Expressions are values, forming a DAG; A refutation marks everything computed from it
+- Depends on: One operation: partial evaluation; The kernel holds no language; An expression is the kernel's value, and a program holds a description of one; A refutation marks everything computed from it
 - Significance: 5 — places every notation inside the one operation
 - Label: foundational — every decision of Part III
 - Options recorded: parsing as a stage before evaluation, outside it (what the code does; rejected: the kernel holds no language and has one operation)
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling. When a parser runs follows from the partial-evaluation decisions: a text that is known is parsed, and a text or grammar that is missing leaves a residual.
 - Held finding (2026-11-12, DR3): parsing is a host stage: the engine is TypeScript (`src/grammar2/engine.ts`) and no Allegro function parses a program's text.
+- Notes (2026-11-20, the second adversarial review, cluster 14): the last two sentences replace "A text that does not parse is a refutation", by ruling. A reader saw that a program which parses text it receives would be wrong on bad input unless it wrapped the parser in an attempt. With a failure as plain data ("A failure a program can handle is plain data of one shape") the parser answers one, and only the loader's claim makes it a refutation. What a parser returns for a text that does parse is under discussion.
+- Notes (2026-11-20, the second adversarial review, cluster 14): "to an expression" becomes "to a description", by ruling: no program holds an expression.
 - Chapter: Parsing
 
 #### No parser is privileged
@@ -1618,11 +1644,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### Every notation stands for an expression
-- Decides: a grammar form maps what it matched to an expression and does nothing else. Free names in that expression mean what they meant where the form was defined, never what they mean where the form is used.
+- Decides: a grammar form maps what it matched to the description of an expression and does nothing else. Free names in it mean what they meant where the form was defined, never what they mean where the form is used.
 - Status: partly built (the forms of the `grammar { … }` block do this; the base grammar does not); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Meaning comes before notation; Grammars are values; Symbol identity is a fully-qualified name
+- Depends on: Meaning comes before notation; Grammars are values; A symbol names something, and the same spelling is the same symbol
 - Significance: 5 — what a notation can and cannot do
 - Label: foundational — a notation can change without changing what any program means
 - Units: grammar-extension, tree-builder
@@ -1738,7 +1764,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Grammars are values; Order of definition carries no meaning
+- Depends on: Grammars are values; Bindings and extensions may be written in any order
 - Significance: 3 — independent libraries can each add operators
 - Label: swappable — the means of stating precedence, not the fact of it
 - Units: grammar-formalism, grammar-extension
@@ -1752,7 +1778,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open (the shipped engine resolves ambiguity by the order of alternatives); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Claims are evaluated like everything else; Grammars are values; Order of definition carries no meaning; Named, partially ordered precedence levels
+- Depends on: Claims are evaluated like everything else; Grammars are values; Bindings and extensions may be written in any order; Named, partially ordered precedence levels
 - Significance: 4 — whether a notation can mean two things silently
 - Label: foundational — combining grammars from independent authors
 - Units: grammar-formalism, base-grammar
@@ -1818,11 +1844,11 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (conflicts between operators, keywords and precedence are found before use; a replacement only warns); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: Order of definition carries no meaning; Every production can be extended; Ambiguity is a claim
+- Depends on: Bindings and extensions may be written in any order; Every production can be extended; Ambiguity is a claim
 - Significance: 4 — independent notations can be used together
 - Label: foundational — a program written in several languages at once
 - Units: grammar-extension
-- Options recorded: replacement as an error (rejected in the sources: replacement is a legitimate technique); replacement with a warning (what the code does; rejected under "Order of definition carries no meaning", where replacing is explicit); grammars that combine only when one's chain of bases is a prefix of the other's (what the code requires today)
+- Options recorded: replacement as an error (rejected in the sources: replacement is a legitimate technique); replacement with a warning (what the code does; rejected under "Bindings and extensions may be written in any order", where replacing is explicit); grammars that combine only when one's chain of bases is a prefix of the other's (what the code requires today)
 - Sources: W_PRODUCTION_REPLACED ruling (docs/decisions.md "Standing rulings"); docs/book/extension/grammar.md §4; docs/book/grammar-formalism.md §7.5; docs/book/extension/README.md "Invariants"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Conflicts are validated before activation".
 - Held finding (2026-11-12, DR3): replacing a production of the base only warns (`src/grammar2/fragments.ts:154`–`165`).
@@ -1968,12 +1994,12 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR3): the file reader is a host option of the loader (`src/modules.ts:252`), not a capability value, and the browser host scans and loads with code of its own (`web/allegro-web.ts:38`, `:110`–`:125`).
 - Chapter: Modules and programs
 
-#### Running a program is evaluating its main module with a configuration's capabilities
+#### There is no separate act of running, and a session at a prompt is a module
 - Decides: there is no separate act of running. A session at a prompt is a module whose text arrives one entry at a time: each entry is read in the grammar the earlier entries left and sees the bindings they made. At a prompt a name may be bound again; the new binding holds for the entries that follow, and what earlier entries computed is unchanged. Each entry at a prompt is a module that imports the session so far, so a session has an identity like any module.
 - Status: partly built; ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is an extension that arrives as a file; Phases are configuration; A text can change the grammar it is read in; Order of definition carries no meaning
+- Depends on: A module is an extension that arrives as a file; Phases are configuration; A text can change the grammar it is read in; Bindings and extensions may be written in any order
 - Significance: 3 — what it means to run
 - Label: foundational — files, scripts and prompts are one case
 - Options recorded: a prompt that forbids rebinding, as a file does (rejected 2026-11-12: a prompt needs to allow it)
@@ -1981,14 +2007,15 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling. Rebinding, as the maintainer confirmed on PR #190: each entry opens a scope inside the last, so a later binding hides the earlier one and replaces nothing; the rule that a name is bound once in a scope then holds at a prompt as it does in a file.
 - Held finding (2026-11-12, DR3): a grammar change does not reach the prompt: the REPL loads no module named by a header (tooling claims C60, C61 of docs/book/platform/tooling.ir.md).
 - Notes (2026-11-17, the second adversarial review, cluster 2): the last sentence is added by ruling.
+- Notes (2026-11-20, the second adversarial review, cluster 14): retitled by ruling, from "Running a program is evaluating its main module with a configuration's capabilities". The old title's statement is one sentence of the text; the rest is about a session at a prompt.
 - Chapter: Modules and programs
 
 #### Every program is evaluated the same way, however it arrives
-- Decides: a program may arrive as an extension in the configuration, as parsed text, as an imported module, as a script or a prompt entry, or as an expression built by a running program. The same evaluation and the same checks apply to all: a library is checked exactly as the program that uses it, and a program built by a program is checked like any other.
+- Decides: a program may arrive as an extension in the configuration, as parsed text, as an imported module, as a script or a prompt entry, or as a function that a running program built from a description. The same evaluation and the same checks apply to all: a library is checked exactly as the program that uses it, and a program built by a program is checked like any other.
 - Status: partly built (one pipeline serves programs and libraries; whether a constructed program skips checks is not confirmed); ruled 2026-11-12 (DR3)
 - Type: capability
 - Rationale kind: technical
-- Depends on: What the kernel requires of an extension; Parsing is evaluation; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities; Claims are evaluated like everything else; Trust comes from the kernel, not the author
+- Depends on: What the kernel requires of an extension; Parsing is evaluation; A module is an extension that arrives as a file; There is no separate act of running, and a session at a prompt is a module; Claims are evaluated like everything else; Trust comes from the kernel, not the author
 - Significance: 5 — a library's assurance is the same assurance as a program's
 - Label: foundational — trust in anything a program is built from
 - Units: module-loading, pipeline
@@ -2051,13 +2078,14 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled
 - Type: capability
 - Rationale kind: technical
-- Depends on: Symbol identity is a fully-qualified name; Types are values that constrain values
+- Depends on: A symbol names something, and the same spelling is the same symbol; Types are values that constrain values
 - Significance: 4 — conformance, laws and privacy all key on member symbols
 - Label: foundational — lawful interfaces, private members and `distinct`
 - Units: type-core
 - Options recorded: spelling-based nominal chain-walk (replaced); diamonds dedupe by symbol identity or error
 - Sources: D30 (docs/decisions.md; structures.md §5, §8); docs/book/concepts.md §33; C5.2-R1–R6
 - Book home (fragments' proposal): standard/type-system
+- Notes (2026-11-20, the second adversarial review, cluster 14): the member symbols are qualified by the standard language's reader, not by the kernel, and what they are qualified with is left to Part IV. They keep two modules' members apart by accident only.
 - Chapter: Types as values
 
 #### One meta-type with an optional name
@@ -2123,7 +2151,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: settled; reworded 2026-11-12 (DR4)
 - Type: capability
 - Rationale kind: technical
-- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it computes nothing on them; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
+- Depends on: In the standard language every value has a type; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; Machine arithmetic is a set of pure primitives that ships with the platform; The standard language's handled failure is an exception
 - Significance: 3 — what every program starts with
 - Label: swappable — the roster
 - Units: core-types, type-primitives
@@ -2191,6 +2219,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a `distinct` that shares the parent's eq impl (the pre-E1 state; `UserId(42) == 42` was true)
 - Sources: C7.2-R2 (docs/decisions.md); docs/book/concepts.md §38; docs/book/standard/type-system.md §3; docs/plans/equality-and-laws.md §2, §6
 - Book home (fragments' proposal): standard/type-system
+- Notes (2026-11-20, the second adversarial review, cluster 14): a fresh symbol keeps a type apart from others by accident only, since anyone can make a symbol of any spelling. A type whose values outside code must not make takes a key.
 - Chapter: Types as values
 
 #### The user-facing generics surface and parameter kinds
@@ -2598,7 +2627,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-16, hand-off from the acceptance stream): the sentences on a refused proposal and on binding a proof value are added by the maintainer's rulings of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", rulings 2 and G). A policy "no proposal in the source is refused" exists and is off by default.
 - Chapter: Claims and proofs
 
-#### Discharge mechanisms without search
+#### The standard extension decides without search, and a proposer searches
 - Decides: the standard extension decides claims without search, in order of preference: evaluation; entailment from a refinement's domain; equational rules through `by`; enumeration of a finite type. Search belongs to a proposer. The platform ships one, the standard deriver, which a build runs on each claim still undecided after evaluation: it evaluates with the value unknown, then samples, then derives, within budgets counted in steps that the build configures. A counterexample refutes; none found leaves the claim sampled; a derivation decides it, as strongly as what it rests on. The kernel checks every proposal. Found proofs are stored where the configuration says and checked again at every build. The deriver holds no capability.
 - Status: partly built; reworded 2026-11-12 (DR4); extended 2026-11-15
 - Type: capability
@@ -2612,6 +2641,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): proposed standard/proofs / Proving in Allegro
 - Notes: Merged from fragment B ("Discharge strategies without search"), fragment C ("Four discharge mechanisms in order of preference"). B: bounded sampling is recorded as survival, not proof, in the law tiers; the `proven` clause's tier visibility in the ledger is not stated in the primer. C: the primer's "four strategies" and the vision's "three legs" are different lists (mechanisms inside leg 1 versus strategy legs); the book should name both distinctly.
 - Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 5, with rulings N and O): "So it needs a budget, it needs to be configurable." The budget is a count of samples and a number of derivation steps for a claim, under a total for the build. Only what the kernel can check again is stored: a proof or a counterexample. The deriver does not attempt a law its author has assumed. The entry said there is no outside solver; the deriver is a proposer like any other.
+- Notes (2026-11-20, the second adversarial review, cluster 14): retitled by ruling, from "Discharge mechanisms without search". Half of the text defines the proposer, which does search.
 - Chapter: Claims and proofs
 
 #### Bounded sampling for universal claims
@@ -2619,7 +2649,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built; reworded 2026-11-12 (DR4); reworded 2026-11-15
 - Type: capability
 - Rationale kind: technical
-- Depends on: Discharge mechanisms without search; Every result says how strongly it holds
+- Depends on: The standard extension decides without search, and a proposer searches; Every result says how strongly it holds
 - Significance: 3 — the only universal-claim path beyond finite enumeration
 - Label: swappable — a symbolic engine could replace the sampler behind the same primitives
 - Units: proofs
@@ -3556,7 +3586,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; What the kernel requires of an extension; A module is an extension that arrives as a file; Running a program is evaluating its main module with a configuration's capabilities
+- Depends on: The launcher does only what cannot be done in Allegro; Only the launcher sets the ceiling; What the kernel requires of an extension; A module is an extension that arrives as a file; There is no separate act of running, and a session at a prompt is a module
 - Significance: 4 — how the parts fit together
 - Label: swappable — the order within the constraints the steps state
 - Options recorded: none recorded
@@ -3572,7 +3602,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: partly built (the prompt); ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: What the kernel's interface offers; Only the launcher sets the ceiling; Running a program is evaluating its main module with a configuration's capabilities
+- Depends on: What the kernel's interface offers; Only the launcher sets the ceiling; There is no separate act of running, and a session at a prompt is a module
 - Significance: 3 — servers, prompts and tools that stay running
 - Label: swappable — who drives the stream
 - Options recorded: a new kernel for every invocation
@@ -3624,7 +3654,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13; reworded 2026-11-18
 - Type: capability
 - Rationale kind: technical
-- Depends on: A module is a function of its capabilities, inputs and imports; Order of definition carries no meaning; The same program and the same information give the same result
+- Depends on: A module is a function of its capabilities, inputs and imports; Bindings and extensions may be written in any order; The same program and the same information give the same result
 - Significance: 3 — importing a library never does anything
 - Label: foundational — the order in which modules are instantiated cannot be observed
 - Options recorded: any module may perform top-level effects, in dependency order, with the order among independent modules unspecified (rejected: that order would be observable); a saved program that evaluates at load (rejected: the loader loses control of when effects happen); top-level effects gathered into a function under a reserved name (the maintainer's suggestion; the module as one function is the same idea without the name)
@@ -3737,7 +3767,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Status: open; ruled 2026-11-13 (DR6)
 - Type: capability
 - Rationale kind: technical
-- Depends on: A saved program is a recorded sequence of interface calls; Order of definition carries no meaning
+- Depends on: A saved program is a recorded sequence of interface calls; Bindings and extensions may be written in any order
 - Significance: 3 — a saved program never runs against something else
 - Label: swappable — how a dependency is identified
 - Options recorded: trusting that the loading execution has the same versions; version numbers
@@ -4142,12 +4172,12 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | # | Entry | Depended on | Resolution | Why |
 |---|---|---|---|---|
 | 1 | Arrays are structures with unkeyed entries | The composite is one sequence of optionally-keyed entries | (a) Now depends on "One composite kind: Structure". The composite's representation now depends on this entry and follows it. | An array is a structure with unkeyed entries however the entries are stored; concepts.md files the sequence and its index as an implementation choice. |
-| 2 | Authority is an unforgeable value | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | The wire form is the name, interned or not; interning realises identity by name. |
+| 2 | Authority is an unforgeable value | Symbols interned by FQN | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | The wire form is the name, interned or not; interning realises identity by name. |
 | 3 | A missing value is a cell that is filled once | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Resolution rests on the parent-chain protocol that entry states; the constant-time chain is how it is built. |
 | 4 | Offside rule through stateful indent terminals | Memoized recursive-descent engine with seed-growing left recursion | (a) Removed. The engine now depends on this entry and follows it. | Grammar authors name the indent terminals; the engine implements them, so the edge pointed the wrong way. |
 | 5 | Parse failure reporting and recovery | Memoized recursive-descent engine with seed-growing left recursion | (a) Now depends on "Grammars are Allegro values". The engine now depends on this entry and follows it. | Error productions and sync points are features of a grammar; the engine's farthest-advance report realises them. |
 | 6 | Extensions are the module substrate | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Extensions layer by the scope's protocol, not by its cost. |
-| 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "Symbol identity is a fully-qualified name". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
+| 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
 | 8 | Export marks the binding, and a module with no exports is open | Module loading and typed module objects are separate layers | (a) Now depends on "Extensions are the module substrate". | Export rests on modules existing; which unit loads them is a cut in the code. |
 | 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Occurrence facts live in the scope's facts plane, which that entry states. |
 | 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every result says how strongly it holds". | Contracts must reach the verdict and the ledger however the verdict is computed. |
@@ -4158,7 +4188,7 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | 15 | One command-line entry with subcommands | One evalSource pipeline for programs and libraries | (a) Removed; the entry now depends on nothing. | The command-line surface holds whatever runs behind it; what every run checks is "Claims are evaluated like everything else". |
 | 16 | File runner as one evaluation with futures drained | Callers pre-scan and strip the `use` header | (a) Now depends on "`use` header for language extension, `import` for module values". | The runner honours the header; the pre-scan is how a caller does it. |
 | 17 | REPL as successive evaluations over a persistent scope | One evalSource pipeline for programs and libraries | (a) Now depends on "The environment is not a value". | An entry sees the earlier entries by scope layering; the shared pipeline is how it runs. |
-| 18 | Execution tracing and step-through debugging | The evalSource stage order | (a) Now depends on "Expressions are values, forming a DAG". | Tracing and graph inspection show evaluation and the expression graph, not the stage list. |
+| 18 | Execution tracing and step-through debugging | The evalSource stage order | (a) Now depends on "An expression is the kernel's value, and a program holds a description of one". | Tracing and graph inspection show evaluation and the expression graph, not the stage list. |
 | 19 | A stated host boundary in a host unit | The environment is not a value | (a) Removed. | The edge recorded where the future manager is planted, on the scope's host plane, which is an implementation detail; the boundary rests on the environment capabilities. |
 | 20 | Browser sandbox as an IIFE bundle with a library registry | A browser-compatible core | (a) Removed. The core rule now depends on the sandbox and follows it. | The rule exists to keep the sandbox possible (its own significance line), so it realises the sandbox. |
 | 21 | Browser runtime packaging | A browser-compatible core | (a) Now depends on "Browser sandbox as an IIFE bundle with a library registry". | Packaging extends the sandbox's one bundle; the API rule is its implementation. |
@@ -4189,7 +4219,7 @@ Not merged, because they relate without needing each other: "Mediated member acc
 - "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies" move after "Parse failure reporting and recovery" (Grammars as values).
 - "A browser-compatible core" moves after "Browser sandbox as an IIFE bundle with a library registry" (Hosts: the terminal and the browser).
 
-**Contents changed.** "Why a new language" lists "Order of definition carries no meaning", which the rulings added but the list missed (9 decisions). "Evaluation" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
+**Contents changed.** "Why a new language" lists "Bindings and extensions may be written in any order", which the rulings added but the list missed (9 decisions). "Evaluation" has 11 decisions after the merge. "Structures", "Grammars as values" and "Hosts: the terminal and the browser" list their decisions in the new order.
 
 ### The maintainer's rulings on the type check, 2026-11-06 (PR #164)
 
@@ -4230,7 +4260,7 @@ Other edges were changed without a cycle forcing it, so that the order reads rig
 2. **Whether `when` arms narrow knowledge.** `docs/book/standard/pattern-matching.md` §3 says they do not; `docs/book/standard/contracts.md` §4 says the arms lift the matched pattern tagged `match-case`, and §9 says that shipped. A spot check finds the `match-case` provenance tag declared in `src/refinements.ts:457` and no other occurrence of the string in `src/` (a text search, not a binder-aware survey), which suggests the tag has no producer and pattern-matching.md is the current one. Entries: "Unification and branch refinement in patterns", "Branch refinement narrows knowledge per region".
 3. **Effects as values or a set of strings.** `docs/book/standard/effects.md` says an effect is a value of kind `Effect` composed by conjunction, with no separate effect-set type; the code holds an effect set as `Set<string>` merged by union (`src/effects.ts:41`), and non-trivial unions coerce to `opaque`. Entry: "Effects are values in one lattice" (status partly built).
 4. **The evaluator chapter's prose against its IR.** `docs/book/allegretto/evaluator.md` §2 says the switch names all seven kinds with no default arm; the IR and the code (`src/evaluator.ts:546`) have a default arm. §3 says `eval_when`, `&&` and `||` do not meet PE Rule 2 and that `eval_when` evaluates no branch; the IR and the code (`speculate` at `src/evaluator.ts:331`, `speculateWhenArms` at `src/primitives.ts:865`) say they do. Entries: "A branch that may not be taken is evaluated without capabilities", "Each decision lives in one replaceable unit of code".
-5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every result says how strongly it holds". Entries: "Bounded sampling for universal claims", "Discharge mechanisms without search". Whether to fix the code or the claim is a decision for the proofs chapter.
+5. **`prove_induction` and the sampled tier: verified.** `prove_induction_impl` (`src/primitives.ts:4330` to `4377`) checks `predicate(0)` and then `_INDUCTION_SAMPLE_K` (4, line 4302) inductive steps, and on success returns `_makeProof(...)` with the proposition text "forall n: NonNeg, p(n) [verified base + 4 inductive steps]". `makeProof` (`src/types-std.ts:4681`) writes `discharged` = 1 and no tier. The verdict's `TheoremResult` (`src/pcp.ts:199` onward) has status `discharged`, `failed` or `skipped` and carries a tier only as `lawBacking` for equality chains; the sampled tier exists only for law obligations (`src/pcp.ts:151` to `157`). So a theorem proved by bounded induction reaches the verdict as discharged with no sampled tier and stays out of the assumption ledger; its weaker strength shows only in the proposition text. This contradicts "Every result says how strongly it holds". Entries: "Bounded sampling for universal claims", "The standard extension decides without search, and a proposer searches". Whether to fix the code or the claim is a decision for the proofs chapter.
 6. **The tier vocabulary.** `docs/book/vision.md` §1a names proven, enumerated, sampled, admitted, pending; `docs/book/getting-started.md` adds witnessed; the primer uses kernel, enumerated, witnessed, sampled, admitted, pending (matching `src/pcp.ts:155`); the divergence tiers are auto, witnessed, admitted, undischarged (`src/totality.ts:500`). A verdict counts as verified with pending law obligations. Entry: "Every result says how strongly it holds".
 7. **Who runs the `use` pre-scan.** Fragment B's source says libraries and programs share the pre-scan; the pipeline IR says `evalSource` runs none and each caller scans and strips the header. The code agrees with the IR: `evalSource` (`src/runtime.ts:1169`) does not call `scanUses`, which `src/index.ts` and `src/modules.ts` call separately. Both statements hold if "share" means "use the same scanner"; the callers still disagree in behaviour (`inspect`, `verify`, the REPL, `prove` and the sandbox). Entries: "One evalSource pipeline for programs and libraries", "Callers pre-scan and strip the `use` header", "`use` header for language extension, `import` for module values".
 8. **Precompile errors that do not halt.** Precompile records `precompile-eval`, `precompile-type-error` and `return-type-mismatch` as errors without halting, so `inspect` can grade `has-errors` without a halt. Entry: "Claims are evaluated like everything else".
@@ -4458,7 +4488,7 @@ Each identifier this file cites, with its name. Registers: [decisions.md](../dec
 | S2d | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | S4b | a chunk of the concept-spine plan (docs/plans/concept-spine.md), cited by concepts.md |
 | SC-1 | concepts.md: Seven representation kinds |
-| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it computes nothing on them |
+| SC-2 | concepts.md: The kernel's plain data is a sequence of bits, and it gives them no meaning but a count |
 | SC-3 | concepts.md: Expressions are values |
 | SC-4 | concepts.md: Symbol identity is fully-qualified, not spelling |
 | SC-5 | concepts.md: One composite kind rather than two |

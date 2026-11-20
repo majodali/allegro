@@ -574,6 +574,18 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Symbols and descriptions (the second review's
+  cluster 14, closed; the review is ruled).** A symbol is defined by
+  what it does, and a fully-qualified name is a spelling the
+  language's reader writes. A new decision lists a description's
+  forms and says what a parser returns. Five entries retitled, one
+  withdrawn, one added: 249 decisions.
+- **2026-11-20 — Wording (the second review's cluster 14, in part).**
+  Five points ruled and written into the inventory: what the kernel
+  does with bits, with a new title; a text that does not parse is a
+  failure, and a refutation only at the loader; the order of the four
+  strengths; a header note on entries not to build from as written;
+  ten terms for the tour, drafted.
 - **2026-11-20 — Notation (the second review's cluster 12, closed).**
   Ruled for the parser engine, not built: three rules keep "a notation
   only adds", checked on the grammar; a production may be marked

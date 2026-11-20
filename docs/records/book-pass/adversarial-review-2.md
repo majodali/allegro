@@ -964,6 +964,57 @@ stream reads the answer's present shape.
 With this cluster 12 is ruled. What of it is for the parser engine is
 recorded and not built. One cluster remains: wording (14).
 
+### Cluster 14: wording (2026-11-20)
+
+Seven points were put to the maintainer. Ruled ("Agreed") on five:
+
+1. Bits. The kernel reads bits as a count or a place where one of its
+   primitives takes one, as a whole number with the most significant
+   bit first, and gives them no other meaning. The entry is reworded
+   and retitled.
+4. A text that does not parse is a failure the parser answers; the
+   loader claims a program's own text parsed, and there it is a
+   refutation.
+5. The order of the four strengths is stated where they are defined;
+   refuted is an outcome and no strength.
+6. Entries not to build from as written are marked in the inventory's
+   header: five that decide "open" and seven in the present tree's
+   vocabulary. None is rewritten now and none is split.
+7. The tour introduces ten terms, each in one sentence, before Part I
+   uses them. Drafted in the inventory for the maintainer to correct.
+
+2. Symbols. The maintainer: "The text needs to clearly define what a
+   symbol is in terms of function. 'A symbol is its spelling' states
+   how symbol identity works, but not what it does. Have we given up
+   fully-qualified names for symbols? Perhaps I'm missing the
+   difference between symbols and keys for private field access."
+   Ruled: a symbol is a value that carries nothing but which symbol it
+   is, and names three kinds of thing: a binding, an entry, a case.
+   The same spelling is the same symbol. A fully-qualified name is a
+   spelling a language's reader writes; the kernel has no part in it.
+   A symbol names and a key guards. One entry is retitled and one
+   withdrawn. What the standard language qualifies with is left to
+   Part IV.
+3. Expressions and what a parser returns. The maintainer: "Should we
+   be clearer on what the parser returns? Is 'a description' defined
+   well enough?" It was not: the forms stood only in a comment of the
+   kernel's source. Ruled: a new decision, "A description is plain
+   data in a fixed set of forms"; a parser of a module's text returns
+   the description of the module's function, its declarations and the
+   number of its keys; where a part was written gets a form of its
+   own, designed with the parser engine; "Expressions are values,
+   forming a DAG" is retitled.
+
+Three more titles were wrong and are changed by ruling: "Order of
+definition carries no meaning", "Running a program is evaluating its
+main module with a configuration's capabilities" and "Discharge
+mechanisms without search".
+
+All seven confirmed on 2026-11-20. With this the second adversarial
+review is ruled: fourteen clusters. Open beside it, in the backlog:
+B-202 (threads and budgets at run time) and B-203 (streams, large
+data and asynchronous iteration).
+
 ## Terms introduced
 
 - **`unambiguous`**: a mark on a production. Where a parse of it is
