@@ -44,6 +44,8 @@ test("each literal form is read as the plain data forms.md §2 says it stands fo
   assert.deepEqual(ok("-7"), int64(-7n));
   assert.deepEqual(ok("-9223372036854775807"), int64(-9223372036854775807n));
   assert.deepEqual(ok("-9223372036854775808"), int64(-(2n ** 63n)), "the least integer");
+  assert.deepEqual(ok("-1.5"), float64(-1.5), "a - written before a fraction is part of the literal");
+  assert.deepEqual(ok("-0.0"), float64(-0), "and -0.0 is negative zero");
   assert.deepEqual(ok("[]"), { entries: [] });
   assert.deepEqual(ok("{}"), { entries: [] });
   assert.deepEqual(ok('{a: 1, b: [true, `x, {c: "t"}], d: -2}'), {
@@ -61,7 +63,6 @@ test("anything else is refused with a finding that says an input's value is a li
     ["1 + 2", /holds an expression \(binary\)$/],
     ["f(1)", /holds an application$/],
     ["x => x", /holds a function$/],
-    ["-1.5", /holds a negative fraction, since prefix - stands for int\.neg/],
     ["--5", /holds a negation of something that is not a whole number$/],
     ["!true", /holds a negation with !$/],
     ["{a: y}", /holds the name y$/],

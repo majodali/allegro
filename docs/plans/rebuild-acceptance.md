@@ -1772,3 +1772,21 @@ policy is the gate ruled there.
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`;
   `milestone 1: programs 5 (passing 5, failing 0) · cases due 25 · realised 5, named only by a failing program 0, not yet named 20 · up to 1: 5 of 25 realised`;
   `milestone 3: programs 41 (passing 41, failing 0) · cases due 132 · realised 98, named only by a failing program 0, not yet named 34 · up to 3: 103 of 167 realised`.
+- **2026-11-20 — A `-` written before a fraction is part of the literal.**
+  PR #268 answered what part 4 of chunk Q5 (the first notation and the
+  bootstrap) handed over. The reference kernel no longer holds a
+  statement after `a <- f()`, and a value that needs itself is refuted;
+  the four readings are confirmed and written into
+  `next/ext/allegretto/forms.md`. One thing came back to this stream,
+  by the maintainer's ruling of 2026-11-20: `-1.5` is one literal, as
+  the least integer is. The reader (`next/bootstrap/reader.ts`) reads a
+  `-` written before a fraction as part of the literal, so
+  `float.text(-1.5)` prints `-1.5`, where it printed `-3`, and `-0.0` is
+  negative zero. Before anything but a number written out, prefix `-`
+  is still `int.neg`. `readLiteral` (`next/bootstrap/literal.ts`) no
+  longer refuses a negative fraction as an input's value. A program,
+  `next/corpus/allegretto/m3/negative-fraction.alg`, shows it. Measured:
+  383 tests pass, none waits; 47 programs pass. PR #268 also says how
+  an importing text's emitter gets an imported module's declarations
+  and identity before there is a loader: emit the imported text first,
+  load its record, and read `moduleOf`. Imports are the next part.

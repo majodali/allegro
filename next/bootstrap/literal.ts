@@ -19,13 +19,11 @@
 // the symbols of its field names, as the emitter writes them; an array's
 // keys are null.
 //
-// A negative fraction is refused. In Allegretto prefix `-` stands for
-// `int.neg` (forms.md §2, "Operators"), so `-1.5` in a program is
-// `int.neg` applied to the bits of 1.5, which is not the fraction -1.5.
-// A negative whole number is `int.neg` of a whole number in the signed
-// 64-bit range, which never wraps, and so is the whole number itself. The
-// least integer, `-9223372036854775808`, is read by the reader as one
-// literal, and is that integer here too.
+// A negative number is a literal. The reader reads a `-` written before
+// a fraction as part of the literal, and `-9223372036854775808`, the least
+// integer, as one literal (forms.md §2, "Values"). Any other negative
+// whole number is `int.neg` of a whole number in the signed 64-bit range,
+// which never wraps, and so is the whole number itself.
 //
 // The plain data is the launcher's `Plain` (next/launch/launcher.ts). The
 // launcher does not import this file.
@@ -87,10 +85,6 @@ export function readLiteral(text: string): LiteralResult {
         return { entries: e.items.map((i) => [null, plain(i)] as const) };
       case "unary":
         if (e.op === "-" && e.operand.k === "int") return plain({ ...e.operand, value: -e.operand.value });
-        if (e.op === "-" && e.operand.k === "float") {
-          refusals.push("a negative fraction, since prefix - stands for int.neg (forms.md §2)");
-          return { entries: [] };
-        }
         refusals.push(formName(e));
         return { entries: [] };
       default:

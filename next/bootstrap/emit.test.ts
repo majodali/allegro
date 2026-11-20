@@ -570,6 +570,14 @@ test("the least integer is written -9223372036854775808: one literal, with no in
   assert.deepEqual(seenInts(run("input see\nsee(-9223372036854775808)\nsee(-9223372036854775807 - 1)")), [-(2n ** 63n), -(2n ** 63n)]);
 });
 
+test("a - written before a fraction is part of the literal: -1.5 is the fraction, with no int.neg", () => {
+  const text = "input see\nsee(float.text(-1.5))\nsee(float.text(float.add(-0.25, 1.0)))";
+  assert.deepEqual(emitted(text).needs.map((n) => n.name), ["float.add", "float.text"]);
+  assert.deepEqual(seenTexts(run(text)), ["-1.5", "0.75"]);
+  // Before anything but a number written out, prefix - is int.neg (forms.md §2, "Operators").
+  assert.ok(emitted("input see\nx = 1.5\nsee(-x)").needs.some((n) => n.name === "int.neg"));
+});
+
 // ── What the module yields ────────────────────────────────────────────
 
 test("a module with no export yields all its bindings, keyed by the symbols of their names; with export, those marked", () => {

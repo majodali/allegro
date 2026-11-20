@@ -1436,6 +1436,15 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — A `-` written before a fraction is part of the literal (B-196)
+
+B-196 (the rebuild's acceptance side). By the maintainer's ruling of
+2026-11-20, recorded in the forms by PR #268, `-1.5` is one literal. The
+reader reads it so: `float.text(-1.5)` prints `-1.5`, where it printed
+`-3`. `readLiteral` no longer refuses a negative fraction as an input's
+value. Before anything but a number written out, prefix `-` is still
+`int.neg`.
+
 ### 2026-11 — The corpus follows the retitles of PR #265; five symbol cases restated (B-196)
 
 B-196 (the rebuild's acceptance side). 102 citations in 94 cases move to
