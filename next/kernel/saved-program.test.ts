@@ -196,10 +196,9 @@ function loaded(restoreAs?: string) {
   const isZero = k.primitiveFunction({ purity: "pure", hash: EQ0, name: "isZero", arity: 1, run: (a, c) => (ran++, c.bits(Uint8Array.of(c.bitsOf(a[0]).bytes[0] === 0 ? 1 : 0), 1)) });
   const moduleFn = load(k, second, new Map([[EQ0, isZero]]), restoreAs === undefined ? {} : { restoreAs });
   // The record's body is a structure, and this caller reads every entry of it.
-  const scope = k.scope();
-  let result = k.evaluate(k.expression(moduleFn, [k.bits(Uint8Array.of(7))]), scope);
+  let result = k.evaluate(k.expression(moduleFn, [k.bits(Uint8Array.of(7))]));
   for (const [, entry] of result.refuted ? [] : k.entriesOf(result.value)) {
-    const e = k.evaluate(entry, scope);
+    const e = k.evaluate(entry);
     if (e.refuted) result = e;
   }
   return { k, moduleFn, result, ran: () => ran };
@@ -208,8 +207,8 @@ function loaded(restoreAs?: string) {
 test("loading makes the module's keys from its content: the same in every kernel", () => {
   const a = loaded();
   const b = loaded();
-  const keyA = a.k.keyOf(a.k.entriesOf(a.k.evaluate(a.k.expression(a.moduleFn, [a.k.bits(Uint8Array.of(0))]), a.k.scope()).value)[0][1]);
-  const keyB = b.k.keyOf(b.k.entriesOf(b.k.evaluate(b.k.expression(b.moduleFn, [b.k.bits(Uint8Array.of(0))]), b.k.scope()).value)[0][1]);
+  const keyA = a.k.keyOf(a.k.entriesOf(a.k.evaluate(a.k.expression(a.moduleFn, [a.k.bits(Uint8Array.of(0))])).value)[0][1]);
+  const keyB = b.k.keyOf(b.k.entriesOf(b.k.evaluate(b.k.expression(b.moduleFn, [b.k.bits(Uint8Array.of(0))])).value)[0][1]);
   assert.deepEqual(keyA, keyB);
   assert.equal(keyA.slot, 0);
   assert.match(keyA.module, /^sha256:[0-9a-f]{64}$/);
@@ -255,7 +254,7 @@ test("a record of the second version holds a symbol as data and a block of bindi
   assert.deepEqual(check2(doc), []);
   const k = createKernel();
   const moduleFn = load(k, doc as unknown as SavedProgram, new Map());
-  const r = k.evaluate(k.expression(moduleFn, []), k.scope());
+  const r = k.evaluate(k.expression(moduleFn, []));
   assert.deepEqual(k.bitsOf(r.value), { bytes: Uint8Array.of(1), bitLength: 1 });
   // The first version has no symbol as data.
   const first = { ...doc, version: 1, keys: undefined, outcomes: undefined };
@@ -322,9 +321,8 @@ test("a record holds a private member as an entry keyed by a key slot", () => {
   assert.deepEqual(check2(doc), []);
   const k = createKernel();
   const m = load(k, doc as unknown as SavedProgram, new Map());
-  const scope = k.scope();
-  const [obj, read] = k.entriesOf(k.evaluate(k.expression(m, []), scope).value).map(([, v]) => k.evaluate(v, scope).value);
-  const count = k.evaluate(k.expression(k.kernelPrimitive("count"), [obj]), scope).value;
+  const [obj, read] = k.entriesOf(k.evaluate(k.expression(m, [])).value).map(([, v]) => k.evaluate(v).value);
+  const count = k.evaluate(k.expression(k.kernelPrimitive("count"), [obj])).value;
   assert.equal(k.bitsOf(count).bytes[7], 0, "the private entry is not counted");
-  assert.equal(k.bitsOf(k.evaluate(k.expression(read, [obj]), scope).value).bytes[0], 9);
+  assert.equal(k.bitsOf(k.evaluate(k.expression(read, [obj])).value).bytes[0], 9);
 });
