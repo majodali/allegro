@@ -2518,6 +2518,12 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   The kernel and the launcher did nothing the forms or the decisions
   do not say, in any program or test here, on either variant.
   No existing test's assertion changed.
-  Measured: `npm run test:next` passes 699 tests on the reference and
-  700 with `ALLEGRO_KERNEL=machine`; 92 programs pass on both;
+  Measured, after the merge of main with Q10 (the decision map made
+  current): `npm run test:next` passes 701 tests on the reference and
+  702 with `ALLEGRO_KERNEL=machine`; 92 programs pass on both;
   `milestone 3: programs 75 (passing 75, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  One row of the decision map moves to written, with the launcher as
+  its unit: "A late answer or its failure fills a cell as plain data".
+  A shipped capability now gives a failure in the one shape, which was
+  what the row lacked. "The terminal and the browser ship output,
+  timers and HTTP" stays at none until the browser launcher of Q21.
