@@ -1484,6 +1484,19 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — A configuration from its sources (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 2)
+
+B-196 (the rebuild's acceptance side). A run's configuration is
+resolved from four sources, highest first: the command line, the
+project's file `allegro.json` beside the text, the environment's
+`ALLEGRO_STEPS`, and the launcher's own ceiling. One table says which
+source may set each setting, and a setting from a source that may not
+set it is refused with a finding. Inputs are merged by name. Both
+terminal commands gain `--ceiling`, which may only narrow the
+terminal's ceiling. A run's result lists the source of each value. It
+closes B-059 (the project root file) as far as this part goes. Nothing
+printed for a run changes.
+
 ### 2026-11 — What a result holds (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 1)
 
 B-196 (the rebuild's acceptance side). The launcher gives back, with
