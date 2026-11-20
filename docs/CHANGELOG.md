@@ -1444,6 +1444,16 @@ reader reads it so: `float.text(-1.5)` prints `-1.5`, where it printed
 `-3`. `readLiteral` no longer refuses a negative fraction as an input's
 value. Before anything but a number written out, prefix `-` is still
 `int.neg`.
+### 2026-11 — The speed tests of milestone 3, measured again (B-196, chunk Q8 (the speed tests of milestone 3))
+
+B-196 (the rebuild's acceptance side). `npm run bench:next` was run on
+main after the kernel stream's changes to bits and the emitter's part 4.
+Two of the four findings of the first run are closed: `==` on long texts
+and a slice of a long text no longer cost time in the text's length. Two
+are open: a step slows as arguments nest (the parser's time grows with
+exponent 1.20, where it was 1.22), and a recursion still ends at the
+host's stack, now at a lower depth. Milestone 3 is not ready to sign.
+The record is `docs/plans/rebuild-acceptance.md` §7.
 
 ### 2026-11 — The corpus follows the retitles of PR #265; five symbol cases restated (B-196)
 
