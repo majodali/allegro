@@ -19,10 +19,11 @@
 // milliseconds have passed. The value it fills is `n` itself, the same 64
 // bits, so a program can tell which wait ended.
 //
-// A value outside the part's domain is treated as `output.write` treats
-// one (next/launch/output.ts): the part throws, and the launcher ends the
-// run as a fault, naming the part. Outside the domain are a value that is
-// not bits, bits of another length than 64, and a negative number.
+// A value outside the part's domain is a refutation, as for any primitive
+// function (next/ext/allegretto/forms.md §1): the part throws the
+// kernel's `Refusal` (next/kernel/interface.ts) with the reason. Outside
+// the domain are a value that is not bits, bits of another length than
+// 64, and a negative number.
 //
 // Time is the target's. The capability is made with a clock
 // (next/launch/clock.ts): the terminal passes the host's real timer, and
@@ -31,21 +32,21 @@
 //
 // Host-neutral: no process, no fs, no Buffer.
 
-import type { PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
+import { Refusal, type PrimitiveContext, type PrimitiveDeclaration, type Value } from "../kernel/interface.js";
 import type { Clock } from "./clock.js";
 import type { CapabilityDefinition, CapabilityHost, CapabilityImplementation, Plain } from "./launcher.js";
 
 /** The timer capability: one part, which waits. */
 export const TIMER: CapabilityDefinition = { name: "timer", parts: ["wait"] };
 
-/** Reads a whole number of 64 bits that is not negative, as milliseconds; throws on anything else. */
+/** Reads a whole number of 64 bits that is not negative, as milliseconds; refuses anything else. */
 export function millisecondsOf(value: Value, context: PrimitiveContext): { readonly ms: bigint; readonly bytes: Uint8Array } {
-  if (context.kind(value) !== "bits") throw new Error(`timer.wait takes a whole number of 64 bits, not ${context.kind(value)}`);
+  if (context.kind(value) !== "bits") throw new Refusal(`timer.wait takes a whole number of 64 bits, not ${context.kind(value)}`);
   const { bytes, bitLength } = context.bitsOf(value);
-  if (bitLength !== 64) throw new Error(`timer.wait takes a whole number of 64 bits; this value has ${bitLength} bits`);
+  if (bitLength !== 64) throw new Refusal(`timer.wait takes a whole number of 64 bits; this value has ${bitLength} bits`);
   let ms = 0n;
   for (const b of bytes) ms = (ms << 8n) | BigInt(b);
-  if (ms >= 2n ** 63n) throw new Error(`timer.wait takes a number of milliseconds that is not negative; this one is ${ms - 2n ** 64n}`);
+  if (ms >= 2n ** 63n) throw new Refusal(`timer.wait takes a number of milliseconds that is not negative; this one is ${ms - 2n ** 64n}`);
   return { ms, bytes: Uint8Array.from(bytes) };
 }
 

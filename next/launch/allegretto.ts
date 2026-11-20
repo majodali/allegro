@@ -22,7 +22,7 @@
 //
 // The target is the terminal's: `output`, and `timer` on the host's real
 // timer, and the shipped pure primitives. The ceiling grants `output` and
-// `timer` (`ALLEGRETTO_CEILING` of next/launch/terminal.ts). `--steps`
+// `timer` (`TERMINAL_CEILING` of next/launch/terminal.ts). `--steps`
 // sets a step budget. Each `--input name=<literal>` supplies the
 // input `name` at the start. Each `--later name=<literal>` is one later
 // phase that supplies it, in the order written. The value is one
@@ -36,7 +36,7 @@ import { describeDriveFinding, drive } from "../bootstrap/driver.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { encode } from "../kernel/saved-program.js";
 import type { Inputs, Plain } from "./launcher.js";
-import { ALLEGRETTO_CEILING, runOnTerminal, terminalArguments } from "./terminal.js";
+import { runOnTerminal, terminalArguments } from "./terminal.js";
 
 const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--input name=<literal>]... [--later name=<literal>]...";
 
@@ -91,7 +91,7 @@ async function main(argv: readonly string[]): Promise<void> {
   }
   // Each record goes to the launcher as the saved program's JSON, as `npm run launch` reads it.
   const records = r.records.map((x) => JSON.parse(encode(x.program)) as unknown);
-  await runOnTerminal(records[records.length - 1], steps, { inputs, later }, records.slice(0, -1), ALLEGRETTO_CEILING);
+  await runOnTerminal(records[records.length - 1], steps, { inputs, later }, records.slice(0, -1));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname))

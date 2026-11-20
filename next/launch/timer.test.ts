@@ -110,7 +110,7 @@ test("timer.wait(0) answers late too, and a wait no clock of the host could take
   assert.equal(longest.end.kind, "completed");
 });
 
-test("a value outside timer.wait's domain is treated as output.write treats one: the run ends as a fault, naming the part", async () => {
+test("a value outside timer.wait's domain is a refutation with the part's reason", async () => {
   for (const [argument, says] of [
     ["-1", /timer\.wait takes a number of milliseconds that is not negative; this one is -1/],
     ['"ten"', /timer\.wait takes a whole number of 64 bits; this value has 24 bits/],
@@ -118,7 +118,7 @@ test("a value outside timer.wait's domain is treated as output.write treats one:
     ["[]", /timer\.wait takes a whole number of 64 bits, not structure/],
   ] as const) {
     const done = await run(emitted(`capability output\ncapability timer\noutput.write("before")\nr <- timer.wait(${argument})\n`), virtualClock().clock);
-    assert.equal(done.end.kind, "fault", argument);
+    assert.equal(done.end.kind, "refuted", argument);
     assert.match(describe(done.end), says);
   }
 });
@@ -182,15 +182,15 @@ test("npm run allegretto grants timer on the host's real timer: a program that w
   }
 });
 
-test("npm run launch grants output alone: a record that declares timer is refused", () => {
+test("npm run launch grants timer too: a record that declares timer runs on the host's real timer", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "launch-timer-"));
   try {
     const file = path.join(dir, "waits.json");
     fs.writeFileSync(file, encode(ONE_WAIT));
     const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
-    assert.equal(r.stdout, "");
-    assert.equal(r.stderr, "refused: the module declares the capability timer, which the ceiling does not grant\n");
-    assert.equal(r.status, 1);
+    assert.equal(r.stderr, "");
+    assert.equal(r.stdout, "started\nx is 7\n");
+    assert.equal(r.status, 0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

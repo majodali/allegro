@@ -1975,22 +1975,22 @@ policy is the gate ruled there.
   Built. The launcher's target ships a second capability, `timer`
   (`next/launch/timer.ts`), beside `output`. Its clocks are in
   `next/launch/clock.ts`. `npm run allegretto` and the corpus runner
-  (`runProgram` of `next/corpus/allegretto.ts`) grant both;
-  `npm run launch` grants `output` alone, as before. The launcher
-  (`next/launch/launcher.ts`) is unchanged.
+  (`runProgram` of `next/corpus/allegretto.ts`) grant both, and so
+  does `npm run launch`. The launcher (`next/launch/launcher.ts`) is
+  unchanged.
   The proposal, as built, for the maintainer to ratify at the PR:
   - The capability is `timer`, with one part, `wait`. `timer.wait(n)`
     takes a whole number of milliseconds and returns a cell, which the
     launcher fills once `n` milliseconds have passed. Its value is `n`
     itself. A value that is not bits, bits of another length than 64,
-    or a negative number is outside the domain. The part then throws,
-    as `output.write` does, and the launcher ends the run as a fault
-    naming the part. Building showed one reason against this point:
-    forms.md §1 rules that a primitive function applied outside its
-    domain is a refutation, and the kernel makes one where host code
-    throws `Refusal` (`next/kernel/interface.ts`). Both parts end the
-    run as a fault instead. Making both refuse is a change to
-    `output.write` too, so it is left to the maintainer.
+    or a negative number is outside the domain, and is a refutation
+    with the part's reason. forms.md §1 rules that a primitive function
+    applied outside its domain is a refutation, and the kernel makes
+    one where host code throws `Refusal` (`next/kernel/interface.ts`).
+    `output.write` threw a plain error until this chunk, which ended
+    the run as a fault. Both parts now throw `Refusal`, and the test of
+    `output.write` on bytes that are not UTF-8 text expects a
+    refutation where it expected a fault.
   - Time is the target's. The capability is made with a clock: a
     function asked to call back after a number of milliseconds, given
     as a bigint so that any whole number of 64 bits is asked exactly.
@@ -2006,15 +2006,15 @@ policy is the gate ruled there.
     `capability timer` and the ceiling grants it; otherwise it is
     refused, as for any capability. A program that does not declare it
     is unaffected, and the hello-world fixture's record is unchanged.
-    The ceiling of `npm run launch` stays `output`, since the proposal
-    names only the other two commands; whether it grants `timer` too is
-    for the maintainer.
+    The terminal has one ceiling for both of its commands
+    (`TERMINAL_CEILING` of `next/launch/terminal.ts`): it grants every
+    capability the terminal supplies.
   - The launcher needs no new rule. With several waits in flight each
     answer is filled when it arrives, what waited on it is evaluated
     again, a later phase is applied only when no wait is due, and the
     end `waiting` names the inputs left. A test holds each.
   The kernel did nothing the forms do not say, in any program here.
-  Realised at milestone 2, nine of its ten cases, by ten programs under
+  Realised at milestone 2, all nine of its cases, by ten programs under
   `next/corpus/allegretto/m2/`. The present tree's `delay(n)` answers 0
   after `n` milliseconds, and the programs write it
   `then(timer.wait(n), 0)`. Where a case asserts that nothing is
@@ -2043,13 +2043,14 @@ policy is the gate ruled there.
     plain data only.
   - "Stage F3a: top-level print fires immediately": the program prints
     99 once.
-  Left: the boundary case on the wire, which cites D42 (evidence is
-  possession), "the wire never mints". Allegretto has no
-  fully-qualified name, and `symbol(t)` gives the symbol of any
-  spelling, so there is no minting for a program to show; the case
-  "module: C5.1 FQN symbols" was left for the same reason. It waits on
-  no capability of the launcher, and its own note calls milestone 2 a
-  guess; milestone 3, beside that case, looks the better place.
+  Moved to milestone 4, for the maintainer to ratify at the PR: the
+  boundary case on the wire, which cites D42 (evidence is possession),
+  "the wire never mints", from milestone 2, and the case "module: C5.1
+  FQN symbols" from milestone 3. Both ask of fully-qualified names.
+  Allegretto has none: `symbol(t)` gives the symbol of any spelling, and
+  qualifying is the standard language's reader's (PR #265). The first
+  case's own note called milestone 2 a guess. The other cases on
+  fully-qualified names moved the same way on 2026-11-20.
   Eight programs are written for the purpose, under
   `next/corpus/allegretto/m3/`, each a ruled form over answers that
   arrive late: two statements that do not wait for each other, where

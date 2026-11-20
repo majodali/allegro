@@ -28,11 +28,10 @@
 // (`realClock` of next/launch/clock.ts). Its pure primitives are the
 // shipped ones, `shipped` of next/prims/index.ts.
 //
-// The configuration, as far as milestone 2 needs it: the ceiling of
-// `npm run launch` grants `output` alone, as before part 5; the ceiling
-// of `npm run allegretto` grants `output` and `timer` (`runOnTerminal`
-// takes the ceiling). `--steps` sets a step budget, and without it there
-// is none.
+// The configuration, as far as milestone 2 needs it: the ceiling grants
+// both capabilities the terminal supplies (`TERMINAL_CEILING`), for
+// `npm run launch` and `npm run allegretto` alike. `--steps` sets a step
+// budget, and without it there is none.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
 // exporting `createKernel` of type `CreateKernel2`
@@ -84,14 +83,12 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
   return { file, steps };
 }
 
-/** The ceiling of `npm run launch`. */
-export const LAUNCH_CEILING: readonly string[] = ["output"];
-/** The ceiling of `npm run allegretto`. */
-export const ALLEGRETTO_CEILING: readonly string[] = ["output", "timer"];
+/** The ceiling of both terminal commands: every capability the terminal supplies. */
+export const TERMINAL_CEILING: readonly string[] = ["output", "timer"];
 
 /**
  * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
- * the terminal's target, the ceiling given, and the inputs given: those
+ * the terminal's configuration and target, and the inputs given: those
  * supplied at the start and each later phase. Writes each line to stdout;
  * on any end but completed, writes the reason to stderr and exits 1.
  */
@@ -100,14 +97,13 @@ export async function runOnTerminal(
   steps: number | undefined,
   inputs: Pick<Configuration, "inputs" | "later"> = {},
   imports: readonly unknown[] = [],
-  ceiling: readonly string[] = LAUNCH_CEILING,
 ): Promise<void> {
   const createKernel = await kernelFactory();
   const outcome = await launch({
     createKernel,
     program,
     imports,
-    configuration: { ceiling, steps, ...inputs },
+    configuration: { ceiling: TERMINAL_CEILING, steps, ...inputs },
     target: { capabilities: [output, timer(realClock)], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
