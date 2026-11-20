@@ -1046,3 +1046,94 @@ test("the result holds no kernel handle: it survives JSON unchanged", async () =
     assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
   }
 });
+
+
+// ── A configuration from its sources (chunk Q13, part 2) ──────────────
+//
+// The two commands end to end, on a temporary directory: lines and exit
+// codes only. The resolver's rules are tested in
+// next/tools/configuration.test.ts.
+
+/** Runs one of the two commands with the environment given, beside this process's own with no ALLEGRO_STEPS. */
+function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: Readonly<Record<string, string>> = {}) {
+  const { ALLEGRO_STEPS: _, ...inherited } = process.env;
+  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
+}
+
+test("npm run allegretto reads allegro.json beside its text: its inputs, an input a flag replaces, and the environment's budget under the flag's", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-project-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, 'capability output\ninput a\ninput b\noutput.write(a)\noutput.write(b)\n');
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ inputs: { a: '"a from the file"', b: '"b from the file"' } }));
+    const fromFile = command("allegretto.ts", [file]);
+    assert.equal(fromFile.stderr, "");
+    assert.equal(fromFile.stdout, "a from the file\nb from the file\n");
+    assert.equal(fromFile.status, 0);
+    const replaced = command("allegretto.ts", [file, "--input", 'b="b from the flag"']);
+    assert.equal(replaced.stdout, "a from the file\nb from the flag\n");
+    assert.equal(replaced.status, 0);
+    const spent = command("allegretto.ts", [file], { ALLEGRO_STEPS: "0" });
+    assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
+    assert.equal(spent.status, 1);
+    const flagOver = command("allegretto.ts", [file, "--steps", "10000000"], { ALLEGRO_STEPS: "0" });
+    assert.equal(flagOver.stdout, "a from the file\nb from the file\n");
+    assert.equal(flagOver.status, 0);
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ steps: 0, later: [{ a: '"late a"' }, { b: '"late b"' }] }));
+    const fileSteps = command("allegretto.ts", [file]);
+    assert.equal(fileSteps.stderr, "limit: the step budget of 0 ran out\n");
+    assert.equal(fileSteps.status, 1);
+    const fileLater = command("allegretto.ts", [file, "--steps", "10000000"]);
+    assert.equal(fileLater.stdout, "late a\nlate b\n");
+    assert.equal(fileLater.status, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm run allegretto refuses a project file with a finding: a setting it may not set, JSON that does not parse, an unknown key; exit 1 and nothing printed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-project-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    const project = path.join(dir, "allegro.json");
+    fs.writeFileSync(file, 'capability output\noutput.write("ran")\n');
+    fs.writeFileSync(project, JSON.stringify({ ceiling: ["output"] }));
+    const ceiling = command("allegretto.ts", [file]);
+    assert.equal(ceiling.stdout, "");
+    assert.equal(ceiling.stderr, "the setting ceiling is set by the project's file allegro.json, which may not set it: only the command line and the launcher may\n");
+    assert.equal(ceiling.status, 1);
+    fs.writeFileSync(project, "{ not json");
+    const notJson = command("allegretto.ts", [file]);
+    assert.match(notJson.stderr, new RegExp(`^${project.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: the file is not JSON: `));
+    assert.equal(notJson.status, 1);
+    fs.writeFileSync(project, JSON.stringify({ budget: 3 }));
+    const unknown = command("allegretto.ts", [file]);
+    assert.equal(unknown.stderr, `${project}: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel\n`);
+    assert.equal(unknown.status, 1);
+    fs.rmSync(project);
+    const none = command("allegretto.ts", [file]);
+    assert.equal(none.stdout, "ran\n");
+    assert.equal(none.status, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm run launch resolves from its flags, the environment and the launcher: --ceiling narrows, and a name the terminal does not supply is refused", () => {
+  const ok = command("terminal.ts", [FIXTURE, "--ceiling", "output"]);
+  assert.equal(ok.stdout, "hello, world\n");
+  assert.equal(ok.status, 0);
+  const narrowed = command("terminal.ts", [FIXTURE, "--ceiling", "timer,http"]);
+  assert.equal(narrowed.stdout, "");
+  assert.equal(narrowed.stderr, "refused: the module declares the capability output, which the ceiling does not grant\n");
+  assert.equal(narrowed.status, 1);
+  const wider = command("terminal.ts", [FIXTURE, "--ceiling", "output,files"]);
+  assert.equal(wider.stderr, "the ceiling of the command line grants files, which the launcher's ceiling does not grant: a ceiling may only narrow the launcher's\n");
+  assert.equal(wider.status, 1);
+  const spent = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "0" });
+  assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
+  assert.equal(spent.status, 1);
+  const notWhole = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "many" });
+  assert.equal(notWhole.stderr, 'the environment\'s ALLEGRO_STEPS is not a whole number: "many"\n');
+  assert.equal(notWhole.status, 1);
+});
