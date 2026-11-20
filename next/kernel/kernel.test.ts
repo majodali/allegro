@@ -2361,3 +2361,180 @@ test("a loop written as a recursion goes round as often as asked: a hundred thou
   assert.equal(value(r.value), MACHINE ? 100_000 : 200);
   assert.equal(r.steps, (MACHINE ? 100_000 : 200) * 5 + 4, "five steps a turn on either variant: the two count alike");
 });
+
+// ---- Waiting (chunk K10) ---------------------------------------------------------
+//
+// The machine takes a computation up at the point where it stopped. The reference
+// evaluates what was left of it again. Where a ruled decision makes the two answer
+// differently, the test says so.
+
+test("a deep computation that waits at its bottom is taken up there, and its value is the same", () => {
+  const { k, call, kp, n32, value, less, more, none } = counting();
+  const [down, n, e] = [k.symbol("t.down"), k.param("n"), k.param("e")];
+  // down(n, e) = if n == 0 then e else 1 + down(n - 1, e): every level waits for the one below it.
+  const downFn = k.composedFunction([n, e], call(kp("if"), call(none, n), e, call(more, call(down, call(less, n), e))));
+  const depth = MACHINE ? 20_000 : 100;
+  const c = k.cell();
+  const r = k.evaluate(within(k, [[down, downFn]], call(down, n32(depth), c)), k.scope());
+  assert.equal(r.ended, "complete");
+  assert.equal(k.kind(r.value), "expression", "it waits");
+  k.fill(c, n32(7));
+  const a = k.advance();
+  assert.equal(a.ended, "complete");
+  assert.equal(value(k.current(r.value)), depth + 7);
+  // "When information arrives, what waited on it is evaluated again": the reference walks
+  // what was left, one step a level. The machine goes on where it stopped and counts nothing twice.
+  if (MACHINE) assert.equal(a.steps, 0);
+  else assert.equal(a.steps, depth);
+});
+
+test("two arguments that wait go on in the order their answers arrive", () => {
+  const { k, add, call, said, say } = sayer();
+  const [c1, c2] = [k.cell(), k.cell()];
+  const r = k.evaluate(call(add, call(say, c1), call(say, c2)), k.scope());
+  assert.equal(k.waiting().length, 2);
+  k.fill(c2, byte(k, 2));
+  k.fill(c1, byte(k, 1));
+  k.advance();
+  assert.equal(num(k, k.current(r.value)), 3);
+  // "One task runs at a time, and a slice never changes what happens": answers are acted on
+  // in the order they arrive. The reference evaluates the whole of what was left again,
+  // in the order written, so there the first argument's effect comes first.
+  assert.deepEqual(said, MACHINE ? [2, 1] : [1, 2]);
+});
+
+test("a refutation ends an evaluation: an answer that comes later to another part of it does nothing", () => {
+  const { k, add, call, said, say } = sayer();
+  const fails = k.primitiveFunction({ ...pure("fails", 84, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  const [c1, c2] = [k.cell(), k.cell()];
+  // add(say(c1), fails(c2)): the second argument is refuted while the first still waits.
+  const r = k.evaluate(call(add, call(say, c1), call(fails, c2)), k.scope());
+  assert.equal(r.refuted, false);
+  k.fill(c2, byte(k, 0));
+  const a = k.advance();
+  assert.equal(a.refuted.length, 1, "the refutation is reported at once, though the first argument still waits");
+  assert.equal(k.outcomeOf(k.current(r.value)), "refuted");
+  assert.deepEqual(k.waiting(), [], "nothing waits for the first argument's answer any more");
+  k.fill(c1, byte(k, 1));
+  const later = k.advance();
+  assert.deepEqual(said, [], "the effect that waited is never performed");
+  assert.deepEqual(later.refuted, []);
+});
+
+test("a value two parts need is worked out once, and each part gets it", () => {
+  const { k, add, call, said, say } = sayer();
+  const x = k.symbol("t.x");
+  const c = k.cell();
+  // x = say(c); add(x, x)
+  const r = k.evaluate(within(k, [[x, call(say, c)]], call(add, x, x)), k.scope());
+  assert.equal(k.waiting().length, 1);
+  k.fill(c, byte(k, 21));
+  k.advance();
+  assert.deepEqual(said, [21], "said once");
+  assert.equal(num(k, k.current(r.value)), 42);
+});
+
+test("a value still wanted is worked out, though the computation that began it was refuted", () => {
+  const { k, add, call, kp, said, say } = sayer();
+  const fails = k.primitiveFunction({ ...pure("fails", 85, 1, (v) => v), run: () => { throw new Refusal("no"); } });
+  const second = k.primitiveFunction({ purity: "pure", hash: hash(86), name: "second", arity: 2, run: (a) => a[1] });
+  const x = k.symbol("t.x");
+  const [c1, c2] = [k.cell(), k.cell()];
+  // x = say(c1); second(attempt(add(x, fails(c2)), 1000), x)
+  // The attempt begins x and is then refuted inside. The second argument still wants x.
+  const r = k.evaluate(within(k, [[x, call(say, c1)]], call(second, call(kp("attempt"), call(add, x, call(fails, c2)), steps(k, 1000)), x)), k.scope());
+  k.fill(c2, byte(k, 0));
+  assert.deepEqual(k.advance().refuted, [], "the refutation stays inside the attempt");
+  assert.deepEqual(said, []);
+  assert.equal(k.waiting().length, 1, "the evaluation still waits for x's answer");
+  k.fill(c1, byte(k, 5));
+  k.advance();
+  assert.deepEqual(said, [5], "x's effect is performed, once");
+  assert.equal(num(k, k.current(r.value)), 5);
+});
+
+test("what a then holds back is looked at ahead when the then comes to wait, and a refutation in it is the then's at once", () => {
+  const { k, call, kp, said, say } = sayer();
+  const fails = k.primitiveFunction({ ...pure("fails", 87, 1, (v) => v), run: () => { throw new Refusal("no"); } });
+  const c = k.cell();
+  // then(say(c), fails(0)): the second is refuted whatever the first's answer is.
+  const r = k.evaluate(call(kp("then"), call(say, c), call(fails, byte(k, 0))), k.scope());
+  assert.equal(r.refuted, true, "found while the first waits");
+  k.fill(c, byte(k, 1));
+  k.advance();
+  assert.deepEqual(said, [], "and the first, which the refuted evaluation no longer wants, is not gone on with");
+});
+
+test("what is held back will wait too: the cells it needs are among those the evaluation waits for", () => {
+  const { k, call, kp, said, say } = sayer();
+  const [c1, c2] = [k.cell(), k.cell()];
+  // then(say(c1), say(c2)): the second is held, and it needs c2.
+  const r = k.evaluate(call(kp("then"), call(say, c1), call(say, c2)), k.scope());
+  assert.equal(k.waiting().length, 2, "a launcher is told of both answers the evaluation needs");
+  k.fill(c2, byte(k, 2));
+  k.advance();
+  assert.deepEqual(said, [], "the second is held until the first is over");
+  assert.equal(k.waiting().length, 1);
+  k.fill(c1, byte(k, 1));
+  k.advance();
+  assert.deepEqual(said, [1, 2]);
+  assert.equal(num(k, k.current(r.value)), 2);
+});
+
+test("an argument that comes out refuted refutes the call at once, while a later argument still waits", () => {
+  const { k, add, call, said, say } = sayer();
+  const fails = k.primitiveFunction({ ...pure("fails", 88, 1, (x) => x), run: () => { throw new Refusal("no"); } });
+  const [c1, c2] = [k.cell(), k.cell()];
+  // add(fails(c1), say(c2)): the first argument is refuted while the second still waits.
+  const r = k.evaluate(call(add, call(fails, c1), call(say, c2)), k.scope());
+  k.fill(c1, byte(k, 0));
+  const a = k.advance();
+  assert.equal(a.refuted.length, 1, "reported when it arises, not when the second argument's answer comes");
+  assert.equal(k.outcomeOf(k.current(r.value)), "refuted");
+  k.fill(c2, byte(k, 2));
+  k.advance();
+  assert.deepEqual(said, [], "the second argument's effect is never performed");
+});
+
+test("an attempt that waits keeps the budget it has left", () => {
+  const { k, add, call, kp } = setup();
+  const c = k.cell();
+  // attempt(then(c, 1 + 1 + 1 + 1), 6): three additions are held until c is known.
+  const sum = call(add, call(add, call(add, byte(k, 1), byte(k, 1)), byte(k, 1)), byte(k, 1));
+  const r = k.evaluate(call(kp("attempt"), call(kp("then"), c, sum), steps(k, 6)), k.scope());
+  assert.equal(r.ended, "complete");
+  k.fill(c, byte(k, 0));
+  assert.equal(k.advance().ended, "complete");
+  const now = k.current(r.value);
+  if (MACHINE) {
+    // "Limits are step budgets": a budget is never filled up again. Before it waited the
+    // attempt spent four of its six steps: the then, and the three additions looked at
+    // ahead. Two are left, and the three additions need three.
+    assert.equal(form(k, now).form, "limit");
+  } else {
+    // The reference attempts what is left again with the whole budget, so there it is enough.
+    assert.equal(num(k, now), 4);
+  }
+});
+
+test("two evaluations refuted by answers that arrive together are both reported, and no effect is performed between them", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const scope = k.scope();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  k.evaluate(call(kp("claim"), call(isZero, c1)), scope);
+  k.evaluate(call(say, c2), scope);
+  k.evaluate(call(kp("claim"), call(isZero, c3)), scope);
+  k.fill(c1, byte(k, 7));
+  k.fill(c2, byte(k, 2));
+  k.fill(c3, byte(k, 9));
+  const first = k.advance({ steps: 100 });
+  assert.deepEqual(said, [], "the effect that arrived after the first refutation is held");
+  const second = k.advance({ steps: 100 });
+  assert.deepEqual(said, [2], "a later call goes on");
+  assert.equal(first.refuted.length + second.refuted.length, 2, "both refutations are reported");
+  // Where the two variants differ. The reference evaluates what is still in line ahead, with
+  // no effect, so the second refutation is reported by the call that met the first. The
+  // machine cannot look ahead into a computation it has suspended: it leaves what is in
+  // line where it is, and the second refutation is reported by the call that takes it up.
+  assert.equal(first.refuted.length, MACHINE ? 1 : 2);
+});

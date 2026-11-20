@@ -1,5 +1,5 @@
 // The machine: the kernel variant that evaluates with a stack of its own
-// (chunk K9 of docs/plans/book-pass.md, and its section 9).
+// (docs/plans/book-pass.md section 9).
 //
 // It implements the same interface as the reference kernel
 // (next/kernel/kernel.ts) and follows the same rules, case for case. "One
@@ -22,10 +22,23 @@
 // interface that evaluates nothing are shared with the reference
 // (next/kernel/values.ts, next/kernel/core.ts).
 //
-// Not here yet, and in later chunks of the plan: a task that waits where
-// it stands, slices, the first of two answers, sharing, specialization.
-// A computation that waits is, as in the reference, what is left of it as
-// an expression, evaluated again when the answer comes.
+// There are two ways not to know a value, and they are treated apart.
+//   - A parameter left unknown: no answer will come during this
+//     evaluation. What could be evaluated is, and the rest is left as an
+//     expression, as in the reference.
+//   - A cell not yet filled, the answer of an operation that takes time:
+//     an answer will come. The computation stops where it stands. Its
+//     frames, down to the nearest frame that does not need the value yet,
+//     become a task, registered on the cell. When the cell is filled,
+//     `advance` takes the task up at the point where it stopped. Nothing
+//     is evaluated or counted twice.
+// Ahead of what is done (what a `then` or a claim holds back, and what
+// follows a refutation) nothing waits: there a cell is one more unknown,
+// and the evaluation is the reference's.
+//
+// Not here yet, and in later chunks of the plan: slices, the first of
+// two answers, sharing, specialization. A task that a limit stops is
+// dropped.
 
 import type { Advance, Cell, CreateKernel2, Kernel2, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -1251,6 +1264,8 @@ export const createMachine: CreateKernel2 = () => {
         try {
           const s = evaluate(v.args[1], scope);
           second = s instanceof Call ? yield s : s;
+          // A second that itself waits is not the whole's value yet: both go on, and the first is still watched.
+          while (awaited(second) !== undefined && !slot.done) second = yield framed(needGen(second, scope, evaluate), { pass: true });
         } catch (e) {
           if (e instanceof Signal) return new Call(lookAheadGen(v.args[1], scope, e.value), undefined);
           throw e;
