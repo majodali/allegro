@@ -17,7 +17,7 @@ oracle:
   - npm run harness:present
   - npm run harness:next
   - npm run bench:next
-chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8]
+chunks: [Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12, Q13, Q14, Q15, Q16, Q17, Q18, Q19, Q20, Q21, Q22]
 reserves: [B-197, B-198, B-199]
 boundary:
   - docs/plans/rebuild-acceptance.md
@@ -38,6 +38,10 @@ boundary:
 > `docs/plans/rebuild.md`, from the maintainer's rulings of that day.
 > Chunk Q1 (the decision map) is its first chunk. The status line and
 > the header's `status` say the same thing.
+>
+> **Amended 2026-11-20**, as §5 said it would be once chunks Q1 to Q8
+> were delivered: the work after milestone 3 is planned in §5, "After
+> milestone 3", as chunks Q9 to Q22, and its questions are in §6.
 >
 > **Reader**: the maintainer, and the session that runs the stream.
 > Assumed known: the program plan, whose §1 defines
@@ -172,10 +176,130 @@ saved-program data form.
 | Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs). It loads the records of imported modules (amended 2026-11-20, PR #250 and PR #268). The launcher ships a capability for waiting, `timer`, beside `output` (amended 2026-11-20) | milestone 2's command | merge on green; the milestone is the maintainer's |
 | Q8 | **The speed tests of milestone 3.** A typed extension and a toy parser engine, written in the first notation with the kernel stream, measured against the present tree on the same programs | the measurements, recorded in §7 | the maintainer |
 
-**After milestone 3**, by amendment of this plan: the phases as
-configurations, the commands, the tools for proposing rebuilt as
-readers of results, the capabilities the launchers ship, and the units
-and planning libraries ported at milestones 6 and 7.
+### After milestone 3 (amended 2026-11-20)
+
+Chunks Q1 to Q8 are delivered. This part plans the rest of B-196: what
+this stream owes to milestones 3 to 9. It is a proposal until the
+maintainer merges it. Its open questions are in §6.
+
+**What is left, measured** on `origin/main` at `705c232`.
+
+| Measure | Count |
+|---|---|
+| Decisions this stream owns in the decision map | 69: Part V 27, Part VI 42 |
+| Of those, rows whose state the map has moved | 0 |
+| Cases due at milestones 1 to 3, and realised by a program | 165, and 132 |
+| Cases due at milestones 4 to 9 | 1,681 |
+| Scenarios due at milestones 5, 6 and 7 | 5, 3 and 3 |
+| Backlog items classed as still needed in this stream | 18 |
+
+The cases due, by milestone, with the sources that hold most of them:
+
+| Milestone | Cases due | Of them classed *changes* | Largest sources |
+|---|---|---|---|
+| 4 | 653 | 25 | the three type test files (243), the language tests of the second grammar (70), six pinned programs (116) |
+| 5 | 541 | 177 | proofs (78), effects (61), totality (59), the prover protocol (55), equality and laws (35) |
+| 6 | 147 | 15 | the language tests of the second grammar (37), the units programs (62) |
+| 7 | 244 | 28 | the planning programs (187), the prover protocol (35) |
+| 8 | 94 | 5 | the parser engine's tests (61) |
+| 9 | 2 | 0 | tooling |
+
+Milestones 1 and 3 still hold 33 cases not yet realised. Eleven of
+milestone 1's wait on metadata fields and their writers, which the
+kernel stream builds with the rest of Part II. Four of milestone 3's
+wait on the prompt of Q14. Each stays at its milestone and is realised
+in the part of Q12 that follows what it waits on.
+
+**What each milestone needs from each stream.**
+
+| Milestone | From the kernel stream | From this stream |
+|---|---|---|
+| 3 | chunks K12 (the interface made one) to K15 (specialization, and the switch) of `docs/plans/book-pass.md` §5 | Q9; the bench run on both variants at each of those chunks |
+| 4 | the chapters of Part IV on types, as extensions in `next/ext/`; the forms of the standard language's notation, ruled as Allegretto's were | Q10, Q11, and Q12 for milestone 4 |
+| 5 | the rest of Part IV: refinements, claims and proofs, laws, effects, contracts, termination | Q13, Q14, Q15, Q16, and Q12 for milestone 5 |
+| 6 | a text that changes the grammar it is read in, read on the kernel | Q17, and Q12 for milestone 6 |
+| 7 | nothing new is named | Q18, Q19, and Q12 for milestone 7 |
+| 8 | the parser engine and the module loader, written in Allegro | Q20, and Q12 for milestone 8 |
+| 9 | the book's consumable chapters | Q21, Q22 |
+
+**The chunks.**
+
+| Chunk | Deliverable | Oracle | Gate |
+|---|---|---|---|
+| Q9 | **The launcher on the one interface.** This stream's side of chunk K12: `fill` takes up what waited, `scope()` is gone, and `steps` on `advance` is removed if the maintainer confirms it. One pull request on each side | `npm run test:next` on both variants; `npm run harness:next` on both | the maintainer: a contract change |
+| Q10 | **The decision map made current.** Each row of this stream moved to the state its unit has earned, with the unit named. The stored `cases` lists go: the check derives them from the corpus, where each case already lists its decisions. From this chunk on, a chunk moves its rows in its own pull request (program plan §8, item 6) | `npm run lint:decisions` | merge on green; the dropped lists are question B4 (the map's stored lists of cases) of §6 |
+| Q11 | **The standard language's notation in the bootstrap.** A grammar for the present parser engine, a reader and an emitter for the forms the kernel stream rules, as Q5 built Allegretto's. The emitter writes each form as what the forms document says it stands for. It reads the fixed notation only: a text that changes the grammar is read on the kernel: question B1 (how a text in the standard language is read) of §6 | the forms document's examples emit and run; `npm run test:next` | the maintainer: the notation is a contract |
+| Q12 | **The cases of each milestone, realised.** In parts, one for each milestone and source. A pinned program is run on the new tree as it stands and compared with its pins by class. A test is restated as a program that shows what it asserts. A case that only host code can show is counted as question B2 (cases only host code can show) of §6 has it. Subagents do the restating; this session reviews every program against its case | the harness's line for the milestone: every case due is realised | merge on green; a change of class or milestone is the maintainer's; each milestone is the maintainer's |
+| Q13 | **Check and run as configurations, and what a result holds.** Under `next/tools/`. A configuration from its sources in their ruled order: the command line, a project's file, the environment, what the launcher holds. Check, with no capability but the loader's file reading. Run, with the ceiling's capabilities. A pipeline whose residual the next evaluation takes, in one execution. The result as data: each claim as written, with its counts of decided, assumed, undecided and refuted, the reasons, and what the outcomes rest on; and the source of each configuration value. It closes B-059 (the project root file) | tests of each rule; the result of a fixture program, compared field by field | the maintainer: the result's form is what every tool reads |
+| Q14 | **The commands.** Each names a configuration and a way of presenting its result: `allegro` with a file runs it, with no argument it starts a prompt, and one command for each of check and the listings of Q15. A module's summary is one word, the weakest strength among its claims. The prompt is a module, on one kernel that serves every entry. The default configuration is the standard language | each command on fixture programs; the prompt's cases of the corpus | the maintainer for the commands' names; then merge on green |
+| Q15 | **The tools for proposing.** Readers of a check's result, with no analysis of their own. The list of open obligations, in a form for programs and one for people. One primer. A proposal that is only the missing value, placed, evaluated again and kept only if the claim is decided, for a bounded number of attempts. Where accepted values are stored is configuration, the store is never trusted, and the deriver holds no capability. The proposer that asks a language model runs `claude -p`; no test runs it or reaches a network. It replaces the present prover protocol and the planning-loop tooling | scenario rung 1's prover loop; the prover protocol's cases; tests with a scripted proposer | the maintainer: a design, and writing to the repository is an effect |
+| Q16 | **The capabilities the launchers ship.** HTTP, proposed as `timer` was: its name, its parts, what each answers, and its failure as plain data of the one shape. File reading for the loader, bounded to the project's and the platform's directories. File writing only where Q15's store needs it. Tests use a transport and a file system they control | tests of each part; programs under `next/corpus/` | the maintainer: names and shapes are a proposal |
+| Q17 | **The units library.** Under `next/models/units/`, from the present library and to the four decisions of "Units of measure" | scenarios rung 2, one to three; the harness's line for milestone 6 | merge on green; a change by ruling is the maintainer's |
+| Q18 | **The planning library.** Under `next/models/planning/`, to the planning model's specification of Q4 and the decisions of "Plans as outcome graphs" and "Finding solutions to a plan". The decisions of "Models" and "Search and optimization" are realised as far as this model needs them | scenarios rung 3, one and two; the planning programs' cases | the maintainer for each design the specification left open; then merge on green |
+| Q19 | **The loop over a plan.** Rung 4: a plan's gaps listed as obligations, and catalog entries proposed and checked, with the tools of Q15 | scenario rung 4; the two planning-loop programs' cases | the maintainer: milestone 7 |
+| Q20 | **The bootstrap retired.** With the kernel stream. Every program of the corpus is read by both readers and runs the same. Then the driver gives way to the loader with Q16's file reading, `use name` is read, and `next/bootstrap/` is deleted | both readers agree on every program; then `npm run harness:next` without the bootstrap | the maintainer: milestone 8 |
+| Q21 | **The browser launcher.** One bundle that sets one global object, on the core that runs in a browser. Where the pages live in the new tree is named when this chunk is in sight, since the site's directories are the present tree's | the bundle's calls on fixture programs, in a browser | the maintainer: a lane's paths change |
+| Q22 | **The present tree's end.** With the kernel stream. A last recorded run of the comparison and of the bench against the present tree. Then the comparison's present side, the present suite's gate and its ratchets go, CI runs the new tree's gate alone, and the directories are deleted. Who deletes which directory is named when this chunk is in sight: the lanes split them | every case that survives or changes is realised; the new tree's gate | the maintainer: milestone 9 |
+
+**Order.** Q9 follows the kernel stream's chunk. Q10, Q13 and Q16 wait
+on nothing and start first. Q11 waits on the forms. Q12 for a milestone
+waits on Q11 and on the kernel stream's chapters for it. Q14 follows
+Q13, and Q15 follows Q14. Q17 to Q19 wait on their milestones'
+notation. Q20 and Q22 are joint.
+
+**The decisions, by chapter.** Each chapter's rows are moved by the
+chunk named. "Later" is the list below.
+
+| Chapter | Decisions | Chunk | Later |
+|---|---|---|---|
+| Configuration | 3 | Q13 | a configuration written as a model |
+| Launching | 4 | Q7, Q14 for one kernel serving many entries, Q20 for the loader | |
+| Capabilities and primitive functions | 5 | Q7, Q16 | loading host code; a reference definition for every pure primitive, which is the kernel stream's work on `next/prims/` |
+| Phases | 3 | Q13 | export |
+| Saved programs and export | 9 | Q5 and Q7 for the three on saved programs | the six on export, rewriting by a law and distribution |
+| Trust | 6 | Q13 for what a result names and what a phase must leave decided | manifests, signatures, profiles, and the stronger grounds for a primitive's purity |
+| Tools | 7 | Q14, Q15 | a trace read from origins |
+| The launchers we ship | 5 | Q7, Q14, Q16, Q21 | |
+| Models | 4 | Q18 | a change to a model as a mapping |
+| Search and optimization | 3 | Q18, Q19 | |
+| Analysing models | 1 | | all of it |
+| Units of measure | 4 | Q17 | |
+| Plans as outcome graphs | 11 | Q18 | |
+| Finding solutions to a plan | 4 | Q18, Q19 | search beyond enumeration |
+
+**Not owed to a milestone.** The program is done when the corpus
+passes, the parser engine has replaced the bootstrap and the present
+tree is deleted (program plan §1). The present tree does none of the
+following, so no case asks for it, and this plan does not schedule
+it. That is question B3 (what no milestone asks for) of §6.
+
+- export to a target, saving as a case of export, and an exported
+  program's equivalence to the program in a kernel;
+- rewriting by a law, and how extensions are distributed;
+- manifests, signatures, profiles of policies, and purity shown by
+  sampling or by a confined target;
+- a configuration written as a model and evaluated first, which the
+  inventory marks a design to prove;
+- loading host code as a capability;
+- a trace read from origins, and the analysis of models;
+- the software system model: its specification of Q4 stands, and it
+  is not built before milestone 9;
+- the backlog items B-054 (the proof catalog), B-055 (parallel prover
+  strategies), B-056 (effort budgets for provers), B-063 (tree shaking),
+  B-064 (tracing and stepping), B-066 (expression-graph processing),
+  B-067 (editor integration), B-068 (the review surface), B-078 (module
+  versions), B-080 (further model languages), B-082 (model composition)
+  and B-086 (awareness of escape hatches).
+
+Six of the 18 backlog items are taken by a chunk:
+
+- B-059 (the project root file) by Q13;
+- B-065 (the prompt's improvements) by Q14, as far as the corpus asks;
+- B-083 (the AI iteration loop) by Q15 and Q19;
+- B-070 (browser packaging) by Q21;
+- B-071 (the capabilities for input and output) by Q16, for HTTP and
+  the two file capabilities; its rest is later;
+- B-151 (the planning pilot) by Q18.
 
 ## 6. Rulings
 
@@ -193,6 +317,45 @@ policy is the gate ruled there.
 - **A3 — Q4 before any pilot code.** The software system model's rows
   proposed at PR #194 are input to its specification, not chunks.
   Default: as written.
+
+**Put at the amendment's PR (2026-11-20)**, for the work after
+milestone 3. Each has a default, taken at the merge unless the
+maintainer rules otherwise.
+
+- **B1 — How a text in the standard language is read at milestones 4
+  to 7.** The parser engine written in Allegro replaces the bootstrap
+  only at milestone 8, and at milestone 3 it reads 64 terms in about 15
+  seconds. Three ways were weighed. (a) The bootstrap gains a second
+  grammar for the standard language's fixed notation, and a text that
+  changes the grammar is read on the kernel by the kernel stream's
+  engine. (b) The engine written in Allegro reads every such text from
+  milestone 4. (c) Every case is restated in Allegretto as calls on the
+  extension's functions, and the notation waits for milestone 8.
+  Default: (a). It keeps the suite fast, as (b) does not until
+  specialization lands, and it tests the notation, as (c) does not. It
+  needs the kernel stream to rule the forms and to have its engine read
+  a text that changes its grammar by milestone 6. Both readers must
+  agree before milestone 8, which Q20 checks.
+- **B2 — How a case that only host code can show is counted.** 19 of
+  the 25 cases of milestone 1 and 14 of the 131 of milestone 3 are not
+  realised by a program. Most wait on something not yet built: metadata
+  fields and their writers, the prompt, a second configuration. Some
+  assert what only host code can observe, such as what a primitive
+  function is handed or a second fill of one cell, and more such cases
+  are due at milestones 4 to 8. Default: a list under `next/corpus/` names, for each such case, a test of the
+  new tree that shows it, in either lane. The harness counts the case
+  as realised when the test exists and passes, and its line says how
+  many cases are shown by a program and how many by a test. The list is
+  this stream's file; it edits no test of the kernel stream.
+- **B3 — What is not owed to a milestone.** Default: the list of §5,
+  "Not owed to a milestone", waits until milestone 9 is signed.
+- **B4 — The decision map's stored `cases` lists.** They are empty, and
+  each case of the corpus already lists its decisions. Default: the
+  lists are dropped from the map's rows and the check derives them.
+- **B5 — The gates of chunks Q9 to Q22**, as their rows say. A design
+  of Part V or Part VI, a contract, a capability's name and shape, and
+  each milestone are the maintainer's. Realising cases and porting to
+  ruled decisions merge on green. Default: as written.
 
 ## 7. Record
 
@@ -2191,3 +2354,11 @@ policy is the gate ruled there.
   it are realised by the ten programs of `next/corpus/allegretto/m2/`.
   Milestone 1 was signed at PR #214 and is recorded in
   `docs/plans/book-pass.md` §7.
+- **2026-11-20 — The plan amended for the work after milestone 3.**
+  Asked for by the maintainer on 2026-11-20. Chunks Q1 to Q8 are
+  delivered, and milestones 1 and 2 are signed. §5 gains "After
+  milestone 3": what is left, measured; what each milestone needs from
+  each stream; chunks Q9 to Q22; the chapter of each of this stream's 69
+  decisions against the chunk that moves its rows; and what no
+  milestone asks for. §6 gains five questions, B1 to B5, each with a
+  default. The header's chunk list gains Q9 to Q22. No code changed.
