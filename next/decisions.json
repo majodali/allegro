@@ -35,7 +35,7 @@
     {"title":"The composite is one sequence of optionally-keyed entries","part":"II","chapter":"Values","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Construction only through factories, one host class","part":"II","chapter":"Values","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"Binding state belongs to the binding, not the value","part":"II","chapter":"Values","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
-    {"title":"Symbols interned by FQN","part":"II","chapter":"Values","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
+    {"title":"Symbols interned by spelling","part":"II","chapter":"Values","type":"implementation","present":"settled","owner":"R","state":"none","unit":null,"cases":[],"was":["Symbols interned by FQN"]},
     {"title":"An expression is the kernel's value, and a program holds a description of one","part":"II","chapter":"Programs as values","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[],"was":["Expressions are values, forming a DAG"]},
     {"title":"Positional parameters owned by membership","part":"II","chapter":"Programs as values","type":"capability","present":"settled","owner":"R","state":"none","unit":null,"cases":[]},
     {"title":"A composed function is parameters and a body","part":"II","chapter":"Programs as values","type":"capability","present":"settled","owner":"R","state":"written","unit":"next/kernel/kernel.ts","cases":[],"was":["Functions are data: params plus body"]},

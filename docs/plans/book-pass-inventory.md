@@ -32,7 +32,7 @@ Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded i
 As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
 
 3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
-   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; A symbol names something, and the same spelling is the same symbol; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by FQN.
+   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; A symbol names something, and the same spelling is the same symbol; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by spelling.
 4. **Programs as values** (4 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: An expression is the kernel's value, and a program holds a description of one; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context.
 5. **Authority** (8 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
@@ -819,8 +819,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): allegretto/structures.md or scope chapter (planned)
 - Chapter: Values
 
-#### Symbols interned by FQN
-- Decides: the same FQN is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
+#### Symbols interned by spelling
+- Decides: the same spelling is the same object, across re-evaluation, module reload and loader instances, so identity comparison is a pointer compare; metadata on an interned symbol warns rather than errors.
 - Status: settled
 - Type: implementation — concepts.md files it as an implementation choice; it realises symbol identity by name
 - Rationale kind: technical
@@ -832,6 +832,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/concepts.md IC-4; docs/plans/metadata-on-values.md §6 ruling 2
 - Book home (fragments' proposal): symbols chapter (proposed)
 - Notes (2026-11-20, the second adversarial review, cluster 14): "FQN" here is a symbol's spelling: the same spelling is the same object ("A symbol names something, and the same spelling is the same symbol").
+- Notes (2026-11-20): retitled by ruling, from "Symbols interned by FQN". A fully-qualified name is a spelling, and the kernel interns by spelling.
 - Chapter: Values
 
 ### Programs as values
@@ -4172,12 +4173,12 @@ Result: 256 decisions, 202 capability and 54 implementation. The check found 21 
 | # | Entry | Depended on | Resolution | Why |
 |---|---|---|---|---|
 | 1 | Arrays are structures with unkeyed entries | The composite is one sequence of optionally-keyed entries | (a) Now depends on "One composite kind: Structure". The composite's representation now depends on this entry and follows it. | An array is a structure with unkeyed entries however the entries are stored; concepts.md files the sequence and its index as an implementation choice. |
-| 2 | Authority is an unforgeable value | Symbols interned by FQN | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | The wire form is the name, interned or not; interning realises identity by name. |
+| 2 | Authority is an unforgeable value | Symbols interned by spelling | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | The wire form is the name, interned or not; interning realises identity by name. |
 | 3 | A missing value is a cell that is filled once | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Resolution rests on the parent-chain protocol that entry states; the constant-time chain is how it is built. |
 | 4 | Offside rule through stateful indent terminals | Memoized recursive-descent engine with seed-growing left recursion | (a) Removed. The engine now depends on this entry and follows it. | Grammar authors name the indent terminals; the engine implements them, so the edge pointed the wrong way. |
 | 5 | Parse failure reporting and recovery | Memoized recursive-descent engine with seed-growing left recursion | (a) Now depends on "Grammars are Allegro values". The engine now depends on this entry and follows it. | Error productions and sync points are features of a grammar; the engine's farthest-advance report realises them. |
 | 6 | Extensions are the module substrate | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Extensions layer by the scope's protocol, not by its cost. |
-| 7 | Members are keyed by symbol and conformance is membership | Symbols interned by FQN | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
+| 7 | Members are keyed by symbol and conformance is membership | Symbols interned by spelling | (a) Now depends on "A symbol names something, and the same spelling is the same symbol". | Conformance needs symbol identity; interning is its pointer-compare realisation. |
 | 8 | Export marks the binding, and a module with no exports is open | Module loading and typed module objects are separate layers | (a) Now depends on "Extensions are the module substrate". | Export rests on modules existing; which unit loads them is a cut in the code. |
 | 9 | Knowledge has intrinsic and occurrence carriers | Scopes layer by parent chain | (a) Now depends on "The environment is not a value". | Occurrence facts live in the scope's facts plane, which that entry states. |
 | 10 | Contracts in the verdict and the ledger | The verdict as accumulated metadata | (a) Now depends on "Every result says how strongly it holds". | Contracts must reach the verdict and the ledger however the verdict is computed. |
