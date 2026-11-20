@@ -1048,6 +1048,28 @@ Terms ratified: task, slice, `first`.
 Built: point 5. The others are rules for the evaluator that keeps its
 own stack; `first` is not built.
 
+### Review of the acceptance stream's emitter (2026-11-20)
+
+The maintainer asked for a review of PR #264, "to be sure the work
+streams aren't diverging". The emitter follows the forms point for
+point; merged onto the main line it type-checks and every test passes.
+It found three things on the kernel stream's side.
+
+- The kernel held a statement the forms say is not held: after
+  `a <- f()`, where a claim waits inside `f`. Ruled: the forms stand,
+  and the kernel holds only where the statement is itself a claim that
+  waits. This withdraws the detail confirmed with PR #257.
+- A binding that needs itself ran until its steps ran out. Fixed: a
+  value needed while it is being evaluated is a refutation.
+- `-1.5` was read as the integer negation of a float's bits, and
+  printed `-3`. Ruled: "read -1.5 as one literal".
+
+Four readings the acceptance stream took where the forms were silent,
+all confirmed: the module's last statement is claimed; a statement
+that is itself a claim stands for no second one; `sync` is the last
+word of the line before a block, and not at a module's top level; a
+dropped statement's claim uses Allegretto's own `is_failure`.
+
 ## Terms introduced
 
 - **Task**: one piece of work the kernel can run, pause and take up
