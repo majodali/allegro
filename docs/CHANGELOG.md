@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — The machine: evaluation.** `next/kernel/machine.ts`
+  is a second kernel variant that keeps its own stack. The environment
+  variable `ALLEGRO_KERNEL` chooses it (`machine`); the reference stays
+  the one given. The kernel's tests run on both and count the same
+  steps. A recursion a million calls deep completes, and a loop of a
+  million turns runs in constant space; the reference ends both near
+  two thousand. Waiting is unchanged in this chunk. The interface's
+  part that evaluates nothing moved into `core.ts`, shared by both.
 - **2026-11-20 — The reference kernel in parts.** `next/kernel/kernel.ts`
   is split in three, with no change in behaviour: `values.ts` is the
   representation, `core.ts` is what a kernel does that is no
