@@ -2156,3 +2156,38 @@ policy is the gate ruled there.
     the machine but one, the launcher's test of a run with no step
     budget, which does not end there. What it should assert waits on
     the maintainer's ruling on ask 1 of PR #277.
+- **2026-11-20 — A run with no step budget goes on: the ruling, and the launcher's test.**
+  PR #277 asked what a run with no step budget does on the machine,
+  where a program that never ends does not end. Ruled by the maintainer
+  on 2026-11-20, to this stream: the launcher gives no default step
+  budget. A run whose configuration sets none goes on, as a host
+  program does. The terminal keeps `--steps`, and the corpus runner and
+  the tests set a budget.
+  - **The launcher** (`next/launch/launcher.ts`) is unchanged in what
+    it does. Its header and the comment of `Configuration.steps` state
+    the ruling.
+  - **The test** "with no step budget a run that ends at the kernel's
+    own limit says that no budget was set" ran a program that never
+    ends and relied on the host's stack to end it, so it did not end
+    on the machine. It now runs the same program on a kernel that
+    stops at a limit of its own: the test's kernel gives every
+    evaluation 50 steps that the launcher did not set. It asserts the
+    same end and the same words, and that the launcher hands the
+    kernel no budget. It passes on both variants.
+  - **The inventory says the opposite.** PR #279 added a note under
+    "Limits are step budgets" in `docs/plans/book-pass-inventory.md`:
+    the launcher gives a default budget, and a run that reaches it
+    says so. That note is the kernel stream's to correct; this stream
+    does not edit the inventory.
+  - **Measured.** `npm run test:next` passes on the reference. With
+    `ALLEGRO_KERNEL=machine` every test file of this stream passes and
+    ends, the launcher's included.
+- **2026-11-20 — Milestone 2 signed.**
+  The maintainer, on 2026-11-20: "I agree, milestone 2 is done".
+  Milestone 2 of `docs/plans/rebuild.md` §5 is the state "The launcher
+  runs a saved program that prints through a capability". Its command
+  is `npm run launch -- next/launch/fixtures/hello.json`, which prints
+  `hello, world` on both kernel variants. All nine corpus cases due at
+  it are realised by the ten programs of `next/corpus/allegretto/m2/`.
+  Milestone 1 was signed at PR #214 and is recorded in
+  `docs/plans/book-pass.md` §7.
