@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — The machine: waiting.** On the machine a computation
+  that needs a late answer stops where it stands. Its frames become a
+  task, registered on the cell, and `advance` takes it up at that point
+  when the cell is filled. Nothing is evaluated or counted twice: taking
+  up a recursion 300,000 deep that waits at its bottom takes half a
+  second and no step. Answers are acted on in the order they arrive. A
+  task whose value nothing will read is not taken up. An attempt that
+  waits keeps the budget it has left. The reference is unchanged.
 - **2026-11-20 — The machine: evaluation.** `next/kernel/machine.ts`
   is a second kernel variant that keeps its own stack. The environment
   variable `ALLEGRO_KERNEL` chooses it (`machine`); the reference stays
