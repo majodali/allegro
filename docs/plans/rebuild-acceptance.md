@@ -2425,3 +2425,207 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     No assertion of this stream's tests changed; the test kernel that
     stops by itself reads the limits as the second argument of
     `evaluate`.
+- **2026-11-20 — Q16, part 1: the HTTP capability.**
+  Built. The launcher's target ships a third capability, `http`
+  (`next/launch/http.ts`), beside `output` and `timer`. The transport
+  that reaches no network is in `next/launch/scripted-transport.ts`.
+  The terminal's two commands, `npm run launch` and
+  `npm run allegretto`, and the corpus runner (`runProgram` of
+  `next/corpus/allegretto.ts`) grant it. The launcher
+  (`next/launch/launcher.ts`) is unchanged. Chunk Q16 (the
+  capabilities the launchers ship) has two parts left: file reading
+  for the loader and file writing.
+  The proposal, as built, for the maintainer to ratify at the PR:
+  1. **The capability.** It is `http`, with one part, `request`.
+     `http.request(r)` takes a structure with the entries `method` and
+     `url`, texts, which are required; `headers`, an array of pairs
+     `[name, value]` of texts; and `body`, bits of whole bytes. It
+     returns a cell, which the launcher fills with plain data: the
+     structure `{status, headers, body}`, the status a whole number of
+     64 bits. Any status is an answer, a 404 and a 500 included. A
+     request that gets no answer fills the cell with
+     ``{failure: `unreachable, reason: <a text>}``: the transport
+     rejected, or threw. A value outside the domain is a refutation
+     with a reason that names the part, thrown as the kernel's
+     `Refusal`. Building showed one point the proposal does not state.
+     A private entry of the request is outside no domain: the kernel
+     passes it over when it hands a structure to a primitive function,
+     as forms.md §4, "Keys and private entries", rules. So the part
+     never sees it, and the request is made without it. A test holds
+     this.
+  2. **The transport is the target's.** The capability is made with a
+     function from a request as host data to a promise of an answer as
+     host data. The terminal passes `fetchTransport`, over
+     `globalThis.fetch`. The tests and the corpus runner pass the
+     scripted transport: a table from a method and a URL to an answer,
+     every other request rejected with the reason
+     `nothing serves <METHOD> <url>`. It answers in the order the
+     requests were asked, one at a time, with one host turn between two
+     answers (`nextTurn`, now exported by `next/launch/clock.ts`). Two
+     points about `fetch` that no test can show, since none calls it.
+     It follows a redirect by itself, so the status a program sees is
+     the last one's and a 3xx is seldom seen. It rejects some requests
+     the part accepts, a body on a GET among them, and such a request
+     is then the failure `unreachable` with fetch's reason. Whether
+     those belong to the part's domain is the maintainer's to say.
+  3. **No test and no corpus run reaches a network.** No test calls
+     `fetchTransport`. A test reads the two new files and finds that
+     the capability reaches no host API but `globalThis.fetch`, and the
+     scripted transport none but the host's turn.
+  4. **The ceiling.** `TERMINAL_CEILING` of `next/launch/terminal.ts`
+     gains `http`. A program that declares `capability http` where the
+     ceiling does not grant it is refused, as for any capability, and
+     a program that does not declare it is unaffected. The runner's
+     `CEILING` gains it too. Building showed no reason against it.
+  5. **The corpus convention.** A program states what the network
+     serves in lines `// serves: <METHOD> <url> = <status> <literal>`,
+     one for each request served (`readServes`). The status is a whole
+     number of three digits, and the literal a text literal read by
+     `readLiteral`, whose bytes are the body. The answer has no
+     headers: no program here needed the optional form for them, so it
+     is not built. A request no line serves is unreachable. A line not
+     of the form, a body that is no text literal, and two lines for one
+     request each fail the program, which is not launched. A run gives
+     the requests the transport was handed (`ProgramRun.requests`).
+     The README of `next/corpus/allegretto/` says this in the section
+     "Requests".
+  6. **The launcher needs no new rule.** With several requests in
+     flight each answer is filled when it arrives, in any order, and
+     what waited on it is evaluated again. A test holds it.
+  Eight programs are written for the purpose, under
+  `next/corpus/allegretto/m3/`, and none realises a case of
+  `next/corpus/cases.json`: no case asserts an HTTP request.
+  - `http-get.alg`: a GET answered; it prints the status and the body.
+  - `http-not-found.alg`: a 404 is an answer, no failure, and nothing
+    is refuted.
+  - `http-unreachable-handled.alg`: a request no line serves is the
+    failure `unreachable`, and `handle` answers it.
+  - `http-unreachable-dropped.alg`: the same request as a statement
+    whose value is dropped; its claim holds the line after it and is
+    refuted, as forms.md "Failures" says.
+  - `http-at-once.alg`: two requests whose values are bound, and a line
+    after them that prints first.
+  - `http-each.alg`: `each` over a stream of three URLs. Each call
+    writes that it asks and then the answer, and the lines alternate,
+    so one request is made at a time.
+  - `http-headers-body.alg`: a POST with two headers and a body. Its
+    served answer depends on nothing it sends. A test of
+    `next/corpus/allegretto.test.ts` shows that both arrived: it reads
+    what the runner's transport was handed, the headers in the order
+    written and the body's bytes.
+  - `http-outside-domain.alg`: a request with no `url`, refuted with
+    the part's reason.
+  The kernel and the launcher did nothing the forms or the decisions
+  do not say, in any program or test here, on either variant.
+  No existing test's assertion changed.
+  Measured, after the merge of main with Q10 (the decision map made
+  current): `npm run test:next` passes 701 tests on the reference and
+  702 with `ALLEGRO_KERNEL=machine`; 92 programs pass on both;
+  `milestone 3: programs 75 (passing 75, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  One row of the decision map moves to written, with the launcher as
+  its unit: "A late answer or its failure fills a cell as plain data".
+  A shipped capability now gives a failure in the one shape, which was
+  what the row lacked. "The terminal and the browser ship output,
+  timers and HTTP" stays at none until the browser launcher of Q21.
+  **Confirmed by the maintainer on 2026-11-20, for now**: "I confirm
+  all the asks for now, noting that this capability is not final, and
+  we'll rework various features as it matures". Three reworks were
+  named:
+  - request and answer bodies that are streamed;
+  - argument types and values checked more closely against the HTTP
+    standard, a body on a GET request refused among them;
+  - more transports and protocols.
+  So a body on a GET stays the failure `unreachable` with the host's
+  reason until the second rework, and the answer's body stays whole
+  bytes until the first. None of the three is scheduled by this plan;
+  each is taken up when a case or a library needs it.
+- **2026-11-20 — Q13, part 1: what a result holds.**
+  Built. The launcher (`next/launch/launcher.ts`) gives back, with how a
+  run ended, what the run found: its result (`LaunchResult`). This is
+  part 1 of chunk Q13 (check and run as configurations, and what a
+  result holds). Configuration sources, check as a configuration and
+  pipelines are later parts, and none is built. Nothing printed
+  changes: `npm run launch` and `npm run allegretto` print what they
+  printed. Showing a result is chunk Q14's (the commands).
+  The proposal, as built, for the maintainer to ratify at the PR:
+  1. **`LaunchOutcome` gains `result`.** It is present for every end
+     but `refused`, a fault included. It is plain data: every field is
+     a string, a number, or a list or record of those. A test holds
+     that it survives `JSON.stringify` and `JSON.parse` unchanged.
+     Building showed no reason against it.
+  2. **`result.claims`.** One entry for each claim as written, in the
+     order the run first reported it. An entry holds `module`, where
+     the kernel gives it; the four counts, summed over the evaluation
+     and every later call; `waiting`, the level of the last record;
+     each reason once; and each thing it rests on once, as plain data.
+     An assumption keeps `by` and loses its `at`, which is a kernel
+     handle. So two assumptions made by one module are one thing in an
+     entry's list. Records of one claim are matched by the handle
+     `ClaimRecord.claim`. The claims of a `fill` that holds are summed
+     too, though such a call reports none.
+  3. **How a reader tells claims apart.** `at` is the claim's key in
+     the function of its module, resting on nothing: `claimKey` with
+     the module function the loader returned, an empty list of what it
+     rests on, and the record's declarations. `originOf` gives nothing
+     on either variant: neither keeps origins, and a saved program
+     carries none. A key is a hash, so a tool can use it and a person
+     can only compare it. It is computed from the claim's content and
+     its module's, so it is the same on both variants and in every run
+     of the same records. It looks like this: `claim(square(7) == 49)`
+     of `m3/claim-holds.alg` is `sha256:f17efc297897…`, and the line
+     `output.write("the claim holds")` after it, a claim by "Failures"
+     of `next/ext/allegretto/forms.md`, is `sha256:ed828b2068d8…`. What is missing: two
+     claims of the same content in the same function have the same
+     key, so `output.write("x")` written twice gives two entries with
+     one `at`; a claim of no module has none; and nothing gives the
+     place in the text. A source position needs origins, which the
+     saved program leaves out.
+  4. **`result.summary`.** One word, the weakest strength among the
+     claims, from weakest: refuted, undecided, assumed, sampled,
+     decided (`summaryOf`). A claim with a refuted evaluation is
+     refuted; else one with an undecided evaluation, or one that still
+     waits, is undecided; else one with an assumed evaluation is
+     assumed; else it is decided. The kernel's records have no count
+     for sampled, so no run gives sampled yet. A run with no claim is
+     decided, a choice the maintainer may change.
+  5. **`result.restsOn`.** The kernel's `variant`; the pure primitives
+     the loaded records name, each once, by hash and name; the identity
+     of each imported module and then of the module run, in the order
+     loaded; the capabilities the module run declares, which the
+     ceiling grants; and the builder, where the configuration names one
+     (`restoreAs`). The configuration's sources, the loader, the parser
+     and the target come with configuration sources, a later part.
+  6. **The launcher adds no analysis.** It sums what the kernel reports
+     and names what it was given. `at` is the kernel's own answer to
+     `claimKey`.
+  7. **Nothing printed changes.** The terminal's files are unchanged.
+  The corpus runner (`runProgram` of `next/corpus/allegretto.ts`) gives
+  the result of a run (`ProgramRun.result`). A program may state its
+  summary in a line `// summary: <word>` (`readSummary`), and passes
+  only if the run's summary is that word. A word that is not a
+  strength, two lines, and a line in a program that is not launched or
+  that the launcher refuses each fail the program. The README of
+  `next/corpus/allegretto/` says this in the section "The summary".
+  Five programs state a summary: `m3/claim-holds.alg` decided,
+  `m3/claim-refuted.alg` refuted, `m3/assume-undecided.alg` undecided,
+  `m3/input-not-supplied.alg` undecided, for a claim that waits when
+  the run ends, and the new `m3/result-assumed.alg` assumed. No
+  existing program showed an assumed claim alone. None realises a case.
+  **What the kernel did that the decisions do not say.** On the
+  variant that keeps its own stack, a claim that a waiting claim holds
+  keeps the level 1 after it is taken up and decided, though nothing
+  waits any more. The reference gives 0. The smallest text:
+  `capability output`, `capability timer`,
+  `claim(timer.wait(15) == 15)`, `output.write("after")`. The run
+  completes on both. The second claim's last record is decided 1,
+  waiting 0 on the reference and decided 1, waiting 1 on the other
+  (`ALLEGRO_KERNEL=machine`), so the summary is decided on one and undecided on the other.
+  `m3/wait-claim.alg` shows it too, and states no summary for that
+  reason. The launcher does not work around it.
+  No existing test's assertion changed. No test branches on the
+  variant.
+  Measured: `npm run test:next` passes 718 tests on the reference and
+  719 with `ALLEGRO_KERNEL=machine`; 93 programs pass on both;
+  `milestone 3: programs 76 (passing 76, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  No row of the decision map moves in this part. The orchestrating
+  session decides which rows it earns.

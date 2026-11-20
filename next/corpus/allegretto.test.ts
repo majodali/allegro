@@ -19,12 +19,20 @@
 // which the runner grants on a virtual clock (`virtualClock` of
 // next/launch/clock.ts), the programs of milestone 2 under m2/, and the
 // programs under m3/ that show the forms over answers that arrive late.
+// Chunk Q16 (the capabilities the launchers ship), part 1, added the HTTP
+// capability, which the runner grants on a scripted transport that serves
+// a program's `// serves:` lines (`scriptedTransport` of
+// next/launch/scripted-transport.ts), and the programs `m3/http-*.alg`.
+// Chunk Q13 (check and run as configurations, and what a result holds),
+// part 1, added the launcher's result to a run (`ProgramRun.result`), the
+// `// summary:` line, and the program `m3/result-assumed.alg`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
-// `--next` uses too, and its lines, end and yielded keys are compared with
-// its `// expect:`, `// end:` and `// yields:` lines, and the lines printed
-// before each later phase with the place of its `// later:` line.
+// `--next` uses too, and its lines, end, yielded keys and summary are
+// compared with its `// expect:`, `// end:`, `// yields:` and `// summary:`
+// lines, and the lines printed before each later phase with the place of
+// its `// later:` line.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -39,7 +47,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPins, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPins, readServes, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -85,6 +93,68 @@ test("the runner grants timer on a virtual clock: the lines print in the order t
     "// end: completed",
   ].join("\n");
   assert.deepEqual((await runProgram(program)).problems, []);
+});
+
+test("the programs that make requests are there, in milestone 3's directory", () => {
+  for (const name of ["get", "not-found", "unreachable-handled", "unreachable-dropped", "at-once", "each", "headers-body", "outside-domain"])
+    assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/http-${name}.alg`), name);
+});
+
+test("the serves lines are read as the convention states: each answers one request, its body the literal's bytes, with no headers", () => {
+  const r = readServes([
+    "capability http",
+    '// serves: GET https://example.org/?a=1 = 200 "hello"',
+    '//serves:POST u = 404 ""',
+    "// expect: x",
+  ].join("\n"));
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.served, [
+    { method: "GET", url: "https://example.org/?a=1", answer: { status: 200, headers: [], body: new TextEncoder().encode("hello") } },
+    { method: "POST", url: "u", answer: { status: 404, headers: [], body: new Uint8Array(0) } },
+  ]);
+});
+
+test("a malformed serves line, a body that is no text literal, and two lines for one request each fail the program, which is not launched", async () => {
+  const body = 'capability output\ncapability http\noutput.write("launched")\n// expect: launched\n// end: completed\n';
+  for (const [line, problem] of [
+    ["// serves: GET u", 'the line "// serves: GET u" is not of the form <METHOD> <url> = <status> <literal>'],
+    ['// serves: GET u = 2000 "x"', 'the line "// serves: GET u = 2000 \\"x\\"" is not of the form <METHOD> <url> = <status> <literal>'],
+    ["// serves: GET u = 200 42", 'the line "// serves: GET u = 200 42" serves a body that is no text literal'],
+    ['// serves: GET u = 200 "a"\n// serves: GET u = 201 "b"', "the request GET u has two `// serves:` lines"],
+  ] as const) {
+    const run = await runProgram(body + line + "\n");
+    assert.ok(run.problems.includes(problem), `${line}: ${JSON.stringify(run.problems)}`);
+    assert.deepEqual(run.lines, [], line);
+  }
+  const notLiteral = await runProgram(body + "// serves: GET u = 200 x\n");
+  assert.ok(notLiteral.problems.some((p) => /^an input's value is a literal: .*; "x" holds the name x$/.test(p)), JSON.stringify(notLiteral.problems));
+});
+
+test("the runner grants http on a scripted transport: a served request is answered, any other is unreachable, and the requests are part of the run", async () => {
+  const program = [
+    "capability output",
+    "capability http",
+    'a <- http.request({method: "GET", url: "https://example.org/served"})',
+    'b <- http.request({method: "GET", url: "https://example.org/unserved"})',
+    "output.write(int.text(a.status) ++ \" \" ++ a.body)",
+    'output.write(handle(b, `unreachable, f => {reason: "unreachable: " ++ f.reason}).reason)',
+    '// serves: GET https://example.org/served = 503 "busy"',
+    "// expect: 503 busy",
+    "// expect: unreachable: nothing serves GET https://example.org/unserved",
+    "// end: completed",
+  ].join("\n");
+  const run = await runProgram(program);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.requests.map((r) => r.url), ["https://example.org/served", "https://example.org/unserved"]);
+});
+
+test("program m3/http-headers-body.alg hands the transport both headers, in the order written, and the body's bytes", async () => {
+  const file = `${PROGRAMS_DIR}/m3/http-headers-body.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.requests, [
+    { method: "POST", url: "https://example.org/notes", headers: [["content-type", "text/plain"], ["x-trace", "7"]], body: new TextEncoder().encode("a note") },
+  ]);
 });
 
 test("the input lines are read as the convention states: at the start, and each later phase with the expect lines above it", () => {
@@ -291,5 +361,48 @@ test("npm run allegretto emits and launches in one step: it prints the lines, an
     assert.equal(refusedText.status, 1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+// ── The result of a run and the summary line (chunk Q13, part 1) ──────
+
+test("the summary line is read as the convention states: one word, a strength", () => {
+  assert.deepEqual(readSummary("capability output\n//summary:   assumed  \n"), { summary: "assumed", problems: [] });
+  assert.deepEqual(readSummary("capability output\n"), { summary: undefined, problems: [] });
+  assert.deepEqual(readSummary("// summary: proven\n").problems, ['the line "// summary: proven" states no summary: the words are refuted, undecided, assumed, sampled, decided']);
+  assert.deepEqual(readSummary("// summary: decided\n// summary: refuted\n").problems, ["the program has two `// summary:` lines"]);
+});
+
+test("a run gives the launcher's result, and a program that states a summary passes only with that word", async () => {
+  const program = "capability output\nassume(1 == 1)\noutput.write(\"after\")\n// expect: after\n// end: completed\n";
+  const plain = await runProgram(program);
+  assert.deepEqual(plain.problems, [], "a program that states no summary is not compared on it");
+  assert.equal(plain.result?.summary, "assumed");
+  assert.ok(plain.result?.claims.some((c) => c.assumed > 0));
+  assert.deepEqual((await runProgram(program + "// summary: assumed\n")).problems, []);
+  assert.deepEqual((await runProgram(program + "// summary: decided\n")).problems, ['the summary is "assumed", expected "decided"']);
+  const bad = await runProgram(program + "// summary: fine\n");
+  assert.deepEqual(bad.problems, ['the line "// summary: fine" states no summary: the words are refuted, undecided, assumed, sampled, decided']);
+  assert.deepEqual(bad.lines, [], "a program whose lines cannot be read is not launched");
+});
+
+test("a summary line where nothing is launched, or where the launcher refuses, fails the program", async () => {
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// summary: decided\n");
+  assert.deepEqual(notEmitted.problems, ["nothing was launched, and the program states a `// summary:` line"]);
+  assert.equal(notEmitted.result, undefined);
+  const refusedRun = await runProgram("capability output\ninput a\noutput.write(a)\n// input: b = 1\n// end: refused: the configuration supplies the input b at the start, which the module does not declare\n// summary: decided\n");
+  assert.deepEqual(refusedRun.problems, ["the launcher refused the run, and the program states the summary decided"]);
+});
+
+test("the programs that state a summary: a claim that holds, one refuted, one assumed, one undecided, and one that waits when the run ends", async () => {
+  for (const [name, summary] of [
+    ["claim-holds", "decided"], ["claim-refuted", "refuted"], ["result-assumed", "assumed"], ["assume-undecided", "undecided"], ["input-not-supplied", "undecided"],
+  ] as const) {
+    const file = `${PROGRAMS_DIR}/m3/${name}.alg`;
+    assert.equal(readSummary(text(file)).summary, summary, file);
+    const run = await runProgram(text(file), file);
+    assert.deepEqual(run.problems, [], file);
+    assert.equal(run.result?.summary, summary, file);
   }
 });

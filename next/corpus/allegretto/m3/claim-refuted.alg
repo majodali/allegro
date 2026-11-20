@@ -7,3 +7,4 @@ output.write("before the claim")
 claim(square(3) == 10)
 output.write("after the claim")
 // end: refuted: a claim that is not true
+// summary: refuted
