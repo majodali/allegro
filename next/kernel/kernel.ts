@@ -930,6 +930,7 @@ export const createKernel: CreateKernel = () => {
       // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
       return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
     },
+    kept: () => [],
     waiting: () => {
       const found = new Set<V>();
       for (const root of roots) if (!root.done) waitsOn(root.value, found, new Set());

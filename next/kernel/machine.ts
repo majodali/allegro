@@ -45,8 +45,9 @@
 //
 // `first(a, b)` starts both and gives the value of whichever is known
 // first. The work of the one that lost is dropped: its task is an
-// orphan. A value in it that has a name, or is an entry of a structure,
-// goes on, because something else may read it.
+// orphan, and nothing is done for it unless something reads a value it
+// was working out. A cell that such a value with a name waits for is
+// kept, and reported apart from the cells waited for.
 //
 // Not here yet, and in later chunks of the plan: sharing, specialization.
 
@@ -92,6 +93,8 @@ interface Ctl {
   holds?: Lazy[];
   /** Values being worked out, any of which settles what the frame waits for. */
   either?: Lazy[];
+  /** The claims found waiting while the frame looked ahead, and how many evaluations of each. */
+  heldWaits?: Map<Expr, number>;
   /** Cells the frame will come to wait for, beyond the one it waits for now. */
   cells?: CellV[];
 }
@@ -203,7 +206,19 @@ export const createMachine: CreateKernel = () => {
   const watchersOf = new WeakMap<Lazy, Registration[]>();
   const interestOf = new WeakMap<CellV, Registration[]>();
   /** The cells something has waited for, in the order they were first waited for. */
-  const waitedCells: CellV[] = [];
+  const waitedCells: WeakRef<CellV>[] = [];
+  const waitedFor = new WeakSet<CellV>();
+  const noteCell = (c: CellV): void => {
+    if (waitedFor.has(c)) return;
+    waitedFor.add(c);
+    waitedCells.push(new WeakRef(c));
+  };
+  /**
+   * Cells that are kept: no task waits for them, and a value with a name or an entry of
+   * a structure still holds their answer. Each goes when its answer comes, when a task
+   * comes to wait for it, or when nothing can reach the value any more.
+   */
+  let keptCells: { readonly cell: WeakRef<CellV>; readonly holder: WeakRef<Lazy> }[] = [];
   /** The roots that came out refuted in the call of `advance` now running. */
   let refutedNow: V[] = [];
   /** The evaluation whose work is being done now. */
@@ -323,7 +338,7 @@ export const createMachine: CreateKernel = () => {
     t.epoch++;
     const on = t.on;
     if (on !== undefined) registrations(waitersOf, on).push({ task: t, epoch: t.epoch, frame: 0 });
-    if (on instanceof CellV && !waitedCells.includes(on)) waitedCells.push(on);
+    if (on instanceof CellV) noteCell(on);
     t.frames.forEach((f, i) => {
       const c = f.ctl;
       if (c === undefined) return;
@@ -336,7 +351,7 @@ export const createMachine: CreateKernel = () => {
       for (const cell of c.cells ?? []) {
         if (cell.filled) continue;
         registrations(interestOf as WeakMap<object, Registration[]>, cell).push({ task: t, epoch: t.epoch, frame: i });
-        if (!waitedCells.includes(cell)) waitedCells.push(cell);
+        noteCell(cell);
       }
     });
     if (t.slot !== undefined) taskOf.set(t.slot, t);
@@ -374,14 +389,27 @@ export const createMachine: CreateKernel = () => {
     register(t);
   };
   /**
-   * The work of an argument that lost is dropped. A value in it that has a name, or is an
-   * entry of a structure, was started and may be read by something else: the part that
-   * works it out goes on, and the cell it waits for is still waited for.
+   * The work of an argument that lost is dropped: its task is an orphan, and nothing is
+   * done for it unless something comes to read a value it was working out. A value in it
+   * that has a name, or is an entry of a structure, may still be read by something else,
+   * so the cell it waits for is kept: a launcher does not abort the operation behind it.
    */
-  const cancel = (slot: Lazy): void => {
-    for (const t of orphan([slot])) {
-      const named = t.frames.find((f) => f.ctl?.lazy !== undefined)?.ctl?.lazy;
-      if (named !== undefined) rescue(named);
+  const cancel = (slot: Lazy, holder?: Lazy): void => {
+    const made = orphan([slot]);
+    const bySlot = new Map(made.filter((t) => t.slot !== undefined).map((t) => [t.slot as Lazy, t] as const));
+    // The value each orphan works for: its own, or that of the task whose frames held it.
+    const under = new Map<Task, Lazy>();
+    const mark = (t: Task, inherited: Lazy | undefined): void => {
+      const named = t.frames.find((f) => f.ctl?.lazy !== undefined)?.ctl?.lazy ?? inherited;
+      if (named !== undefined) under.set(t, named);
+      for (const f of t.frames) for (const l of f.ctl?.holds ?? []) if (bySlot.has(l)) mark(bySlot.get(l) as Task, named);
+    };
+    const top = bySlot.get(slot);
+    if (top !== undefined) mark(top, holder);
+    for (const [t, named] of under) {
+      // The cell it waits for, and those its frames will come to wait for.
+      const cells = [t.on, ...t.frames.flatMap((f) => f.ctl?.cells ?? [])].filter((c): c is CellV => c instanceof CellV && !c.filled);
+      for (const cell of cells) keptCells.push({ cell: new WeakRef(cell), holder: new WeakRef(named) });
     }
   };
   /** Nothing will read these values: the tasks working them out are orphans, and so is what those hold. */
@@ -394,6 +422,11 @@ export const createMachine: CreateKernel = () => {
       if (t === undefined || t.slot !== l || t.root || t.orphan || t.done) continue;
       t.orphan = true;
       made.push(t);
+      // Nothing holds an orphan but the values it works out: when nothing can reach them it goes.
+      if (t.on !== undefined) {
+        const list = waitersOf.get(t.on);
+        if (list !== undefined) waitersOf.set(t.on, list.filter((r) => r.task !== t));
+      }
       if (t.queued) {
         ready.splice(ready.indexOf(t), 1);
         t.queued = false;
@@ -836,13 +869,24 @@ export const createMachine: CreateKernel = () => {
     const [before, seenBefore] = [ahead, seenAhead];
     ahead = true;
     const met = (seenAhead = new Set<CellV>());
+    const waitingBefore = new Map(waitingAt);
     try {
       return run(evaluate(e, scope));
     } finally {
       ahead = before;
       seenAhead = seenBefore;
       ctl.cells = [...met];
+      // A claim in what is held waits, and is counted so. The count is taken back when
+      // what is held is evaluated in earnest, where the claim is counted as it comes out.
+      const held = new Map<Expr, number>();
+      for (const [site, n] of waitingAt) if (n > (waitingBefore.get(site) ?? 0)) held.set(site, n - (waitingBefore.get(site) ?? 0));
+      ctl.heldWaits = held;
     }
+  };
+  /** What a frame held is evaluated in earnest, or given up: its claims no longer wait as held. */
+  const unheld = (ctl: Ctl): void => {
+    for (const [site, n] of ctl.heldWaits ?? []) waitingAt.set(site, Math.max(0, (waitingAt.get(site) ?? 0) - n));
+    ctl.heldWaits = undefined;
   };
 
   /**
@@ -1273,6 +1317,7 @@ export const createMachine: CreateKernel = () => {
         const wrong = first instanceof Refuted ? first : group.refuted;
         if (wrong !== undefined) {
           ctl.onSuspend = undefined;
+          unheld(ctl);
           return new Call(lookAheadGen(v.args[1], scope, wrong), undefined);
         }
         if (ahead) break;
@@ -1285,7 +1330,10 @@ export const createMachine: CreateKernel = () => {
       throw e;
     }
     ctl.onSuspend = undefined;
-    if (known(first) && group.pending.size === 0) return evaluate(v.args[1], scope);
+    if (known(first) && group.pending.size === 0) {
+      unheld(ctl);
+      return evaluate(v.args[1], scope);
+    }
     // The first rests on something no answer will come for: what is left is an expression.
     let second: V;
     if (looked !== undefined) second = looked;
@@ -1322,6 +1370,7 @@ export const createMachine: CreateKernel = () => {
         if (looked instanceof Refuted) return looked;
         first = yield framed(needGen(slot, scope, evaluate), { pass: true });
         ctl.holds = undefined;
+        unheld(ctl);
         if (first instanceof Refuted) return new Call(lookAheadGen(v.args[1], scope, first), undefined);
         if (known(first)) return evaluate(v.args[1], scope);
       } else if (slot !== undefined) {
@@ -1369,12 +1418,10 @@ export const createMachine: CreateKernel = () => {
     // known at once, the first written. Neither waits for the other.
     const slots: Lazy[] = [];
     const values: V[] = [];
-    // An argument that is a value with a name, or an entry, already begun: it only waits
-    // for its answer. Losing, it goes on waiting, because something else may read it.
-    const named = new Set<Lazy>();
-    const lose = (slot: Lazy): void => {
-      if (!named.has(slot)) cancel(slot);
-    };
+    // An argument that is a value with a name, or an entry, which only waits for its
+    // answer: losing, its answer is kept, because something else may read it.
+    const named = new Map<Lazy, Lazy>();
+    const lose = (slot: Lazy): void => cancel(slot, named.get(slot));
     for (const arg of v.args) {
       const s = evaluate(arg, scope);
       const x: V = s instanceof Call ? yield s : s;
@@ -1389,9 +1436,9 @@ export const createMachine: CreateKernel = () => {
       // answer will come for is left as it is.
       const slot = ahead ? undefined : x instanceof Lazy && taskOf.get(x)?.slot === x ? x : awaited(x) !== undefined ? spawn(x, scope) : undefined;
       if (slot !== undefined) slots.push(slot);
-      if (slot !== undefined && slot !== x && x instanceof Lazy) named.add(slot);
+      if (slot !== undefined && slot !== x && x instanceof Lazy) named.set(slot, x);
       values.push(slot ?? x);
-      ctl.holds = slots.filter((s) => !named.has(s));
+      ctl.holds = [...slots];
     }
     ctl.boundary = false;
     for (;;) {
@@ -1642,6 +1689,19 @@ export const createMachine: CreateKernel = () => {
     }
   };
 
+  /** The unfilled cells a task waits for now. A cell nothing can reach any more, or filled, leaves the list. */
+  const waitedNow = (): CellV[] => {
+    const found: CellV[] = [];
+    for (let i = waitedCells.length - 1; i >= 0; i--) {
+      const c = waitedCells[i].deref();
+      if (c === undefined || c.filled) {
+        if (c !== undefined) waitedFor.delete(c);
+        waitedCells.splice(i, 1);
+      } else if ((waitersOf.get(c) ?? []).some(live) || (interestOf.get(c) ?? []).some(live)) found.unshift(c);
+    }
+    return found;
+  };
+
   const kernel: Kernel = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -1661,8 +1721,17 @@ export const createMachine: CreateKernel = () => {
       return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
     },
     waiting: () => {
-      for (let i = waitedCells.length - 1; i >= 0; i--) if (waitedCells[i].filled) waitedCells.splice(i, 1);
-      return waitedCells.filter((c) => (waitersOf.get(c) ?? []).some(live) || (interestOf.get(c) ?? []).some(live)).map((c) => out(c) as Cell);
+      return waitedNow().map((c) => out(c) as Cell);
+    },
+    kept: () => {
+      const waited = new Set(waitedNow());
+      keptCells = keptCells.filter((k) => k.holder.deref() !== undefined && k.cell.deref()?.filled === false);
+      const found: CellV[] = [];
+      for (const k of keptCells) {
+        const c = k.cell.deref() as CellV;
+        if (!waited.has(c) && !found.includes(c)) found.push(c);
+      }
+      return found.map((c) => out(c) as Cell);
     },
 
     evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {

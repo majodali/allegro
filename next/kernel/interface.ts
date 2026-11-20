@@ -478,6 +478,20 @@ export interface Kernel {
    */
   waiting(): readonly Cell[];
 
+  /**
+   * The unfilled cells that are kept: no task waits for them now, and a
+   * value with a name, or an entry of a structure, still holds their
+   * answer and may be read. That happens where such a value lost in
+   * `first`. A launcher does not abort the operation behind a kept cell
+   * while its run goes on, and does not wait for one: a run is over when
+   * nothing is waited for. A cell leaves this list when its answer comes,
+   * when something comes to wait for it, or when nothing can reach the
+   * value any more; when that last happens is the host's to say, and
+   * nothing a program does depends on it. The reference kernel keeps
+   * nothing of an argument that lost, and gives none.
+   */
+  kept(): readonly Cell[];
+
   // ---- Evaluating -----------------------------------------------------
 
   /**

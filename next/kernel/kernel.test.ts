@@ -2833,6 +2833,7 @@ test("a value with a name goes on when it loses in first: something else may rea
   k.fill(c2, byte(k, 5), { hold: false });
   assert.deepEqual(said, []);
   assert.equal(k.waiting().length, 1, "x lost, and its answer is still waited for");
+  assert.deepEqual(k.kept(), [], "waited for by the part that reads x, so it is not among those only kept");
   k.fill(c1, byte(k, 7), { hold: false });
   assert.deepEqual(said, [7], "x is worked out once");
   assert.equal(num(k, k.current(r.value)), 12);
@@ -2852,10 +2853,10 @@ test("a request written inside first is cancelled when it loses, and one bound t
   assert.equal(cells.length, 2);
   k.fill(timer, byte(k, 0), { hold: false });
   k.fill(other, byte(k, 0), { hold: false });
-  if (MACHINE) assert.deepEqual(k.waiting(), [cells[1]], "the request written inside first is no longer waited for; the one with a name is");
-  // The reference keeps nothing of an argument that lost: there neither is waited for. It
-  // would take the name's request up again only if something read the name.
-  else assert.deepEqual(k.waiting(), []);
+  assert.deepEqual(k.waiting(), [], "neither is waited for: the run is over when its value is known");
+  // The request with a name is kept, so a launcher does not abort it: something may read the name.
+  // The reference keeps nothing of an argument that lost.
+  assert.deepEqual(k.kept(), MACHINE ? [cells[1]] : [], "the request written inside first is not kept");
 });
 
 test("an argument of first that comes out refuted refutes it, and the other's effect is not performed", () => {
@@ -2907,14 +2908,40 @@ test("a named value whose own work was begun goes on with it after it loses in f
   k.fill(c2, byte(k, 5), { hold: false });
   assert.equal(num(k, k.current(r.value)), 5);
   assert.deepEqual(said, []);
-  if (MACHINE) {
-    // "A value that has a name ... goes on being evaluated once it was started, because
-    // something else may read it."
-    assert.equal(k.waiting().length, 1, "its answer is still waited for");
-    k.fill(c1, byte(k, 1), { hold: false });
-    assert.deepEqual(said, [1], "and its work is finished when the answer comes");
-  } else {
-    // The reference keeps nothing of an argument that lost.
-    assert.deepEqual(k.waiting(), []);
-  }
+  // Ruled on 2026-11-20: the work of a named value that lost is not done unless something
+  // reads the value, and its answer is kept. This test first held the opposite of the first
+  // half: that the work was finished when the answer came.
+  assert.deepEqual(k.waiting(), [], "nothing waits for its answer");
+  assert.deepEqual(k.kept(), MACHINE ? [c1] : [], "the answer is kept; the reference keeps nothing");
+  k.fill(c1, byte(k, 1), { hold: false });
+  assert.deepEqual(said, [], "nothing read x, so its work is not done");
+  assert.deepEqual(k.kept(), []);
+});
+
+test("a value two requests deep that loses in first: both its answers are kept", () => {
+  if (!MACHINE) return; // The reference keeps nothing of an argument that lost.
+  const { k, add, call, kp } = sayer();
+  const cells: Value[] = [];
+  const ask = k.primitiveFunction({ purity: "effectful", capability: "net", part: "get", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  const [x, timer] = [k.symbol("t.x"), k.cell()];
+  // x = add(ask(), ask()); first(x, timer)
+  k.evaluate(within(k, [[x, call(add, call(ask), call(ask))]], call(kp("first"), x, timer)));
+  assert.equal(k.waiting().length, 3);
+  k.fill(timer, byte(k, 0), { hold: false });
+  assert.deepEqual(k.waiting(), []);
+  assert.deepEqual(new Set(k.kept()), new Set(cells));
+});
+
+test("a claim held back by a claim that waits is counted as waiting until it is decided, and not after", () => {
+  const { k, isZero, call, kp, say } = sayer();
+  const c = k.cell();
+  // The held claim is on an effect, which is not performed ahead: so it waits while it is held.
+  const [holder, held] = [call(kp("claim"), call(isZero, c)), call(kp("claim"), call(isZero, call(say, byte(k, 0))))];
+  const r = k.evaluate(call(kp("also"), holder, held));
+  const waitingOf = (records: readonly { claim: Value; waiting: number; decided: number }[], claim: Value) => records.find((x) => x.claim === claim);
+  assert.equal(waitingOf(r.claims, held)?.waiting, 1, "held, it waits");
+  const a = k.fill(c, byte(k, 0), { hold: false });
+  // Found by the acceptance stream (PR #288): the machine left this level at 1.
+  assert.deepEqual([waitingOf(a.claims, held)?.decided, waitingOf(a.claims, held)?.waiting], [1, 0]);
+  assert.deepEqual([waitingOf(a.claims, holder)?.decided, waitingOf(a.claims, holder)?.waiting], [1, 0]);
 });
