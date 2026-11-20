@@ -1070,8 +1070,50 @@ that is itself a claim stands for no second one; `sync` is the last
 word of the line before a block, and not at a module's top level; a
 dropped statement's claim uses Allegretto's own `is_failure`.
 
+### B-203: streams, large data and asynchronous iteration (2026-11-20)
+
+The second discussion to hold before the evaluator is rebuilt. The
+review session's proposal: a stream is an ordinary value, and nothing
+is added to the kernel for it. A structure's entries are evaluated
+when read, so a structure of an item and a rest is a stream, and
+reading the rest is what fetches the next item.
+
+Eight points, ruled as proposed ("All eight asks and terms
+confirmed"):
+
+1. A stream is a value: `{item, rest}`, the empty structure at its
+   end, or a failure. Read twice it gives the same items.
+2. Host code offers an operation that answers the next item, the end
+   or a failure, and serves calls in order. The capability's
+   definition wraps it as a stream.
+3. Reads stay in order by need. One is in flight at a time.
+4. Iteration is recursion, with library functions and no primitive:
+   one at a time, all at once, at most a given number at once; and
+   starting every entry of a list and waiting for all.
+5. A loop that carries only the rest holds one item. Keeping the
+   first part keeps everything read since. No mechanism is added.
+6. The kernel shares what an operation does not change: building a
+   structure entry by entry costs about its size. A requirement on
+   the rebuilt kernel.
+7. Data too large for memory stays behind a capability. Parsing a
+   text larger than memory is not provided for.
+8. `first` cancels only what nothing else can need. A value with a
+   name, or an entry of a structure, goes on once started. A cell
+   nobody waits on leaves the list of cells waited on.
+
+Terms ratified: stream, `item`, `rest`.
+
+Built: nothing in the kernel. Its tests hold a stream over late
+answers, read one item at a time and replayed, and a list whose
+entries are started at once and waited for together. The four
+library functions are written in Allegretto in the forms document and
+run on a stream computed in the program.
+
 ## Terms introduced
 
+- **Stream**: a structure of an item and a rest, where the rest is
+  evaluated when read. Its two entries are named `item` and `rest`.
+  Ratified by the maintainer on 2026-11-20.
 - **Task**: one piece of work the kernel can run, pause and take up
   again. Ratified by the maintainer on 2026-11-20.
 - **Slice**: the most steps one call into the kernel runs before it

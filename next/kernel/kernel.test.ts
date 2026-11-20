@@ -2172,3 +2172,82 @@ test("a binding that needs its own value is refuted, and a function or a structu
   assert.equal(looped.refuted, false);
   assert.equal(k.bitsOf(looped.value).bytes[7], 2);
 });
+
+// ---- A stream is a value (B-203, 2026-11-20) ----------------------------------
+//
+// Nothing in the kernel is for streams. These tests hold that a structure whose entries
+// are evaluated when read is one: {item, rest}, where reading the rest reads the source.
+
+function streams() {
+  const base = sayer();
+  const { k, isZero, call, kp } = base;
+  const cells: Value[] = [];
+  // The host's operation: the next item, as a late answer. 0 stands for the end.
+  const read = k.primitiveFunction({ purity: "effectful", capability: "source", part: "read", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  const [lines, r, each, s] = [k.symbol("t.lines"), k.symbol("t.r"), k.symbol("t.each"), k.param("s")];
+  const sd = (name: string) => k.symbolData(name);
+  // lines() = r <- read(); if r == 0 then [] else {item: r, rest: lines()}
+  const linesFn = k.composedFunction(
+    [],
+    within(k, [[r, call(read)]], call(kp("if"), call(isZero, r), k.structure([]), k.structure([[k.symbol("item"), r], [k.symbol("rest"), call(lines)]]))),
+  );
+  const isEnd = (x: Value) => call(kp("same"), call(kp("count"), x), call(kp("count"), k.structure([])));
+  // each(s) = if s is the end then [] else then(say(s.item), each(s.rest))
+  const eachFn = k.composedFunction(
+    [s],
+    call(kp("if"), isEnd(s), k.structure([]), call(kp("then"), call(base.say, call(kp("get"), s, sd("item"))), call(each, call(kp("get"), s, sd("rest"))))),
+  );
+  const program = (body: Value) => within(k, [[lines, linesFn], [each, eachFn]], body);
+  const answer = (n: number) => {
+    const next = cells.findIndex((c) => !k.filled(c as never));
+    k.fill(cells[next] as never, byte(k, n));
+    return k.advance({ steps: 500 });
+  };
+  return { ...base, cells, lines, each, sd, program, answer, isEnd };
+}
+
+test("a stream backed by late answers is read one item at a time, in order, by need", () => {
+  const { k, call, said, cells, lines, each, program, answer } = streams();
+  k.evaluate(program(call(each, call(lines))), k.scope());
+  assert.equal(cells.length, 1, "one read is in flight");
+  assert.deepEqual(said, []);
+  answer(7);
+  assert.deepEqual(said, [7]);
+  assert.equal(cells.length, 2, "the next read was asked for only when the rest was read");
+  answer(8);
+  answer(0);
+  assert.deepEqual(said, [7, 8]);
+  assert.equal(cells.length, 3, "the end was read, and nothing after it");
+  assert.deepEqual(k.waiting(), []);
+});
+
+test("a stream is a value: read twice it gives the same items, and the source is read once", () => {
+  const { k, add, call, kp, cells, lines, sd, program, answer } = streams();
+  const st = k.symbol("t.st");
+  const second = () => call(kp("get"), call(kp("get"), st, sd("rest")), sd("item"));
+  // st = lines(); st.rest.item + st.rest.item
+  const r = k.evaluate(program(within(k, [[st, call(lines)]], call(add, second(), second()))), k.scope());
+  answer(5);
+  answer(6);
+  assert.equal(num(k, k.current(r.value)), 12, "the second item, twice");
+  assert.equal(cells.length, 2, "two reads for two cells of the stream, though the second was read twice");
+});
+
+test("every entry of a list is started at once, and a then around them waits for all", () => {
+  const { k, call, kp, said, say } = sayer();
+  const cells: Value[] = [];
+  const fetch = k.primitiveFunction({ purity: "effectful", capability: "net", part: "get", arity: 0, run: (_a, c) => (cells.push(c.cell()), cells[cells.length - 1]) });
+  const xs = k.symbol("t.xs");
+  const at = (i: number) => call(kp("get"), xs, byte(k, i));
+  // xs = [fetch(), fetch()]; then(also(xs[0], xs[1]), say(xs[0] + xs[1]))
+  const sum = call(k.primitiveFunction(pure("sum", 71, 2, (a, b) => a + b)), at(0), at(1));
+  k.evaluate(within(k, [[xs, k.structure([[null, call(fetch)], [null, call(fetch)]])]], call(kp("then"), call(kp("also"), at(0), at(1)), call(say, sum))), k.scope());
+  assert.equal(cells.length, 2, "both requests are in flight before either has answered");
+  k.fill(cells[1] as never, byte(k, 2));
+  k.advance({ steps: 200 });
+  assert.deepEqual(said, [], "one answer is not all of them");
+  k.fill(cells[0] as never, byte(k, 1));
+  k.advance({ steps: 200 });
+  assert.deepEqual(said, [3]);
+  assert.equal(cells.length, 2, "each entry was evaluated once");
+});

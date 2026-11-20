@@ -1634,6 +1634,10 @@ its approval.
 - **2026-11-20 — the acceptance stream's emitter reviewed** (the
   review session): no divergence; two kernel faults it found are
   fixed, and four readings are written into the forms.
+- **2026-11-20 — B-203 (streams, large data and asynchronous
+  iteration) held and ruled** (the review session): a stream is a
+  value; no primitive. 253 decisions. Both discussions set before the
+  evaluator's rebuild are held.
 
 ## 8. Sessions
 

@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Streams, large data and iteration (B-203, held and
+  ruled).** A stream is a value: `{item, rest}`, with the rest
+  evaluated when read. Iteration is recursion, with four functions
+  written in Allegretto and no primitive. The kernel is to share what
+  an operation does not change. `first` cancels only what nothing else
+  can need. Nothing in the kernel changed: three tests hold that a
+  stream over late answers already works. Two entries added: 253
+  decisions.
 - **2026-11-20 — A claim holds only where the statement is the claim;
   four readings and a literal.** From the review of the acceptance
   stream's PR #264. In `next/kernel/kernel.ts`: `also` holds its second
