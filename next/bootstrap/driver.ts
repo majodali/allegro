@@ -19,10 +19,17 @@
 // its caller passes in (`ReadText`), so a test needs no file system and
 // the rule is in this one place.
 //
+// Where it may read. The caller's function may refuse a file
+// (`ReadRefused`): the bounded reader of next/launch/files.ts refuses one
+// whose real path is outside the project's directory (chunk Q16 (the
+// capabilities the launchers ship), part 2). The driver reports the
+// refusal as a finding at the import and reads nothing of the file.
+//
 // What it answers: the records in the order they are to be loaded, the
 // main text's last, each once however many texts import it. What it
 // refuses, with the file each finding is in:
 //   - an imported text that is not found;
+//   - an imported text the reader refuses, with the reader's reason;
 //   - a cycle of imports, which has no order, naming the cycle;
 //   - a finding of the reader or the emitter in any text, the imported
 //     ones included. A text that imports one with a finding is not
@@ -45,8 +52,13 @@ import { shippedByName } from "../prims/index.js";
 import { read, type Header, type Place } from "./reader.js";
 import { emitModule, type Finding, type FormId, type ImportedModule } from "./emit.js";
 
-/** Reads the text of a file, or gives undefined where there is none. */
-export type ReadText = (file: string) => string | undefined;
+/** A file the reader will not read, and why. */
+export interface ReadRefused {
+  readonly refused: string;
+}
+
+/** Reads the text of a file, gives undefined where there is none, or refuses the file. */
+export type ReadText = (file: string) => string | undefined | ReadRefused;
 
 /** One emitted text: where it was read from, its record, the identity the kernel gives its module, and the forms the text uses. */
 export interface DrivenRecord {
@@ -60,8 +72,8 @@ export interface DrivenRecord {
 export interface DriveFinding {
   readonly file: string;
   readonly at: Place;
-  /** The emitter's kinds, and "not found" and "cycle" for an import the driver cannot follow. */
-  readonly kind: Finding["kind"] | "not found" | "cycle";
+  /** The emitter's kinds, and "not found", "refused" and "cycle" for an import the driver cannot follow. */
+  readonly kind: Finding["kind"] | "not found" | "refused" | "cycle";
   readonly message: string;
 }
 
@@ -134,6 +146,17 @@ export function drive(text: string, file: string, readText: ReadText, createKern
               at: h.at,
               kind: "not found",
               message: `the text ${h.name.name}.alg, which import ${h.name.name} names, is not found in the directory of ${path.basename(at)}`,
+            });
+            done.set(targetKey, undefined);
+            complete = false;
+            continue;
+          }
+          if (typeof imported !== "string") {
+            findings.push({
+              file: at,
+              at: h.at,
+              kind: "refused",
+              message: `the text ${h.name.name}.alg, which import ${h.name.name} names, is not read: ${imported.refused}`,
             });
             done.set(targetKey, undefined);
             complete = false;

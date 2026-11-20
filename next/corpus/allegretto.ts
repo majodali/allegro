@@ -5,7 +5,8 @@
 // the timer capability; chunk Q16 (the capabilities the launchers ship),
 // part 1, for the HTTP capability and the `// serves:` lines; chunk Q13
 // (check and run as configurations, and what a result holds), part 1, for
-// the result and the `// summary:` line): how a
+// the result and the `// summary:` line, and part 3, for the `// phases:`
+// line): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -44,7 +45,18 @@
 //                             next/launch/launcher.ts): `refuted`,
 //                             `undecided`, `assumed`, `sampled` or
 //                             `decided`. At most one line. A program that
-//                             states none is not compared on it.
+//                             states none is not compared on it;
+//   // phases: check         the phases the run applies, as the setting
+//                             `phases` of next/tools/configuration.ts names
+//                             them: `check` alone is the one value built
+//                             beside `run`. At most one line. A program
+//                             that states none runs as `run` alone. Check
+//                             supplies no capability and no input, so a
+//                             `// later:` line cannot stand with it.
+//                             `check, run` fails the program with the
+//                             resolver's finding. The `// expect:`,
+//                             `// end:` and `// summary:` lines hold for
+//                             the whole launch.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
 // next/launch/launcher.ts on the reference kernel, the imported ones
@@ -82,8 +94,11 @@ import { createKernel } from "../kernel/create.js";
 import type { Cell } from "../kernel/interface.js";
 import { encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.js";
+import { boundedReader } from "../launch/files.js";
+import { nodeFiles } from "../launch/node-files.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, plainValue, STRENGTHS, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
+import { shapeOf } from "../tools/configuration.js";
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
 import { virtualClock } from "../launch/clock.js";
@@ -97,12 +112,14 @@ export const PROGRAMS_DIR = "next/corpus/allegretto";
 /** The repository root. */
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 
-/** A reader of the texts under a root: a path relative to it, or absolute; undefined where there is no such file. */
+/**
+ * A reader of the texts under a root: a path relative to it, or absolute;
+ * undefined where there is no such file. It is bounded to the root
+ * (next/launch/files.ts): a file whose real path is outside it is refused.
+ */
 export function readUnder(root: string): ReadText {
-  return (file) => {
-    const p = path.isAbsolute(file) ? file : path.join(root, file);
-    return fs.existsSync(p) && fs.statSync(p).isFile() ? fs.readFileSync(p, "utf-8") : undefined;
-  };
+  const bounded = boundedReader([root], nodeFiles);
+  return (file) => bounded(path.isAbsolute(file) ? file : path.join(root, file));
 }
 
 /** The step budget every program runs under. */
@@ -231,6 +248,27 @@ export function readSummary(text: string): { summary: Strength | undefined; prob
   return { summary, problems };
 }
 
+/**
+ * A program's `// phases:` line: the names it states, in order, and the
+ * problems of the lines that cannot be read. The names are separated by
+ * commas. Two lines are a problem. Whether the list is built is the
+ * resolver's to say (`shapeOf` of next/tools/configuration.ts).
+ */
+export function readPhases(text: string): { phases: string[] | undefined; problems: string[] } {
+  let phases: string[] | undefined;
+  const problems: string[] = [];
+  let lines = 0;
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*phases:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    if (++lines === 2) problems.push("the program has two `// phases:` lines");
+    const names = m[1].split(",").map((n) => n.trim());
+    if (names.some((n) => !/^[a-z]+$/.test(n))) problems.push(`the line ${JSON.stringify(line.trim())} is not of the form phases: <name>, <name>`);
+    else phases ??= names;
+  }
+  return { phases, problems };
+}
+
 /** A run's end as a program's `// end:` line writes it. */
 export function endText(end: LaunchEnd): string {
   if (end.kind === "refuted") return `refuted: ${end.reason}`;
@@ -337,13 +375,18 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
     if (summaryLine.summary !== undefined) problems.push("nothing was launched, and the program states a `// summary:` line");
+    if (readPhases(text).phases !== undefined) problems.push("nothing was launched, and the program states a `// phases:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
     return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], result: undefined, problems };
   }
   const given = inputsOf(pins);
   const network = readServes(text);
-  if ("problems" in given || network.problems.length > 0 || summaryLine.problems.length > 0) {
-    problems.push(...("problems" in given ? given.problems : []), ...network.problems, ...summaryLine.problems);
+  const phaseLine = readPhases(text);
+  // The phases, as the resolver makes them of the setting `phases`.
+  const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later);
+  const shapeProblems = shape === undefined || shape.ok ? [] : [...shape.findings];
+  if ("problems" in given || network.problems.length > 0 || summaryLine.problems.length > 0 || phaseLine.problems.length > 0 || shapeProblems.length > 0) {
+    problems.push(...("problems" in given ? given.problems : []), ...network.problems, ...summaryLine.problems, ...phaseLine.problems, ...shapeProblems);
     return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, problems };
   }
   const transport = scriptedTransport(network.served);
@@ -351,13 +394,14 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     createKernel,
     program: e.program,
     imports: e.imports,
-    configuration: { ceiling: CEILING, steps: STEPS, inputs: given.inputs, later: given.later },
+    configuration: { ceiling: CEILING, steps: STEPS, ...(shape !== undefined && shape.ok ? shape.shape : {}) },
     target: { capabilities: [output, timer(virtualClock().clock), http(transport.transport)], primitives: shipped },
   });
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
     problems.push(`printed ${JSON.stringify(outcome.lines)}, expected ${JSON.stringify(pins.lines)}`);
   // Each `// later:` line: applied, and with the `// expect:` lines above it printed before it.
+  // It cannot stand with `check` alone, so it follows run, the first phase.
   pins.later.forEach((l, i) => {
     const before = outcome.linesBeforePhase[i];
     if (before === undefined) problems.push(`the later phase that supplies ${l.name} (phase ${i + 1}) was not applied`);

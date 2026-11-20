@@ -1494,6 +1494,43 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The loader's file reading, bounded (B-196, chunk Q16 (the capabilities the launchers ship), part 2)
+
+B-196 (the rebuild's acceptance side). The texts a text imports are read
+through a reader bounded to the project's directory
+(`next/launch/files.ts`): a file whose real path, with every link
+followed, is outside it is refused, and the driver reports the refusal
+as a finding at the import. `npm run allegretto`, `npm run emit` and the
+corpus's runner read through it. It is a host function the loader is
+handed, and no capability a program can declare yet.
+
+### 2026-11 — Check and run as phases (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 3)
+
+B-196 (the rebuild's acceptance side). The launcher applies a sequence
+of phases, each supplying capabilities and inputs, and gives the result
+of each phase. A declared capability no phase has supplied yet is a
+cell. The setting `phases` (`--phases` on both commands, `"phases"` in
+`allegro.json`, `// phases:` in the corpus) builds `run` alone, as
+before, and `check` alone, which supplies no capability and no input.
+Three programs under `next/corpus/allegretto/m3/` run under check.
+`check, run` is a finding, and the launcher refuses a later phase that
+supplies a capability before anything is evaluated: both kernel
+variants fill a cell with plain data only, so no later phase can put a
+capability into the cell that check left waiting.
+
+
+### 2026-11 — A configuration from its sources (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 2)
+
+B-196 (the rebuild's acceptance side). A run's configuration is
+resolved from four sources, highest first: the command line, the
+project's file `allegro.json` beside the text, the environment's
+`ALLEGRO_STEPS`, and the launcher's own ceiling. One table says which
+source may set each setting, and a setting from a source that may not
+set it is refused with a finding. Inputs are merged by name. Both
+terminal commands gain `--ceiling`, which may only narrow the
+terminal's ceiling. A run's result lists the source of each value. It
+closes B-059 (the project root file) as far as this part goes. Nothing
+printed for a run changes.
 
 ### 2026-11 — The notation writes `first` (B-196, chunk Q5 (the first notation and the bootstrap))
 
