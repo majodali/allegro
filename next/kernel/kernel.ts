@@ -222,7 +222,8 @@ export const createKernel: CreateKernel2 = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
+    shared,
   } = core;
   const roots: Root[] = [];
   const rootOf = new WeakMap<object, Root>();
@@ -253,9 +254,6 @@ export const createKernel: CreateKernel2 = () => {
   const groups: Group[] = [];
   /** Set by `waitsOn` when it passes a `then` that waits for work its first part started. */
   let sawGroup = false;
-  /** The assumptions a configuration does not accept: by module, and one by one. */
-  const withdrawnModules = new Set<string>();
-  const withdrawnSites = new WeakSet<Expr>();
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(localKey(r), r);
   };
@@ -893,40 +891,9 @@ export const createKernel: CreateKernel2 = () => {
   const kernel: Kernel2 = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
-
-    bits: (bytes, bitLength) => {
-      const n = bitLength ?? bytes.length * 8;
-      if (!Number.isInteger(n) || n < 0 || n > bytes.length * 8) throw new InterfaceError("bits: the length does not fit the bytes");
-      return out(new Bits(bytes, n));
-    },
-    symbol: (fqn) => out(intern(fqn)),
-    symbolData: (fqn) => out(new Quoted(intern(fqn))),
-    param: (name) => out(new Param(name)),
-    structure: (entries) => out(new Struct(entries.map(([k, e]) => [k === null ? null : into(k, "a key"), into(e, "an entry")] as const))),
-    expression: (fn, args) => out(new Expr(into(fn, "the function"), args.map((a) => into(a, "an argument")))),
-    composedFunction: (params, body) => {
-      const ps = params.map((p) => {
-        const v = into(p, "a parameter");
-        if (!(v instanceof Param)) throw new InterfaceError("composedFunction: a parameter is not of kind param");
-        return v;
-      });
-      if (new Set(ps).size !== ps.length) throw new InterfaceError("composedFunction: a parameter is listed twice");
-      return out(new Fn(ps, into(body, "the body")));
-    },
-    primitiveFunction: (declaration) => {
-      const p = new Prim(declaration);
-      if (declaration.purity === "pure") pureByHash.set(declaration.hash, p);
-      return out(p);
-    },
-    kernelPrimitive: (name) => {
-      const p = kernelPrims.get(name);
-      if (p === undefined) throw new InterfaceError(`kernelPrimitive: the kernel has no primitive named "${name}"`);
-      return out(p);
-    },
-    kernelPrimitiveNames: () => [...kernelPrims.keys()],
+    ...shared,
 
     scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
-    cell: () => out(new CellV(undefined)) as Cell,
     fill: (cell, value) => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
@@ -941,12 +908,6 @@ export const createKernel: CreateKernel2 = () => {
         root.queued = true;
         ready.push(root);
       }
-    },
-    filled: (cell) => {
-      const c = into(cell, "the cell");
-      if (c instanceof CellV) return c.filled;
-      if (c instanceof NameRef) return bindingOf(c) !== undefined;
-      throw new InterfaceError("filled: not a cell");
     },
     waiting: () => {
       const found = new Set<V>();
@@ -1026,132 +987,6 @@ export const createKernel: CreateKernel2 = () => {
       if (root !== undefined) return out(root.value);
       const now = through(v);
       return now === v ? value : out(now);
-    },
-
-    kind: (v) => kindOf(into(v, "the value")),
-    bitsOf: (v) => bitsOf(into(v, "the value")),
-    symbolName: (v) => symbolName(into(v, "the value")),
-    paramName: (v) => {
-      const s = seen(into(v, "the value"));
-      return s instanceof Param ? s.name : wrong("paramName", s);
-    },
-    entriesOf: (v) => entriesOf(into(v, "the value")),
-    expressionOf: (v) => {
-      const s = seen(into(v, "the value"));
-      return s instanceof Expr ? { fn: out(s.fn), args: s.args.map(out) } : wrong("expressionOf", s);
-    },
-    composedFunctionOf: (v) => {
-      const s = seen(into(v, "the value"));
-      return s instanceof Fn ? { params: s.params.map(out), body: out(s.body) } : wrong("composedFunctionOf", s);
-    },
-    primitiveFunctionOf: (v) => {
-      const s = seen(into(v, "the value"));
-      if (s instanceof KernelPrim) return { purity: "pure", hash: `kernel:${s.name}`, name: s.name, arity: s.arity };
-      if (!(s instanceof Prim)) return wrong("primitiveFunctionOf", s);
-      const { run: _run, ...rest } = s.declaration;
-      return rest;
-    },
-    fieldsOf: (v) => {
-      into(v, "the value");
-      return [];
-    },
-    field: (v, field) => {
-      into(v, "the value");
-      into(field, "the field");
-      return undefined;
-    },
-    outcomeOf: (v): Outcome | undefined => {
-      let s = into(v, "the value");
-      for (;;) {
-        if (s instanceof Refuted) return "refuted";
-        if (s instanceof Decided) return s.outcome;
-        const t = through(s);
-        if (t !== s) s = t;
-        else if (s instanceof Quoted) s = s.inner;
-        else break;
-      }
-      return s instanceof Expr && s.fn === kernelPrims.get("claim") ? "undecided" : undefined;
-    },
-    originOf: (v) => {
-      into(v, "the value");
-      return undefined;
-    },
-
-    module: (fn, count, declares) => {
-      const f = into(fn, "the function");
-      if (!(f instanceof Fn)) throw new InterfaceError("module: not a composed function");
-      if (!Number.isInteger(count) || count < 0 || count > f.params.length) throw new InterfaceError("module: the number of key slots does not fit the function's parameters");
-      const free = freeNames(f, new Set(), [], new Map());
-      if (free.length > 0) throw new InterfaceError(`module: the function has the free name(s) ${free.map((n) => n.fqn).join(", ")}; a module names only what its blocks bind and what it is handed`);
-      declarationsFor(f, count, declares, "module");
-      const identity = identityOf(f, declares);
-      const env = new Map<Param, V>();
-      for (let slot = 0; slot < count; slot++) {
-        const name = `${identity} ${slot}`;
-        let key = keys.get(name);
-        if (key === undefined) keys.set(name, (key = new Key(identity, slot)));
-        env.set(f.params[slot], key);
-      }
-      const made = new Fn(f.params.slice(count), substitute(f.body, env, new Map()));
-      moduleIds.set(made, identity);
-      if (!modulesById.has(identity)) modulesById.set(identity, made);
-      if (declares !== undefined) moduleDeclares.set(made, declares);
-      // Every part of the module's text is the module's, written in the function it sits in.
-      markAll(made, identity, undefined, new Set());
-      return out(made);
-    },
-    moduleOf: (value) => {
-      const v = into(value, "the value");
-      return v instanceof Fn ? moduleIds.get(v) : undefined;
-    },
-    withdraw: (what) => {
-      if (typeof what === "string") {
-        if (!/^sha256:[0-9a-f]{64}$/.test(what)) throw new InterfaceError("withdraw: a module is named by its identity, as sha256: and 64 hex digits");
-        withdrawnModules.add(what);
-        return;
-      }
-      const e = into(what, "the assumption");
-      if (!(e instanceof Expr) || e.fn !== kernelPrims.get("assume")) throw new InterfaceError("withdraw: not an application of the kernel's assume primitive");
-      withdrawnSites.add(e.site ?? e);
-    },
-    inspectionRight: () => {
-      let key = keys.get(INSPECT);
-      if (key === undefined) keys.set(INSPECT, (key = new Key(INSPECT, 0)));
-      return out(key);
-    },
-    isKey: (value) => seen(into(value, "the value")) instanceof Key,
-    keyOf: (value): KeyDescription => {
-      const s = seen(into(value, "the value"));
-      if (!(s instanceof Key)) throw new InterfaceError("keyOf: the value is not a key");
-      return { module: s.module, slot: s.slot };
-    },
-    restsOn: (value) => {
-      const v = through(into(value, "the value"));
-      return v instanceof Decided ? v.rests : [];
-    },
-    reasonOf: (value) => {
-      const v = through(into(value, "the value"));
-      return v instanceof Refuted ? v.reason : v instanceof Decided ? v.reason : undefined;
-    },
-    claimKey: (claim, within, restsOn, declares) => claimKey(into(claim, "the claim"), into(within, "the function"), restsOn, declares),
-    restore: (claim, within, builder, restsOn, key, declares) => {
-      const c = into(claim, "the claim");
-      if (builder === "") throw new InterfaceError("restore: an outcome is restored under a builder's name");
-      if (restsOn.some((r) => r.kind === "limit"))
-        throw new InterfaceError("restore: an outcome that rests on a limit is never stored");
-      if (restsOn.some((r) => r.kind === "capability"))
-        throw new InterfaceError("restore: an outcome that rests on a capability's answer is never stored");
-      const w = into(within, "the function");
-      if (claimKey(c, w, restsOn, declares) !== key)
-        throw new InterfaceError("restore: the key does not match this claim, in this function, resting on these things");
-      closedFor(c as Expr, w as Fn, declares);
-      const all = new Map<string, Rest>();
-      for (const r of [{ kind: "builder", builder } as const, ...restsOn]) all.set(restKey(r), r);
-      restored.set(c as Expr, [...all.values()]);
-    },
-    isCell: (value) => {
-      const v = into(value, "the value");
-      return v instanceof CellV || v instanceof NameRef;
     },
   };
   return kernel;
