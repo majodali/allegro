@@ -2,7 +2,7 @@
 
 > Working material of the book pass, chunk P1 ([book-pass.md](book-pass.md) §5, "The re-scoped front"). Built by merging three fragments, written read-only from the repository: the thesis and L0 (97 entries), L1 and L2 (95), and the surface language, Vivace, the tracks and the thesis test (92). Duplicates were merged, guessed dependency names resolved, cycles broken and significance calibrated to one scale; the notes on each merge are a separate working file of the pass. Each entry keeps the fragment's form and adds the chapter it belongs to.
 >
-> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 251 decisions in 6 parts and 38 chapters (231 when the phase closed; twenty-one added by rulings since and one withdrawn) after the preface and the tour. Part I: 23; Part II: 60; Part III: 26; Part IV: 64; Part V: 27; Part VI: 46. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 218, implementation 17. By significance: 5: 38, 4: 73, 3: 79, 2: 39, 1: 6. By label: foundational 125, swappable 110. By status against the code: settled 92, partly built 65, open 78. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
+> Counts, recounted when phase 1 (the decision review) closed on 2026-11-13: 253 decisions in 6 parts and 38 chapters (231 when the phase closed; twenty-three added by rulings since and one withdrawn) after the preface and the tour. Part I: 23; Part II: 62; Part III: 26; Part IV: 64; Part V: 27; Part VI: 46. Part I also has a thesis statement and Parts V and VI an introduction, none of them decisions. Of Part V's, 15 are held, not ruled: the planning pilot's. By type: capability 220, implementation 17. By significance: 5: 38, 4: 74, 3: 80, 2: 39, 1: 6. By label: foundational 127, swappable 110. By status against the code: settled 92, partly built 66, open 79. At the merge of the fragments, 2026-11-03, the inventory held 256 decisions in 33 proposed chapters (capability 202, implementation 54; settled 176, partly built 42, open 37): the review ruled more decisions open than the sources recorded, because it states each decision as the goal and holds the difference from the code as a finding.
 
 Ids appear in this file only as data: in the Sources lines, and in the Notes where a fragment cited them. The identifier key at the end names each one.
 
@@ -31,16 +31,16 @@ Chapter 3 of the first proposal was dissolved in DR1: its decisions are folded i
 
 As ruled in DR2 (2026-11-11), with the chapter titles the maintainer confirmed on PR #187. Implementation decisions sit at the end of the chapter whose decisions they realise.
 
-3. **Values** (12 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
-   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; A symbol names something, and the same spelling is the same symbol; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by spelling.
+3. **Values** (13 decisions). What exists in the kernel: one universe of values in seven kinds, bits the kernel does not compute on, one composite, names.
+   - Decisions: One value universe; Seven representation kinds; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count; One composite kind: Structure; The kernel shares what an operation does not change; Structures immutable by default; derive, never mutate; Arrays are structures with unkeyed entries; A symbol names something, and the same spelling is the same symbol; Value as a contract, seven kind units and an assembly; The composite is one sequence of optionally-keyed entries; Construction only through factories, one host class; Binding state belongs to the binding, not the value; Symbols interned by spelling.
 4. **Programs as values** (4 decisions). Expressions and functions are ordinary values, so a program can be built, read and partly evaluated like any other data.
    - Decisions: An expression is the kernel's value, and a program holds a description of one; Positional parameters owned by membership; A composed function is parameters and a body; Expressions memoize per evaluation context.
 5. **Authority** (8 decisions). The right to do what not all code may do is an unforgeable value that reading never yields; capabilities are granted, bounded by claims and supplied per target.
    - Decisions: Authority is an unforgeable value; Reading an expression never yields authority; A description is plain data in a fixed set of forms; Describing a function requires authority; A live expression is built only from live values; A capability is granted, never acquired; What code may do is bounded by the capabilities it is given, and that bound is a claim; A capability is supplied per target; Machine arithmetic is a set of pure primitives that ships with the platform.
 6. **Metadata** (8 decisions). Every value carries independent fields, each registered by its owner with a pure, bounded rule; every value keeps its origin.
    - Decisions: Metadata fields are independent; Metadata is a field on every value; An extension registers its own fields; A field's rule is a pure, bounded function; A value's origin is a description; Trust in a value needs no seal; Metadata supplied at construction, one attachment operation; Metadata slot mixed in from the metadata unit.
-7. **Evaluation** (14 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
-   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A statement does not wait for the one before it; The first of two answers is one kernel primitive; A block of bindings is one kernel primitive; A free name never gets a value; Need and `then` order effects, and nothing else does; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; A loop written as a recursion runs in constant space.
+7. **Evaluation** (15 decisions). How the one operation proceeds: calls, recursion, branches, missing values, arriving information, determinism, the environment.
+   - Decisions: Evaluation is total over unresolved information; The environment is not a value; An expression is evaluated when its value is needed; Sequence is one kernel primitive; A statement does not wait for the one before it; The first of two answers is one kernel primitive; A stream is a value: an item, and a rest that is evaluated when read; A block of bindings is one kernel primitive; A free name never gets a value; Need and `then` order effects, and nothing else does; No argument can be inspected; A call is evaluated by evaluating the function's body; A function can be specialized with its parameters unknown; A recursive call is evaluated once for each state of knowledge; A branch that may not be taken is evaluated without capabilities; A missing value is a cell that is filled once; When information arrives, what waited on it is evaluated again; The same program and the same information give the same result; Scopes layer by parent chain; Substitution of params into bodies; A loop written as a recursion runs in constant space.
 8. **Extensions** (3 decisions). Functions and metadata fields, the few pure primitives beneath them, and what the kernel requires of an extension.
    - Decisions: An extension is made of functions and metadata fields; The kernel's primitives are pure and few; What the kernel requires of an extension.
 9. **Correctness** (6 decisions). The kernel's record of a claim, refutation and how it spreads, failing paths, failures a program handles, and the two reasons evaluation stops early.
@@ -712,6 +712,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: Significance calibrated from 5.
 - Chapter: Values
 
+#### The kernel shares what an operation does not change
+- Decides: a value never changes, so the kernel need never copy one. Putting an entry on a structure, taking a part of a bits value and joining two share whatever they leave as it was. Building a structure entry by entry therefore costs about its size, and taking a part of a bits value costs about the same whatever the size of the part. How the kernel keeps its values to do so is its own choice, and the steps it charges follow the work it does. Data too large to hold stays behind a capability, which hands it over in parts as a stream or by position; the kernel never needs it whole. A parser reads a whole text, so parsing a text larger than memory is not provided for.
+- Status: open (the reference kernel copies: a `put` copies every entry it is given, and `slice` and `join` copy bits, so building a list of n entries costs n squared); ruled 2026-11-20
+- Type: capability
+- Rationale kind: technical
+- Depends on: One composite kind: Structure; The kernel's plain data is a sequence of bits, and it gives them no meaning but a count
+- Significance: 3 — large data is ordinary data
+- Label: foundational — every structure built at run time, and every text taken apart
+- Options recorded: values that can be changed in place (rejected: a value is shared, and whoever else holds it would see the change)
+- Sources: the maintainer's rulings of 2026-11-20 (../records/book-pass/adversarial-review-2.md, Rulings taken, streams, large data and iteration)
+- Use case: a parser builds a tree of a hundred thousand nodes with a hundred thousand puts, not ten thousand million copies.
+- Notes: new, by ruling. A requirement on the kernel that is rebuilt to keep its own stack, beside "A loop written as a recursion runs in constant space".
+- Chapter: Values
+
 #### Structures immutable by default; derive, never mutate
 - Decides: data structures are born immutable with deep immutability, a value is written in place only while provably unshared during construction, an unresolved future cell counts as immutable, and transient-to-immutable finalisation waits for the mutability track.
 - Status: partly built
@@ -1245,7 +1259,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### The first of two answers is one kernel primitive
-- Decides: the kernel primitive `first(a, b)` starts both of its arguments, and its value is that of whichever is known first; where both are known at once, the first written. The other is cancelled: the work it had left to do is dropped, an answer that arrives for it is ignored, and effects it had already performed stay performed. A task can therefore be cancelled, and the evaluator is built so.
+- Decides: the kernel primitive `first(a, b)` starts both of its arguments, and its value is that of whichever is known first; where both are known at once, the first written. Of the other, `first` cancels only what nothing else can need: the work of the losing argument itself is dropped, and effects it had already performed stay performed. A value that has a name, or is an entry of a structure, goes on being evaluated once it was started, because something else may read it. So a request written inside `first` is cancelled when it loses, and one bound to a name before is kept; and a timeout on a stream loses no item, since the item arrives and the next reader of that part of the stream gets it. When nothing waits on a cell any more, the cell is no longer among those the kernel reports as waited on, so a launcher may abort the operation behind it. A task can therefore be cancelled, and the evaluator is built so.
 - Status: open (not built); ruled 2026-11-20
 - Type: capability
 - Rationale kind: technical
@@ -1256,6 +1270,21 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-20 (../records/book-pass/adversarial-review-2.md, Rulings taken, threads and budgets at run time)
 - Use case: `first(http.get(url), timers.after(5000))`: the page, or the timer's answer if five seconds pass first.
 - Notes: new, by ruling; the name `first` is ratified. `then` waits for one thing and needing two values waits for both, so nothing could wait for the earlier of two. Which is known first follows from the order in which answers arrive, which is information like any other.
+- Notes (2026-11-20, the discussion of streams, large data and iteration): what is cancelled is narrowed by ruling. Streams forced it: in `first(s.rest, timers.after(5000))`, cancelling the read would lose an item, and whoever else read `s.rest` would wait for ever.
+- Chapter: Evaluation
+
+#### A stream is a value: an item, and a rest that is evaluated when read
+- Decides: a stream is a structure of two entries, `item` and `rest`; the empty structure where it ends; or a failure in place of either. `rest` is the stream that follows, and like every entry it is evaluated when read and at most once. So a stream is a value: read twice it gives the same items. A stream computed by code and one that comes from a file or a connection have this one shape, and what consumes one consumes the other. Host code cannot hand over a stream, since a late answer is plain data: it offers an operation that answers the next item, the end or a failure, and serves the calls in the order they were made; the capability's definition, in Allegro, wraps the operation as a stream. Reads stay in order by need, because a part of a stream is reached only through the part before it; one read is in flight, and the next is asked for when something reads further. Writing needs nothing more: a write whose value is dropped holds the next until it has answered. A loop that carries only the rest holds one item at a time; a program that keeps the first part of a stream keeps everything read since.
+- Status: partly built (the reference kernel evaluates entries when read, and its tests hold a stream over late answers; no capability's definition offers one yet); ruled 2026-11-20
+- Type: capability
+- Rationale kind: technical
+- Depends on: An expression is evaluated when its value is needed; A statement does not wait for the one before it
+- Significance: 4 — files, connections, events and long computations, with no mechanism of their own
+- Label: foundational — every capability whose data arrives over time
+- Options recorded: an operation that answers the next item, used directly by programs (it is what host code offers, but a stream is then no value: two reads give different answers, and pure code needs another shape); a kind of its own in the kernel, or a cell that is filled more than once (rejected: an entry evaluated when read already does it)
+- Sources: the maintainer's rulings of 2026-11-20 (../records/book-pass/adversarial-review-2.md, Rulings taken, streams, large data and iteration)
+- Use case: the lines of a file larger than memory are read one at a time by a loop that carries only the rest; the same loop runs over a list of numbers computed in the program.
+- Notes: new, by ruling; the terms stream, `item` and `rest` are ratified. Iteration over a stream is recursion: Allegretto ships functions for one item at a time, all at once and at most a given number at once, written in Allegretto ("A loop written as a recursion runs in constant space").
 - Chapter: Evaluation
 
 #### A block of bindings is one kernel primitive
@@ -1449,7 +1478,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Evaluation
 
 #### A loop written as a recursion runs in constant space
-- Decides: recursion is the only loop. A call that is the value of its function's body, through `if`, `then` and `block`, replaces the call that made it, so a loop written that way runs in space that does not grow with its turns. A recursion's depth is bounded by the step budget and by memory, never by the host's stack. An argument that is a pure primitive function applied to values already known is evaluated when the call is made, so a counter or a total does not grow into a chain of work put off; a value carried by a composed function is needed with `then` where it must not be put off.
+- Decides: recursion is the only loop, and iteration over a list or a stream is a function written with it; none is a primitive. A call that is the value of its function's body, through `if`, `then` and `block`, replaces the call that made it, so a loop written that way runs in space that does not grow with its turns. A recursion's depth is bounded by the step budget and by memory, never by the host's stack. An argument that is a pure primitive function applied to values already known is evaluated when the call is made, so a counter or a total does not grow into a chain of work put off; a value carried by a composed function is needed with `then` where it must not be put off.
 - Status: open (the present tree marks tail calls before precompile and returns a host sentinel; the reference kernel evaluates the one-step argument and still uses the host's stack); restated 2026-11-18
 - Type: implementation — how a loop is run; that recursion is the only loop is its effect
 - Rationale kind: technical
@@ -1462,6 +1491,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): allegretto/evaluator.md §5
 - Notes: nothing checks that a wrapper forwards the sentinel (B-113).
 - Notes (2026-11-18, the second adversarial review, cluster 9): restated and retitled by ruling, from "Tail calls by sentinel and loop", which described the present tree's mechanism. A reviewer ran `count(n, acc) => if n == 0 then acc else count(n - 1, acc + 1)`: the total, needed only at the end, became a chain of 400 additions put off and the host's stack ran out. The maintainer had ruled on 2026-11-17 that the depth limit goes. Ruled now: the entry as it reads; no loop form in Allegretto. Built: the one-step argument. The rest comes with the evaluator's move off the host's stack.
+- Notes (2026-11-20, the discussion of streams, large data and iteration): iteration is recursion, by ruling: one item at a time is written with `then`, all at once with `also`, and at most a given number at once by waiting for the oldest before another is started. Starting every entry of a list and waiting for all is `also` on each, inside a `then`. Allegretto ships these as functions written in Allegretto.
 - Chapter: Evaluation
 
 ### Extensions

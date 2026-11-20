@@ -309,6 +309,64 @@ as an entry: `output.write("hello")`.
 
 Comments are `// to the end of the line` and `/* between */`.
 
+### Streams
+
+A stream is a structure of two entries, `item` and `rest`; `[]` where it
+ends; or a failure in place of either. `rest` is the stream that
+follows. Like every entry it is evaluated when read, and once: so a
+stream is a value, and reading it twice gives the same items.
+
+```
+from(n, last) => if n > last then [] else {item: n, rest: from(n + 1, last)}
+```
+
+A capability whose data comes over time offers an operation that
+answers the next item, and its definition wraps the operation the same
+way, so that reading `rest` is what asks for the next item. One read is
+in flight at a time, and a loop that carries only the rest holds one
+item at a time.
+
+Iteration is recursion. Allegretto ships four functions for it, written
+in Allegretto:
+
+| Name | Does |
+|---|---|
+| `each(s, f)` | `f` on each item, one at a time: each is over before the next is read. Its value is `[]`, or the failure the stream ended in. A failure `f` answers refutes |
+| `each_at_once(s, f)` | `f` on each item, none waiting for another |
+| `each_within(s, n, f)` | `f` on each item, at most `n` at once: the oldest is waited for before another is started |
+| `all(xs)` | starts every entry of the list `xs` and waits for all of them; its value is `xs` |
+
+```
+each(s, f) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else sync
+    f(s.item)
+    each(s.rest, f)
+
+each_at_once(s, f) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else
+    r <- f(s.item)
+    each_at_once(s.rest, f)
+
+each_within(s, n, f) => window(s, n, f, [])
+window(s, n, f, q) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else if count(q) < n then go(s, n, f, q)
+  else then(q[0], go(s, n, f, without_first(q, 1, [])))
+go(s, n, f, q) =>
+  r <- f(s.item)
+  window(s.rest, n, f, put(q, [], r))
+without_first(q, i, out) =>
+  if i == count(q) then out else without_first(q, i + 1, put(out, [], q[i]))
+
+all(xs) => then(start(xs, 0), xs)
+start(xs, i) => if i == count(xs) then [] else also(xs[i], start(xs, i + 1))
+```
+
 ## 3. The shipped primitives Allegretto names
 
 Pure primitive functions, each with a content hash and, as the goal, a
@@ -473,3 +531,6 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    a dropped statement's claim uses Allegretto's own `is_failure`.
    `-1.5` is one literal, as the least integer is. A claim inside a
    called function does not hold the caller's statements.
+15. **Streams** (2026-11-20). A stream is a value, `{item, rest}`.
+   `each`, `each_at_once`, `each_within` and `all` are Allegretto's
+   functions for iteration, and no primitive.
