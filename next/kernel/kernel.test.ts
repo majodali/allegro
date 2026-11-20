@@ -2124,3 +2124,27 @@ test("an attempt's answer is handled as any failure is: is_failure and handle wo
   assert.equal(num(k, k.evaluate(call(handle, refutedOne, sd("refuted"), nine), scope).value), 9);
   assert.equal(num(k, k.evaluate(call(handle, call(kp("attempt"), byte(k, 3), steps(k, 100)), sd("refuted"), nine), scope).value), 3, "a value is itself");
 });
+
+// ---- A value that needs itself (found by the acceptance stream, 2026-11-20) ---
+
+test("a binding that needs its own value is refuted, and a function or a structure that mentions itself is not", () => {
+  const { k, add, mul, dec, isZero, call, kp } = setup();
+  const [n, m, xs, fact] = [k.symbol("t.n"), k.symbol("t.m"), k.symbol("t.xs"), k.symbol("t.fact")];
+  const p = k.param("p");
+  // n = n + 1: before, this ran until the steps or the host's stack ran out.
+  const self = k.evaluate(within(k, [[n, call(add, n, byte(k, 1))]], n), k.scope(), { steps: 1000 });
+  assert.equal(self.ended, "complete", "it ends, and not at a limit");
+  assert.equal(self.refuted, true);
+  assert.match(k.reasonOf(self.value) ?? "", /needs itself/);
+  assert.ok(self.steps < 20);
+  // Through another binding: n = m + 1, m = n.
+  const round = k.evaluate(within(k, [[n, call(add, m, byte(k, 1))], [m, call(add, n, byte(k, 0))]], n), k.scope(), { steps: 1000 });
+  assert.equal(round.refuted, true);
+  // A function that calls itself needs no value of its own to be made.
+  const factFn = k.composedFunction([p], call(kp("if"), call(isZero, p), byte(k, 1), call(mul, p, call(fact, call(dec, p)))));
+  assert.equal(num(k, k.evaluate(within(k, [[fact, factFn]], call(fact, byte(k, 5))), k.scope()).value), 120);
+  // A structure whose entry mentions the structure: an entry is evaluated when read, so the structure is made first.
+  const looped = k.evaluate(within(k, [[xs, k.structure([[null, byte(k, 1)], [null, xs]])]], call(kp("count"), xs)), k.scope());
+  assert.equal(looped.refuted, false);
+  assert.equal(k.bitsOf(looped.value).bytes[7], 2);
+});

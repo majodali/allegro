@@ -271,6 +271,8 @@ class Decided {
  */
 class Lazy {
   done = false;
+  /** True while it is being evaluated: needing it again then means it needs itself. */
+  busy = false;
   rests: readonly Rest[] = [];
   constructor(public value: V, readonly scope: ScopeV) {}
 }
@@ -763,7 +765,16 @@ export const createKernel: CreateKernel2 = () => {
         v.rests.forEach(rest);
         return v.value;
       }
-      const { value: r, rests } = collecting(() => evaluate(v.value, v.scope));
+      // A value that needs itself has no value: `n = n + 1`, read, would never end.
+      if (v.busy) return new Refuted("a value that needs itself to be known", undefined);
+      v.busy = true;
+      let got: { value: V; rests: Rest[] };
+      try {
+        got = collecting(() => evaluate(v.value, v.scope));
+      } finally {
+        v.busy = false;
+      }
+      const { value: r, rests } = got;
       rests.forEach(rest);
       v.rests = [...v.rests, ...rests];
       v.value = r;
