@@ -1444,6 +1444,17 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — A capability for waiting (B-196, chunk Q7 (the minimal launcher and the output capability), part 5)
+
+B-196 (the rebuild's acceptance side). The launcher's target ships a
+second capability, `timer`, whose one part `wait(n)` answers late with
+`n`. Time is the target's: the terminal passes the host's timer, and
+the tests and the corpus runner pass a clock that runs no real time and
+answers the waits in the order they fall due. `npm run allegretto` and
+the corpus runner grant `output` and `timer`. Ten programs realise nine
+cases of milestone 2, and eight show the ruled statement and iteration
+forms over answers that arrive late.
+
 ### 2026-11 — The four iteration functions shipped (B-196)
 
 B-196 (the rebuild's acceptance side). PR #271 ruled streams and asked
