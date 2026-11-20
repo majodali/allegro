@@ -591,7 +591,7 @@ are:
 | K5 (recursion) | rebuild | recursion and the policy for opening calls, proved by building | milestone 3, with the acceptance stream; needs K4 |
 | K6 (the rest, listed when K5 is in sight) | rebuild | the rest of Part II (metadata fields and their rules, refutation, the remaining evaluation issues); then Part IV as extensions in the first notation; then Part III's parser engine | further chunks are named by an amendment of this plan |
 | K7 (the plan for a kernel that keeps its own stack) | rebuild | §9 of this plan | the maintainer |
-| K8 (the reference kernel in parts) | rebuild | `next/kernel/kernel.ts` split into the parts both variants share and the reference evaluator, with no change in behaviour | every test passes unchanged |
+| K8 (the reference kernel in parts) | rebuild | `next/kernel/kernel.ts` split into the parts both variants share and the reference evaluator, with no change in behaviour | done 2026-11-20: every test passes unchanged, and every line of the old file is in one of the three new ones |
 | K9 (the machine: evaluation) | rebuild | a second variant that evaluates with a stack of its own: calls, blocks, conditionals, values evaluated when needed, claims, unknown parameters; no limit on depth; a loop in constant space. `next/kernel/create.ts` chooses the variant, and the kernel's tests run against both | the tests of evaluation pass on both variants |
 | K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | every test passes on both variants; the acceptance stream's programs print the same on both |
 | K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | new tests; a contract change |
@@ -1651,6 +1651,9 @@ its approval.
   (the review session): §9, and nine chunks added to §5 by amendment,
   as the last row of the rebuild's chunks foresaw. Put to the
   maintainer before any code.
+- **2026-11-20 — the reference kernel in parts** (the review
+  session): `next/kernel/kernel.ts` split in three with no change in
+  behaviour: `values.ts`, `core.ts` and the evaluator.
 
 ## 8. Sessions
 

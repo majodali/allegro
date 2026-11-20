@@ -574,6 +574,11 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — The reference kernel in parts.** `next/kernel/kernel.ts`
+  is split in three, with no change in behaviour: `values.ts` is the
+  representation, `core.ts` is what a kernel does that is no
+  evaluation (52 definitions), and `kernel.ts` keeps the evaluator and
+  the interface. A second kernel variant will share the first two.
 - **2026-11-20 — A plan for the kernel that keeps its own stack.**
   `docs/plans/book-pass.md` §9 and nine chunks in its §5: a second
   kernel variant beside the reference, which stays as the oracle. No
