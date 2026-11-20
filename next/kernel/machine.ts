@@ -43,8 +43,12 @@
 // the call returns "paused", and the next call goes on with that task
 // first.
 //
-// Not here yet, and in later chunks of the plan: the first of two
-// answers, sharing, specialization.
+// `first(a, b)` starts both and gives the value of whichever is known
+// first. The work of the one that lost is dropped: its task is an
+// orphan. A value in it that has a name, or is an entry of a structure,
+// goes on, because something else may read it.
+//
+// Not here yet, and in later chunks of the plan: sharing, specialization.
 
 import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -86,6 +90,8 @@ interface Ctl {
   watch?: Lazy[];
   /** Values tasks are working out for this frame: orphans if the frame goes without reading them. */
   holds?: Lazy[];
+  /** Values being worked out, any of which settles what the frame waits for. */
+  either?: Lazy[];
   /** Cells the frame will come to wait for, beyond the one it waits for now. */
   cells?: CellV[];
 }
@@ -182,7 +188,7 @@ export const createMachine: CreateKernel = () => {
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k11";
+  const VARIANT = "machine-k13";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -322,6 +328,7 @@ export const createMachine: CreateKernel = () => {
       const c = f.ctl;
       if (c === undefined) return;
       if (c.lazy !== undefined) taskOf.set(c.lazy, t);
+      for (const l of c.either ?? []) if (taskOf.has(l)) registrations(waitersOf, l).push({ task: t, epoch: t.epoch, frame: i });
       for (const l of c.watch ?? []) {
         if (!taskOf.has(l)) continue;
         registrations(watchersOf as WeakMap<object, Registration[]>, l).push({ task: t, epoch: t.epoch, frame: i });
@@ -366,20 +373,34 @@ export const createMachine: CreateKernel = () => {
       }
     register(t);
   };
+  /**
+   * The work of an argument that lost is dropped. A value in it that has a name, or is an
+   * entry of a structure, was started and may be read by something else: the part that
+   * works it out goes on, and the cell it waits for is still waited for.
+   */
+  const cancel = (slot: Lazy): void => {
+    for (const t of orphan([slot])) {
+      const named = t.frames.find((f) => f.ctl?.lazy !== undefined)?.ctl?.lazy;
+      if (named !== undefined) rescue(named);
+    }
+  };
   /** Nothing will read these values: the tasks working them out are orphans, and so is what those hold. */
-  const orphan = (slots: readonly Lazy[]): void => {
+  const orphan = (slots: readonly Lazy[]): Task[] => {
+    const made: Task[] = [];
     const work = [...slots];
     while (work.length > 0) {
       const l = work.pop() as Lazy;
       const t = taskOf.get(l);
       if (t === undefined || t.slot !== l || t.root || t.orphan || t.done) continue;
       t.orphan = true;
+      made.push(t);
       if (t.queued) {
         ready.splice(ready.indexOf(t), 1);
         t.queued = false;
       }
       work.push(...abandoned(t));
     }
+    return made;
   };
   /** What an orphan's frames held. A value in it that something else waits for is still wanted: its part goes on. */
   const abandoned = (t: Task): Lazy[] => {
@@ -1062,6 +1083,10 @@ export const createMachine: CreateKernel = () => {
         const ctl: Ctl = { boundary: true, scope };
         return framed(alsoGen(v, fn, scope, ctl), ctl);
       }
+      if (fn.name === "first") {
+        const ctl: Ctl = { boundary: true, scope };
+        return framed(firstGen(v, fn, scope, ctl), ctl);
+      }
       if (fn.name === "attempt") {
         // The budget is needed; what is attempted is evaluated inside the attempt.
         return needed(evaluate(v.args[1], scope), scope, (steps) => {
@@ -1338,6 +1363,54 @@ export const createMachine: CreateKernel = () => {
     if (second instanceof Refuted) return second;
     if (!held && !ahead && known(second)) return second;
     return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+  };
+  const firstGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV, ctl: Ctl): Gen {
+    // Both are started, and the value is that of whichever is known first; where both are
+    // known at once, the first written. Neither waits for the other.
+    const slots: Lazy[] = [];
+    const values: V[] = [];
+    // An argument that is a value with a name, or an entry, already begun: it only waits
+    // for its answer. Losing, it goes on waiting, because something else may read it.
+    const named = new Set<Lazy>();
+    const lose = (slot: Lazy): void => {
+      if (!named.has(slot)) cancel(slot);
+    };
+    for (const arg of v.args) {
+      const s = evaluate(arg, scope);
+      const x: V = s instanceof Call ? yield s : s;
+      // Known at once: it is the value, and what the other had begun is dropped.
+      if (x instanceof Refuted || known(x)) {
+        ctl.boundary = false;
+        slots.forEach(lose);
+        ctl.holds = undefined;
+        return x;
+      }
+      // It waits for an answer that will come: it is a task. One that rests on something no
+      // answer will come for is left as it is.
+      const slot = ahead ? undefined : x instanceof Lazy && taskOf.get(x)?.slot === x ? x : awaited(x) !== undefined ? spawn(x, scope) : undefined;
+      if (slot !== undefined) slots.push(slot);
+      if (slot !== undefined && slot !== x && x instanceof Lazy) named.add(slot);
+      values.push(slot ?? x);
+      ctl.holds = slots.filter((s) => !named.has(s));
+    }
+    ctl.boundary = false;
+    for (;;) {
+      // In the order written, the first that is over gives the value.
+      for (const slot of slots) {
+        if (taskOf.has(slot) || !slot.done) continue;
+        const x = slot.value;
+        slots.filter((other) => other !== slot).forEach(lose);
+        ctl.holds = ctl.either = undefined;
+        return x;
+      }
+      const going = slots.filter((slot) => taskOf.has(slot));
+      if (going.length === 0) break;
+      ctl.either = going.slice(1);
+      yield waitFor(going[0]);
+    }
+    // Neither will be known: what is left is an expression.
+    ctl.holds = ctl.either = undefined;
+    return new Expr(fn, values.map((x) => (x instanceof Lazy || !(x instanceof Expr || x instanceof NameRef) ? x : later(x, scope))));
   };
   const attemptGen = function* (v: Expr, fn: KernelPrim, steps: V, allowed: number, scope: ScopeV): Gen {
     let r: V;

@@ -1271,6 +1271,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: `first(http.get(url), timers.after(5000))`: the page, or the timer's answer if five seconds pass first.
 - Notes: new, by ruling; the name `first` is ratified. `then` waits for one thing and needing two values waits for both, so nothing could wait for the earlier of two. Which is known first follows from the order in which answers arrive, which is information like any other.
 - Notes (2026-11-20, the discussion of streams, large data and iteration): what is cancelled is narrowed by ruling. Streams forced it: in `first(s.rest, timers.after(5000))`, cancelling the read would lose an item, and whoever else read `s.rest` would wait for ever.
+- Notes (2026-11-20, built): built on both kernel variants. On the variant that keeps its own stack the task of the argument that lost is an orphan, and a value in it that has a name goes on: where its own work was begun that work is finished when its answer comes, and where it only waits for an answer the answer is still waited for. The reference kernel keeps nothing of the argument that lost, and of two answers filled before one call it takes the first written, since it cannot tell which arrived first. The notation does not yet read the name.
 - Chapter: Evaluation
 
 #### A stream is a value: an item, and a rest that is evaluated when read
