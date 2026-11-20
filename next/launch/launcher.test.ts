@@ -1109,7 +1109,7 @@ test("npm run allegretto refuses a project file with a finding: a setting it may
     assert.equal(notJson.status, 1);
     fs.writeFileSync(project, JSON.stringify({ budget: 3 }));
     const unknown = command("allegretto.ts", [file]);
-    assert.equal(unknown.stderr, `${project}: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel\n`);
+    assert.equal(unknown.stderr, `${project}: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases\n`);
     assert.equal(unknown.status, 1);
     fs.rmSync(project);
     const none = command("allegretto.ts", [file]);
@@ -1265,4 +1265,53 @@ test("a configuration of phases is refused before anything is evaluated: with in
   // An input a phase supplies is checked as today: declared, and supplied once.
   const twice = await launch({ createKernel, program: PRINTS_N, configuration: { ceiling: ["output"], phases: [{ name: "a", capabilities: ["output"], inputs: { n: textData("x") } }, { name: "b", capabilities: [], inputs: { n: textData("y") } }] }, target: TERMINAL });
   assert.equal(twice.end.kind === "refused" && twice.end.reason, "the configuration supplies the input n at the start and again in later phase 1");
+});
+
+test("both commands take --phases: run as today, check with nothing printed; a list that is not built, or no list, exits 1", () => {
+  const waitingOnOutput = "waiting: the program waits on the capability(ies) output, which no phase supplies\n";
+  const run = command("terminal.ts", [FIXTURE, "--phases", "run"]);
+  assert.equal(run.stdout, "hello, world\n");
+  assert.equal(run.status, 0);
+  const check = command("terminal.ts", [FIXTURE, "--phases", "check"]);
+  assert.equal(check.stdout, "");
+  assert.equal(check.stderr, waitingOnOutput);
+  assert.equal(check.status, 1);
+  const notBuilt = command("terminal.ts", [FIXTURE, "--phases", "run,check"]);
+  assert.equal(notBuilt.stdout, "");
+  assert.equal(notBuilt.stderr, 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"\n');
+  assert.equal(notBuilt.status, 1);
+  const noList = command("allegretto.ts", [FIXTURE_TEXT, "--phases"]);
+  assert.match(noList.stderr, /^--phases takes the names of phases, separated by commas: run, check, or check,run\nusage: npm run allegretto -- /);
+  assert.equal(noList.status, 1);
+  const text = command("allegretto.ts", [FIXTURE_TEXT, "--phases", "check"]);
+  assert.equal(text.stdout, "");
+  assert.equal(text.stderr, waitingOnOutput);
+  assert.equal(text.status, 1);
+});
+
+test("npm run allegretto under --phases check: a false claim after a statement bound with <- is refuted, nothing printed; the project's file sets phases, under the flag's", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-phases-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, 'capability output\nshown <- output.write("hello")\nclaim(2 + 2 == 5)\n');
+    const checked = command("allegretto.ts", [file, "--phases", "check"]);
+    assert.equal(checked.stdout, "");
+    assert.equal(checked.stderr, "refuted: a claim that is not true\n");
+    assert.equal(checked.status, 1);
+    const ran = command("allegretto.ts", [file]);
+    assert.equal(ran.stdout, "hello\n");
+    assert.equal(ran.stderr, "refuted: a claim that is not true\n");
+    assert.equal(ran.status, 1);
+    fs.writeFileSync(file, 'capability output\noutput.write("hello")\n');
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ phases: ["check"] }));
+    const fromFile = command("allegretto.ts", [file]);
+    assert.equal(fromFile.stdout, "");
+    assert.equal(fromFile.stderr, "waiting: the program waits on the capability(ies) output, which no phase supplies\n");
+    assert.equal(fromFile.status, 1);
+    const flagOver = command("allegretto.ts", [file, "--phases", "run"]);
+    assert.equal(flagOver.stdout, "hello\n");
+    assert.equal(flagOver.status, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -3,15 +3,15 @@
 // bootstrap), part 3; chunk Q7 (the minimal launcher and the output
 // capability), part 3, for the inputs, part 4, for imports, and part 5,
 // for the timer capability; chunk Q13 (check and run as configurations,
-// and what a result holds), part 2, for the configuration's sources): it
-// emits
+// and what a result holds), part 2, for the configuration's sources, and
+// part 3, for `--phases`): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <list>] [--input name=<literal>]… [--later name=<literal>]…
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <list>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes and exits 0 when the run
 // completed. Otherwise it writes the end's reason to stderr and exits 1.
@@ -30,7 +30,9 @@
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
-//     narrows the ceiling. Each `--input name=<literal>` supplies the
+//     narrows the ceiling. `--phases` sets the phases: `run`, `check` or
+//     `check,run`; check supplies no capability and no input, and run
+//     every capability of the ceiling and the inputs. Each `--input name=<literal>` supplies the
 //     input `name` at the start. Each `--later name=<literal>` is one
 //     later phase that supplies it, in the order written. The value is
 //     one Allegretto literal, read by `readLiteral` of
@@ -38,9 +40,10 @@
 //     with no `=`, is a usage error and exits 1;
 //   - the project's file, `allegro.json` in the directory of the text,
 //     where there is one (`readProjectFile` of
-//     next/tools/configuration.ts). It may set `steps`, `inputs` and
-//     `later`, each literal written as a JSON string. An input it gives
-//     is replaced by an `--input` of the same name;
+//     next/tools/configuration.ts). It may set `steps`, `inputs`,
+//     `later`, each literal written as a JSON string, and `phases`, a
+//     list of names such as `["check", "run"]`. An input it gives is
+//     replaced by an `--input` of the same name;
 //   - the environment: `ALLEGRO_STEPS`;
 //   - the launcher's own value: the ceiling that grants all three
 //     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts).
@@ -57,7 +60,7 @@ import { PROJECT_FILE, readProjectFile, type Settings } from "../tools/configura
 import type { Inputs, Plain } from "./launcher.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]... [--later name=<literal>]...";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);
