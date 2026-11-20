@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — The interface made one, first half.** `Kernel` and
+  `Kernel2` are one interface; `Kernel2` and `CreateKernel2` stay as
+  other names for it. `evaluate` needs no scope. `fill` with
+  `hold: false` takes up what waited on the cell and returns what
+  `advance` returns; with `hold: true` it only records. A budget given
+  to `evaluate` is the evaluation's on the reference kernel too, and
+  `advance` names an evaluation whose budget was spent. The older
+  forms still work and are marked deprecated.
 - **2026-11-20 — Budgets and slices.** `Limits` gains `slice`: a call
   on the machine returns "paused" when its slice is spent, and the next
   call of `advance` goes on with the paused task first. Effects, their

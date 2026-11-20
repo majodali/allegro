@@ -8,7 +8,7 @@
 // 2026-11-20 with no change (docs/plans/book-pass.md section 9). The
 // reference kernel's evaluator is next/kernel/kernel.ts.
 
-import type { Cell, ClaimRecord, Declaration, Entry, Kernel2, KeyDescription, Kind, Outcome, Rest, Value } from "./interface.js";
+import type { Cell, ClaimRecord, Declaration, Entry, Kernel, KeyDescription, Kind, Outcome, Rest, Value } from "./interface.js";
 import { InterfaceError } from "./interface.js";
 import { sha256Text } from "./hash.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KERNEL_PRIMITIVES, KernelPrim, Key, Lazy, NameRef, Param, Prim, Quoted, Refuted, Struct, Sym } from "./values.js";
@@ -851,7 +851,7 @@ export const createCore = () => {
    * as it is. What is left to a variant is evaluation: `scope`, `fill`, `waiting`,
    * `evaluate`, `advance` and `current`.
    */
-  const shared: Omit<Kernel2, "interfaceVersion" | "variant" | "scope" | "fill" | "waiting" | "evaluate" | "advance" | "current"> = {
+  const shared: Omit<Kernel, "interfaceVersion" | "variant" | "scope" | "fill" | "waiting" | "evaluate" | "advance" | "current"> = {
 
     bits: (bytes, bitLength) => {
       const n = bitLength ?? bytes.length * 8;

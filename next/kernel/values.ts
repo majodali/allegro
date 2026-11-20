@@ -117,6 +117,17 @@ export interface Root {
   groups: readonly Group[];
   /** True where what it holds includes a sequence that waits for work its first part started. */
   grouped: boolean;
+  /** The budget of the evaluation it belongs to. */
+  readonly account: Account;
+}
+
+/** The budget of one evaluation: all its work counts against it, in whichever call it is done. */
+export interface Account {
+  left: number;
+  /** True once the budget is spent: the evaluation is over, and what it had waiting is dropped. */
+  dead: boolean;
+  /** What `evaluate` gave as the evaluation's value. */
+  handle: V | undefined;
 }
 
 /** What the first part of one `then` started and left going. The `then` waits until none is left. */
