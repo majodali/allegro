@@ -42,8 +42,8 @@ function valueOf(setting: Setting, source: SourceName): Settings[Setting] {
     case "kernel":
       return `variant-${i}`;
     case "phases":
-      // Three values are built, so two of the four sources share one.
-      return [["check", "run"], ["check"], ["run"], ["check", "run"]][i];
+      // Two values are built, so the four sources share them.
+      return [["check"], ["run"], ["check"], ["run"]][i];
   }
 }
 const one = (setting: Setting, source: SourceName): Sources => ({ [source]: { [setting]: valueOf(setting, source) } });
@@ -260,8 +260,8 @@ test("a run's result names the source of each value of its configuration: values
 
 const CEILING3: Settings = { ceiling: ["output", "timer"] };
 
-test("the setting phases: run alone is today's shape, check alone supplies nothing, check then run supplies the ceiling and the inputs with run", () => {
-  assert.deepEqual(PHASE_VALUES.map((v) => [...v]), [["run"], ["check"], ["check", "run"]]);
+test("the setting phases: run alone is today's shape, and check alone is one phase that supplies nothing", () => {
+  assert.deepEqual(PHASE_VALUES.map((v) => [...v]), [["run"], ["check"]]);
   const inputs = { n: text("n") };
   const run = resolved(resolve({ "command line": { phases: ["run"], inputs, later: [{ m: text("m") }] }, launcher: CEILING3 }));
   assert.equal(run.configuration.phases, undefined);
@@ -272,31 +272,28 @@ test("the setting phases: run alone is today's shape, check alone supplies nothi
   const check = resolved(resolve({ file: { phases: ["check"] }, launcher: CEILING3 }));
   assert.deepEqual(check.configuration.phases, [{ name: "check", capabilities: [] }]);
   assert.equal(sourceOf(check, "phases"), "file");
-  const both = resolved(resolve({ environment: { phases: ["check", "run"], inputs, later: [{ m: text("m") }] }, launcher: CEILING3 }));
-  assert.deepEqual(both.configuration, {
-    ceiling: ["output", "timer"],
-    phases: [
-      { name: "check", capabilities: [] },
-      { name: "run", capabilities: ["output", "timer"], inputs },
-      { name: "later", capabilities: [], inputs: { m: text("m") } },
-    ],
-  });
-  assert.equal(sourceOf(both, "phases"), "environment");
+});
+
+test("check then run is a finding of its own: a later phase cannot supply a capability", () => {
+  for (const source of SOURCES) {
+    const r = resolve({ launcher: CEILING3, [source]: { ...(source === "launcher" ? CEILING3 : {}), phases: ["check", "run"] } });
+    assert.deepEqual(r.ok ? [] : r.findings, ['the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'], source);
+  }
 });
 
 test("a value of phases that is not built is a finding that says what is built, and later with check alone is a finding", () => {
   for (const value of [["run", "check"], ["export"], [], ["check", "check"]]) {
     const r = resolve({ "command line": { phases: value }, launcher: CEILING3 });
-    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check", "check, run"`], JSON.stringify(value));
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check"`], JSON.stringify(value));
   }
   const later = resolve({ "command line": { phases: ["check"] }, file: { later: [{ m: text("m") }] }, launcher: CEILING3 });
   assert.deepEqual(later.ok ? [] : later.findings, ['the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input']);
-  assert.deepEqual(shapeOf(["check"], ["output"], undefined, []), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } }, "an empty list of later phases is none");
+  assert.deepEqual(shapeOf(["check"], undefined, []), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } }, "an empty list of later phases is none");
 });
 
 test("the project's file reads phases as a list of names", () => {
-  const r = readProjectFile("dir/allegro.json", JSON.stringify({ phases: ["check", "run"] }));
-  assert.deepEqual(r, { ok: true, settings: { phases: ["check", "run"] } });
+  const r = readProjectFile("dir/allegro.json", JSON.stringify({ phases: ["check"] }));
+  assert.deepEqual(r, { ok: true, settings: { phases: ["check"] } });
   const bad = readProjectFile("dir/allegro.json", JSON.stringify({ phases: "check" }));
   assert.deepEqual(bad.ok ? [] : bad.findings, ["dir/allegro.json: phases is not a list of phase names"]);
 });

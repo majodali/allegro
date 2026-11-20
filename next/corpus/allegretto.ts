@@ -48,14 +48,15 @@
 //                             states none is not compared on it;
 //   // phases: check         the phases the run applies, as the setting
 //                             `phases` of next/tools/configuration.ts names
-//                             them: `check` alone, or `check, run`. At most
-//                             one line. A program that states none runs as
-//                             `run` alone. Check supplies no capability and
-//                             no input; run supplies every capability of
-//                             the ceiling and the `// input:` lines; each
-//                             `// later:` line is a further phase after
-//                             run. The `// expect:`, `// end:` and
-//                             `// summary:` lines hold for the whole launch.
+//                             them: `check` alone is the one value built
+//                             beside `run`. At most one line. A program
+//                             that states none runs as `run` alone. Check
+//                             supplies no capability and no input, so a
+//                             `// later:` line cannot stand with it.
+//                             `check, run` fails the program with the
+//                             resolver's finding. The `// expect:`,
+//                             `// end:` and `// summary:` lines hold for
+//                             the whole launch.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
 // next/launch/launcher.ts on the reference kernel, the imported ones
@@ -378,7 +379,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   const network = readServes(text);
   const phaseLine = readPhases(text);
   // The phases, as the resolver makes them of the setting `phases`.
-  const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, CEILING, given.inputs, given.later);
+  const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later);
   const shapeProblems = shape === undefined || shape.ok ? [] : [...shape.findings];
   if ("problems" in given || network.problems.length > 0 || summaryLine.problems.length > 0 || phaseLine.problems.length > 0 || shapeProblems.length > 0) {
     problems.push(...("problems" in given ? given.problems : []), ...network.problems, ...summaryLine.problems, ...phaseLine.problems, ...shapeProblems);
@@ -396,10 +397,9 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
     problems.push(`printed ${JSON.stringify(outcome.lines)}, expected ${JSON.stringify(pins.lines)}`);
   // Each `// later:` line: applied, and with the `// expect:` lines above it printed before it.
-  // It follows run, so with `check, run` the phases before it are two.
-  const ahead = (phaseLine.phases ?? ["run"]).length - 1;
+  // It cannot stand with `check` alone, so it follows run, the first phase.
   pins.later.forEach((l, i) => {
-    const before = outcome.linesBeforePhase[ahead + i];
+    const before = outcome.linesBeforePhase[i];
     if (before === undefined) problems.push(`the later phase that supplies ${l.name} (phase ${i + 1}) was not applied`);
     else if (before !== l.expectsAbove)
       problems.push(`${before} line(s) were printed before the later phase that supplies ${l.name} (phase ${i + 1}), and ${l.expectsAbove} \`// expect:\` line(s) are above it`);

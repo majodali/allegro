@@ -32,7 +32,7 @@ Each statement is a comment line of its own:
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
-| `// phases: check` or `// phases: check, run` | the phases the run applies; at most one line (see "Phases") |
+| `// phases: check` | the run applies check alone; at most one line (see "Phases") |
 | `// serves: <METHOD> <url> = <status> <literal>` | the network answers this request; one line per request served (see "Requests") |
 
 A program written for the purpose that shows no case of the present
@@ -81,24 +81,20 @@ with the program's inputs handed in and its imported records loaded.
 
 ## Phases
 
-`// phases: check` or `// phases: check, run` names the phases the run
-applies, in order, as the setting `phases` of
-`next/tools/configuration.ts` names them. A program with no such line
-runs as `run` alone, which is what the runner did before the line
-existed. Check supplies no capability and no input: a declared
-capability is a cell that nothing fills, so a statement that calls it
-waits, and nothing is printed. Run supplies every capability of the
-ceiling and the program's `// input:` lines. Each `// later:` line is a
-further phase after run, so `// later:` with `// phases: check` alone
-fails the program. The `// expect:`, `// end:` and `// summary:` lines
-hold for the whole launch, across its phases. A line not of the form
-`phases: <name>, <name>`, a list that is not built, and two lines each
-fail the program, and it is not launched.
+`// phases: check` is the one line built. It names the phases the run
+applies, as the setting `phases` of `next/tools/configuration.ts` names
+them. A program with no such line runs as `run` alone, which is what the
+runner did before the line existed. Check supplies no capability and no
+input: a declared capability is a cell that nothing fills, so a
+statement that calls it waits, and nothing is printed. So a `// later:`
+line with `// phases: check` fails the program. The `// expect:`,
+`// end:` and `// summary:` lines hold for the whole launch. A line not
+of the form `phases: <name>, <name>`, a list that is not built, and two
+lines each fail the program, and it is not launched.
 
-Both kernel variants refuse to fill a cell with a capability, since a
-cell takes plain data. So under `check, run` a program that waits on a
-capability in check ends in a fault when run supplies it, and no
-program here states `check, run` yet.
+`// phases: check, run` fails the program with the resolver's finding.
+Run would have to put a capability into the cell that check left
+waiting, and the kernel fills a cell with plain data only.
 
 ## The summary
 

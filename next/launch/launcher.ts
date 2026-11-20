@@ -17,12 +17,13 @@
 //    launcher fills a cell with plain data
 //   "Phases are configuration", "When information arrives, what waited on
 //    it is evaluated again": a later phase of the configuration supplies
-//    an input or a capability, and what waited on it is evaluated again in
-//    the same launch
+//    an input, and what waited on it is evaluated again in the same
+//    launch
 //   "A phase hands its residual to the next", as far as one execution: the
 //    phases are applied in order on one kernel, and the next phase takes
-//    up what the one before left waiting. What a phase must leave decided
-//    is not built
+//    up what the one before left waiting on an input. A later phase
+//    supplies no capability, and what a phase must leave decided is not
+//    built
 //   "A result names everything it rests on", as far as this part goes,
 //   "A tool reads a phase's result and adds no analysis of its own" and
 //   "A module's summary is the weakest strength among its claims": the
@@ -76,8 +77,7 @@
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`. When it waits and no capability's
 //      answer is due, it applies the next phase: it fills the cells of the
-//      capabilities and the inputs that phase supplies, a capability with
-//      the structure of its parts, and calls `advance`. Phases are applied
+//      inputs that phase supplies and calls `advance`. Phases are applied
 //      in order, one at a time; when nothing waits, the phases left are not
 //      applied, and a refutation ends the launch in whatever phase it is
 //      found. A phase is what it supplies (`Phase`): the configuration
@@ -85,17 +85,19 @@
 //      named `run` that supplies every capability of the ceiling and
 //      `inputs`, and one named `later` for each entry of `later`, which
 //      supplies inputs only. A configuration that gives `phases` and also
-//      `inputs` or `later`, a phase that supplies a capability the ceiling
-//      does not grant, and a capability supplied by two phases are refused
-//      before anything is evaluated. A phase is no formal element of the
+//      `inputs` or `later`, an empty list of phases, a phase that supplies
+//      a capability the ceiling does not grant, and a phase after the
+//      first that supplies a capability are refused before anything is
+//      evaluated. A phase is no formal element of the
 //      system (the maintainer, 2026-11-17 and 2026-11-18): a phase is one
 //      call of the module function with some capabilities and inputs
 //      given, and the step to the next is the same event as a value that
 //      arrives later. So every phase runs on the same kernel, under one
-//      step budget. Both kernel variants refuse to fill a cell with a
-//      capability, since a cell takes plain data: a later phase that
-//      supplies a capability the program waits on ends the launch as a
-//      fault that says so;
+//      step budget. A capability is supplied by the first phase or by
+//      none: the kernel fills a cell with plain data only, and a
+//      capability is a structure of primitive functions, so no later
+//      phase can put one into the cell a declared capability is handed
+//      as;
 //   7  returns how the run ended, and the lines the output capability
 //      wrote, with the number of lines printed before each later phase was
 //      applied. A refuted run carries the reason the kernel gives for each
@@ -219,10 +221,11 @@ export interface Configuration {
   /**
    * The phases, in order, each by what it supplies. The first is applied
    * at the start, and each later one when the kernel waits and no
-   * capability's answer is due. None: one phase that supplies every
-   * capability of the ceiling and `inputs`, and then one for each entry
-   * of `later`, each named `later`. A configuration that gives `phases`
-   * gives neither `inputs` nor `later`.
+   * capability's answer is due. Only the first may supply capabilities:
+   * the kernel fills a cell with plain data only. None: one phase that
+   * supplies every capability of the ceiling and `inputs`, and then one
+   * for each entry of `later`, each named `later`. A configuration that
+   * gives `phases` gives neither `inputs` nor `later`.
    */
   readonly phases?: readonly Phase[];
 }
@@ -237,7 +240,11 @@ export interface Configuration {
 export interface Phase {
   /** A word for reports, such as `check` or `run`. */
   readonly name: string;
-  /** The capabilities this phase supplies, each of the ceiling, and each supplied by one phase only. */
+  /**
+   * The capabilities this phase supplies, each of the ceiling. Only the
+   * first phase may name any: a later one cannot put a capability into a
+   * cell, since the kernel fills a cell with plain data only.
+   */
   readonly capabilities: readonly string[];
   /** The inputs this phase supplies, as `Configuration.inputs` holds them. */
   readonly inputs?: Inputs;
@@ -622,15 +629,14 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     { name: "run", capabilities: configuration.ceiling, ...(configuration.inputs === undefined ? {} : { inputs: configuration.inputs }) },
     ...(configuration.later ?? []).map((inputs) => ({ name: "later", capabilities: [], inputs })),
   ];
-  // Each capability a phase supplies is of the ceiling, and is supplied once.
-  const capabilityIn = new Map<string, string>();
-  for (const phase of phases)
+  // Each capability a phase supplies is of the ceiling, and only the first phase supplies any.
+  phases.forEach((phase, i) => {
     for (const name of phase.capabilities) {
       if (!configuration.ceiling.includes(name)) problems.push(`the phase ${phase.name} supplies the capability ${name}, which the ceiling does not grant`);
-      const first = capabilityIn.get(name);
-      if (first !== undefined) problems.push(`the phase ${phase.name} supplies the capability ${name}, which the phase ${first} supplies already`);
-      else capabilityIn.set(name, phase.name);
+      if (i > 0)
+        problems.push(`the phase ${phase.name} supplies the capability ${name} after the first phase: the kernel fills a cell with plain data only, so a capability is supplied by the first phase or by none`);
     }
+  });
   // The inputs, by declared name: each declared, and each supplied once.
   const declaredInputs = new Set(program.declares.filter((d) => d.role === "input").map((d) => d.name));
   const suppliedIn = new Map<string, number>();
@@ -735,7 +741,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const names = implementation.definition.parts;
       granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
     }
-    // Each capability: the one the first phase supplies, or else a fresh cell that a later phase may fill.
+    // Each capability: the one the first phase supplies, or else a fresh cell that nothing fills.
     // Each input: the plain data the first phase supplies, or else a fresh cell that a later phase may fill.
     const capabilityCells = new Map<string, Cell>();
     const inputCells = new Map<string, Cell>();
@@ -816,19 +822,6 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         linesBeforePhase.push(lines.length);
         const phase = phases[nextPhase++];
         applied.push({ name: phase.name, linesBefore: lines.length });
-        // Each capability it supplies fills that capability's cell with the capability, as a structure of its parts.
-        for (const name of phase.capabilities) {
-          const cell = capabilityCells.get(name);
-          if (cell === undefined) continue;
-          try {
-            fill(cell, granted.get(name)!);
-          } catch (e) {
-            if (e instanceof InterfaceError)
-              return ended({ kind: "fault", reason: `the kernel does not take the capability ${name} into its cell: ${e.message}` });
-            throw e;
-          }
-          capabilityCells.delete(name);
-        }
         const inputs = phase.inputs ?? {};
         for (const name of namesOf(inputs)) {
           const cell = inputCells.get(name)!;

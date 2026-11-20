@@ -5,8 +5,8 @@
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <list>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <list>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
 //
 // Each `--import` names the saved program of a module the program
 // imports, directly or through another, in the order they are loaded: a
@@ -39,10 +39,10 @@
 // first:
 //   - the command line: `--steps <n>` sets the step budget,
 //     `--ceiling a,b` the ceiling, which may only narrow the terminal's,
-//     and `--phases` the phases: `run`, `check` or `check,run` (the
-//     setting `phases` of next/tools/configuration.ts). A name the
-//     terminal does not supply, and a list of phases that is not built,
-//     are findings;
+//     and `--phases` the phases: `run` or `check` (the setting `phases`
+//     of next/tools/configuration.ts). A name the terminal does not
+//     supply, and a list of phases that is not built, `check,run` among
+//     them, are findings;
 //   - the environment: `ALLEGRO_STEPS`, a whole number, sets the step
 //     budget;
 //   - what is built into the launcher: the ceiling that grants every
@@ -118,7 +118,7 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
       ceiling = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
     } else if (argv[i] === "--phases") {
       const names = argv[++i];
-      if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run, check, or check,run\n${usage}`);
+      if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run or check\n${usage}`);
       phases = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
     } else if (file === undefined) file = argv[i];
     else fail(`unexpected argument ${argv[i]}`);
@@ -185,7 +185,7 @@ function readRecord(file: string): unknown {
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>]";
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]";
   const rest: string[] = [];
   const imported: string[] = [];
   for (let i = 0; i < argv.length; i++) {

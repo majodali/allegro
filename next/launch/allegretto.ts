@@ -10,8 +10,8 @@
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <list>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <list>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes and exits 0 when the run
 // completed. Otherwise it writes the end's reason to stderr and exits 1.
@@ -30,10 +30,11 @@
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
-//     narrows the ceiling. `--phases` sets the phases: `run`, `check` or
-//     `check,run`; check supplies no capability and no input, and run
-//     every capability of the ceiling and the inputs. Each `--input name=<literal>` supplies the
-//     input `name` at the start. Each `--later name=<literal>` is one
+//     narrows the ceiling. `--phases` sets the phases: `run` or `check`;
+//     check supplies no capability and no input, and run every
+//     capability of the ceiling and the inputs. `check,run` is a finding,
+//     since it is not built yet. Each `--input name=<literal>` supplies
+//     the input `name` at the start. Each `--later name=<literal>` is one
 //     later phase that supplies it, in the order written. The value is
 //     one Allegretto literal, read by `readLiteral` of
 //     next/bootstrap/literal.ts. A value that is not a literal, or a flag
@@ -42,7 +43,7 @@
 //     where there is one (`readProjectFile` of
 //     next/tools/configuration.ts). It may set `steps`, `inputs`,
 //     `later`, each literal written as a JSON string, and `phases`, a
-//     list of names such as `["check", "run"]`. An input it gives is
+//     list of names such as `["check"]`. An input it gives is
 //     replaced by an `--input` of the same name;
 //   - the environment: `ALLEGRO_STEPS`;
 //   - the launcher's own value: the ceiling that grants all three
@@ -60,7 +61,7 @@ import { PROJECT_FILE, readProjectFile, type Settings } from "../tools/configura
 import type { Inputs, Plain } from "./launcher.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]... [--later name=<literal>]...";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);

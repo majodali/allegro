@@ -433,8 +433,9 @@ test("a malformed phases line, a list that is not built, two lines, and later li
   const body = 'capability output\ninput a\noutput.write("launched")\n// end: completed\n';
   for (const [lines, problem] of [
     ["// phases: check run", 'the line "// phases: check run" is not of the form phases: <name>, <name>'],
-    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"'],
-    ["// phases: check\n// phases: check, run", "the program has two `// phases:` lines"],
+    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check"'],
+    ["// phases: check, run", 'the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'],
+    ["// phases: check\n// phases: run", "the program has two `// phases:` lines"],
     ['// phases: check\n// later: a = "x"', 'the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input'],
   ] as const) {
     const run = await runProgram(body + lines + "\n");

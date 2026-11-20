@@ -1235,22 +1235,22 @@ test("without phases the launch has one entry named run, and then one named late
 
 test("a refutation ends the launch in the phase that finds it: the phases after it are not applied", async () => {
   const r = recording();
-  const phases = [CHECK, { name: "run", capabilities: ["output"] }];
-  const outcome = await launch({ createKernel: r.createKernel, program: emitted('capability output\nclaim(1 == 2)\noutput.write("never")\n'), configuration: { ceiling: ["output"], phases }, target: SHIPPED_TARGET });
+  const phases = [{ name: "first", capabilities: ["output"] }, { name: "second", capabilities: [], inputs: { n: textData("never") } }];
+  const outcome = await launch({ createKernel: r.createKernel, program: emitted("capability output\ninput n\nclaim(1 == 2)\noutput.write(n)\n"), configuration: { ceiling: ["output"], phases }, target: SHIPPED_TARGET });
   assert.equal(describe(outcome.end), "refuted: a claim that is not true");
   assert.deepEqual(outcome.lines, []);
-  assert.deepEqual(outcome.phases?.map((p) => p.name), ["check"]);
+  assert.deepEqual(outcome.phases?.map((p) => p.name), ["first"]);
   assert.ok(!r.calls.includes("fill"));
 });
 
-test("a configuration of phases is refused before anything is evaluated: with inputs or later beside it, with no phase, a capability the ceiling does not grant, a capability supplied twice", async () => {
+test("a configuration of phases is refused before anything is evaluated: with inputs or later beside it, with no phase, a capability the ceiling does not grant, a capability after the first phase", async () => {
   const run = { name: "run", capabilities: ["output"] };
   const cases: Array<[Configuration, string]> = [
     [{ ceiling: ["output"], phases: [run], inputs: { n: textData("x") } }, "the configuration gives phases and also inputs or later: with phases, each phase supplies its own inputs"],
     [{ ceiling: ["output"], phases: [run], later: [{ n: textData("x") }] }, "the configuration gives phases and also inputs or later: with phases, each phase supplies its own inputs"],
     [{ ceiling: ["output"], phases: [] }, "the configuration gives no phase"],
-    [{ ceiling: ["output"], phases: [CHECK, { name: "run", capabilities: ["output", "timer"] }] }, "the phase run supplies the capability timer, which the ceiling does not grant"],
-    [{ ceiling: ["output"], phases: [run, { name: "again", capabilities: ["output"] }] }, "the phase again supplies the capability output, which the phase run supplies already"],
+    [{ ceiling: ["output"], phases: [{ name: "run", capabilities: ["output", "timer"] }] }, "the phase run supplies the capability timer, which the ceiling does not grant"],
+    [{ ceiling: ["output"], phases: [run, { name: "again", capabilities: ["output"] }] }, "the phase again supplies the capability output after the first phase: the kernel fills a cell with plain data only, so a capability is supplied by the first phase or by none"],
   ];
   for (const [configuration, reason] of cases) {
     const r = recording();
@@ -1267,6 +1267,17 @@ test("a configuration of phases is refused before anything is evaluated: with in
   assert.equal(twice.end.kind === "refused" && twice.end.reason, "the configuration supplies the input n at the start and again in later phase 1");
 });
 
+test("check then run, given to the launcher directly, is refused before anything is evaluated: a phase after the first cannot supply a capability", async () => {
+  const r = recording();
+  const outcome = await launch({ createKernel: r.createKernel, program: HELLO, configuration: { ceiling: ["output"], phases: [CHECK, { name: "run", capabilities: ["output"] }] }, target: TERMINAL });
+  assert.equal(
+    describe(outcome.end),
+    "refused: the phase run supplies the capability output after the first phase: the kernel fills a cell with plain data only, so a capability is supplied by the first phase or by none",
+  );
+  assert.ok(!r.calls.includes("evaluate"));
+  assert.deepEqual(outcome.lines, []);
+});
+
 test("both commands take --phases: run as today, check with nothing printed; a list that is not built, or no list, exits 1", () => {
   const waitingOnOutput = "waiting: the program waits on the capability(ies) output, which no phase supplies\n";
   const run = command("terminal.ts", [FIXTURE, "--phases", "run"]);
@@ -1278,10 +1289,16 @@ test("both commands take --phases: run as today, check with nothing printed; a l
   assert.equal(check.status, 1);
   const notBuilt = command("terminal.ts", [FIXTURE, "--phases", "run,check"]);
   assert.equal(notBuilt.stdout, "");
-  assert.equal(notBuilt.stderr, 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"\n');
+  assert.equal(notBuilt.stderr, 'the setting phases is "run, check", which is not built: the values built are "run", "check"\n');
   assert.equal(notBuilt.status, 1);
+  for (const entry of ["terminal.ts", "allegretto.ts"] as const) {
+    const both = command(entry, [entry === "terminal.ts" ? FIXTURE : FIXTURE_TEXT, "--phases", "check,run"]);
+    assert.equal(both.stdout, "", entry);
+    assert.equal(both.stderr, 'the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only\n', entry);
+    assert.equal(both.status, 1, entry);
+  }
   const noList = command("allegretto.ts", [FIXTURE_TEXT, "--phases"]);
-  assert.match(noList.stderr, /^--phases takes the names of phases, separated by commas: run, check, or check,run\nusage: npm run allegretto -- /);
+  assert.match(noList.stderr, /^--phases takes the names of phases, separated by commas: run or check\nusage: npm run allegretto -- /);
   assert.equal(noList.status, 1);
   const text = command("allegretto.ts", [FIXTURE_TEXT, "--phases", "check"]);
   assert.equal(text.stdout, "");

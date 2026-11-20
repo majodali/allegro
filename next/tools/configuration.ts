@@ -13,7 +13,10 @@
 //   "A result names everything it rests on": the configuration and its
 //    sources, which the launcher puts in the result
 //   "The platform ships three phases: check, run and export", as far as
-//    check and run: the setting `phases` (`shapeOf`). Export is not built
+//    check alone and run alone: the setting `phases` (`shapeOf`). Check
+//    then run is not built yet: a later phase cannot supply a capability,
+//    since the kernel fills a cell with plain data only. Export is not
+//    built
 // "A full configuration is a model, evaluated in a first phase" is a design
 // to prove and is not built: the configuration here is in host form.
 //
@@ -26,11 +29,12 @@
 //   restore  the builder whose stored outcomes are accepted;
 //   kernel   the kernel variant's name;
 //   phases   the shipped phases to apply, in order (`PHASE_VALUES`):
-//            `run` alone, `check` alone, or `check` then `run`. Check
-//            supplies no capability and no input. Run supplies every
-//            capability of the ceiling and the inputs. Each entry of
-//            `later` is a further phase after run. Where no source sets
-//            it, it is `run` alone, which is what happens without it.
+//            `run` alone or `check` alone. Check supplies no capability
+//            and no input. Run supplies every capability of the ceiling
+//            and the inputs, and each entry of `later` is a further phase
+//            after it. Where no source sets it, it is `run` alone, which
+//            is what happens without it. `check, run` is a finding of its
+//            own, since it is not built yet.
 //
 // The sources, highest first (`SOURCES`): the command line, the project's
 // file, the environment, what is built into the launcher. A setting is
@@ -83,7 +87,7 @@ export const MAY_SET: Readonly<Record<Setting, readonly SourceName[]>> = {
 export type ShippedPhase = "check" | "run";
 
 /** The values of the setting `phases` that are built, each a list of shipped phases in order. */
-export const PHASE_VALUES: ReadonlyArray<readonly ShippedPhase[]> = [["run"], ["check"], ["check", "run"]];
+export const PHASE_VALUES: ReadonlyArray<readonly ShippedPhase[]> = [["run"], ["check"]];
 
 /** The name of the project's file, in the directory of the text being run. */
 export const PROJECT_FILE = "allegro.json";
@@ -129,36 +133,27 @@ const phaseList = (names: readonly string[]): string => names.join(", ");
 /**
  * What the setting `phases` makes of the configuration: the inputs and
  * later phases of today's shape for `run` alone, and the launcher's
- * `phases` otherwise. Check supplies no capability and no input; run
- * supplies every capability of the ceiling and `inputs`; each entry of
- * `later` is a further phase after run, named `later`. A value that is not
- * built, and `later` with `check` alone, are findings. Gives findings
- * only, never a partial shape.
+ * `phases` for `check` alone, one phase that supplies no capability and
+ * no input. `check, run` is a finding of its own: a later phase cannot
+ * supply a capability, since the kernel fills a cell with plain data
+ * only. Any other value that is not built, and `later` with `check`
+ * alone, are findings. Gives findings only, never a partial shape.
  */
 export function shapeOf(
   phases: readonly string[] | undefined,
-  ceiling: readonly string[],
   inputs?: Inputs,
   later?: readonly Inputs[],
 ): { readonly ok: true; readonly shape: Pick<Configuration, "inputs" | "later" | "phases"> } | { readonly ok: false; readonly findings: readonly string[] } {
   const names = phases ?? ["run"];
+  if (names.length === 2 && names[0] === "check" && names[1] === "run")
+    return { ok: false, findings: ['the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'] };
   if (!PHASE_VALUES.some((v) => v.length === names.length && v.every((n, i) => n === names[i])))
     return { ok: false, findings: [`the setting phases is ${JSON.stringify(phaseList(names))}, which is not built: the values built are ${PHASE_VALUES.map((v) => JSON.stringify(phaseList(v))).join(", ")}`] };
   if (!names.includes("run")) {
     if (later !== undefined && later.length > 0) return { ok: false, findings: [`the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input`] };
     return { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } };
   }
-  if (names.length === 1) return { ok: true, shape: { ...(inputs === undefined ? {} : { inputs }), ...(later === undefined ? {} : { later }) } };
-  return {
-    ok: true,
-    shape: {
-      phases: [
-        { name: "check", capabilities: [] },
-        { name: "run", capabilities: ceiling, ...(inputs === undefined ? {} : { inputs }) },
-        ...(later ?? []).map((l) => ({ name: "later", capabilities: [], inputs: l })),
-      ],
-    },
-  };
+  return { ok: true, shape: { ...(inputs === undefined ? {} : { inputs }), ...(later === undefined ? {} : { later }) } };
 }
 
 const or = (names: readonly string[]): string => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
@@ -208,7 +203,7 @@ export function resolve(sources: Sources): Resolved {
   const restore = from("restore");
   const kernel = from("kernel");
   const phases = from("phases");
-  const shape = shapeOf(phases?.value, ceiling?.value ?? [], inputSources.length === 0 ? undefined : inputs, later?.value);
+  const shape = shapeOf(phases?.value, inputSources.length === 0 ? undefined : inputs, later?.value);
   if (!shape.ok) return { ok: false, findings: shape.findings };
   const configuration: Configuration = {
     ceiling: ceiling?.value ?? [],
