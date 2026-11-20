@@ -2527,6 +2527,18 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   A shipped capability now gives a failure in the one shape, which was
   what the row lacked. "The terminal and the browser ship output,
   timers and HTTP" stays at none until the browser launcher of Q21.
+  **Confirmed by the maintainer on 2026-11-20, for now**: "I confirm
+  all the asks for now, noting that this capability is not final, and
+  we'll rework various features as it matures". Three reworks were
+  named:
+  - request and answer bodies that are streamed;
+  - argument types and values checked more closely against the HTTP
+    standard, a body on a GET request refused among them;
+  - more transports and protocols.
+  So a body on a GET stays the failure `unreachable` with the host's
+  reason until the second rework, and the answer's body stays whole
+  bytes until the first. None of the three is scheduled by this plan;
+  each is taken up when a case or a library needs it.
 - **2026-11-20 — Q13, part 1: what a result holds.**
   Built. The launcher (`next/launch/launcher.ts`) gives back, with how a
   run ended, what the run found: its result (`LaunchResult`). This is

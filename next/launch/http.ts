@@ -9,10 +9,14 @@
 //   "A late answer or its failure fills a cell as plain data"
 //   "A failure a program can handle is plain data of one shape"
 //
-// The names and shapes are this stream's proposal, for the maintainer to
-// ratify: no decision names the capability for HTTP, its parts, or the
-// shape of a request and an answer. The capability is `http`, and its one
-// part is `request`.
+// The names and shapes are this stream's proposal: no decision names the
+// capability for HTTP, its parts, or the shape of a request and an
+// answer. The maintainer confirmed them on 2026-11-20, for now: the
+// capability is not final, and is to be reworked as it matures. Named
+// then: request and answer bodies that are streamed; arguments checked
+// more closely against the HTTP standard, a body on a GET refused among
+// them; more transports and protocols. The capability is `http`, and its
+// one part is `request`.
 //
 // `http.request(r)` takes a structure with the entries `method`, a text;
 // `url`, a text; `headers`, an array of pairs `[name, value]` of texts;
