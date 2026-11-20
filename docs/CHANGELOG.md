@@ -1494,6 +1494,18 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The HTTP capability (B-196, chunk Q16 (the capabilities the launchers ship), part 1)
+
+B-196 (the rebuild's acceptance side). The launcher's target ships a
+third capability, `http`, with one part, `request`. It takes a
+structure of a method, a URL, headers and a body, and answers late with
+the status, the headers and the body. A request with no answer is the
+failure `unreachable`. The transport is the target's: the terminal's
+is the host's `fetch`, and the tests and the corpus runner use one that
+answers from a table and reaches no network. A corpus program states
+what is served in `// serves:` lines. Eight programs show it. The
+launcher is unchanged.
+
 
 
 

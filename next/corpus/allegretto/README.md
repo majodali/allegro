@@ -31,6 +31,7 @@ Each statement is a comment line of its own:
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
+| `// serves: <METHOD> <url> = <status> <literal>` | the network answers this request; one line per request served (see "Requests") |
 
 A program written for the purpose that shows no case of the present
 tree has no `// realises:` line.
@@ -70,7 +71,8 @@ the text and the texts it imports with the driver of
 `next/bootstrap/driver.ts` and runs the records with the launcher of
 `next/launch/launcher.ts` on the reference kernel, the imported ones
 loaded first, with the output capability, the timer capability, the
-shipped primitives, its inputs and a budget of 1,000,000 steps. A program passes when its printed lines, its end, the
+HTTP capability, the shipped primitives, its inputs and a budget of
+1,000,000 steps. A program passes when its printed lines, its end, the
 lines printed before each later phase and its yielded keys are the ones
 stated. The yielded keys are read with the program's inputs handed in
 and its imported records loaded.
@@ -105,7 +107,7 @@ would be written.
 
 ## Waits
 
-The runner's ceiling grants `output` and `timer`. `timer.wait(n)`
+The runner's ceiling grants `output`, `timer` and `http`. `timer.wait(n)`
 (`next/launch/timer.ts`) answers late with the number `n` once `n`
 milliseconds have passed. In the runner they pass on a clock that runs
 no real time (`virtualClock` of `next/launch/clock.ts`), made anew for
@@ -114,7 +116,44 @@ waits due at the same time the one asked first. A wait asked when an
 answer arrives falls due counted from that answer. So a program's
 printed order under waits is the order its waits fall due, a run takes
 no wall-clock time for them, and two runs print the same. `npm run
-allegretto` grants the same two capabilities on the host's real timer.
+allegretto` grants the same capabilities on the host's real timer.
+
+## Requests
+
+`http.request(r)` (`next/launch/http.ts`) makes an HTTP request and
+answers late. `r` is a structure: `method` and `url`, texts, are
+required; `headers`, an array of pairs `[name, value]` of texts, and
+`body`, bits of whole bytes, may be left out. The answer is the
+structure `{status, headers, body}`: the status a whole number, the
+headers an array of pairs of texts, the body the bytes received. Any
+status is an answer, a 404 and a 500 included. A request that gets no
+answer is the failure ``{failure: `unreachable, reason: <a text>}``. A
+value outside that domain is a refutation with the part's reason.
+
+No program here reaches a network. The runner makes the capability, for
+each run, with a transport that answers from the program's own lines
+(`scriptedTransport` of `next/launch/scripted-transport.ts`). Each line
+serves one request:
+
+```
+// serves: GET https://example.org/hello = 200 "hello, world"
+```
+
+The method and the URL are compared exactly with the request's. The
+status is a whole number of three digits. The literal is a text literal,
+read by `readLiteral` of `next/bootstrap/literal.ts`, and its bytes are
+the body. The answer has no headers. A request that no line serves is
+unreachable, with the reason `nothing serves <METHOD> <url>`. A line
+not of this form, a body that is no text literal, and two lines for one
+request each fail the program, and it is not launched.
+
+The transport answers the requests in the order they were asked, one at
+a time, and lets the host's event loop take one turn between two
+answers. So a program's printed order under requests is the same on
+every run. What the transport was handed is part of what a run gives
+(`requests` of `runProgram`), so a test can see the headers and the body
+a program sent. `npm run allegretto` grants `http` on the host's
+`fetch`.
 
 ## A text of the standard language
 
