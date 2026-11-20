@@ -2629,6 +2629,18 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `milestone 3: programs 76 (passing 76, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
   No row of the decision map moves in this part. The orchestrating
   session decides which rows it earns.
+- **2026-11-20 — Q5: the notation writes `first`.**
+  The kernel stream built the kernel primitive `first(a, b)` in PR #285
+  and ruled its form in `next/ext/allegretto/forms.md` §4, item 13. The
+  emitter (`next/bootstrap/emit.ts`) now binds the name, as it binds
+  `then` and `also`. Three programs under `next/corpus/allegretto/m3/`
+  show it on the timer: the earlier of two waits, whichever is written
+  first, and a value known at once; the effect of the argument that
+  loses is never performed; a refutation of either argument refutes it
+  at once. None realises a case. `m3/wait-claim.alg` states its summary,
+  decided, now that PR #285 fixed the waiting count of a held claim on
+  the machine. The emitter's test of what waits has nothing left to do:
+  every kernel primitive is one the emitter writes.
 - **2026-11-20 — Q13, part 2: a configuration from its sources.**
   Built. The new tree reads a run's configuration from four sources in
   the ruled order, and a run's result says which source supplied each
