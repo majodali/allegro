@@ -1898,7 +1898,11 @@ policy is the gate ruled there.
   - The new end: `// end: refused: <the finding>`, for a text the
     reader, the emitter or the driver refuses. Nothing is launched, and
     the program passes when one finding's message is the one stated.
-  Realised: ten cases of `src/test/modules.ts` at milestone 3 (load
+    The part of a message before a colon may be stated alone, so a text
+    that does not parse is stated as `not Allegretto`, without the
+    parser engine's own words.
+  Realised: eleven cases of `src/test/modules.ts` at milestone 3, ten
+  of them here and the reclassed one below (load
   simple module, loaded functions work in evaluation, module with
   bindings and functions, transitive dependencies, circular dependency
   detected, caching prevents re-reads, a second loader returns the same
@@ -1912,14 +1916,23 @@ policy is the gate ruled there.
   an import nothing needs, and a key handed out by an exported binding.
   Two imports of one module being one instance is
   `m3/module-shared/main.alg`.
+  One case is reclassed, for the maintainer to confirm. "P2 — the same
+  name in two directories is two keys" loads one text from two
+  directories and asserts two extensions. On the new kernel a module's
+  identity is its content ("A key is made with the module that holds
+  it"), so two files with one text are one module, and with the same
+  arguments one instance. The case is class changes, and
+  `m3/module-same-text/main.alg` shows it: the top-level statement of
+  the shared text happens once.
+  For the kernel stream: the forms do not say whether `with` and
+  `without` may come in either order (both are read); and the withheld
+  refusal says "the capability c was withheld" also where `c` is an
+  input, as the forms word it.
   Left, with the reason:
   - "C5.1 FQN symbols": Allegretto has no fully-qualified name.
   - "an edited file is a new key" and "the harness and the CLI loader
     share one cache": each is about two configurations, or two
     callers of the host, which one program's run cannot show.
-  - "the same name in two directories is two keys": one program
-    cannot import two files of the same name, and two files of the same
-    text are one module, since the identity is the content.
   - "extension: source can shadow extension binding" and "extension:
     multiple extensions layer correctly": the conflict they become is
     between bare names, which `use` would bring and `import` does not.
@@ -1928,6 +1941,6 @@ policy is the gate ruled there.
     import in the residual; the driver refuses it before anything is
     evaluated, and whether a missing module is a cell or a refutation is
     not ruled.
-  Measured: 434 tests pass, none waits; 64 programs pass;
+  Measured: 435 tests pass, none waits; 65 programs pass;
   `milestone 1: programs 7 (passing 7, failing 0) · cases due 25 · realised 6, named only by a failing program 0, not yet named 19 · up to 1: 6 of 25 realised`;
-  `milestone 3: programs 57 (passing 57, failing 0) · cases due 132 · realised 116, named only by a failing program 0, not yet named 16 · up to 3: 122 of 167 realised`.
+  `milestone 3: programs 58 (passing 58, failing 0) · cases due 132 · realised 117, named only by a failing program 0, not yet named 15 · up to 3: 123 of 167 realised`.
