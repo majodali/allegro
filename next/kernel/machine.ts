@@ -65,6 +65,8 @@ interface Ctl {
   onSuspend?: () => V | undefined;
   /** Values being worked out whose refutation refutes this frame. */
   watch?: Lazy[];
+  /** Values tasks are working out for this frame: orphans if the frame goes without reading them. */
+  holds?: Lazy[];
   /** Cells the frame will come to wait for, beyond the one it waits for now. */
   cells?: CellV[];
 }
@@ -108,8 +110,8 @@ class Task {
   done = false;
   result: V | undefined = undefined;
   queued = false;
-  /** True where its answer came while nothing needed it. */
-  parked = false;
+  /** True where nothing will read its value: the frame that was to read it is gone. */
+  orphan = false;
   /** True where what woke it is a refutation, which it only has to hand on. */
   carries = false;
   /** Raised each time it is taken up: what it registered for before no longer counts. */
@@ -263,68 +265,105 @@ export const createMachine: CreateKernel2 = () => {
   // point of the wait down to the nearest frame that does not need the value yet, become
   // a task. The frames below go on. When the answer comes, `advance` takes the task up at
   // the point where it stopped.
+  //
+  // A task is wanted until the frame that was to read its value is gone without reading
+  // it. From then it is an orphan: its answer may come, and nothing is done with it.
 
   const registrations = (of: WeakMap<object, Registration[]>, w: object): Registration[] => {
     let list = of.get(w);
     if (list === undefined) of.set(w, (list = []));
     return list;
   };
-  const live = (r: Registration): boolean => !r.task.done && r.epoch === r.task.epoch;
+  const live = (r: Registration): boolean => !r.task.done && !r.task.orphan && r.epoch === r.task.epoch;
   /** True where what a task waits for has come. */
   const arrived = (w: Waitable | undefined): boolean =>
     w === undefined ? true : w instanceof CellV ? w.filled : w instanceof Lazy ? !taskOf.has(w) : w.pending.size === 0 || w.refuted !== undefined;
-  /** True where something still wants a task's value: a root not yet over, or a task that waits for it or watches it. */
-  const inDemand = (t: Task, visited: Set<Task> = new Set()): boolean => {
-    if (t.root) return !t.done;
-    if (t.slot === undefined || visited.has(t)) return false;
-    visited.add(t);
-    return (waitersOf.get(t.slot) ?? []).some((r) => live(r) && inDemand(r.task, visited)) || (watchersOf.get(t.slot) ?? []).some((r) => live(r) && inDemand(r.task, visited));
-  };
-  /** Puts a task in line, if anything needs it. One nothing needs is kept, and taken up if that changes. */
+  /** Puts a task in line. An orphan is left where it is. */
   const enqueue = (t: Task, front: boolean): void => {
-    if (t.queued || t.done) return;
-    if (!inDemand(t)) {
-      t.parked = true;
-      return;
-    }
-    t.parked = false;
+    if (t.queued || t.done || t.orphan) return;
     t.queued = true;
     if (front) ready.splice(Math.min(cursor++, ready.length), 0, t);
     else ready.push(t);
   };
-  /** Something now needs a value: the task working it out, if its answer came unneeded, is put in line, and so on down. */
-  const want = (w: Waitable | undefined): void => {
-    if (!(w instanceof Lazy)) return;
-    const t = taskOf.get(w);
-    if (t === undefined || !t.parked || !inDemand(t)) return;
-    if (arrived(t.on) || t.woken !== undefined) enqueue(t, false);
-    else t.parked = false;
-    wanted(t);
-  };
-  const wanted = (t: Task): void => {
-    want(t.on);
-    for (const f of t.frames) for (const l of f.ctl?.watch ?? []) want(l);
-  };
-  /** Records what a suspended task waits for. */
+  /** Records what a suspended task waits for, and which values its frames are working out. */
   const register = (t: Task): void => {
     t.epoch++;
     const on = t.on as Waitable;
     registrations(waitersOf, on).push({ task: t, epoch: t.epoch, frame: 0 });
     if (on instanceof CellV && !waitedCells.includes(on)) waitedCells.push(on);
     t.frames.forEach((f, i) => {
-      for (const l of f.ctl?.watch ?? []) {
+      const c = f.ctl;
+      if (c === undefined) return;
+      if (c.lazy !== undefined) taskOf.set(c.lazy, t);
+      for (const l of c.watch ?? []) {
         if (!taskOf.has(l)) continue;
         registrations(watchersOf as WeakMap<object, Registration[]>, l).push({ task: t, epoch: t.epoch, frame: i });
       }
-      for (const c of f.ctl?.cells ?? []) {
-        if (c.filled) continue;
-        registrations(interestOf as WeakMap<object, Registration[]>, c).push({ task: t, epoch: t.epoch, frame: i });
-        if (!waitedCells.includes(c)) waitedCells.push(c);
+      for (const cell of c.cells ?? []) {
+        if (cell.filled) continue;
+        registrations(interestOf as WeakMap<object, Registration[]>, cell).push({ task: t, epoch: t.epoch, frame: i });
+        if (!waitedCells.includes(cell)) waitedCells.push(cell);
       }
     });
     if (t.slot !== undefined) taskOf.set(t.slot, t);
+    // A value an orphan is working out is wanted again: the part that works it out goes on.
+    if (on instanceof Lazy && !t.orphan) rescue(on);
     if (arrived(on)) enqueue(t, false);
-    wanted(t);
+  };
+  /**
+   * Takes the frames that work out a value, and those above them, out of an orphan into a
+   * task of their own, which is wanted. What is left of the orphan waits for that value.
+   */
+  const rescue = (l: Lazy): void => {
+    const u = taskOf.get(l);
+    if (u === undefined || !u.orphan || u.slot === l) return;
+    const j = u.frames.findIndex((f) => f.ctl?.lazy === l);
+    if (j < 0) return;
+    const t = new Task(undefined, false);
+    t.frames = u.frames.splice(j);
+    t.inherited = u.inherited;
+    t.on = u.on;
+    t.deliver = u.deliver;
+    u.on = l;
+    u.deliver = t;
+    register(u);
+    revive(t);
+  };
+  /** A task is wanted again, and so is what its frames hold. */
+  const revive = (t: Task): void => {
+    t.orphan = false;
+    for (const f of t.frames)
+      for (const l of f.ctl?.holds ?? []) {
+        const held = taskOf.get(l);
+        if (held !== undefined && held.slot === l && held.orphan) revive(held);
+      }
+    register(t);
+  };
+  /** Nothing will read these values: the tasks working them out are orphans, and so is what those hold. */
+  const orphan = (slots: readonly Lazy[]): void => {
+    const work = [...slots];
+    while (work.length > 0) {
+      const l = work.pop() as Lazy;
+      const t = taskOf.get(l);
+      if (t === undefined || t.slot !== l || t.root || t.orphan || t.done) continue;
+      t.orphan = true;
+      if (t.queued) {
+        ready.splice(ready.indexOf(t), 1);
+        t.queued = false;
+      }
+      work.push(...abandoned(t));
+    }
+  };
+  /** What an orphan's frames held. A value in it that something else waits for is still wanted: its part goes on. */
+  const abandoned = (t: Task): Lazy[] => {
+    const wantedAt = t.frames.findIndex((f) => f.ctl?.lazy !== undefined && (waitersOf.get(f.ctl.lazy) ?? []).some(live));
+    if (wantedAt >= 0) rescue(t.frames[wantedAt].ctl?.lazy as Lazy);
+    return t.frames.flatMap((f) => f.ctl?.holds ?? []);
+  };
+  /** A frame is gone: what it held and did not read is an orphan. */
+  const release = (f: Frame): void => {
+    const holds = f.ctl?.holds;
+    if (holds !== undefined && holds.length > 0) orphan(holds);
   };
 
   const pushBinds = (c: Call): Frame => {
@@ -341,14 +380,12 @@ export const createMachine: CreateKernel2 = () => {
     if (f.collector !== undefined) collectors.pop();
     if (f.group !== undefined) groups.pop();
     if (f.capped) budget = f.saved;
-  };
-  /** Drops the frames from a place up: what they were doing is given up. */
-  const drop = (frames: Frame[], from: number): void => {
-    while (frames.length > from) popBinds(frames.pop() as Frame);
+    if (f.ctl !== undefined) release(f);
   };
   /** Moves the frames from a place up into a task that waits. */
   const park = (t: Task, frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
-    const moved = frames.splice(from);
+    // The whole of a task taken up again keeps its frames where they are.
+    const moved = from === 0 && t.frames === frames ? frames : frames.splice(from);
     let [nCollectors, nGroups] = [0, 0];
     for (let j = moved.length - 1; j >= 0; j--) {
       const f = moved[j];
@@ -382,42 +419,35 @@ export const createMachine: CreateKernel2 = () => {
       groups.push(...heldGroups);
     }
   };
+  /** Frames whose value nothing will read are kept as an orphan: a value one of them is working out may yet be wanted. */
+  const shelve = (frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
+    const t = new Task(undefined, false);
+    t.orphan = true;
+    park(t, frames, from, on, deliver);
+    orphan(abandoned(t));
+  };
   /**
-   * The frame on top waits for something. Going down the stack: a frame working out a
-   * value evaluated when needed takes the frames above it into a task of that value's, and
-   * what is below then waits for the value; a frame that does not need the value yet takes
-   * the frames above it into a task, is handed a value that stands for the task's, and goes
-   * on. With no such frame the whole stack waits.
+   * The frame on top waits for something. Going down the stack, the nearest frame that
+   * does not need the value yet takes the frames above it into a task, is handed a value
+   * that stands for the task's, and goes on. With no such frame the whole stack waits.
    */
-  const suspend = (S: Stack, first: Waitable): { value: V } | { error: Signal } | undefined => {
+  const suspend = (S: Stack, on: Waitable): { value: V } | { error: Signal } | undefined => {
     const frames = S.frames;
-    let on: Waitable = first;
-    let deliver: Task | undefined;
     for (let i = frames.length - 1; i >= 0; i--) {
       const c = frames[i].ctl;
       if (c === undefined) continue;
       if (c.onSuspend !== undefined) {
         const answer = atLevel(frames, i, c.onSuspend);
         if (answer !== undefined) {
-          drop(frames, i + 1);
+          shelve(frames, i + 1, on, undefined);
           return { error: new Signal(answer) };
         }
       }
-      if (c.lazy !== undefined) {
-        const again = i === 0 && S.task !== undefined && S.task.slot === c.lazy;
-        const t = again ? (S.task as Task) : new Task(c.lazy, false);
-        park(t, frames, i, on, deliver);
-        if (again) return undefined;
-        on = c.lazy;
-        deliver = t;
-        continue;
-      }
       if (c.boundary === true) {
-        // Nothing but the value's own task was above: the value itself stands for it.
-        if (i === frames.length - 1) return { value: on as Lazy };
         const slot = new Lazy(PENDING, c.scope as ScopeV);
         slot.busy = true;
-        park(new Task(slot, true), frames, i + 1, on, deliver);
+        (c.holds ??= []).push(slot);
+        park(new Task(slot, true), frames, i + 1, on, undefined);
         return { value: slot };
       }
     }
@@ -427,8 +457,8 @@ export const createMachine: CreateKernel2 = () => {
       // The top of an evaluation: a root.
       t = S.task = new Task(undefined, true);
       t.root = true;
-    }
-    park(t, frames, 0, on, deliver);
+    } else t.frames = frames;
+    park(t, frames, 0, on, undefined);
     return undefined;
   };
 
@@ -528,18 +558,7 @@ export const createMachine: CreateKernel2 = () => {
         slot.done = x instanceof Refuted || known(x);
         slot.rests = [...t.base.values()];
       }
-      for (const r of waitersOf.get(slot) ?? []) {
-        if (!live(r)) continue;
-        if (x instanceof Refuted) r.task.carries = true;
-        enqueue(r.task, true);
-      }
-      if (x instanceof Refuted)
-        for (const r of watchersOf.get(slot) ?? []) {
-          if (!live(r) || r.task.queued) continue;
-          r.task.woken = { frame: r.frame, value: x };
-          r.task.carries = true;
-          enqueue(r.task, true);
-        }
+      woke(slot, x);
     }
     if (!t.root) return;
     if (x instanceof Refuted) refutedNow.push(x);
@@ -554,25 +573,37 @@ export const createMachine: CreateKernel2 = () => {
       }
     }
   };
+  /** A value being worked out is settled: what waited for it goes on straight after, and a refutation reaches what watched it. */
+  const woke = (slot: Lazy, x: V | undefined): void => {
+    for (const r of waitersOf.get(slot) ?? []) {
+      if (!live(r)) continue;
+      if (x instanceof Refuted) r.task.carries = true;
+      enqueue(r.task, true);
+    }
+    if (!(x instanceof Refuted)) return;
+    for (const r of watchersOf.get(slot) ?? []) {
+      if (!live(r) || r.task.queued) continue;
+      r.task.woken = { frame: r.frame, value: x };
+      r.task.carries = true;
+      enqueue(r.task, true);
+    }
+  };
   /** Work a block left going: it is a root from here, and every sequence around it waits for it. */
   const detach = (t: Task): void => {
     if (t.done || t.root) return;
     t.root = true;
     t.memberOf = [...groups];
     for (const g of t.memberOf) g.pending.add(t);
-    if (t.parked && (arrived(t.on) || t.woken !== undefined)) enqueue(t, false);
-    wanted(t);
   };
   /** Takes a task up at the point where it stopped. */
   const resume = (t: Task): void => {
     t.epoch++;
-    t.parked = false;
     t.carries = false;
     if (t.slot !== undefined) taskOf.delete(t.slot);
     const woken = t.woken;
     t.woken = undefined;
-    if (woken !== undefined) t.frames.length = woken.frame + 1;
     const handed = woken === undefined ? t.deliver?.result : undefined;
+    const [wasOn, wasDeliver] = [t.on as Waitable, t.deliver];
     t.deliver = undefined;
     t.on = undefined;
     const [outerCollectors, outerGroups, outerBudget] = [collectors, groups, budget];
@@ -585,9 +616,11 @@ export const createMachine: CreateKernel2 = () => {
         f.saved = budget;
         f.cap = budget = Math.min(budget, spent + f.remaining);
       }
+      if (f.ctl?.lazy !== undefined) taskOf.delete(f.ctl.lazy);
     }
+    // What was above a frame that a watched refutation woke is given up.
+    if (woken !== undefined && t.frames.length > woken.frame + 1) shelve(t.frames, woken.frame + 1, wasOn, wasDeliver);
     const S: Stack = { frames: t.frames, task: t, nested: false };
-    t.frames = [];
     try {
       const r = S.frames.length === 0 ? (handed as V) : runStack(S, handed, woken === undefined ? undefined : new Signal(woken.value));
       if (r !== SUSPENDED) finish(t, r);
@@ -701,12 +734,17 @@ export const createMachine: CreateKernel2 = () => {
   };
   /** True where a task's value will be a claim's: the claim waits. */
   const claimWaits = (t: Task | undefined): boolean => {
+    let from = 0;
     while (t !== undefined) {
-      for (const f of t.frames) {
+      for (let i = from; i < t.frames.length; i++) {
+        const f = t.frames[i];
         if (f.marks?.site !== undefined) return true;
         if (f.ctl?.pass !== true) return false;
       }
-      t = t.on instanceof Lazy ? taskOf.get(t.on) : undefined;
+      // It only hands on a value another task is working out.
+      const l = t.on;
+      t = l instanceof Lazy ? taskOf.get(l) : undefined;
+      from = t === undefined || t.slot === l ? 0 : Math.max(0, t.frames.findIndex((f) => f.ctl?.lazy === l));
     }
     return false;
   };
@@ -748,24 +786,37 @@ export const createMachine: CreateKernel2 = () => {
     return all(args, scope, one, k);
   };
   const eachGen = function* (items: readonly V[], i: number, s: Step, args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, ctl: Ctl): Gen {
-    for (;;) {
-      const r: V = s instanceof Call ? yield s : s;
-      if (r instanceof Refuted) return r;
-      args.push(r);
-      if (++i >= items.length) break;
-      s = one(items[i], scope);
+    try {
+      for (;;) {
+        // With nothing left to start after it, the last is simply needed: where it waits, this waits.
+        if (i === items.length - 1) {
+          ctl.boundary = false;
+          ctl.watch = ctl.holds;
+        }
+        const r: V = s instanceof Call ? yield s : s;
+        if (r instanceof Refuted) return r;
+        args.push(r);
+        if (++i >= items.length) break;
+        s = one(items[i], scope);
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
     }
+    // The values tasks are working out pass to the frame that needs them all.
+    const holds = ctl.holds;
     ctl.boundary = false;
-    return all(args, scope, one, k);
+    ctl.holds = ctl.watch = undefined;
+    return all(args, scope, one, k, holds);
   };
-  const all = (args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step): Step => {
+  const all = (args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, holds?: Lazy[]): Step => {
     if (ahead || !args.some(behind)) return k(args);
-    const ctl: Ctl = {};
+    const ctl: Ctl = { holds };
     return framed(allGen(args, scope, one, k, ctl), ctl);
   };
   /** Every one of some values is needed. One that comes out refuted while another is waited for refutes the whole at once. */
   const allGen = function* (args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, ctl: Ctl): Gen {
-    ctl.watch = args.filter((a): a is Lazy => a instanceof Lazy && taskOf.has(a));
+    ctl.watch = ctl.holds;
     ctl.cells = args.map(awaited).filter((w): w is CellV => w instanceof CellV);
     try {
       for (let i = 0; i < args.length; i++) {
@@ -785,8 +836,7 @@ export const createMachine: CreateKernel2 = () => {
       if (e instanceof Signal) return e.value;
       throw e;
     }
-    ctl.watch = undefined;
-    ctl.cells = undefined;
+    ctl.watch = ctl.holds = ctl.cells = undefined;
     return k(args);
   };
 
@@ -880,11 +930,10 @@ export const createMachine: CreateKernel2 = () => {
     rests.forEach(rest);
     v.rests = [...v.rests, ...rests];
     v.value = r;
-    if (r instanceof Refuted || known(r)) {
-      v.done = true;
-      return r;
-    }
-    return v; // It still waits. It stays one thing, so whatever is left in it is done once.
+    if (r instanceof Refuted || known(r)) v.done = true;
+    // What waited for this value in other tasks goes on.
+    if (waitersOf.has(v)) woke(v, r);
+    return v.done ? r : v; // Not done, it still waits. It stays one thing, so whatever is left in it is done once.
   };
 
   /** An application, once what is applied is known. */
@@ -1182,13 +1231,15 @@ export const createMachine: CreateKernel2 = () => {
     if (known(first)) return evaluate(v.args[1], scope);
     if (!ahead) {
       // The first waits for an answer that will come: it is a task.
-      const slot = first instanceof Lazy && taskOf.has(first) ? first : awaited(first) !== undefined ? spawn(first, scope) : undefined;
+      const slot = first instanceof Lazy && taskOf.get(first)?.slot === first ? first : awaited(first) !== undefined ? spawn(first, scope) : undefined;
+      ctl.holds = slot === undefined ? undefined : [slot];
       if (slot !== undefined && claimWaits(taskOf.get(slot))) {
         // A claim that waits holds what is written after it: no effect of it is performed
         // until the claim is decided. It is evaluated ahead, so a refutation in it is found now.
         const looked = aheadOf(v.args[1], scope, ctl);
         if (looked instanceof Refuted) return looked;
         first = yield framed(needGen(slot, scope, evaluate), { pass: true });
+        ctl.holds = undefined;
         if (first instanceof Refuted) return new Call(lookAheadGen(v.args[1], scope, first), undefined);
         if (known(first)) return evaluate(v.args[1], scope);
       } else if (slot !== undefined) {
@@ -1209,6 +1260,7 @@ export const createMachine: CreateKernel2 = () => {
         if (slot.done && slot.value instanceof Refuted) return slot.value;
         const t = taskOf.get(slot);
         if (t !== undefined) detach(t);
+        ctl.holds = undefined;
         return second;
       }
     }
@@ -1397,16 +1449,27 @@ export const createMachine: CreateKernel2 = () => {
   /** The entries are started in order, and none waits for one before it. Then each is needed. */
   const entriesGen = function* (s: Struct, r: V, scope: ScopeV, ctl: Ctl): Gen {
     const waits: V[] = [];
-    for (const [k, e] of s.entries) {
-      if (hidden(k)) continue;
-      step(); // a structure handed over whole costs a step for each entry
-      const st = inFull(e, scope);
-      const x: V = st instanceof Call ? yield st : st;
-      if (x instanceof Refuted) return x;
-      if (!ahead && behind(x)) waits.push(x);
+    const open = s.entries.filter(([k]) => !hidden(k));
+    try {
+      for (let i = 0; i < open.length; i++) {
+        step(); // a structure handed over whole costs a step for each entry
+        if (i === open.length - 1) {
+          ctl.boundary = false;
+          ctl.watch = ctl.holds;
+        }
+        const st = inFull(open[i][1], scope);
+        const x: V = st instanceof Call ? yield st : st;
+        if (x instanceof Refuted) return x;
+        if (!ahead && behind(x)) waits.push(x);
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
     }
+    const holds = ctl.holds;
     ctl.boundary = false;
-    return waits.length === 0 ? r : all(waits, scope, inFull, () => r);
+    ctl.holds = ctl.watch = undefined;
+    return waits.length === 0 ? r : all(waits, scope, inFull, () => r, holds);
   };
 
   /**
@@ -1465,8 +1528,7 @@ export const createMachine: CreateKernel2 = () => {
     },
     waiting: () => {
       for (let i = waitedCells.length - 1; i >= 0; i--) if (waitedCells[i].filled) waitedCells.splice(i, 1);
-      const wanted = (r: Registration): boolean => live(r) && inDemand(r.task);
-      return waitedCells.filter((c) => (waitersOf.get(c) ?? []).some(wanted) || (interestOf.get(c) ?? []).some(wanted)).map((c) => out(c) as Cell);
+      return waitedCells.filter((c) => (waitersOf.get(c) ?? []).some(live) || (interestOf.get(c) ?? []).some(live)).map((c) => out(c) as Cell);
     },
 
     evaluate: (expression, scope, limits): Result => {
