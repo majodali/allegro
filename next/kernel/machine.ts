@@ -1,5 +1,5 @@
 // The machine: the kernel variant that evaluates with a stack of its own
-// (chunk K9 of docs/plans/book-pass.md, and its section 9).
+// (docs/plans/book-pass.md section 9).
 //
 // It implements the same interface as the reference kernel
 // (next/kernel/kernel.ts) and follows the same rules, case for case. "One
@@ -22,16 +22,29 @@
 // interface that evaluates nothing are shared with the reference
 // (next/kernel/values.ts, next/kernel/core.ts).
 //
-// Not here yet, and in later chunks of the plan: a task that waits where
-// it stands, slices, the first of two answers, sharing, specialization.
-// A computation that waits is, as in the reference, what is left of it as
-// an expression, evaluated again when the answer comes.
+// There are two ways not to know a value, and they are treated apart.
+//   - A parameter left unknown: no answer will come during this
+//     evaluation. What could be evaluated is, and the rest is left as an
+//     expression, as in the reference.
+//   - A cell not yet filled, the answer of an operation that takes time:
+//     an answer will come. The computation stops where it stands. Its
+//     frames, down to the nearest frame that does not need the value yet,
+//     become a task, registered on the cell. When the cell is filled,
+//     `advance` takes the task up at the point where it stopped. Nothing
+//     is evaluated or counted twice.
+// Ahead of what is done (what a `then` or a claim holds back, and what
+// follows a refutation) nothing waits: there a cell is one more unknown,
+// and the evaluation is the reference's.
+//
+// Not here yet, and in later chunks of the plan: slices, the first of
+// two answers, sharing, specialization. A task that a limit stops is
+// dropped.
 
 import type { Advance, Cell, CreateKernel2, Kernel2, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
-import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
-import type { Group, Mark, Root, V } from "./values.js";
+import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
+import type { Mark, V } from "./values.js";
 
 /** What evaluating gives: a value, or a call still to be run. */
 type Step = V | Call;
@@ -41,13 +54,106 @@ type Gen = Generator<Call, Step, V>;
 interface Marks {
   readonly owner: Mark | undefined;
   readonly site: Expr | undefined;
-  readonly group: Group | undefined;
+  readonly group: MGroup | undefined;
 }
 /** A call still to be run: a frame, or a function `run` calls in its place. */
+/** Something a computation waits for: a late answer, a value another task is working out, or the work a sequence's first part started. */
+type Waitable = CellV | Lazy | MGroup;
+/** The work a sequence's first part started and that still goes on. */
+interface MGroup {
+  readonly pending: Set<Task>;
+  refuted: Refuted | undefined;
+}
+/** What a frame tells `run` about itself. */
+interface Ctl {
+  /** True while the frame does not need the value it asked for: a wait above it becomes a task, and the frame goes on. */
+  boundary?: boolean;
+  /** The scope of a boundary frame. */
+  scope?: ScopeV;
+  /** The value evaluated when needed that this frame is working out. */
+  lazy?: Lazy;
+  /** True where the frame's value is the value it asked for, unchanged. */
+  pass?: boolean;
+  /** Called when the frame is first made to wait. A value it gives is the frame's answer at once, and nothing waits. */
+  onSuspend?: () => V | undefined;
+  /** Values being worked out whose refutation refutes this frame. */
+  watch?: Lazy[];
+  /** Values tasks are working out for this frame: orphans if the frame goes without reading them. */
+  holds?: Lazy[];
+  /** Cells the frame will come to wait for, beyond the one it waits for now. */
+  cells?: CellV[];
+}
 class Call {
   marks: Marks | undefined = undefined;
+  /** What the evaluation rests on is collected here while the frame lives. */
+  collector: Map<string, Rest> | undefined = undefined;
+  /** The sequence whose first part the frame evaluates. */
+  group: MGroup | undefined = undefined;
+  /** A budget of steps for the frame. */
+  cap: number | undefined = undefined;
+  ctl: Ctl | undefined = undefined;
+  /** Set on a call that only says what the frame waits for. */
+  wait: Waitable | undefined = undefined;
   constructor(readonly gen: Gen | undefined, readonly thunk: (() => Step) | undefined) {}
 }
+/** One frame of a stack. */
+interface Frame {
+  readonly gen: Gen;
+  marks: Marks | undefined;
+  readonly collector: Map<string, Rest> | undefined;
+  readonly group: MGroup | undefined;
+  readonly capped: boolean;
+  /** The budget in force while the frame runs, and the one before it. */
+  cap: number;
+  saved: number;
+  /** The steps left to the frame while its task waits. */
+  remaining: number;
+  readonly ctl: Ctl | undefined;
+}
+/** A suspended stack: the frames of a computation that waits, and what it waits for. */
+class Task {
+  frames: Frame[] = [];
+  on: Waitable | undefined = undefined;
+  /** The task whose value this one is handed when it goes on. */
+  deliver: Task | undefined = undefined;
+  /** A watched value came out refuted: the frame that watched it, and the refutation. */
+  woken: { frame: number; value: V } | undefined = undefined;
+  /** True for the top of an evaluation and for work a block left going: its refutation is reported. */
+  root = false;
+  done = false;
+  result: V | undefined = undefined;
+  queued = false;
+  /** True where nothing will read its value: the frame that was to read it is gone. */
+  orphan = false;
+  /** True where what woke it is a refutation, which it only has to hand on. */
+  carries = false;
+  /** Raised each time it is taken up: what it registered for before no longer counts. */
+  epoch = 0;
+  /** What its own work rests on. */
+  readonly base = new Map<string, Rest>();
+  /** The sequences around it when it was split off, outermost first. */
+  inherited: MGroup[] = [];
+  /** The sequences that wait for it to be over. */
+  memberOf: MGroup[] = [];
+  /** `slot` is where its value goes. `fills` is true where the task itself must write it there. */
+  constructor(public slot: Lazy | undefined, readonly fills: boolean) {}
+}
+/** Thrown into a frame to hand it an answer in place of the value it asked for. */
+class Signal {
+  constructor(readonly value: V) {}
+}
+interface Registration {
+  readonly task: Task;
+  readonly epoch: number;
+  readonly frame: number;
+}
+/** A stack being run. */
+interface Stack {
+  readonly frames: Frame[];
+  task: Task | undefined;
+  readonly nested: boolean;
+}
+const SUSPENDED = Symbol("suspended");
 /** The marks of an inner evaluation come first; an outer one fills what is still missing. */
 const merge = (inner: Marks | undefined, outer: Marks | undefined): Marks | undefined =>
   inner === undefined ? outer : outer === undefined ? inner : { owner: inner.owner ?? outer.owner, site: inner.site ?? outer.site, group: inner.group ?? outer.group };
@@ -66,23 +172,30 @@ export const createMachine: CreateKernel2 = () => {
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,
   } = core;
-  const roots: Root[] = [];
-  const rootOf = new WeakMap<object, Root>();
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k9";
+  const VARIANT = "machine-k10";
   /**
-   * What `advance` is to take up, in order: an evaluation is put here when a cell it waits
-   * on is filled, so answers are acted on in the order they arrive, and an evaluation that
-   * waits on none of the cells filled is left alone.
+   * The tasks `advance` is to take up, in order. A task is put here when what it waits for
+   * arrives, so answers are acted on in the order they arrive.
    */
-  const ready: Root[] = [];
-  /** How many cells have been filled: an evaluation that a fill overtook is taken up again. */
-  let fills = 0;
+  const ready: Task[] = [];
+  /** Where in `ready` a task woken by the one now running is put: straight after it. */
+  let cursor = 1;
+  /** The task whose value each value being worked out will be. */
+  const taskOf = new WeakMap<Lazy, Task>();
+  /** What waits for each cell, value and sequence, in the order it came to wait. */
+  const waitersOf = new WeakMap<object, Registration[]>();
+  const watchersOf = new WeakMap<Lazy, Registration[]>();
+  const interestOf = new WeakMap<CellV, Registration[]>();
+  /** The cells something has waited for, in the order they were first waited for. */
+  const waitedCells: CellV[] = [];
+  /** The roots that came out refuted in the call of `advance` now running. */
+  let refutedNow: V[] = [];
   let spent = 0;
   let budget = Infinity;
   /** What the evaluations now under way rest on: one collector for each claim or binding being evaluated. */
-  const collectors: Map<string, Rest>[] = [];
+  let collectors: Map<string, Rest>[] = [];
   /** The capability part now running, so a cell it makes knows where its answer comes from. */
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
@@ -92,9 +205,10 @@ export const createMachine: CreateKernel2 = () => {
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
-  const groups: Group[] = [];
-  /** Set by `waitsOn` when it passes a `then` that waits for work its first part started. */
-  let sawGroup = false;
+  let groups: MGroup[] = [];
+  const groupOf = thenGroups as unknown as WeakMap<Expr, MGroup>;
+  /** What stands in a value being worked out by a task until the task writes it. */
+  const PENDING = new Expr(new Param("pending"), []);
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(localKey(r), r);
   };
@@ -141,7 +255,7 @@ export const createMachine: CreateKernel2 = () => {
   const marksOf = (v: V): Marks | undefined => {
     if (v instanceof Expr) {
       const site = v.site ?? (v.fn === CLAIM || v.fn === ASSUME ? v : undefined);
-      const group = thenGroups.get(v);
+      const group = groupOf.get(v);
       return v.owner === undefined && site === undefined && group === undefined ? undefined : { owner: v.owner, site, group };
     }
     if (v instanceof Struct || v instanceof Fn) return v.owner === undefined ? undefined : { owner: v.owner, site: undefined, group: undefined };
@@ -153,26 +267,245 @@ export const createMachine: CreateKernel2 = () => {
     if ((r instanceof Expr || r instanceof Struct || r instanceof Fn) && r.owner === undefined) r.owner = m.owner;
     if (r instanceof Expr) {
       if (r.site === undefined && m.site !== undefined && m.site !== r) r.site = m.site;
-      if (m.group !== undefined && !thenGroups.has(r)) thenGroups.set(r, m.group);
+      if (m.group !== undefined && !groupOf.has(r)) groupOf.set(r, m.group);
     }
     return r;
   };
 
+  // ---- Tasks ----------------------------------------------------------------
+  //
+  // A computation that needs a late answer stops where it stands. Its frames, from the
+  // point of the wait down to the nearest frame that does not need the value yet, become
+  // a task. The frames below go on. When the answer comes, `advance` takes the task up at
+  // the point where it stopped.
+  //
+  // A task is wanted until the frame that was to read its value is gone without reading
+  // it. From then it is an orphan: its answer may come, and nothing is done with it.
+
+  const registrations = (of: WeakMap<object, Registration[]>, w: object): Registration[] => {
+    let list = of.get(w);
+    if (list === undefined) of.set(w, (list = []));
+    return list;
+  };
+  const live = (r: Registration): boolean => !r.task.done && !r.task.orphan && r.epoch === r.task.epoch;
+  /** True where what a task waits for has come. */
+  const arrived = (w: Waitable | undefined): boolean =>
+    w === undefined ? true : w instanceof CellV ? w.filled : w instanceof Lazy ? !taskOf.has(w) : w.pending.size === 0 || w.refuted !== undefined;
+  /** Puts a task in line. An orphan is left where it is. */
+  const enqueue = (t: Task, front: boolean): void => {
+    if (t.queued || t.done || t.orphan) return;
+    t.queued = true;
+    if (front) ready.splice(Math.min(cursor++, ready.length), 0, t);
+    else ready.push(t);
+  };
+  /** Records what a suspended task waits for, and which values its frames are working out. */
+  const register = (t: Task): void => {
+    t.epoch++;
+    const on = t.on as Waitable;
+    registrations(waitersOf, on).push({ task: t, epoch: t.epoch, frame: 0 });
+    if (on instanceof CellV && !waitedCells.includes(on)) waitedCells.push(on);
+    t.frames.forEach((f, i) => {
+      const c = f.ctl;
+      if (c === undefined) return;
+      if (c.lazy !== undefined) taskOf.set(c.lazy, t);
+      for (const l of c.watch ?? []) {
+        if (!taskOf.has(l)) continue;
+        registrations(watchersOf as WeakMap<object, Registration[]>, l).push({ task: t, epoch: t.epoch, frame: i });
+      }
+      for (const cell of c.cells ?? []) {
+        if (cell.filled) continue;
+        registrations(interestOf as WeakMap<object, Registration[]>, cell).push({ task: t, epoch: t.epoch, frame: i });
+        if (!waitedCells.includes(cell)) waitedCells.push(cell);
+      }
+    });
+    if (t.slot !== undefined) taskOf.set(t.slot, t);
+    // A value an orphan is working out is wanted again: the part that works it out goes on.
+    if (on instanceof Lazy && !t.orphan) rescue(on);
+    if (arrived(on)) enqueue(t, false);
+  };
   /**
-   * Runs a call to its value. The frames that wait are generators, kept here in a list; a
-   * frame that ends by handing on another call is replaced by it, so a call that is the
-   * value of its function's body takes no room.
+   * Takes the frames that work out a value, and those above them, out of an orphan into a
+   * task of their own, which is wanted. What is left of the orphan waits for that value.
    */
-  const run = (start: Step): V => {
-    const frames: Gen[] = [];
-    const held: (Marks | undefined)[] = [];
-    let item: Step = start; // what is being worked out for the frame on top
+  const rescue = (l: Lazy): void => {
+    const u = taskOf.get(l);
+    if (u === undefined || !u.orphan || u.slot === l) return;
+    const j = u.frames.findIndex((f) => f.ctl?.lazy === l);
+    if (j < 0) return;
+    const t = new Task(undefined, false);
+    t.frames = u.frames.splice(j);
+    t.inherited = u.inherited;
+    t.on = u.on;
+    t.deliver = u.deliver;
+    u.on = l;
+    u.deliver = t;
+    register(u);
+    revive(t);
+  };
+  /** A task is wanted again, and so is what its frames hold. */
+  const revive = (t: Task): void => {
+    t.orphan = false;
+    for (const f of t.frames)
+      for (const l of f.ctl?.holds ?? []) {
+        const held = taskOf.get(l);
+        if (held !== undefined && held.slot === l && held.orphan) revive(held);
+      }
+    register(t);
+  };
+  /** Nothing will read these values: the tasks working them out are orphans, and so is what those hold. */
+  const orphan = (slots: readonly Lazy[]): void => {
+    const work = [...slots];
+    while (work.length > 0) {
+      const l = work.pop() as Lazy;
+      const t = taskOf.get(l);
+      if (t === undefined || t.slot !== l || t.root || t.orphan || t.done) continue;
+      t.orphan = true;
+      if (t.queued) {
+        ready.splice(ready.indexOf(t), 1);
+        t.queued = false;
+      }
+      work.push(...abandoned(t));
+    }
+  };
+  /** What an orphan's frames held. A value in it that something else waits for is still wanted: its part goes on. */
+  const abandoned = (t: Task): Lazy[] => {
+    const wantedAt = t.frames.findIndex((f) => f.ctl?.lazy !== undefined && (waitersOf.get(f.ctl.lazy) ?? []).some(live));
+    if (wantedAt >= 0) rescue(t.frames[wantedAt].ctl?.lazy as Lazy);
+    return t.frames.flatMap((f) => f.ctl?.holds ?? []);
+  };
+  /** A frame is gone: what it held and did not read is an orphan. */
+  const release = (f: Frame): void => {
+    const holds = f.ctl?.holds;
+    if (holds !== undefined && holds.length > 0) orphan(holds);
+  };
+
+  const pushBinds = (c: Call): Frame => {
+    const f: Frame = { gen: c.gen as Gen, marks: undefined, collector: c.collector, group: c.group, capped: c.cap !== undefined, cap: 0, saved: 0, remaining: 0, ctl: c.ctl };
+    if (f.collector !== undefined) collectors.push(f.collector);
+    if (f.group !== undefined) groups.push(f.group);
+    if (c.cap !== undefined) {
+      f.saved = budget;
+      f.cap = budget = Math.min(budget, spent + c.cap);
+    }
+    return f;
+  };
+  const popBinds = (f: Frame): void => {
+    if (f.collector !== undefined) collectors.pop();
+    if (f.group !== undefined) groups.pop();
+    if (f.capped) budget = f.saved;
+    if (f.ctl !== undefined) release(f);
+  };
+  /** Moves the frames from a place up into a task that waits. */
+  const park = (t: Task, frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
+    // The whole of a task taken up again keeps its frames where they are.
+    const moved = from === 0 && t.frames === frames ? frames : frames.splice(from);
+    let [nCollectors, nGroups] = [0, 0];
+    for (let j = moved.length - 1; j >= 0; j--) {
+      const f = moved[j];
+      if (f.collector !== undefined) nCollectors++;
+      if (f.group !== undefined) nGroups++;
+      if (f.capped) {
+        f.remaining = f.cap - spent;
+        budget = f.saved;
+      }
+    }
+    collectors.length -= nCollectors;
+    groups.length -= nGroups;
+    t.inherited = [...groups];
+    t.frames = moved;
+    t.on = on;
+    t.deliver = deliver;
+    register(t);
+  };
+  /** Calls a frame's hook as the frame stands: what the frames above it collect is not its own. */
+  const atLevel = (frames: Frame[], i: number, hook: () => V | undefined): V | undefined => {
+    let [nCollectors, nGroups] = [0, 0];
+    for (let j = i + 1; j < frames.length; j++) {
+      if (frames[j].collector !== undefined) nCollectors++;
+      if (frames[j].group !== undefined) nGroups++;
+    }
+    const [heldCollectors, heldGroups] = [collectors.splice(collectors.length - nCollectors), groups.splice(groups.length - nGroups)];
+    try {
+      return hook();
+    } finally {
+      collectors.push(...heldCollectors);
+      groups.push(...heldGroups);
+    }
+  };
+  /** Frames whose value nothing will read are kept as an orphan: a value one of them is working out may yet be wanted. */
+  const shelve = (frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
+    const t = new Task(undefined, false);
+    t.orphan = true;
+    park(t, frames, from, on, deliver);
+    orphan(abandoned(t));
+  };
+  /**
+   * The frame on top waits for something. Going down the stack, the nearest frame that
+   * does not need the value yet takes the frames above it into a task, is handed a value
+   * that stands for the task's, and goes on. With no such frame the whole stack waits.
+   */
+  const suspend = (S: Stack, on: Waitable): { value: V } | { error: Signal } | undefined => {
+    const frames = S.frames;
+    for (let i = frames.length - 1; i >= 0; i--) {
+      const c = frames[i].ctl;
+      if (c === undefined) continue;
+      if (c.onSuspend !== undefined) {
+        const answer = atLevel(frames, i, c.onSuspend);
+        if (answer !== undefined) {
+          shelve(frames, i + 1, on, undefined);
+          return { error: new Signal(answer) };
+        }
+      }
+      if (c.boundary === true) {
+        const slot = new Lazy(PENDING, c.scope as ScopeV);
+        slot.busy = true;
+        (c.holds ??= []).push(slot);
+        park(new Task(slot, true), frames, i + 1, on, undefined);
+        return { value: slot };
+      }
+    }
+    if (S.nested) throw new KernelFault("an evaluation that may not wait came to wait");
+    let t = S.task;
+    if (t === undefined) {
+      // The top of an evaluation: a root.
+      t = S.task = new Task(undefined, true);
+      t.root = true;
+    } else t.frames = frames;
+    park(t, frames, 0, on, undefined);
+    return undefined;
+  };
+
+  /**
+   * Runs a stack until it has a value or waits. The frames are generators; a frame that
+   * ends by handing on another call is replaced by it, so a call that is the value of its
+   * function's body takes no room.
+   */
+  const runStack = (S: Stack, start: Step | undefined, thrown: Signal | undefined): V | typeof SUSPENDED => {
+    const frames = S.frames;
+    let item = start as Step; // what is being worked out for the frame on top
     let marks: Marks | undefined; // the marks its value will take
-    let failed = false;
-    let error: unknown;
+    let failed = thrown !== undefined;
+    let error: unknown = thrown;
     for (;;) {
       while (!failed && item instanceof Call) {
         const call: Call = item;
+        if (call.wait !== undefined) {
+          let answer: { value: V } | { error: Signal } | undefined;
+          try {
+            answer = suspend(S, call.wait);
+          } catch (e) {
+            failed = true;
+            error = e;
+            continue;
+          }
+          if (answer === undefined) return SUSPENDED;
+          marks = undefined;
+          if ("error" in answer) {
+            failed = true;
+            error = answer.error;
+          } else item = answer.value;
+          break;
+        }
         marks = merge(call.marks, marks);
         if (call.thunk !== undefined) {
           try {
@@ -183,16 +516,17 @@ export const createMachine: CreateKernel2 = () => {
           }
           continue;
         }
-        const gen = call.gen as Gen;
+        const f = pushBinds(call);
         try {
-          const res = gen.next(undefined as never);
+          const res = f.gen.next(undefined as never);
           item = res.value;
           if (!res.done) {
-            frames.push(gen);
-            held.push(marks);
+            f.marks = marks;
+            frames.push(f);
             marks = undefined;
-          }
+          } else popBinds(f);
         } catch (e) {
+          popBinds(f);
           failed = true;
           error = e;
         }
@@ -203,21 +537,113 @@ export const createMachine: CreateKernel2 = () => {
         if (failed) throw error;
         return item as V;
       }
-      const gen = frames[frames.length - 1];
+      const f = frames[frames.length - 1];
       try {
-        const res = failed ? gen.throw(error) : gen.next(item as V);
+        const res = failed ? f.gen.throw(error) : f.gen.next(item as V);
         failed = false;
         item = res.value;
         if (res.done) {
           frames.pop();
-          marks = held.pop();
+          popBinds(f);
+          marks = f.marks;
         }
       } catch (e) {
         frames.pop();
-        held.pop();
+        popBinds(f);
         failed = true;
         error = e;
       }
+    }
+  };
+  /** Runs a call to its value, from inside the running of another. It may not wait. */
+  const run = (start: Step): V => runStack({ frames: [], task: undefined, nested: true }, start, undefined) as V;
+
+  /** A task is over: its value is written where it goes, and what waited for it is put in line. */
+  const finish = (t: Task, x: V): void => {
+    t.done = true;
+    t.result = x;
+    const slot = t.slot;
+    if (slot !== undefined) {
+      taskOf.delete(slot);
+      if (t.fills) {
+        slot.busy = false;
+        slot.value = x;
+        slot.done = x instanceof Refuted || known(x);
+        slot.rests = [...t.base.values()];
+      }
+      woke(slot, x);
+    }
+    if (!t.root) return;
+    if (x instanceof Refuted) refutedNow.push(x);
+    for (const g of t.memberOf) {
+      g.pending.delete(t);
+      if (x instanceof Refuted && g.refuted === undefined) g.refuted = x;
+      if (!arrived(g)) continue;
+      for (const r of waitersOf.get(g) ?? []) {
+        if (!live(r)) continue;
+        if (g.refuted !== undefined) r.task.carries = true;
+        enqueue(r.task, false);
+      }
+    }
+  };
+  /** A value being worked out is settled: what waited for it goes on straight after, and a refutation reaches what watched it. */
+  const woke = (slot: Lazy, x: V | undefined): void => {
+    for (const r of waitersOf.get(slot) ?? []) {
+      if (!live(r)) continue;
+      if (x instanceof Refuted) r.task.carries = true;
+      enqueue(r.task, true);
+    }
+    if (!(x instanceof Refuted)) return;
+    for (const r of watchersOf.get(slot) ?? []) {
+      if (!live(r) || r.task.queued) continue;
+      r.task.woken = { frame: r.frame, value: x };
+      r.task.carries = true;
+      enqueue(r.task, true);
+    }
+  };
+  /** Work a block left going: it is a root from here, and every sequence around it waits for it. */
+  const detach = (t: Task): void => {
+    if (t.done || t.root) return;
+    t.root = true;
+    t.memberOf = [...groups];
+    for (const g of t.memberOf) g.pending.add(t);
+  };
+  /** Takes a task up at the point where it stopped. */
+  const resume = (t: Task): void => {
+    t.epoch++;
+    t.carries = false;
+    if (t.slot !== undefined) taskOf.delete(t.slot);
+    const woken = t.woken;
+    t.woken = undefined;
+    const handed = woken === undefined ? t.deliver?.result : undefined;
+    const [wasOn, wasDeliver] = [t.on as Waitable, t.deliver];
+    t.deliver = undefined;
+    t.on = undefined;
+    const [outerCollectors, outerGroups, outerBudget] = [collectors, groups, budget];
+    collectors = [t.base];
+    groups = [...t.inherited];
+    for (const f of t.frames) {
+      if (f.collector !== undefined) collectors.push(f.collector);
+      if (f.group !== undefined) groups.push(f.group);
+      if (f.capped) {
+        f.saved = budget;
+        f.cap = budget = Math.min(budget, spent + f.remaining);
+      }
+      if (f.ctl?.lazy !== undefined) taskOf.delete(f.ctl.lazy);
+    }
+    // What was above a frame that a watched refutation woke is given up.
+    if (woken !== undefined && t.frames.length > woken.frame + 1) shelve(t.frames, woken.frame + 1, wasOn, wasDeliver);
+    const S: Stack = { frames: t.frames, task: t, nested: false };
+    try {
+      const r = S.frames.length === 0 ? (handed as V) : runStack(S, handed, woken === undefined ? undefined : new Signal(woken.value));
+      if (r !== SUSPENDED) finish(t, r);
+    } catch (e) {
+      // Its steps ran out, or it failed: what it was doing is dropped, and nothing it was to give comes.
+      t.done = true;
+      if (t.slot !== undefined) taskOf.set(t.slot, t);
+      throw e;
+    } finally {
+      [collectors, groups, budget] = [outerCollectors, outerGroups, outerBudget];
     }
   };
 
@@ -228,41 +654,203 @@ export const createMachine: CreateKernel2 = () => {
   };
   /** A call run from `run` itself, not from where it was made: what keeps a long chain of calls off the host's stack. */
   const bounce = (thunk: () => Step): Call => new Call(undefined, thunk);
+  /** A frame whose whole life is one evaluation: what is bound to its call is in force for all of it. */
+  const passGen = function* (make: () => Step): Gen {
+    const s = make();
+    return s instanceof Call ? yield s : s;
+  };
+  const framed = (gen: Gen, ctl: Ctl | undefined): Call => {
+    const c = new Call(gen, undefined);
+    c.ctl = ctl;
+    return c;
+  };
+  const hooked = (make: (ctl: Ctl) => Gen): Call => {
+    const ctl: Ctl = {};
+    return framed(make(ctl), ctl);
+  };
+  const waitFor = (w: Waitable): Call => {
+    const c = new Call(undefined, undefined);
+    c.wait = w;
+    return c;
+  };
   /** Evaluates under a fresh collector, and hands on the value with what the evaluation rested on. */
   const collectingGen = function* (make: () => Step, k: (value: V, rests: Rest[]) => Step): Gen {
     const mine = new Map<string, Rest>();
-    collectors.push(mine);
-    let value: V;
-    try {
-      const s = make();
-      value = s instanceof Call ? yield s : s;
-    } finally {
-      collectors.pop();
-    }
+    const c = framed(passGen(make), { pass: true });
+    c.collector = mine;
+    const value: V = yield c;
     return k(value, [...mine.values()]);
   };
-  /** Each of some values in turn, each needing the one before it to be done; a refutation ends it. */
+
+  /**
+   * What a value still waits for that will come: an unfilled cell, or a value a task is
+   * working out. A parameter left unknown is not that: no answer comes for it, and what
+   * needs it is left as an expression.
+   */
+  const awaited = (x: V): CellV | Lazy | undefined => {
+    for (;;) {
+      if (x instanceof CellV) {
+        if (!x.filled) return x;
+        x = x.value as V;
+      } else if (x instanceof Lazy) {
+        if (!x.done && x.busy) return taskOf.has(x) ? x : undefined;
+        x = x.value;
+      } else return undefined;
+    }
+  };
+  /** True for a handle that waits for something that will come, or stands for more than it did when it was last evaluated. */
+  const behind = (x: V): boolean => {
+    if (x instanceof CellV) return true;
+    if (!(x instanceof Lazy) || x.done) return false;
+    if (x.busy) return taskOf.has(x);
+    const inner = x.value;
+    return inner instanceof CellV || (inner instanceof Lazy && (inner.done || behind(inner)));
+  };
+  /** Waits until a value no longer waits for anything that will come, evaluating it again each time something came. */
+  const needGen = function* (x: V, scope: ScopeV, one: (a: V, scope: ScopeV) => Step): Gen {
+    for (;;) {
+      const w = awaited(x);
+      if (w === undefined) return x;
+      yield waitFor(w);
+      const s = one(x, scope);
+      x = s instanceof Call ? yield s : s;
+    }
+  };
+  /** What is to be done with a value that is needed. Ahead of what is done nothing waits. */
+  const needed = (s: Step, scope: ScopeV, k: (x: V) => Step): Step =>
+    after(s, (x) => (ahead || awaited(x) === undefined ? k(x) : after(framed(needGen(x, scope, evaluate), { pass: true }), k)));
+  /** The value of an evaluation, once it waits for nothing that will come. */
+  const needStep = (s: Step, scope: ScopeV): Step =>
+    s instanceof Call ? framed(needFromGen(s, scope), { pass: true }) : ahead || awaited(s) === undefined ? s : framed(needGen(s, scope, evaluate), { pass: true });
+  const needFromGen = function* (s: Call, scope: ScopeV): Gen {
+    let x: V = yield s;
+    for (;;) {
+      const w = ahead ? undefined : awaited(x);
+      if (w === undefined) return x;
+      yield waitFor(w);
+      const again = evaluate(x, scope);
+      x = again instanceof Call ? yield again : again;
+    }
+  };
+  /** A task that waits for a value in hand, and the value that stands for the task's. */
+  const spawn = (x: V, scope: ScopeV): Lazy => {
+    const slot = new Lazy(PENDING, scope);
+    slot.busy = true;
+    const t = new Task(slot, true);
+    const gen = needGen(x, scope, evaluate);
+    const w = gen.next(undefined as never).value as Call;
+    t.frames = [{ gen, marks: undefined, collector: undefined, group: undefined, capped: false, cap: 0, saved: 0, remaining: 0, ctl: { pass: true } }];
+    t.inherited = [...groups];
+    t.on = w.wait as Waitable;
+    register(t);
+    return slot;
+  };
+  /** True where a task's value will be a claim's: the claim waits. */
+  const claimWaits = (t: Task | undefined): boolean => {
+    let from = 0;
+    while (t !== undefined) {
+      for (let i = from; i < t.frames.length; i++) {
+        const f = t.frames[i];
+        if (f.marks?.site !== undefined) return true;
+        if (f.ctl?.pass !== true) return false;
+      }
+      // It only hands on a value another task is working out.
+      const l = t.on;
+      t = l instanceof Lazy ? taskOf.get(l) : undefined;
+      from = t === undefined || t.slot === l ? 0 : Math.max(0, t.frames.findIndex((f) => f.ctl?.lazy === l));
+    }
+    return false;
+  };
+  /** The unfilled cells met while evaluating ahead: what is held will come to wait for them. */
+  let seenAhead: Set<CellV> | undefined;
+  /**
+   * Evaluates ahead of what is done, at once: no effect is performed, and nothing waits.
+   * The cells it meets are noted for the frame that holds what was evaluated.
+   */
+  const aheadOf = (e: V, scope: ScopeV, ctl: Ctl): V => {
+    const [before, seenBefore] = [ahead, seenAhead];
+    ahead = true;
+    const met = (seenAhead = new Set<CellV>());
+    try {
+      return run(evaluate(e, scope));
+    } finally {
+      ahead = before;
+      seenAhead = seenBefore;
+      ctl.cells = [...met];
+    }
+  };
+
+  /**
+   * Each of some values in turn. They are started in order and none waits for one before
+   * it: where one comes to wait, the next is started all the same. Then every one is
+   * needed. A refutation ends it.
+   */
   const each = (items: readonly V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step): Step => {
     const args: V[] = [];
-    const from = (start: number): Step => {
-      for (let i = start; i < items.length; i++) {
-        const s = one(items[i], scope);
-        if (s instanceof Call) {
-          return new Call(
-            afterGen(s, (r) => {
-              if (r instanceof Refuted) return r;
-              args.push(r);
-              return from(i + 1);
-            }),
-            undefined,
-          );
-        }
-        if (s instanceof Refuted) return s;
-        args.push(s);
+    for (let i = 0; i < items.length; i++) {
+      const s = one(items[i], scope);
+      if (s instanceof Call) {
+        const ctl: Ctl = { boundary: true, scope };
+        return framed(eachGen(items, i, s, args, scope, one, k, ctl), ctl);
       }
-      return k(args);
-    };
-    return from(0);
+      if (s instanceof Refuted) return s;
+      args.push(s);
+    }
+    return all(args, scope, one, k);
+  };
+  const eachGen = function* (items: readonly V[], i: number, s: Step, args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, ctl: Ctl): Gen {
+    try {
+      for (;;) {
+        // With nothing left to start after it, the last is simply needed: where it waits, this waits.
+        if (i === items.length - 1) {
+          ctl.boundary = false;
+          ctl.watch = ctl.holds;
+        }
+        const r: V = s instanceof Call ? yield s : s;
+        if (r instanceof Refuted) return r;
+        args.push(r);
+        if (++i >= items.length) break;
+        s = one(items[i], scope);
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
+    }
+    // The values tasks are working out pass to the frame that needs them all.
+    const holds = ctl.holds;
+    ctl.boundary = false;
+    ctl.holds = ctl.watch = undefined;
+    return all(args, scope, one, k, holds);
+  };
+  const all = (args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, holds?: Lazy[]): Step => {
+    if (ahead || !args.some(behind)) return k(args);
+    const ctl: Ctl = { holds };
+    return framed(allGen(args, scope, one, k, ctl), ctl);
+  };
+  /** Every one of some values is needed. One that comes out refuted while another is waited for refutes the whole at once. */
+  const allGen = function* (args: V[], scope: ScopeV, one: (a: V, scope: ScopeV) => Step, k: (args: V[]) => Step, ctl: Ctl): Gen {
+    ctl.watch = ctl.holds;
+    ctl.cells = args.map(awaited).filter((w): w is CellV => w instanceof CellV);
+    try {
+      for (let i = 0; i < args.length; i++) {
+        let a = args[i];
+        if (!behind(a)) continue;
+        for (;;) {
+          const w = awaited(a);
+          if (w !== undefined) yield waitFor(w);
+          const s = one(a, scope);
+          a = s instanceof Call ? yield s : s;
+          if (awaited(a) === undefined) break;
+        }
+        if (a instanceof Refuted) return a;
+        args[i] = a;
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
+    }
+    ctl.watch = ctl.holds = ctl.cells = undefined;
+    return k(args);
   };
 
   // ---- Evaluation ---------------------------------------------------------
@@ -304,7 +892,10 @@ export const createMachine: CreateKernel2 = () => {
       );
     }
     if (v instanceof CellV) {
-      if (!v.filled) return v;
+      if (!v.filled) {
+        seenAhead?.add(v);
+        return v;
+      }
       if (v.source !== undefined) rest(v.source);
       return v.value as V;
     }
@@ -315,8 +906,9 @@ export const createMachine: CreateKernel2 = () => {
         return v.value;
       }
       // A value that needs itself has no value: `n = n + 1`, read, would never end.
-      if (v.busy) return new Refuted("a value that needs itself to be known", undefined);
-      return new Call(lazyGen(v), undefined);
+      // Unless a task that waits is working it out: then it is that task's to give, and still waits.
+      if (v.busy) return taskOf.has(v) ? v : new Refuted("a value that needs itself to be known", undefined);
+      return framed(lazyGen(v), { lazy: v, pass: true });
     }
     if (v instanceof Struct) {
       // A structure does not need its entries. Each is kept as written, tied to this scope,
@@ -334,20 +926,16 @@ export const createMachine: CreateKernel2 = () => {
       return tallied(v, new Decided(TRUE, stored), []);
     }
     step();
-    return after(evaluate(v.fn, scope), (fn) => applied(v, fn, scope));
+    return needed(evaluate(v.fn, scope), scope, (fn) => applied(v, fn, scope));
   };
   const lazyGen = function* (v: Lazy): Gen {
     v.busy = true;
     const mine = new Map<string, Rest>();
     let r: V;
     try {
-      collectors.push(mine);
-      try {
-        const s = evaluate(v.value, v.scope);
-        r = s instanceof Call ? yield s : s;
-      } finally {
-        collectors.pop();
-      }
+      const c = framed(passGen(() => evaluate(v.value, v.scope)), { pass: true });
+      c.collector = mine;
+      r = yield c;
     } finally {
       v.busy = false;
     }
@@ -355,11 +943,10 @@ export const createMachine: CreateKernel2 = () => {
     rests.forEach(rest);
     v.rests = [...v.rests, ...rests];
     v.value = r;
-    if (r instanceof Refuted || known(r)) {
-      v.done = true;
-      return r;
-    }
-    return v; // It still waits. It stays one thing, so whatever is left in it is done once.
+    if (r instanceof Refuted || known(r)) v.done = true;
+    // What waited for this value in other tasks goes on.
+    if (waitersOf.has(v)) woke(v, r);
+    return v.done ? r : v; // Not done, it still waits. It stays one thing, so whatever is left in it is done once.
   };
 
   /** An application, once what is applied is known. */
@@ -370,28 +957,7 @@ export const createMachine: CreateKernel2 = () => {
       if (v.args.length !== fn.arity) return new Refuted(`"${fn.name}" takes ${fn.arity} argument(s) and was given ${v.args.length}`, undefined);
       // An assumption a configuration has withdrawn is not taken on trust: it is a claim.
       const withdrawn = fn.name === "assume" && (withdrawnSites.has(v.site ?? v) || withdrawnModules.has(v.owner?.module ?? ""));
-      if (fn.name === "claim" || withdrawn) {
-        return new Call(
-          collectingGen(
-            () => evaluate(v.args[0], scope),
-            (claimed, rests) => {
-              rests.forEach(rest);
-              if (claimed instanceof Refuted) return tallied(v, claimed, rests);
-              // What decides the claim answered that it cannot tell: the claim is done, and undecided.
-              const told = through(claimed);
-              if (told instanceof Decided && told.outcome === "undecided") return tallied(v, new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason), rests);
-              if (truthOf(claimed) === true) {
-                // A claim that rests on an assumption is no stronger than assumed.
-                const assumed = rests.some((r) => r.kind === "assumption");
-                return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided"), rests);
-              }
-              if (known(claimed)) return tallied(v, new Refuted("a claim that is not true", claimed), rests);
-              return tallied(v, new Expr(fn, [claimed]), rests);
-            },
-          ),
-          undefined,
-        );
-      }
+      if (fn.name === "claim" || withdrawn) return hooked((ctl) => claimGen(v, fn, scope, ctl));
       if (fn.name === "assume") {
         // The claim is not evaluated. The record says who assumed it, the module whose code
         // this is, and which assumption it is: the one written here.
@@ -401,7 +967,7 @@ export const createMachine: CreateKernel2 = () => {
       }
       if (fn.name === "if") {
         // The condition is needed; a branch is needed only if it is the one taken.
-        return after(evaluate(v.args[0], scope), (condition) => {
+        return needed(evaluate(v.args[0], scope), scope, (condition) => {
           if (condition instanceof Refuted) return condition;
           const truth = truthOf(condition);
           if (truth === true) return evaluate(v.args[1], scope);
@@ -427,8 +993,8 @@ export const createMachine: CreateKernel2 = () => {
       if (fn.name === "put") {
         // A new structure: the old one with this entry added at its end, or put in place of the
         // entry already under that key. The value is not evaluated: an entry is evaluated when read.
-        return after(evaluate(v.args[0], scope), (target) =>
-          after(evaluate(v.args[1], scope), (k) => {
+        return needed(evaluate(v.args[0], scope), scope, (target) =>
+          needed(evaluate(v.args[1], scope), scope, (k) => {
             if (target instanceof Refuted) return target;
             if (k instanceof Refuted) return k;
             const s = seen(target);
@@ -447,11 +1013,14 @@ export const createMachine: CreateKernel2 = () => {
           }),
         );
       }
-      if (fn.name === "then") return new Call(thenGen(v, fn, scope), undefined);
-      if (fn.name === "also") return new Call(alsoGen(v, fn, scope), undefined);
+      if (fn.name === "then") return hooked((ctl) => thenGen(v, fn, scope, ctl));
+      if (fn.name === "also") {
+        const ctl: Ctl = { boundary: true, scope };
+        return framed(alsoGen(v, fn, scope, ctl), ctl);
+      }
       if (fn.name === "attempt") {
         // The budget is needed; what is attempted is evaluated inside the attempt.
-        return after(evaluate(v.args[1], scope), (steps) => {
+        return needed(evaluate(v.args[1], scope), scope, (steps) => {
           if (steps instanceof Refuted) return steps;
           const budgetBits = seen(steps);
           if (!known(steps)) return new Expr(fn, [later(v.args[0], scope), steps]);
@@ -581,45 +1150,137 @@ export const createMachine: CreateKernel2 = () => {
     });
   };
 
-  const thenGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV): Gen {
+  const claimGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV, ctl: Ctl): Gen {
+    const site = v.site ?? v;
+    // A claim made to wait is counted as waiting, once, until it is decided.
+    let waits = false;
+    ctl.onSuspend = () => {
+      if (!waits) {
+        waits = true;
+        tallyOf(site);
+        waitingAt.set(site, (waitingAt.get(site) ?? 0) + 1);
+      }
+      return undefined;
+    };
+    const mine = new Map<string, Rest>();
+    const c = framed(passGen(() => needStep(evaluate(v.args[0], scope), scope)), undefined);
+    c.collector = mine;
+    const claimed: V = yield c;
+    ctl.onSuspend = undefined;
+    if (waits) waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
+    const rests = [...mine.values()];
+    rests.forEach(rest);
+    if (claimed instanceof Refuted) return tallied(v, claimed, rests);
+    // What decides the claim answered that it cannot tell: the claim is done, and undecided.
+    const told = through(claimed);
+    if (told instanceof Decided && told.outcome === "undecided") return tallied(v, new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason), rests);
+    if (truthOf(claimed) === true) {
+      // A claim that rests on an assumption is no stronger than assumed.
+      const assumed = rests.some((r) => r.kind === "assumption");
+      return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided"), rests);
+    }
+    if (known(claimed)) return tallied(v, new Refuted("a claim that is not true", claimed), rests);
+    return tallied(v, new Expr(fn, [claimed]), rests);
+  };
+  const thenGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV, ctl: Ctl): Gen {
     // The first is over, and only then the second. Over means its value is known and
     // nothing that evaluating it started still goes on: a caller who writes `then` cannot
-    // see what a function it calls left going. While the first is not over, the second is
-    // evaluated ahead with no effect performed, so a refutation in it is found now.
-    const group: Group = thenGroups.get(v) ?? { pending: new Set(), refuted: undefined };
-    groups.push(group);
+    // see what a function it calls left going. When the first is made to wait, the second is
+    // evaluated ahead with no effect performed, once, so a refutation in it is found now.
+    const group: MGroup = groupOf.get(v) ?? { pending: new Set(), refuted: undefined };
+    let looked: V | undefined;
+    ctl.onSuspend = () => {
+      if (looked !== undefined) return undefined;
+      looked = aheadOf(v.args[1], scope, ctl);
+      return looked instanceof Refuted ? looked : undefined;
+    };
     let first: V;
     try {
-      const s = evaluate(v.args[0], scope);
-      first = s instanceof Call ? yield s : s;
-    } finally {
-      groups.pop();
+      const c = framed(passGen(() => evaluate(v.args[0], scope)), undefined);
+      c.group = group;
+      first = yield c;
+      for (;;) {
+        // A refutation in what the first started is a refutation of the first.
+        const wrong = first instanceof Refuted ? first : group.refuted;
+        if (wrong !== undefined) {
+          ctl.onSuspend = undefined;
+          return new Call(lookAheadGen(v.args[1], scope, wrong), undefined);
+        }
+        if (ahead) break;
+        if (awaited(first) !== undefined) first = yield framed(needGen(first, scope, evaluate), { pass: true });
+        else if (group.pending.size > 0) yield waitFor(group);
+        else break;
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
     }
-    // A refutation in what the first started is a refutation of the first.
-    const wrong = first instanceof Refuted ? first : group.refuted;
-    if (wrong !== undefined) return new Call(lookAheadGen(v.args[1], scope, wrong), undefined);
+    ctl.onSuspend = undefined;
     if (known(first) && group.pending.size === 0) return evaluate(v.args[1], scope);
-    const before = ahead;
-    ahead = true;
+    // The first rests on something no answer will come for: what is left is an expression.
     let second: V;
-    try {
-      const s = evaluate(v.args[1], scope);
-      second = s instanceof Call ? yield s : s;
-    } finally {
-      ahead = before;
+    if (looked !== undefined) second = looked;
+    else {
+      const before = ahead;
+      ahead = true;
+      try {
+        const s = evaluate(v.args[1], scope);
+        second = s instanceof Call ? yield s : s;
+      } finally {
+        ahead = before;
+      }
     }
     if (second instanceof Refuted) return second;
     const left = new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
-    thenGroups.set(left, group);
+    groupOf.set(left, group);
     return left;
   };
-  const alsoGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV): Gen {
+  const alsoGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV, ctl: Ctl): Gen {
     // The first is started, and then the second; the second does not wait for the first.
     const s1 = evaluate(v.args[0], scope);
-    const first: V = s1 instanceof Call ? yield s1 : s1;
+    let first: V = s1 instanceof Call ? yield s1 : s1;
+    ctl.boundary = false;
     if (first instanceof Refuted) return new Call(lookAheadGen(v.args[1], scope, first), undefined);
     if (known(first)) return evaluate(v.args[1], scope);
-    // A claim that waits holds what is written after it: no effect of it is performed.
+    if (!ahead) {
+      // The first waits for an answer that will come: it is a task.
+      const slot = first instanceof Lazy && taskOf.get(first)?.slot === first ? first : awaited(first) !== undefined ? spawn(first, scope) : undefined;
+      ctl.holds = slot === undefined ? undefined : [slot];
+      if (slot !== undefined && claimWaits(taskOf.get(slot))) {
+        // A claim that waits holds what is written after it: no effect of it is performed
+        // until the claim is decided. It is evaluated ahead, so a refutation in it is found now.
+        const looked = aheadOf(v.args[1], scope, ctl);
+        if (looked instanceof Refuted) return looked;
+        first = yield framed(needGen(slot, scope, evaluate), { pass: true });
+        ctl.holds = undefined;
+        if (first instanceof Refuted) return new Call(lookAheadGen(v.args[1], scope, first), undefined);
+        if (known(first)) return evaluate(v.args[1], scope);
+      } else if (slot !== undefined) {
+        // Nothing holds the second. Its value is the whole's, and the first goes on as work
+        // of this evaluation. A refutation of the first while the second is worked out is
+        // the whole's.
+        ctl.watch = [slot];
+        let second: V;
+        try {
+          const s = evaluate(v.args[1], scope);
+          second = s instanceof Call ? yield s : s;
+          // A second that itself waits is not the whole's value yet: both go on, and the first is still watched.
+          while (awaited(second) !== undefined && !slot.done) second = yield framed(needGen(second, scope, evaluate), { pass: true });
+        } catch (e) {
+          if (e instanceof Signal) return new Call(lookAheadGen(v.args[1], scope, e.value), undefined);
+          throw e;
+        }
+        ctl.watch = undefined;
+        if (second instanceof Refuted) return second;
+        if (slot.done && slot.value instanceof Refuted) return slot.value;
+        const t = taskOf.get(slot);
+        if (t !== undefined) detach(t);
+        ctl.holds = undefined;
+        return second;
+      }
+    }
+    // The first rests on something no answer will come for. A claim that waits holds what
+    // is written after it.
     const held = heldByClaim(first);
     const before = ahead;
     if (held) ahead = true;
@@ -631,36 +1292,28 @@ export const createMachine: CreateKernel2 = () => {
       ahead = before;
     }
     if (second instanceof Refuted) return second;
-    // The second is known and nothing holds it: its value is given now, and the first
-    // goes on as work of this evaluation. Ahead of what is done nothing was started, so
-    // nothing goes on: the whole is evaluated again when it is really reached.
-    if (!held && !ahead && known(second)) {
-      started(first, scope);
-      return second;
-    }
+    if (!held && !ahead && known(second)) return second;
     return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
   };
   const attemptGen = function* (v: Expr, fn: KernelPrim, steps: V, allowed: number, scope: ScopeV): Gen {
-    const outer = budget;
-    budget = Math.min(outer, spent + allowed);
     let r: V;
     try {
-      const s = evaluate(v.args[0], scope);
-      r = s instanceof Call ? yield s : s;
+      // What is attempted is needed inside the attempt: where it waits, the attempt waits, and its budget with it.
+      const c = framed(passGen(() => needStep(evaluate(v.args[0], scope), scope)), undefined);
+      c.cap = allowed;
+      r = yield c;
     } catch (e) {
       // The attempt's own budget ran out, or the host's own limit was reached inside it:
       // either way the answer is "limit", and what goes on from it rests on a limit.
-      if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
+      if ((e instanceof LimitReached && spent < budget) || e instanceof RangeError) {
         rest({ kind: "limit" });
         return failure("limit");
       }
       throw e;
-    } finally {
-      budget = outer;
     }
     if (r instanceof Refuted) return failure("refuted", text(r.reason));
     if (known(r)) return r;
-    // It waits on something. What is left is attempted again, so nothing done so far is done twice.
+    // It rests on something no answer will come for. What is left is attempted again.
     return new Expr(fn, [r, steps]);
   };
   const openingGen = function* (fn: Fn, body: () => Step): Gen {
@@ -802,18 +1455,36 @@ export const createMachine: CreateKernel2 = () => {
     after(evaluate(v, scope), (r) => {
       if (r instanceof Refuted) return r;
       const s = seen(r);
-      if (s instanceof Struct && !settled.has(s)) return new Call(entriesGen(s, r, scope), undefined);
+      if (s instanceof Struct && !settled.has(s)) {
+        const ctl: Ctl = { boundary: true, scope };
+        return framed(entriesGen(s, r, scope, ctl), ctl);
+      }
       return r;
     });
-  const entriesGen = function* (s: Struct, r: V, scope: ScopeV): Gen {
-    for (const [k, e] of s.entries) {
-      if (hidden(k)) continue;
-      step(); // a structure handed over whole costs a step for each entry
-      const st = inFull(e, scope);
-      const x: V = st instanceof Call ? yield st : st;
-      if (x instanceof Refuted) return x;
+  /** The entries are started in order, and none waits for one before it. Then each is needed. */
+  const entriesGen = function* (s: Struct, r: V, scope: ScopeV, ctl: Ctl): Gen {
+    const waits: V[] = [];
+    const open = s.entries.filter(([k]) => !hidden(k));
+    try {
+      for (let i = 0; i < open.length; i++) {
+        step(); // a structure handed over whole costs a step for each entry
+        if (i === open.length - 1) {
+          ctl.boundary = false;
+          ctl.watch = ctl.holds;
+        }
+        const st = inFull(open[i][1], scope);
+        const x: V = st instanceof Call ? yield st : st;
+        if (x instanceof Refuted) return x;
+        if (!ahead && behind(x)) waits.push(x);
+      }
+    } catch (e) {
+      if (e instanceof Signal) return e.value;
+      throw e;
     }
-    return r;
+    const holds = ctl.holds;
+    ctl.boundary = false;
+    ctl.holds = ctl.watch = undefined;
+    return waits.length === 0 ? r : all(waits, scope, inFull, () => r, holds);
   };
 
   /**
@@ -837,36 +1508,6 @@ export const createMachine: CreateKernel2 = () => {
     return refutation;
   };
 
-  /** Keeps an evaluation that waits, with the cells it waits on. */
-  const started = (value: V, scope: ScopeV): Root => {
-    const root: Root = { scope, value, done: false, waits: new Set(), queued: false, groups: [...groups], grouped: false };
-    for (const g of root.groups) g.pending.add(root);
-    settle(root);
-    roots.push(root);
-    rootOf.set(value, root);
-    return root;
-  };
-  /** Finds again what an evaluation waits on, after it was evaluated. */
-  const settle = (root: Root): void => {
-    root.waits = new Set();
-    sawGroup = false;
-    if (!root.done) waitsOn(root.value, root.waits as Set<V>, new Set());
-    root.grouped = sawGroup;
-  };
-  /** An evaluation is over: every sequence that waited for it is told, and may now go on. */
-  const finished = (root: Root): void => {
-    if (root.groups.length === 0) return;
-    for (const g of root.groups) {
-      g.pending.delete(root);
-      if (root.value instanceof Refuted && g.refuted === undefined) g.refuted = root.value;
-    }
-    for (const r of roots) {
-      if (r.done || r.queued || !r.grouped) continue;
-      r.queued = true;
-      ready.push(r);
-    }
-  };
-
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
     return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)) ? new Lazy(tied, scope) : tied;
@@ -884,32 +1525,6 @@ export const createMachine: CreateKernel2 = () => {
     }
   };
 
-  /** The unfilled cells and unbound names a value still waits on. */
-  const waitsOn = (v: V, found: Set<V>, visited: Set<V>): void => {
-    if (visited.has(v)) return;
-    visited.add(v);
-    if (v instanceof CellV) {
-      if (!v.filled) found.add(v);
-      else waitsOn(v.value as V, found, visited);
-    } else if (v instanceof Expr) {
-      waitsOn(v.fn, found, visited);
-      v.args.forEach((a) => waitsOn(a, found, visited));
-      // A sequence that waits for what its first part started waits on what that waits on.
-      const group = thenGroups.get(v);
-      if (group !== undefined && group.pending.size > 0) {
-        sawGroup = true;
-        for (const r of group.pending) waitsOn(r.value, found, visited);
-      }
-    } else if (v instanceof Struct) {
-      if (!settled.has(v)) v.entries.forEach(([, e]) => waitsOn(e, found, visited));
-    } else if (v instanceof Decided) waitsOn(v.inner, found, visited);
-    else if (v instanceof Lazy) waitsOn(v.value, found, visited);
-    else if (v instanceof NameRef) {
-      const at = bindingOf(v);
-      if (at !== undefined) waitsOn(at.binding.memo ?? at.binding.value, found, visited);
-    }
-  };
-
   const kernel: Kernel2 = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -922,19 +1537,13 @@ export const createMachine: CreateKernel2 = () => {
       if (c.filled) throw new InterfaceError("fill: the cell is already filled");
       c.value = asData(into(value, "the value"), "what a cell is filled with");
       c.filled = true;
-      fills++;
-      // What waits on this cell is taken up by the next `advance`, after what waits on cells
-      // filled before it. An evaluation with no cell in sight is taken up too, to be safe.
-      for (const root of roots) {
-        if (root.done || root.queued || !(root.waits.has(c) || root.waits.size === 0)) continue;
-        root.queued = true;
-        ready.push(root);
-      }
+      // What waits for this cell is taken up by the next `advance`, in the order it came to
+      // wait, after what waits for cells filled before it.
+      for (const r of waitersOf.get(c) ?? []) if (live(r)) enqueue(r.task, false);
     },
     waiting: () => {
-      const found = new Set<V>();
-      for (const root of roots) if (!root.done) waitsOn(root.value, found, new Set());
-      return [...found].map((v) => out(v) as Cell);
+      for (let i = waitedCells.length - 1; i >= 0; i--) if (waitedCells[i].filled) waitedCells.splice(i, 1);
+      return waitedCells.filter((c) => (waitersOf.get(c) ?? []).some(live) || (interestOf.get(c) ?? []).some(live)).map((c) => out(c) as Cell);
     },
 
     evaluate: (expression, scope, limits): Result => {
@@ -942,71 +1551,50 @@ export const createMachine: CreateKernel2 = () => {
       const s = scopeIn(scope, "the scope");
       tallies.clear();
       cut = false;
-      const r = within(limits, () => run(evaluate(e, s)));
+      collectors = [];
+      groups = [];
+      const r = within(limits, (): V => {
+        const S: Stack = { frames: [], task: undefined, nested: false };
+        const x = runStack(S, needStep(evaluate(e, s), s), undefined);
+        if (x !== SUSPENDED) return x;
+        // It waits. What is given stands for its value, which `current` reads once it is known.
+        const t = S.task as Task;
+        // A claim that waits reads as a claim not yet decided.
+        const slot = new Lazy(claimWaits(t) ? new Expr(CLAIM as V, [PENDING]) : PENDING, s);
+        slot.busy = true;
+        t.slot = slot;
+        taskOf.set(slot, t);
+        return slot;
+      });
       const value = r.value ?? e;
-      if (r.ended === "complete" && !known(value)) started(value, s);
       return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     advance: (limits): Advance => {
       if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies.clear();
       cut = false;
-      const refuted: Value[] = [];
-      // Once one comes out refuted, no further effect is performed in this call: the rest
-      // are evaluated ahead, so their refutations are reported too, and they stay in the list
-      // for a later call to take up in earnest. Whether there is one is the launcher's to say.
-      let halted = false;
-      const held: Root[] = [];
+      refutedNow = [];
+      // Each task is taken up in the order its answer arrived, and what it wakes straight
+      // after it. Once a root comes out refuted, no further effect is performed in this
+      // call: only a task that the refutation woke is taken up, to hand it on, and the
+      // others stay in line for a later call. Whether there is one is the launcher's to say.
       const r = within(limits, () => {
-        // Each is taken up once, in the order its answer arrived. One that a limit stops stays
-        // first in the list, so the next call goes on with it.
-        try {
-          while (ready.length > 0) {
-            const root = ready[0];
-            const before = fills;
-            const onlyAhead = halted;
-            if (!root.done) {
-              const was = ahead;
-              if (onlyAhead) ahead = true;
-              let next: V;
-              try {
-                next = run(evaluate(root.value, root.scope));
-              } finally {
-                ahead = was;
-              }
-              root.value = next;
-              rootOf.set(next, root);
-              if (next instanceof Refuted) {
-                if (!refuted.includes(out(next))) refuted.push(out(next));
-                halted = true;
-              }
-              if (known(next)) root.done = true;
-              settle(root);
-              if (root.done) finished(root);
-            }
-            ready.shift();
-            root.queued = false;
-            if (root.done) continue;
-            if (onlyAhead) held.push(root);
-            // A cell filled while it was being evaluated may have been passed already.
-            else if (fills !== before) {
-              root.queued = true;
-              ready.push(root);
-            }
-          }
-        } finally {
-          for (const root of held) {
-            root.queued = true;
-            ready.push(root);
-          }
+        for (;;) {
+          const i = refutedNow.length === 0 ? 0 : ready.findIndex((t) => t.carries);
+          if (i < 0 || i >= ready.length) break;
+          const t = ready.splice(i, 1)[0];
+          t.queued = false;
+          cursor = 0;
+          resume(t);
         }
       });
+      const refuted: Value[] = [];
+      for (const x of refutedNow) if (!refuted.includes(out(x))) refuted.push(out(x));
       return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     current: (value) => {
       const v = into(value, "the value");
-      const root = rootOf.get(v);
-      if (root !== undefined) return out(root.value);
+      if (v instanceof Lazy && taskOf.has(v)) return value;
       const now = through(v);
       return now === v ? value : out(now);
     },

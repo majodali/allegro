@@ -593,7 +593,7 @@ are:
 | K7 (the plan for a kernel that keeps its own stack) | rebuild | §9 of this plan | the maintainer |
 | K8 (the reference kernel in parts) | rebuild | `next/kernel/kernel.ts` split into the parts both variants share and the reference evaluator, with no change in behaviour | done 2026-11-20: every test passes unchanged, and every line of the old file is in one of the three new ones |
 | K9 (the machine: evaluation) | rebuild | a second variant that evaluates with a stack of its own: calls, blocks, conditionals, values evaluated when needed, claims, unknown parameters; no limit on depth; a loop in constant space. `next/kernel/create.ts` chooses the variant, and the kernel's tests run against both | done 2026-11-20: the kernel's 141 tests pass on both variants with the same step counts, and the acceptance stream's 66 programs pass on both. A computation that waits is still what is left of it as an expression; the next chunk changes that |
-| K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | every test passes on both variants; the acceptance stream's programs print the same on both |
+| K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | done 2026-11-20: every test passes on both variants, and the acceptance stream's 66 programs pass on both. Seven tests say where the two differ and by which decision. A task that a limit stops is dropped until slices exist |
 | K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | new tests; a contract change |
 | K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | with the acceptance stream; a contract change |
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | new tests |
@@ -1662,6 +1662,14 @@ its approval.
   for the acceptance stream: one test of the launcher expects a run
   with no step budget to end at the host's limit, and on this variant
   it does not end.
+- **2026-11-20 — the machine: waiting** (the review session): a
+  computation that needs a late answer stops where it stands and
+  becomes a task, registered on the cell. `advance` takes tasks up in
+  the order their answers arrive. A task whose value nothing will read
+  is an orphan and is not taken up. What is held back is evaluated
+  ahead once, when its holder comes to wait. Ruled on the pull request
+  of the chunk before: where the configuration sets no step budget the
+  launcher gives a default one.
 
 ## 8. Sessions
 
