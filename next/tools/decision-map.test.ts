@@ -9,7 +9,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   parseInventory, deriveAll, normalisePresent, ownerOf, initialMap, checkMap, checkRepository,
-  serializeMap, syncMap, type DecisionMap, type Derived, type Row,
+  serializeMap, syncMap, casesByDecision, CASES_PATH, MAP_PATH, type DecisionMap, type Derived, type Row,
 } from "./decision-map.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -178,9 +178,31 @@ test("a state on a row owned by none fails", () => {
   assert.deepEqual(check(m).findings, ['row 1 "Alpha": state carried on a row owned by none']);
 });
 
-test("cases that are not a list of strings fail", () => {
-  const m = good(); (m.rows[1] as unknown as Record<string, unknown>).cases = [1];
-  assert.deepEqual(check(m).findings, ['row 2 "Beta": cases is not a list of strings']);
+test("a row that stores cases fails: the cases of a decision are derived from the corpus", () => {
+  const m = good(); (m.rows[1] as unknown as Record<string, unknown>).cases = [];
+  assert.deepEqual(check(m).findings, ['row 2 "Beta": cases is stored; the cases of a decision are derived from next/corpus/cases.json (--cases)']);
+});
+
+test("the cases of a decision are those that list it, in the corpus's order, and a former title counts for its row", () => {
+  const rows = [{ title: "Alpha" }, { title: "Beta", was: ["Beta, old title"] }, { title: "Gamma" }];
+  const cases = [
+    { id: "c1", decisions: ["Alpha", "Beta"] },
+    { id: "c2", decisions: ["Beta, old title"] },
+    { id: "c3", decisions: ["No such decision"] },
+    { id: "c4", decisions: ["Alpha", "Alpha"] },
+    { id: "c5" },
+  ];
+  const r = casesByDecision(rows, cases);
+  assert.deepEqual([...r.byTitle], [["Alpha", ["c1", "c4"]], ["Beta", ["c1", "c2"]], ["Gamma", []]]);
+  assert.deepEqual([...r.unknown], [["No such decision", ["c3"]]]);
+});
+
+test("every decision a case of the committed corpus lists is a row of the committed map, by its title or a former one", () => {
+  const map = JSON.parse(fs.readFileSync(path.join(ROOT, MAP_PATH), "utf-8")) as DecisionMap;
+  const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, CASES_PATH), "utf-8")) as { cases: { id: string; decisions?: string[] }[] };
+  const r = casesByDecision(map.rows, corpus.cases);
+  assert.deepEqual([...r.unknown.keys()], []);
+  assert.ok([...r.byTitle.values()].some((ids) => ids.length > 0));
 });
 
 test("rows out of order fail", () => {
@@ -204,21 +226,21 @@ test("the serialiser writes one row per line and round-trips", () => {
   assert.deepEqual(JSON.parse(text), JSON.parse(JSON.stringify(m)));
 });
 
-test("sync keeps state, unit and cases, rewrites derived fields and adds new decisions", () => {
+test("sync keeps state and unit, rewrites derived fields and adds new decisions", () => {
   const m = good();
-  m.rows[2] = { ...m.rows[2], owner: "Q", state: "written", unit: "next/kernel/eval.ts", cases: ["c1"] };
+  m.rows[2] = { ...m.rows[2], owner: "Q", state: "written", unit: "next/kernel/eval.ts" };
   m.rows.splice(4, 1);
   const r = syncMap(derived, m);
   assert.deepEqual(r.added, ["Epsilon"]);
   assert.deepEqual(r.orphans, []);
   assert.deepEqual(check(r.map).findings, []);
   const g = r.map.rows[2] as Row;
-  assert.deepEqual([g.owner, g.state, g.unit, g.cases], ["R", "written", "next/kernel/eval.ts", ["c1"]]);
+  assert.deepEqual([g.owner, g.state, g.unit], ["R", "written", "next/kernel/eval.ts"]);
 });
 
 test("sync never guesses a rename: an orphan is kept and reported until --rename moves it", () => {
   const m = good();
-  m.rows[1] = { ...m.rows[1], title: "Beta, old title", cases: ["c2"] };
+  m.rows[1] = { ...m.rows[1], title: "Beta, old title" };
   const r = syncMap(derived, m);
   assert.deepEqual(r.added, ["Beta"]);
   assert.deepEqual(r.orphans, ["Beta, old title"]);
@@ -227,7 +249,7 @@ test("sync never guesses a rename: an orphan is kept and reported until --rename
   const moved = syncMap(derived, m, [["Beta, old title", "Beta"]]);
   assert.deepEqual(moved.errors, []);
   assert.deepEqual(check(moved.map).findings, []);
-  assert.deepEqual(moved.map.rows[1].cases, ["c2"]);
+  assert.equal(moved.map.rows[1].title, "Beta");
   // The moved row records its former title, and keeps it through a later sync.
   assert.deepEqual(moved.map.rows[1].was, [m.rows[1].title]);
   assert.deepEqual(syncMap(derived, moved.map).map.rows[1].was, [m.rows[1].title]);
