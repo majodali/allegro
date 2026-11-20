@@ -367,6 +367,8 @@ export const createKernel: CreateKernel2 = () => {
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
   let ahead = false;
+  /** True where this call met a refutation and ran out of steps while looking for more. */
+  let cut = false;
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
@@ -1220,19 +1222,19 @@ export const createKernel: CreateKernel2 = () => {
   /**
    * After a refutation, what was written after it is still evaluated, ahead of what is done
    * and with no effect, so that a further refutation in it is found and counted now. What it
-   * comes to is dropped. It is given half of the steps that are left, so that looking can
-   * never be what ends the evaluation at its limit.
+   * comes to is dropped. A refutation outranks a limit: where the steps run out while
+   * looking, the looking stops and the refutation stands. The call's result says that it
+   * was cut short, so whoever reads it knows a further refutation may be unreported.
    */
   const lookAhead = (rest: V, scope: ScopeV): void => {
-    const [outer, before] = [budget, ahead];
-    budget = spent + Math.floor((outer - spent) / 2);
+    const before = ahead;
     ahead = true;
     try {
       evaluate(rest, scope);
     } catch (e) {
       if (!(e instanceof LimitReached || e instanceof RangeError)) throw e;
+      cut = true;
     } finally {
-      budget = outer;
       ahead = before;
     }
   };
@@ -1871,14 +1873,16 @@ export const createKernel: CreateKernel2 = () => {
       const e = into(expression, "the expression");
       const s = scopeIn(scope, "the scope");
       tallies = new Map();
+      cut = false;
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
       if (r.ended === "complete" && !known(value)) started(value, s);
-      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords() };
+      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     advance: (limits): Advance => {
       if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies = new Map();
+      cut = false;
       const refuted: Value[] = [];
       // Once one comes out refuted, no further effect is performed in this call: the rest
       // are evaluated ahead, so their refutations are reported too, and they stay in the list
@@ -1929,7 +1933,7 @@ export const createKernel: CreateKernel2 = () => {
           }
         }
       });
-      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords() };
+      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     current: (value) => {
       const v = into(value, "the value");

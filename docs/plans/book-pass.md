@@ -1628,6 +1628,9 @@ its approval.
 - **2026-11-20 — the second adversarial review closed** (the review
   session): cluster 14 ruled; all fourteen clusters are. 249
   decisions.
+- **2026-11-20 — B-202 (threads and budgets at run time) held and
+  ruled** (the review session): budget and slice, tasks, `first`. 251
+  decisions.
 
 ## 8. Sessions
 

@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Threads and budgets at run time (B-202, held and
+  ruled).** A budget bounds an evaluation and is never filled up
+  again; a slice bounds one call and only pauses. One task runs at a
+  time, and a slice never changes what happens. `first(a, b)` is ruled
+  for the earlier of two answers. In `next/kernel/kernel.ts`: a
+  refutation outranks a limit, and a result says where looking for
+  more was cut short; the halving is gone. Two entries added: 251
+  decisions.
 - **2026-11-20 — Symbols and descriptions (the second review's
   cluster 14, closed; the review is ruled).** A symbol is defined by
   what it does, and a fully-qualified name is a spelling the

@@ -1015,8 +1015,47 @@ review is ruled: fourteen clusters. Open beside it, in the backlog:
 B-202 (threads and budgets at run time) and B-203 (streams, large
 data and asynchronous iteration).
 
+### B-202: threads and budgets at run time (2026-11-20)
+
+The discussion the maintainer set aside on 2026-11-19, held before the
+evaluator is rebuilt. The review session's finding: one count of steps
+had two uses. A budget bounds the whole work of an evaluation. A slice
+bounds one call into the kernel. The question "how is the budget
+replenished" has the answer that a slice needs no filling, since each
+call brings its own, and a budget is never filled.
+
+Seven points, ruled as proposed ("All asks and terms confirmed"):
+
+1. A budget and a slice are kept apart. A call's result says complete,
+   paused or limit.
+2. A task is one piece of work the kernel can run, pause and take up
+   again. One runs at a time. Computing on several processors is a
+   capability's business.
+3. A slice never changes what happens: a paused task is the first to
+   go on.
+4. Inside one evaluation a task runs until it finishes or waits, and
+   ready tasks are taken in the order their answers arrived. A turn
+   of a fixed number of steps may be added later. Among separate
+   evaluations the launcher chooses.
+5. A refutation outranks a limit. This replaces giving the look ahead
+   half of the steps left.
+6. A budget that is spent drops what its evaluation had in flight.
+7. `first(a, b)` gives the value of whichever of two is known first
+   and cancels the other.
+
+Terms ratified: task, slice, `first`.
+
+Built: point 5. The others are rules for the evaluator that keeps its
+own stack; `first` is not built.
+
 ## Terms introduced
 
+- **Task**: one piece of work the kernel can run, pause and take up
+  again. Ratified by the maintainer on 2026-11-20.
+- **Slice**: the most steps one call into the kernel runs before it
+  returns. Ratified the same day.
+- **`first`**: the kernel primitive for the earlier of two answers.
+  Ratified the same day.
 - **`unambiguous`**: a mark on a production. Where a parse of it is
   complete, it must be the only reading of the text so far. Ratified
   by the maintainer on 2026-11-20.

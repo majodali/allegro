@@ -136,6 +136,12 @@ export type PrimitiveDeclaration =
  * the clock is the launcher's business. An evaluation that ends at its
  * limit cannot be continued by this kernel: evaluating the expression
  * again starts again, and performs again any effect already performed.
+ *
+ * Ruled on 2026-11-20 and not built in this version: a count of steps
+ * is to be given in two ways. A budget bounds the whole work of an
+ * evaluation and is never filled up again. A slice bounds one call, and
+ * when it is spent the work is paused for the next call to go on with.
+ * This version has the budget only.
  */
 export interface Limits {
   /** The evaluation ends, with everything unfinished undecided, after this many steps. */
@@ -211,6 +217,12 @@ export interface Result {
   readonly refuted: boolean;
   /** The claims this call evaluated: one record for each claim as written. */
   readonly claims: readonly ClaimRecord[];
+  /**
+   * Present, and true, where the call met a refutation and its steps ran
+   * out while it looked for further ones. A refutation outranks a limit:
+   * the refutation stands, and this says the list of them may be short.
+   */
+  readonly cutShort?: true;
 }
 
 /**
@@ -265,6 +277,12 @@ export interface Advance {
   readonly refuted: readonly Value[];
   /** The claims this call evaluated: one record for each claim as written. */
   readonly claims: readonly ClaimRecord[];
+  /**
+   * Present, and true, where the call met a refutation and its steps ran
+   * out while it looked for further ones. A refutation outranks a limit:
+   * the refutation stands, and this says the list of them may be short.
+   */
+  readonly cutShort?: true;
 }
 
 /**
