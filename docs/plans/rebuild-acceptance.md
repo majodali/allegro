@@ -1630,3 +1630,64 @@ policy is the gate ruled there.
   merged with main (350 tests, none failing). Nothing else of this
   stream reads an attempt's answer: the programs of the corpus, the
   speed tests, the scenarios and the specifications were searched.
+- **2026-11-20 — Q5, part 4: the grammar, reader and emitter follow the forms as they stand.**
+  The kernel stream's PRs #245 to #260 grew `next/ext/allegretto/forms.md`,
+  and the waiting test of `next/bootstrap/emit.test.ts` named the kernel
+  primitives the emitter did not write. Built, by item:
+  - **Statements.** A block's statements are a chain of the kernel
+    primitive `also`. `sync` before an indented block makes them a chain
+    of `then`; it is read after `=`, `=>` and `<-`, and in a branch of
+    `if`, where an indented block may stand.
+  - **A dropped statement** is `claim(!is_failure(a))`, in both kinds of
+    block. A block's last statement, `x <- e` and a statement that is
+    itself a claim are not wrapped. Every statement of the module is
+    dropped: the module yields the structure of its bindings.
+  - **`is_failure` and `handle`** are kept as the forms write them, in
+    one constant of `next/bootstrap/emit.ts` (`FAILURE_FUNCTIONS`), read
+    with the same reader. A test reads the two definitions out of
+    forms.md and compares. They are bound in a block around the module's
+    own where the text uses either name, so a text may bind either again
+    and hide it. A dropped statement's claim applies Allegretto's
+    `is_failure` itself, so a text that hides the name does not change
+    what a dropped statement means.
+  - **`x <- e`** is `x: e` among its block's bindings and the statement
+    `x` at its place. The reader refuses a statement above the arrow that
+    needs the name, itself or through a binding of the block, and names
+    the name and both places.
+  - **The kernel's primitives as names**: `also`, `refuse`, `assume`,
+    `undecided`, `put`, `key`, `kind`, `symbol`, `spelling`. The waiting
+    test reports nothing owed.
+  - **A computed key**: `{a: e, [k]: f}` is `put({a: e}, k, f)`, and an
+    entry after it is put too.
+  - **Keys**: a header line `key name` is a parameter before every other,
+    in written order; the record's `keys` counts them; `declares` and the
+    yielded structure leave them out. `[name]: e` with a key's name is the
+    structure's entry keyed by the key's parameter. The forms' example
+    prints `1` then `42` (`keys.alg`).
+  - **`int`, `float`, `text` and `bits`** are structures where used as a
+    value; `int.add` is still the primitive where the text does not bind
+    `int` again, so `needs` lists only what the text names.
+  - **Four primitives** named: `bits.int`, `float.eq`, `float.ge`,
+    `float.gt`.
+  - **Header lines anywhere** at the top level, in any order.
+  - **The least integer**: prefix `-` on the whole number 2^63 is read as
+    `-9223372036854775808`; `readLiteral` follows.
+  - **Programs**: ten under `next/corpus/allegretto/m3/`, written for the
+    purpose: `sync-block`, `dropped-failure`, `handle`, `arrow-binding`,
+    `data`, `keys`, `refuse`, `assume-undecided`, `least-integer`,
+    `namespaces`.
+  - **Left, with the reason.** Imports (`import`, `with`, `without`,
+    `use`): an import is a call of the imported module's function, which
+    needs that module's declarations and identity and a way to find its
+    text. The emitter still writes `import name` as a parameter declared
+    a module, and the launcher refuses such a module. `sync` before the
+    module's own block: the forms do not say where it would be written.
+  - **What changed in a running program.** No printed line, end or
+    yielded key of the 35 programs, the speed tests or `hello.alg`.
+    Steps rose with the claims: the parser speed program from 23,299 to
+    23,329, the typed one from 1,187 to 1,227, and `hello.json` from 4 to
+    14. The test of `next/launch/launcher.test.ts` that pins the fixture's
+    4 steps is outside this part's files and fails until it follows. A
+    module with no export now yields its `x <- e` bindings too.
+  - **Measured.**
+    `milestone 3: programs 41 (passing 41, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.
