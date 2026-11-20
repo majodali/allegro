@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Notation (the second review's cluster 12, closed).**
+  Ruled for the parser engine, not built: three rules keep "a notation
+  only adds", checked on the grammar; a production may be marked
+  `unambiguous`, and the form that changes the grammar is one; the
+  right to call `parser.extend` is a capability that a notation
+  brought in with `use` does not hold.
 - **2026-11-19 — Allegretto's forms and four primitives (the second
   review's cluster 12, in part).** `x <- e` is a binding of its
   block's one group and a statement at its place; `int`, `float`,
@@ -1394,6 +1400,26 @@ changed.
 Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
+
+### 2026-11 — The corpus follows two retitles; 30 new results wait for Part IV (B-196)
+
+B-196 (the rebuild's acceptance side). 35 corpus cases move to the new
+titles of two decisions: "A loop written as a recursion runs in constant
+space" (19) and "A failure a program can handle is plain data of one
+shape" (16). The second was replaced by ruling on 2026-11-19: nothing
+carries a failure to later results. 30 cases state a new result that
+rests on an exception being carried. Each is marked to be restated when
+"The standard language's handled failure is an exception" is reworked
+with Part IV. No class changes.
+
+### 2026-11 — The emitter's test no longer reads what an attempt answers (B-196)
+
+B-196 (the rebuild's acceptance side). The kernel stream's PR #261
+could not merge while one test of this stream failed on it: the test
+read the former answer of the kernel primitive `attempt`, a structure
+of a tag and a value. By the ruling of 2026-11-19 an attempt answers
+the value itself, or a failure. The test now holds only what the
+emitter owes, and passes on both kernels.
 
 ### 2026-11 — The launcher and the corpus follow "A free name never gets a value" (B-196)
 

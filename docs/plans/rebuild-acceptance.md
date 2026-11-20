@@ -1617,3 +1617,43 @@ policy is the gate ruled there.
   title changed: `--follow-renames` of `next/tools/corpus.ts` moved no
   case. Measured: 303 tests pass; 35 programs pass;
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
+- **2026-11-20 — The emitter's test no longer reads what an attempt answers.**
+  PR #261 could not merge: one test of this stream failed on it. The
+  ruling of 2026-11-19 gives the kernel primitive `attempt` a new
+  answer: the value itself, or a failure. The test "the kernel
+  primitives Allegretto names" of `next/bootstrap/emit.test.ts` read
+  the former answer, a structure of a tag and a value. What an attempt
+  answers is the kernel's to state, and the kernel's own tests hold it.
+  The test now holds what the emitter owes: the record names the kernel
+  primitive `attempt`, the run goes on past the call, and the call
+  answers something. It passes on the kernel of main and on that PR
+  merged with main (350 tests, none failing). Nothing else of this
+  stream reads an attempt's answer: the programs of the corpus, the
+  speed tests, the scenarios and the specifications were searched.
+- **2026-11-20 — The corpus follows two retitles, and 30 new results wait for Part IV.**
+  Two decisions were retitled between 2026-11-18 and 2026-11-19.
+  "Tail calls by sentinel and loop" is "A loop written as a recursion
+  runs in constant space" (PR #256): 19 cases, all class survives, and
+  none states anything the reworded decision changes. "A failure a
+  program can handle is supplied by an extension" is "A failure a
+  program can handle is plain data of one shape" (PR #257): 16 cases.
+  `--follow-renames` of `next/tools/corpus.ts` moved the 35. The second
+  decision was replaced, and it says nothing carries a failure to later
+  results: a failure handed to a primitive function is a refutation. A
+  note of 2026-11-19 on "The standard language's handled failure is an
+  exception" says its sentence "carried to every result computed from
+  it, in a field the standard extension owns" no longer stands, and
+  that the decision is reworked with Part IV. Of the 73 cases that cite
+  that decision, 30 state a new result or a restatement that rests on
+  the carrying: 15 pins of `tests/logical-error-demo.alg`, 3 of
+  `tests/metadata-channels-demo.alg`, 1 of `tests/arrays.alg`, and 11
+  tests of `src/boundary-tests.ts`, `src/test/equality-laws.ts`,
+  `src/test/grammar2-language.ts` and
+  `src/test/types-construction.ts`. They sit at milestones 4 (15) and
+  5 (15). Each now carries a note that says so. No class and no new
+  result is changed here: the cases are restated when the decision is
+  reworked, since the maintainer's direction for it (a failure is
+  returned as a value of a union type, and a check refutes code that
+  does not handle a declared failure) is not yet a decision's text.
+  Measured:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
