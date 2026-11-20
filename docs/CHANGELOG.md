@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Budgets and slices.** `Limits` gains `slice`: a call
+  on the machine returns "paused" when its slice is spent, and the next
+  call of `advance` goes on with the paused task first. Effects, their
+  order and the count of steps are those of one call. A budget given to
+  `evaluate` is the evaluation's: later work for it counts against what
+  is left, and when it is spent the evaluation is over and `advance`
+  names it in `limited`. The reference kernel ignores a slice.
 - **2026-11-20 — The machine: waiting.** On the machine a computation
   that needs a late answer stops where it stands. Its frames become a
   task, registered on the cell, and `advance` takes it up at that point

@@ -36,9 +36,15 @@
 // follows a refutation) nothing waits: there a cell is one more unknown,
 // and the evaluation is the reference's.
 //
-// Not here yet, and in later chunks of the plan: slices, the first of
-// two answers, sharing, specialization. A task that a limit stops is
-// dropped.
+// A count of steps limits two things. A budget is an evaluation's: every
+// task of the evaluation counts against it, in whichever call it runs,
+// and when it is spent the evaluation is over and its tasks are dropped.
+// A slice is a call's: when it is spent the stack is kept as it stands,
+// the call returns "paused", and the next call goes on with that task
+// first.
+//
+// Not here yet, and in later chunks of the plan: the first of two
+// answers, sharing, specialization.
 
 import type { Advance, Cell, CreateKernel2, Kernel2, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -110,8 +116,18 @@ interface Frame {
   remaining: number;
   readonly ctl: Ctl | undefined;
 }
-/** A suspended stack: the frames of a computation that waits, and what it waits for. */
+/** The budget of one evaluation: every task of the evaluation counts against it. */
+interface Account {
+  left: number;
+  /** True once the budget is spent: the evaluation is over, and its tasks are dropped. */
+  dead: boolean;
+  /** What `evaluate` gave as the evaluation's value. */
+  handle: V | undefined;
+}
+/** A suspended stack: the frames of a computation that waits or is paused, and what it waits for. */
 class Task {
+  /** Where a slice paused it: what was about to be run, and the marks its value will take. */
+  paused: { item: Step; marks: Marks | undefined } | undefined = undefined;
   frames: Frame[] = [];
   on: Waitable | undefined = undefined;
   /** The task whose value this one is handed when it goes on. */
@@ -136,7 +152,7 @@ class Task {
   /** The sequences that wait for it to be over. */
   memberOf: MGroup[] = [];
   /** `slot` is where its value goes. `fills` is true where the task itself must write it there. */
-  constructor(public slot: Lazy | undefined, readonly fills: boolean) {}
+  constructor(public slot: Lazy | undefined, readonly fills: boolean, readonly account: Account) {}
 }
 /** Thrown into a frame to hand it an answer in place of the value it asked for. */
 class Signal {
@@ -174,7 +190,7 @@ export const createMachine: CreateKernel2 = () => {
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k10";
+  const VARIANT = "machine-k11";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -192,6 +208,12 @@ export const createMachine: CreateKernel2 = () => {
   const waitedCells: CellV[] = [];
   /** The roots that came out refuted in the call of `advance` now running. */
   let refutedNow: V[] = [];
+  /** The evaluation whose work is being done now. */
+  let account: Account = { left: Infinity, dead: false, handle: undefined };
+  /** The count of steps at which the call now running pauses: its slice. */
+  let pauseAt = Infinity;
+  /** True once the call now running has paused a task. */
+  let pausedNow = false;
   let spent = 0;
   let budget = Infinity;
   /** What the evaluations now under way rest on: one collector for each claim or binding being evaluated. */
@@ -287,13 +309,13 @@ export const createMachine: CreateKernel2 = () => {
     if (list === undefined) of.set(w, (list = []));
     return list;
   };
-  const live = (r: Registration): boolean => !r.task.done && !r.task.orphan && r.epoch === r.task.epoch;
+  const live = (r: Registration): boolean => !r.task.done && !r.task.orphan && !r.task.account.dead && r.epoch === r.task.epoch;
   /** True where what a task waits for has come. */
   const arrived = (w: Waitable | undefined): boolean =>
     w === undefined ? true : w instanceof CellV ? w.filled : w instanceof Lazy ? !taskOf.has(w) : w.pending.size === 0 || w.refuted !== undefined;
   /** Puts a task in line. An orphan is left where it is. */
   const enqueue = (t: Task, front: boolean): void => {
-    if (t.queued || t.done || t.orphan) return;
+    if (t.queued || t.done || t.orphan || t.account.dead) return;
     t.queued = true;
     if (front) ready.splice(Math.min(cursor++, ready.length), 0, t);
     else ready.push(t);
@@ -301,8 +323,8 @@ export const createMachine: CreateKernel2 = () => {
   /** Records what a suspended task waits for, and which values its frames are working out. */
   const register = (t: Task): void => {
     t.epoch++;
-    const on = t.on as Waitable;
-    registrations(waitersOf, on).push({ task: t, epoch: t.epoch, frame: 0 });
+    const on = t.on;
+    if (on !== undefined) registrations(waitersOf, on).push({ task: t, epoch: t.epoch, frame: 0 });
     if (on instanceof CellV && !waitedCells.includes(on)) waitedCells.push(on);
     t.frames.forEach((f, i) => {
       const c = f.ctl;
@@ -321,7 +343,7 @@ export const createMachine: CreateKernel2 = () => {
     if (t.slot !== undefined) taskOf.set(t.slot, t);
     // A value an orphan is working out is wanted again: the part that works it out goes on.
     if (on instanceof Lazy && !t.orphan) rescue(on);
-    if (arrived(on)) enqueue(t, false);
+    if (on !== undefined && arrived(on)) enqueue(t, false);
   };
   /**
    * Takes the frames that work out a value, and those above them, out of an orphan into a
@@ -332,7 +354,7 @@ export const createMachine: CreateKernel2 = () => {
     if (u === undefined || !u.orphan || u.slot === l) return;
     const j = u.frames.findIndex((f) => f.ctl?.lazy === l);
     if (j < 0) return;
-    const t = new Task(undefined, false);
+    const t = new Task(undefined, false, u.account);
     t.frames = u.frames.splice(j);
     t.inherited = u.inherited;
     t.on = u.on;
@@ -396,7 +418,7 @@ export const createMachine: CreateKernel2 = () => {
     if (f.ctl !== undefined) release(f);
   };
   /** Moves the frames from a place up into a task that waits. */
-  const park = (t: Task, frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
+  const park = (t: Task, frames: Frame[], from: number, on: Waitable | undefined, deliver: Task | undefined): void => {
     // The whole of a task taken up again keeps its frames where they are.
     const moved = from === 0 && t.frames === frames ? frames : frames.splice(from);
     let [nCollectors, nGroups] = [0, 0];
@@ -434,7 +456,7 @@ export const createMachine: CreateKernel2 = () => {
   };
   /** Frames whose value nothing will read are kept as an orphan: a value one of them is working out may yet be wanted. */
   const shelve = (frames: Frame[], from: number, on: Waitable, deliver: Task | undefined): void => {
-    const t = new Task(undefined, false);
+    const t = new Task(undefined, false, account);
     t.orphan = true;
     park(t, frames, from, on, deliver);
     orphan(abandoned(t));
@@ -460,7 +482,7 @@ export const createMachine: CreateKernel2 = () => {
         const slot = new Lazy(PENDING, c.scope as ScopeV);
         slot.busy = true;
         (c.holds ??= []).push(slot);
-        park(new Task(slot, true), frames, i + 1, on, undefined);
+        park(new Task(slot, true, account), frames, i + 1, on, undefined);
         return { value: slot };
       }
     }
@@ -468,11 +490,28 @@ export const createMachine: CreateKernel2 = () => {
     let t = S.task;
     if (t === undefined) {
       // The top of an evaluation: a root.
-      t = S.task = new Task(undefined, true);
+      t = S.task = new Task(undefined, true, account);
       t.root = true;
     } else t.frames = frames;
     park(t, frames, 0, on, undefined);
     return undefined;
+  };
+  /**
+   * The call's slice is spent. The whole stack is kept as it stands, with what was about
+   * to be run, and is the first to go on.
+   */
+  const pause = (S: Stack, item: Step, marks: Marks | undefined): void => {
+    let t = S.task;
+    if (t === undefined) {
+      t = S.task = new Task(undefined, true, account);
+      t.root = true;
+    } else t.frames = S.frames;
+    t.paused = { item, marks };
+    park(t, S.frames, 0, undefined, undefined);
+    if (t.queued) ready.splice(ready.indexOf(t), 1);
+    t.queued = true;
+    ready.unshift(t);
+    pausedNow = true;
   };
 
   /**
@@ -480,15 +519,21 @@ export const createMachine: CreateKernel2 = () => {
    * ends by handing on another call is replaced by it, so a call that is the value of its
    * function's body takes no room.
    */
-  const runStack = (S: Stack, start: Step | undefined, thrown: Signal | undefined): V | typeof SUSPENDED => {
+  const runStack = (S: Stack, start: Step | undefined, thrown: Signal | undefined, marks0?: Marks): V | typeof SUSPENDED => {
     const frames = S.frames;
     let item = start as Step; // what is being worked out for the frame on top
-    let marks: Marks | undefined; // the marks its value will take
+    let marks: Marks | undefined = marks0; // the marks its value will take
     let failed = thrown !== undefined;
     let error: unknown = thrown;
     for (;;) {
       while (!failed && item instanceof Call) {
         const call: Call = item;
+        // A slice that is spent pauses here, before the next thing is run. An evaluation
+        // made from inside another is not paused: it is over soon.
+        if (spent >= pauseAt && !S.nested && call.wait === undefined) {
+          pause(S, call, marks);
+          return SUSPENDED;
+        }
         if (call.wait !== undefined) {
           let answer: { value: V } | { error: Signal } | undefined;
           try {
@@ -617,6 +662,8 @@ export const createMachine: CreateKernel2 = () => {
     t.woken = undefined;
     const handed = woken === undefined ? t.deliver?.result : undefined;
     const [wasOn, wasDeliver] = [t.on as Waitable, t.deliver];
+    const paused = t.paused;
+    t.paused = undefined;
     t.deliver = undefined;
     t.on = undefined;
     const [outerCollectors, outerGroups, outerBudget] = [collectors, groups, budget];
@@ -635,7 +682,12 @@ export const createMachine: CreateKernel2 = () => {
     if (woken !== undefined && t.frames.length > woken.frame + 1) shelve(t.frames, woken.frame + 1, wasOn, wasDeliver);
     const S: Stack = { frames: t.frames, task: t, nested: false };
     try {
-      const r = S.frames.length === 0 ? (handed as V) : runStack(S, handed, woken === undefined ? undefined : new Signal(woken.value));
+      const r =
+        paused !== undefined
+          ? runStack(S, paused.item, undefined, paused.marks)
+          : S.frames.length === 0
+            ? (handed as V)
+            : runStack(S, handed, woken === undefined ? undefined : new Signal(woken.value));
       if (r !== SUSPENDED) finish(t, r);
     } catch (e) {
       // Its steps ran out, or it failed: what it was doing is dropped, and nothing it was to give comes.
@@ -736,7 +788,7 @@ export const createMachine: CreateKernel2 = () => {
   const spawn = (x: V, scope: ScopeV): Lazy => {
     const slot = new Lazy(PENDING, scope);
     slot.busy = true;
-    const t = new Task(slot, true);
+    const t = new Task(slot, true, account);
     const gen = needGen(x, scope, evaluate);
     const w = gen.next(undefined as never).value as Call;
     t.frames = [{ gen, marks: undefined, collector: undefined, group: undefined, capped: false, cap: 0, saved: 0, remaining: 0, ctl: { pass: true } }];
@@ -1553,6 +1605,10 @@ export const createMachine: CreateKernel2 = () => {
       cut = false;
       collectors = [];
       groups = [];
+      // The budget is the evaluation's: what `advance` later does for it counts against what is left.
+      const mine: Account = (account = { left: limits?.steps ?? Infinity, dead: false, handle: undefined });
+      pauseAt = limits?.slice === undefined ? Infinity : Math.max(1, limits.slice);
+      pausedNow = false;
       const r = within(limits, (): V => {
         const S: Stack = { frames: [], task: undefined, nested: false };
         const x = runStack(S, needStep(evaluate(e, s), s), undefined);
@@ -1564,16 +1620,31 @@ export const createMachine: CreateKernel2 = () => {
         slot.busy = true;
         t.slot = slot;
         taskOf.set(slot, t);
+        mine.handle = slot;
         return slot;
       });
+      mine.left -= r.steps;
+      mine.handle ??= r.value;
+      // A spent budget drops what the evaluation had waiting: an answer that comes for it later is ignored.
+      if (r.ended === "limit") mine.dead = true;
       const value = r.value ?? e;
-      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
+      return {
+        value: out(value),
+        ended: r.ended === "limit" ? "limit" : pausedNow ? "paused" : "complete",
+        steps: r.steps,
+        refuted: value instanceof Refuted,
+        claims: claimRecords(),
+        ...(cut ? { cutShort: true as const } : {}),
+      };
     },
     advance: (limits): Advance => {
       if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies.clear();
       cut = false;
       refutedNow = [];
+      pauseAt = limits?.slice === undefined ? Infinity : Math.max(1, limits.slice);
+      pausedNow = false;
+      const limited: Value[] = [];
       // Each task is taken up in the order its answer arrived, and what it wakes straight
       // after it. Once a root comes out refuted, no further effect is performed in this
       // call: only a task that the refutation woke is taken up, to hand it on, and the
@@ -1582,15 +1653,38 @@ export const createMachine: CreateKernel2 = () => {
         for (;;) {
           const i = refutedNow.length === 0 ? 0 : ready.findIndex((t) => t.carries);
           if (i < 0 || i >= ready.length) break;
+          if (pausedNow) break;
           const t = ready.splice(i, 1)[0];
           t.queued = false;
+          if (t.account.dead) continue;
           cursor = 0;
-          resume(t);
+          // The task runs under what is left of its evaluation's budget, and of this call's.
+          const [mine, before, callBudget] = [(account = t.account), spent, budget];
+          budget = Math.min(callBudget, spent + mine.left);
+          try {
+            resume(t);
+          } catch (e) {
+            // A spent budget ends the evaluation: what it had paused or waiting is dropped.
+            mine.dead = true;
+            // Where the call's own budget is spent too, the call has ended at its limit.
+            if (!(e instanceof LimitReached) || spent - before < mine.left || spent >= callBudget) throw e;
+            if (mine.handle !== undefined) limited.push(out(mine.handle));
+          } finally {
+            mine.left -= spent - before;
+            budget = callBudget;
+          }
         }
       });
       const refuted: Value[] = [];
       for (const x of refutedNow) if (!refuted.includes(out(x))) refuted.push(out(x));
-      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
+      return {
+        ended: r.ended === "limit" ? "limit" : pausedNow ? "paused" : "complete",
+        steps: r.steps,
+        refuted,
+        claims: claimRecords(),
+        ...(cut ? { cutShort: true as const } : {}),
+        ...(limited.length > 0 ? { limited } : {}),
+      };
     },
     current: (value) => {
       const v = into(value, "the value");

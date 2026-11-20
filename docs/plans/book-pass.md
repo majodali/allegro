@@ -594,7 +594,7 @@ are:
 | K8 (the reference kernel in parts) | rebuild | `next/kernel/kernel.ts` split into the parts both variants share and the reference evaluator, with no change in behaviour | done 2026-11-20: every test passes unchanged, and every line of the old file is in one of the three new ones |
 | K9 (the machine: evaluation) | rebuild | a second variant that evaluates with a stack of its own: calls, blocks, conditionals, values evaluated when needed, claims, unknown parameters; no limit on depth; a loop in constant space. `next/kernel/create.ts` chooses the variant, and the kernel's tests run against both | done 2026-11-20: the kernel's 141 tests pass on both variants with the same step counts, and the acceptance stream's 66 programs pass on both. A computation that waits is still what is left of it as an expression; the next chunk changes that |
 | K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | done 2026-11-20: every test passes on both variants, and the acceptance stream's 66 programs pass on both. Seven tests say where the two differ and by which decision. A task that a limit stops is dropped until slices exist |
-| K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | new tests; a contract change |
+| K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | done 2026-11-20 on the machine: eight new tests. The contract gains `Limits.slice`, the end "paused" and `Advance.limited`; the reference ignores a slice |
 | K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | with the acceptance stream; a contract change |
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | new tests |
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | cost tests: building a list by `put` costs about its size |
@@ -1670,6 +1670,13 @@ its approval.
   ahead once, when its holder comes to wait. Ruled on the pull request
   of the chunk before: where the configuration sets no step budget the
   launcher gives a default one.
+- **2026-11-20 — budgets and slices** (the review session): on the
+  machine a budget is an evaluation's and a slice is a call's. A call
+  whose slice is spent returns "paused" and the next goes on with the
+  paused task first. A spent budget ends the evaluation, and `advance`
+  names it. Ruled on the pull request of the chunk before: after a
+  refutation `advance` leaves what is in line where it is, and what is
+  held back is evaluated ahead once.
 
 ## 8. Sessions
 
