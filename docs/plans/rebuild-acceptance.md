@@ -1617,3 +1617,16 @@ policy is the gate ruled there.
   title changed: `--follow-renames` of `next/tools/corpus.ts` moved no
   case. Measured: 303 tests pass; 35 programs pass;
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
+- **2026-11-20 — The emitter's test no longer reads what an attempt answers.**
+  PR #261 could not merge: one test of this stream failed on it. The
+  ruling of 2026-11-19 gives the kernel primitive `attempt` a new
+  answer: the value itself, or a failure. The test "the kernel
+  primitives Allegretto names" of `next/bootstrap/emit.test.ts` read
+  the former answer, a structure of a tag and a value. What an attempt
+  answers is the kernel's to state, and the kernel's own tests hold it.
+  The test now holds what the emitter owes: the record names the kernel
+  primitive `attempt`, the run goes on past the call, and the call
+  answers something. It passes on the kernel of main and on that PR
+  merged with main (350 tests, none failing). Nothing else of this
+  stream reads an attempt's answer: the programs of the corpus, the
+  speed tests, the scenarios and the specifications were searched.
