@@ -169,7 +169,7 @@ saved-program data form.
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
 | Q5 | **The first notation and the bootstrap.** The first notation is Allegretto, whose forms the kernel stream's `next/ext/allegretto/forms.md` rules (amended 2026-11-16); under `next/bootstrap/`, a grammar for it made from the present base grammar, a reader of the present parser engine's parse tree, and an emitter that writes a saved program in the data form. The bootstrap's driver emits a text's imported texts first (amended 2026-11-20, PR #250 and PR #268) | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
 | Q6 | **The comparison harness.** Under `next/corpus/`. On the present tree it runs each pinned program and compares its printed lines with its pins by class. On the new tree it runs every Allegretto program under `next/corpus/allegretto/` and reports, per milestone, the cases those programs realise: a case is shown by an Allegretto program that passes, with the present expectation, or the case's stated new result where its class is *changes*. A program may hand a standard-language text to the parser engine once that engine exists in Allegretto (amended 2026-11-16, by the maintainer's ruling that the tests and code of milestones 4 to 7 are written in Allegretto) | its tests on a stub kernel, then on the kernel | merge on green |
-| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs). It loads the records of imported modules (amended 2026-11-20, PR #250 and PR #268) | milestone 2's command | merge on green; the milestone is the maintainer's |
+| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs). It loads the records of imported modules (amended 2026-11-20, PR #250 and PR #268). The launcher ships a capability for waiting, `timer`, beside `output` (amended 2026-11-20) | milestone 2's command | merge on green; the milestone is the maintainer's |
 | Q8 | **The speed tests of milestone 3.** A typed extension and a toy parser engine, written in the first notation with the kernel stream, measured against the present tree on the same programs | the measurements, recorded in §7 | the maintainer |
 
 **After milestone 3**, by amendment of this plan: the phases as
@@ -1971,3 +1971,93 @@ policy is the gate ruled there.
   over late answers, since no capability of the launcher answers late
   with a stream. Measured: 441 tests pass, none waits; 66 programs
   pass.
+- **2026-11-20 — Q7, part 5: a capability for waiting.**
+  Built. The launcher's target ships a second capability, `timer`
+  (`next/launch/timer.ts`), beside `output`. Its clocks are in
+  `next/launch/clock.ts`. `npm run allegretto` and the corpus runner
+  (`runProgram` of `next/corpus/allegretto.ts`) grant both, and so
+  does `npm run launch`. The launcher (`next/launch/launcher.ts`) is
+  unchanged.
+  The proposal, as built, for the maintainer to ratify at the PR:
+  - The capability is `timer`, with one part, `wait`. `timer.wait(n)`
+    takes a whole number of milliseconds and returns a cell, which the
+    launcher fills once `n` milliseconds have passed. Its value is `n`
+    itself. A value that is not bits, bits of another length than 64,
+    or a negative number is outside the domain, and is a refutation
+    with the part's reason. forms.md §1 rules that a primitive function
+    applied outside its domain is a refutation, and the kernel makes
+    one where host code throws `Refusal` (`next/kernel/interface.ts`).
+    `output.write` threw a plain error until this chunk, which ended
+    the run as a fault. Both parts now throw `Refusal`, and the test of
+    `output.write` on bytes that are not UTF-8 text expects a
+    refutation where it expected a fault.
+  - Time is the target's. The capability is made with a clock: a
+    function asked to call back after a number of milliseconds, given
+    as a bigint so that any whole number of 64 bits is asked exactly.
+    The terminal passes the host's timer (`realClock`). The tests and
+    the corpus runner pass a clock that runs no real time
+    (`virtualClock`), made anew for each run. It answers the waits in
+    the order they fall due, the earlier asked first among equal ones,
+    one at a time. Between two answers it lets the host's event loop
+    take one turn, in which the launcher fills the cell and evaluates
+    again what waited on it. A wait asked then falls due counted from
+    that answer. Building showed no reason against it.
+  - The ceiling. A program gets `timer` only where it declares
+    `capability timer` and the ceiling grants it; otherwise it is
+    refused, as for any capability. A program that does not declare it
+    is unaffected, and the hello-world fixture's record is unchanged.
+    The terminal has one ceiling for both of its commands
+    (`TERMINAL_CEILING` of `next/launch/terminal.ts`): it grants every
+    capability the terminal supplies.
+  - The launcher needs no new rule. With several waits in flight each
+    answer is filled when it arrives, what waited on it is evaluated
+    again, a later phase is applied only when no wait is due, and the
+    end `waiting` names the inputs left. A test holds each.
+  The kernel did nothing the forms do not say, in any program here.
+  Realised at milestone 2, all nine of its cases, by ten programs under
+  `next/corpus/allegretto/m2/`. The present tree's `delay(n)` answers 0
+  after `n` milliseconds, and the programs write it
+  `then(timer.wait(n), 0)`. Where a case asserts that nothing is
+  printed while a value waits, a line started after the waiting one
+  prints first.
+  - The six `async:` cases of `src/test/async-futures.ts`: a pending
+    value, its propagation to a dependent, print deferred until the
+    value arrives, two independent waits, and a chain of dependents.
+  - The case of B-028 (completion effects and futures) F1, "a future
+    resolving in a LATER pass": a session at a prompt is a module, so a
+    later entry is a later line. It is evaluated and printed while the
+    earlier entry waits, and the answer then completes the earlier
+    entry's dependent, y = 1. A later phase
+    cannot stand for the later entry: the launcher applies a phase only
+    when no answer is due, so the answer always comes first.
+  - "B-028 F2 (CE-R6)", class changes, by two programs, one for each
+    half. A module whose top level waits on the timer is imported and
+    loads, and its cell is filled when the timer answers. Imported with
+    an input that no phase supplies in place of the timer, the call
+    stays residual and the run ends waiting; nothing fails.
+  - "print returns its argument", class changes: with the output
+    capability the call writes 42, and with an input in place of a
+    capability the call stays residual. An input stands for a
+    capability not given because a module that declares a capability
+    the ceiling does not grant is refused, and a later phase supplies
+    plain data only.
+  - "Stage F3a: top-level print fires immediately": the program prints
+    99 once.
+  Moved to milestone 4, for the maintainer to ratify at the PR: the
+  boundary case on the wire, which cites D42 (evidence is possession),
+  "the wire never mints", from milestone 2, and the case "module: C5.1
+  FQN symbols" from milestone 3. Both ask of fully-qualified names.
+  Allegretto has none: `symbol(t)` gives the symbol of any spelling, and
+  qualifying is the standard language's reader's (PR #265). The first
+  case's own note called milestone 2 a guess. The other cases on
+  fully-qualified names moved the same way on 2026-11-20.
+  Eight programs are written for the purpose, under
+  `next/corpus/allegretto/m3/`, each a ruled form over answers that
+  arrive late: two statements that do not wait for each other, where
+  the shorter wait prints first; the same two in a `sync` block, in
+  written order; `then(a, b)`, where `b` waits for a wait that `a` left
+  going; a claim that waits and holds the line after it; and `each`,
+  `each_at_once`, `each_within` and `all` over waits.
+  Measured: 475 tests pass, none waits; 84 programs pass;
+  `milestone 2: programs 10 (passing 10, failing 0) · cases due 9 · realised 9, named only by a failing program 0, not yet named 0 · up to 2: 15 of 34 realised`;
+  `milestone 3: programs 67 (passing 67, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.

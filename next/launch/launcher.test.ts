@@ -497,9 +497,10 @@ test("the kernel is created once, and output's part is the only effectful primit
   assert.equal(r.made.length, 1, "no pure primitive is made that the record does not need");
 });
 
-test("output's part refuses what is not UTF-8 text, and the launcher reports the fault", async () => {
+test("output's part refuses what is not UTF-8 text: a refutation with the part's reason, and no line", async () => {
   const outcome = await launch({ createKernel, program: writes({ hex: "ff", bits: 8 }), configuration: ONLY_OUTPUT, target: TERMINAL });
-  assert.equal(outcome.end.kind, "fault");
+  assert.equal(outcome.end.kind, "refuted");
+  assert.match(outcome.end.kind === "refuted" ? outcome.end.reason : "", /output\.write takes bits read as UTF-8 text/);
   assert.deepEqual(outcome.lines, []);
 });
 
@@ -512,7 +513,8 @@ test("the terminal entry runs the committed fixture: it prints the line and exit
 
 test("the terminal entry never loads a stand-in kernel", () => {
   const source = fs.readFileSync(path.join(here, "terminal.ts"), "utf8");
-  assert.doesNotMatch(source, /import[^;]*stand-in/);
+  // The code alone: the header comment names the stand-in kernel to say it is never loaded.
+  assert.doesNotMatch(source.replace(/^\s*\/\/.*$/gm, ""), /import[^;]*stand-in/);
   assert.match(source, /KERNEL_MODULE = "next\/kernel\/create\.ts"/);
 });
 

@@ -20,10 +20,13 @@
 // argument, bits read as UTF-8 text, and appends that text as one line to
 // a sink. The sink is a function: a test or a runner collects the lines,
 // and the terminal entry writes them. It answers with an empty structure.
+// A value outside its domain (not bits, not whole bytes, not UTF-8) is a
+// refutation, as for any primitive function (next/ext/allegretto/forms.md
+// §1): the part throws the kernel's `Refusal` (next/kernel/interface.ts).
 //
 // Host-neutral: TextDecoder, never Buffer.
 
-import type { PrimitiveDeclaration, PrimitiveContext, Value } from "../kernel/interface.js";
+import { Refusal, type PrimitiveDeclaration, type PrimitiveContext, type Value } from "../kernel/interface.js";
 import type { CapabilityDefinition, CapabilityImplementation } from "./launcher.js";
 
 /** The output capability: one part, which writes one line. */
@@ -34,12 +37,16 @@ export type Sink = (line: string) => void;
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-/** Reads a bits value as UTF-8 text; throws on anything else. */
+/** Reads a bits value as UTF-8 text; refuses anything else. */
 export function textOf(value: Value, context: PrimitiveContext): string {
-  if (context.kind(value) !== "bits") throw new Error(`output.write takes bits read as UTF-8 text, not ${context.kind(value)}`);
+  if (context.kind(value) !== "bits") throw new Refusal(`output.write takes bits read as UTF-8 text, not ${context.kind(value)}`);
   const { bytes, bitLength } = context.bitsOf(value);
-  if (bitLength % 8 !== 0) throw new Error(`output.write takes whole bytes; this value has ${bitLength} bits`);
-  return decoder.decode(bytes);
+  if (bitLength % 8 !== 0) throw new Refusal(`output.write takes whole bytes; this value has ${bitLength} bits`);
+  try {
+    return decoder.decode(bytes);
+  } catch {
+    throw new Refusal("output.write takes bits read as UTF-8 text; these bytes are not UTF-8");
+  }
 }
 
 /** The part `write` of `output`, writing to `sink`. */
