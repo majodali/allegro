@@ -1772,3 +1772,72 @@ policy is the gate ruled there.
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`;
   `milestone 1: programs 5 (passing 5, failing 0) · cases due 25 · realised 5, named only by a failing program 0, not yet named 20 · up to 1: 5 of 25 realised`;
   `milestone 3: programs 41 (passing 41, failing 0) · cases due 132 · realised 98, named only by a failing program 0, not yet named 34 · up to 3: 103 of 167 realised`.
+- **2026-11-20 — Q8: the speed tests measured again.**
+  The ruling of 2026-11-17 has milestone 3 signed on a run of the bench
+  made after the shape is fixed: time grows in step with the work on
+  both tests. This run shows where that stands. It does not meet the
+  condition yet.
+  - **How it was measured.** `npm run bench:next`, one run, on main at
+    `c205239` (after part 4 of chunk Q5 (the first notation and the
+    bootstrap) and PR #261, PR #265 and PR #266), on an Intel Xeon at
+    2.30 GHz with 4 cores and 16 GiB, Linux 6.18, node 22.23.5. Each
+    time is the median of five runs after a warm-up, in ms, as before.
+    The machine differs from the run of 2026-11-17, so ratios and
+    exponents compare across the two runs and plain times do not.
+  - **Test 1, the parser.**
+
+    | Terms | New steps | New ms | µs per step | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|
+    | 1 | 9,786 | 73.7 | 7.5 | 56.8 | 0.08 | 1.3 | 954 |
+    | 4 | 38,820 | 274 | 7.1 | 108 | 0.10 | 2.5 | 2,643 |
+    | 16 | 154,956 | 1,436 | 9.3 | 374 | 0.45 | 3.8 | 3,182 |
+    | 32 | 309,804 | 3,639 | 11.7 | 618 | 0.81 | 5.9 | 4,492 |
+    | 64 | 619,500 | 10,665, one run | 17.2 | 1,582 | 2.89 | 6.7 | 3,693 |
+
+  - **Test 2a, the typed loop and fold.**
+
+    | n | New steps | New ms | µs per step | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|
+    | 16 | 1,211 | 7.58 | 6.3 | 7.75 | 4.18 | 1.0 | 1.8 |
+    | 32 | 2,321 | 13.0 | 5.6 | 8.76 | 4.72 | 1.5 | 2.8 |
+    | 64 | 4,633 | 34.8 | 7.5 | 12.6 | 6.60 | 2.8 | 5.3 |
+    | 128 | 9,645 | 120 | 12.4 | 22.8 | 9.49 | 5.2 | 12.6 |
+    | 256 | kernel limit | | | 34.3 | 15.9 | | |
+
+  - **Test 2b, the typed sum split in halves.**
+
+    | n | New steps | New ms | µs per step | Present ms | Native ms | New / present | New / native |
+    |---|---|---|---|---|---|---|---|
+    | 256 | 12,186 | 43.5 | 3.6 | 26.0 | 10.6 | 1.7 | 4.1 |
+    | 4,096 | 192,666 | 799 | 4.1 | 303 | 104 | 2.6 | 7.7 |
+    | 65,536 | 3,080,346 | 15,936, one run | 5.2 | 4,990 | 1,906 | 3.2 | 8.4 |
+
+  - **How time grows.** Steps grow linearly with the size on all three
+    (the parser's fitted exponent is 1.00). Time grows faster than
+    steps on the two that nest calls: the parser's fitted exponent is
+    1.20, where it was 1.22, and a step costs 7.5 microseconds at 1 term
+    and 17.2 at 64. The typed loop's step costs 5.6 microseconds at 32
+    and 12.4 at 128; it reaches the kernel's limit before a fit can be
+    made. The halving sum's exponent is 1.08, where it was 1.07.
+  - **The four findings of 2026-11-16, now.**
+
+    | Finding | Then | Now |
+    |---|---|---|
+    | `==` on two equal texts of 1,600 characters | 771 ms | 1.00 ms: fixed |
+    | one slice of a text of 100,000 characters | 17.3 ms | 0.01 ms a call at every length: fixed |
+    | a step slows as arguments nest (`pass(n, sum(n - 1))`, n 50 and n 350) | 16.0 and 54.8 µs | 9.4 and 36.9 µs: still there |
+    | a recursion ends at the host's stack | plain sum to 394 in a fresh process; parser to 41 nested parentheses | plain sum to 245; parser to 25; typed loop to 268: still there, and lower |
+
+    Why the ceiling is lower is not measured. Three things changed
+    between the two runs: the kernel, the emitter (part 4 writes each
+    dropped statement as a claim) and the version of node. The ruling
+    of 2026-11-17 is that
+    nothing bounds a recursion but its step budget and memory; "A loop
+    written as a recursion runs in constant space" states it and its
+    status says the reference kernel still uses the host's stack.
+  - **What this means for milestone 3.** Two of the four findings are
+    closed. The two that are open are the ones the signing condition
+    names: the time of a step still grows with nesting, and a deep
+    recursion still ends at the host's stack, at a depth that moves from
+    run to run. The bench is run again when the kernel stream lands
+    those two.
