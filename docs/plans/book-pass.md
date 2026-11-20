@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -590,6 +590,15 @@ are:
 | K4 (what Allegro code may do with an expression) | rebuild | one design for the review's cluster 1 with issues 14 and 23, which fixes the kernel's own primitive list | design discussion with the maintainer |
 | K5 (recursion) | rebuild | recursion and the policy for opening calls, proved by building | milestone 3, with the acceptance stream; needs K4 |
 | K6 (the rest, listed when K5 is in sight) | rebuild | the rest of Part II (metadata fields and their rules, refutation, the remaining evaluation issues); then Part IV as extensions in the first notation; then Part III's parser engine | further chunks are named by an amendment of this plan |
+| K7 (the plan for a kernel that keeps its own stack) | rebuild | §9 of this plan | the maintainer |
+| K8 (the reference kernel in parts) | rebuild | `next/kernel/kernel.ts` split into the parts both variants share and the reference evaluator, with no change in behaviour | done 2026-11-20: every test passes unchanged, and every line of the old file is in one of the three new ones |
+| K9 (the machine: evaluation) | rebuild | a second variant that evaluates with a stack of its own: calls, blocks, conditionals, values evaluated when needed, claims, unknown parameters; no limit on depth; a loop in constant space. `next/kernel/create.ts` chooses the variant, and the kernel's tests run against both | the tests of evaluation pass on both variants |
+| K10 (the machine: waiting) | rebuild | tasks, cells that know their waiters, `also`, `then` that waits for all, claims that hold, what a refutation halts, evaluation ahead | every test passes on both variants; the acceptance stream's programs print the same on both |
+| K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | new tests; a contract change |
+| K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | with the acceptance stream; a contract change |
+| K13 (the first of two) | rebuild | `first(a, b)` and cancelling | new tests |
+| K14 (sharing) | rebuild | structures and bits that share what an operation does not change | cost tests: building a list by `put` costs about its size |
+| K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | the acceptance stream's speed tests: time per step does not grow with the size of the run |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1638,6 +1647,13 @@ its approval.
   iteration) held and ruled** (the review session): a stream is a
   value; no primitive. 253 decisions. Both discussions set before the
   evaluator's rebuild are held.
+- **2026-11-20 — the plan for a kernel that keeps its own stack**
+  (the review session): §9, and nine chunks added to §5 by amendment,
+  as the last row of the rebuild's chunks foresaw. Put to the
+  maintainer before any code.
+- **2026-11-20 — the reference kernel in parts** (the review
+  session): `next/kernel/kernel.ts` split in three with no change in
+  behaviour: `values.ts`, `core.ts` and the evaluator.
 
 ## 8. Sessions
 
@@ -1688,3 +1704,169 @@ plan; `docs/plans/book-pass-briefs.md`; `docs/plans/book-chapters-now.md`
 (what a count looks like); `docs/book/README.md` and
 `docs/reading-order.json`. It then starts the first chunk in §5 that is
 not waiting.
+
+## 9. The kernel that keeps its own stack
+
+This section is the plan of the nine chunks that close the rebuild's
+rows of §5's table. It is self-contained for a reader who knows the
+decision inventory.
+
+### 9.1 Outcome
+
+A second kernel variant, here called **the machine**, which evaluates
+with a stack of its own. The reference kernel stays as it is. "One
+reference kernel is the root of trust" says a variant "is trusted as far
+as it agrees with the reference", so the reference is the oracle: the
+machine is right where it answers as the reference does, and where a
+ruled decision says it must answer otherwise, a test says so by name.
+
+When the last of the nine closes, `next/kernel/create.ts` gives the
+machine, and
+the reference stays in the tree, small and slow, to compare against.
+
+### 9.2 What the rulings ask of it
+
+Each line names the decision that asks.
+
+| The machine must | Decision |
+|---|---|
+| Recurse as deep as its budget and memory allow | "Limits are step budgets" |
+| Run a loop written as a recursion in constant space | "A loop written as a recursion runs in constant space" |
+| Take up a waiting computation at the point where it stopped, so nothing is walked or charged twice | "When information arrives, what waited on it is evaluated again" |
+| Run one task at a time, the ready ones in the order their answers arrived | "One task runs at a time, and a slice never changes what happens" |
+| Pause at the end of a slice and go on with the paused task first | the same |
+| Keep a budget for each evaluation, never filled up again, and drop what is in flight when it is spent | "Limits are step budgets" |
+| Let `fill` take up the waiters | "A late answer or its failure fills a cell as plain data" |
+| Give the earlier of two answers and cancel only what nothing else can need | "The first of two answers is one kernel primitive" |
+| Share what an operation does not change | "The kernel shares what an operation does not change" |
+| Evaluate a function with its parameters unknown | "A function can be specialized with its parameters unknown" |
+
+Everything the reference kernel does today is asked as well: the tests
+are the list.
+
+### 9.3 Why the reference cannot be bent into it
+
+The reference evaluates by calling itself, on the host's stack. Three
+of its properties follow from that and cannot be patched.
+
+- **Depth.** A recursion a few hundred calls deep ends at the host's
+  limit.
+- **Waiting.** A computation that waits returns what is left of it as
+  an expression. When the answer comes, the whole of what is left is
+  evaluated again from its top. Work is charged twice, and it cannot
+  pause.
+- **Time.** The acceptance stream's speed tests show the time for one
+  step growing with the size of the run: 7.5 microseconds at the
+  smallest parser test and 17.2 at the largest
+  (`docs/plans/rebuild-acceptance.md` §7, 2026-11-20). Milestone 3 of
+  `docs/plans/rebuild.md` is signed when time grows in step with the
+  work.
+
+### 9.4 The design
+
+**Frames.** A computation is a stack of frames. A frame is what is to
+be done with a value once it is known: apply this function to it, take
+this branch, record this claim. Evaluating an expression pushes frames
+and pops them. Nothing uses the host's stack in proportion to the
+program.
+
+**A call in tail position pushes no frame.** The value of a function's
+body, through `if`, `then` and a block, is evaluated in the frame of the
+call that made it. That is what makes a loop run in constant space.
+
+**A value evaluated when needed is a slot.** An argument, a binding and
+an entry are each a slot with three states: not started, being
+evaluated, known. A computation that needs a slot being evaluated waits
+on the slot. A computation that needs a slot it is itself evaluating
+needs itself, which is a refutation.
+
+**Two ways not to know.** They are different, and the reference treats
+them alike.
+
+- *A parameter left unknown*, such as a capability a phase was not
+  given. No answer will come during this evaluation. The machine
+  answers with an expression, as the reference does: what could be
+  evaluated is, and the rest is what is left.
+- *A cell*, the answer of an operation that takes time. An answer will
+  come. The computation is suspended where it stands and registered on
+  the cell.
+
+**A wait splits the stack.** When a computation meets an unfilled cell,
+the frames between that point and the nearest frame that does not need
+the value yet become a task, waiting on the cell. The frames above go
+on. The frames that do not need the value yet are those of `also`, of an
+argument of a primitive function, of an entry needed in full, and the
+top of an evaluation. `then` and a claim that holds need it, so they
+wait too. A task that finishes writes its value into the slot the frames
+above will read.
+
+**Tasks.** A task is a suspended stack. The ready tasks stand in one
+line, in the order their answers arrived. The machine runs the first
+until it finishes, waits or the slice ends. A task that a slice paused
+goes back to the front.
+
+**Evaluation ahead.** Where a `then` or a claim holds what is written
+after it, the reference still evaluates that with no effect performed,
+so that a refutation in it is found at once. The machine does the same
+with a task that may perform no effect and whose value is dropped. Only
+its refutations and its claims are kept.
+
+**Marks, claims, identity, descriptions, saved programs.** Unchanged.
+They are the parts both variants share once the reference kernel is
+split.
+
+### 9.5 How it is known to be right
+
+- **Both variants run the same tests.** The 106 tests of
+  `next/kernel/kernel.test.ts` and those of the saved program and the
+  shipped primitives make a kernel in ten places. From the chunk that
+  brings the machine, each runs once for each variant.
+- **Where the two must differ**, the test says so and names the
+  decision. Step counts are the main case: "Limits are step budgets"
+  lets them vary with the kernel variant. Twelve assertions pin a count
+  today.
+- **The acceptance stream's programs** are run on both variants through
+  `next/kernel/create.ts`, which chooses by the environment variable
+  `ALLEGRO_KERNEL`. Their harness needs no change. The printed lines
+  and the way each run ends must be the same.
+- **New abilities have tests of their own**: a recursion a million
+  calls deep; a loop of a million turns in constant space; a pause in
+  the middle of an effectful computation that performs nothing twice;
+  the earlier of two answers; a list of a hundred thousand entries
+  built by `put`.
+- **Deliberate faults**, as in every chunk so far, with the count of
+  those caught reported.
+- **Speed.** `npm run bench:next`, the acceptance stream's, when the
+  machine first passes every test and again at the end. The condition is theirs: time per step does not grow
+  with the size of the run.
+
+### 9.6 What can go wrong
+
+1. **Splitting `next/kernel/kernel.ts`.** It is one function of
+   two thousand lines whose parts share state. The split must change no
+   behaviour. If it cannot be done cleanly, the machine is written as a
+   second whole kernel and the shared parts are copied; that costs
+   about a thousand duplicated lines and two places to keep in step.
+2. **A waiting result read as an expression.** The reference returns
+   what is left as an expression, which a host can read. The machine
+   returns a handle. Reading it means reading the frames back as an
+   expression, which is also what specialization needs, so it is
+   planned with it, in the last chunk. Until then the machine refuses that one call
+   on a waiting result. One test reads what is left of a computation
+   with an unknown parameter; that case is unaffected.
+3. **Evaluation ahead.** In the reference it falls out of evaluating
+   what is left again. In the machine it is a mechanism of its own. If
+   it proves costly or unfaithful, the question goes to the maintainer:
+   it exists only to find a refutation early.
+4. **Step counts.** A step of the machine is not a step of the
+   reference. Budgets written for one may not suit the other. The
+   acceptance stream's tests no longer pin counts.
+5. **The interface made one** changes the acceptance stream's
+   launcher. It is done with them, in one pull request each side.
+
+### 9.7 What is not in it
+
+Metadata fields and their rules; the module loader and the parser
+engine in Allegretto; capabilities that offer streams; the standard
+language. They follow, on the machine.
+
