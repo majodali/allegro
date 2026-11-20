@@ -447,7 +447,7 @@ test("a malformed phases line, a list that is not built, two lines, and later li
 });
 
 test("the programs that run under check are there, in milestone 3's directory, and each states its phases", () => {
-  for (const name of ["prints", "refuted", "bound", "dropped"]) {
+  for (const name of ["prints", "refuted", "bound"]) {
     const file = `${PROGRAMS_DIR}/m3/phase-check-${name}.alg`;
     assert.ok(FILES.includes(file), name);
     assert.deepEqual(readPhases(text(file)).phases, ["check"], file);

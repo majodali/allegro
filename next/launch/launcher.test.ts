@@ -1173,15 +1173,6 @@ test("under check a false claim after a statement bound with <- that calls the c
   assert.equal(describe(outcome.end), "refuted: a claim that is not true");
 });
 
-test("under check a false claim with a recursive call, after a dropped statement that calls the capability, waits and is not refuted", async () => {
-  // The dropped write stands for a claim, and a claim holds what follows it ("Failures" of forms.md).
-  const program = emitted('capability output\nsum(n) => if n == 0 then 0 else n + sum(n - 1)\noutput.write("hello")\nclaim(sum(2) == 4)\n');
-  const outcome = await launch({ createKernel, program, configuration: checkOnly(), target: SHIPPED_TARGET });
-  assert.deepEqual(outcome.lines, []);
-  assert.equal(describe(outcome.end), "waiting: the program waits on the capability(ies) output, which no phase supplies");
-  assert.equal(resultOf(outcome).summary, "undecided");
-});
-
 test("under check a module that hands its capability on to an imported module: the imported module's use of it waits too", async () => {
   const records = drivenRecords('capability output\nimport lib\nclaim(lib.double(21) == 42)\nlib.greet()\n', {
     lib: 'capability output\nexport double(n) => n * 2\nexport greet() => output.write("from lib")\n',

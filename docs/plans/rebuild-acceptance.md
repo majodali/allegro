@@ -2762,7 +2762,7 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   another, the two choices about the summary, one entry for the
   assumptions of one module, and the corpus line `// summary:` stand as
   built. Both pull requests are merged.
-- **2026-11-20 — Q13, part 3: check, run and a pipeline.**
+- **2026-11-20 — Q13, part 3: check and run as phases.**
   Built, with one stop. The launcher (`next/launch/launcher.ts`) applies
   a sequence of phases, each supplying capabilities and inputs, and the
   resolver (`next/tools/configuration.ts`) ships two values: check alone
@@ -2879,18 +2879,23 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   After `shown <- output.write("hello")`, which holds nothing, a false
   claim on the next line is refuted. After a dropped
   `output.write("hello")`, which stands for a claim and holds what
-  follows, a false claim waits and is not refuted, so check does not
-  decide it: `sum(n) => if n == 0 then 0 else n + sum(n - 1)`,
-  `output.write("hello")`, `claim(sum(2) == 4)` ends waiting, with the
-  summary undecided. That is the finding for the maintainer. It holds
-  only where the claim calls a recursive function. With
-  `claim(2 + 2 == 5)` or `claim(false)` in that place the run is
-  refuted under check on both variants: the kernel evaluates the held
-  claim ahead and reports it. The forms say the claim is held until
-  the write's answer comes. The interface says the reference kernel
-  evaluates what is held ahead, in `advance`; this is `evaluate`, and
-  the variant that keeps its own stack does the same. The launcher does
-  not work around either.
+  follows, what happens to a false claim depends on how it is written.
+  `claim(2 + 2 == 5)` and `claim(false)` in that place are refuted
+  under check on both variants: the kernel evaluates the held claim
+  ahead and reports it. With a recursive function,
+  `sum(n) => if n == 0 then 0 else n + sum(n - 1)`,
+  `output.write("hello")`, `claim(sum(2) == 4)`, the claim waits, the
+  launch ends waiting and the summary is undecided: check does not
+  decide it. The forms say the claim is held until the write's answer
+  comes, and say nothing of evaluating it ahead. The interface says
+  the reference kernel evaluates what is held ahead, in `advance`; this
+  is `evaluate`, and the variant that keeps its own stack does the
+  same. So how much check decides after a dropped statement is the
+  kernel's, and it is a question for the kernel stream and the
+  maintainer. No test and no program of this stream holds the second
+  case: it is a present limit of the kernel, and a test that held it
+  would fail when the kernel decides more. The launcher works around
+  neither.
   **Where the variants differ.** Under check, `output.write("before")`,
   `output.write(n)`, `output.write("after")` with the input `n` not
   supplied: the reference waits on the capability's cell and on `n`,
@@ -2899,11 +2904,10 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   reports the cells the kernel names, so the end's `inputs` is `n` on
   one and empty on the other. The launcher's test uses a statement bound
   with `<-` for the input, which both variants start.
-  Four programs under `next/corpus/allegretto/m3/` state
+  Three programs under `next/corpus/allegretto/m3/` state
   `// phases: check`: `phase-check-prints.alg`,
-  `phase-check-refuted.alg`, `phase-check-bound.alg` and
-  `phase-check-dropped.alg`, whose comment states the finding and names
-  the form that holds it. None realises a case.
+  `phase-check-refuted.alg` and `phase-check-bound.alg`. None realises
+  a case.
   What the decisions name that is not built: export; a project defining
   or extending a phase; what a phase must leave decided before the next
   begins; the loader's capability in check; and supplying a capability
@@ -2913,8 +2917,8 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `next/tools/configuration.test.ts`, and the list of settings that an
   unknown key's finding names, there and in
   `next/launch/launcher.test.ts`. No test branches on the variant.
-  Measured: `npm run test:next` passes 784 tests on the reference and
-  785 with `ALLEGRO_KERNEL=machine`; 100 programs pass on both;
-  `milestone 3: programs 83 (passing 83, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
-  No row of the decision map moves in this part. The orchestrating
-  session decides which rows it earns.
+  Measured: `npm run test:next` passes 782 tests on the reference and
+  783 with `ALLEGRO_KERNEL=machine`; 99 programs pass on both;
+  `milestone 3: programs 82 (passing 82, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  No row of the decision map moves in this part: check alone is built,
+  and the rows of the Phases chapter wait for a pipeline.
