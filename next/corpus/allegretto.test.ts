@@ -444,3 +444,11 @@ test("a malformed phases line, a list that is not built, two lines, and later li
   const notLaunched = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// phases: check\n");
   assert.deepEqual(notLaunched.problems, ["nothing was launched, and the program states a `// phases:` line"]);
 });
+
+test("the programs that run under check are there, in milestone 3's directory, and each states its phases", () => {
+  for (const name of ["prints", "refuted", "bound", "dropped"]) {
+    const file = `${PROGRAMS_DIR}/m3/phase-check-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, ["check"], file);
+  }
+});
