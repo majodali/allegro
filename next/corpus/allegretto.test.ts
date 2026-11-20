@@ -11,7 +11,8 @@
 // next/bootstrap/fixtures/. Chunk Q7 (the minimal launcher and the output
 // capability), part 3, added the `// input:`, `// later:` and
 // `// end: waiting:` lines and the programs that use them, under m1/ and
-// m3/.
+// m3/. Chunk Q5, part 4, added the programs for the forms as they stood
+// on 2026-11-19, under m3/.
 //
 // Each program is emitted and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -43,6 +44,11 @@ test("the programs written for milestone 3 are there, each in its milestone's di
     "claim-holds", "claim-refuted", "divide-by-zero", "operators", "module-open", "module-export",
   ]) assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/${name}.alg`), name);
   for (const f of FILES) assert.notEqual(milestoneOf(f), null, `${f} is not under a directory m<milestone>`);
+});
+
+test("the programs written for the forms as they stood on 2026-11-19 are there, in milestone 3's directory", () => {
+  for (const name of ["sync-block", "dropped-failure", "handle", "arrow-binding", "data", "keys", "refuse", "assume-undecided", "least-integer", "namespaces"])
+    assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/${name}.alg`), name);
 });
 
 test("the programs that use inputs are there, in milestone 1's directory and milestone 3's", () => {

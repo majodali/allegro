@@ -63,6 +63,22 @@ present result.
 A number is printed through `int.text`, a text as it is, and a truth
 value as `if … then "true" else "false"`.
 
+## How a program's statements run
+
+The forms rule this (`next/ext/allegretto/forms.md` §2, "Bindings and
+blocks" and "Failures"). A program's top-level statements are started
+in written order, and none waits for the one before it to be over. A
+statement whose value is dropped stands for a claim that the value is no
+failure, and a claim holds what is written after it until it is decided.
+Every top-level statement's value is dropped, since the module yields
+the structure of its bindings. So a line written with `output.write`
+holds the lines after it until the write has answered, and with no late
+answer the lines print in written order. A line written `x <- e` holds
+nothing: only what uses `x` waits for it. An indented block written
+after `sync` runs each statement to its end before the next. `sync`
+cannot stand before a program's top level: the forms do not say where it
+would be written.
+
 ## A text of the standard language
 
 By the maintainer's ruling, an Allegretto program may hand a text of the

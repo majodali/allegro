@@ -54,6 +54,15 @@ test("a whole number is read from its digits, within the signed 64-bit range; ou
   assert.match(refusal("0x8000000000000000")[0], /outside the signed 64-bit range/);
 });
 
+test("prefix - on the whole number 2^63 is the least integer, one literal; 2^63 is refused anywhere else", () => {
+  assert.deepEqual(exprOf("-9223372036854775808"), { k: "int", value: -(2n ** 63n), at: { start: 0, end: 20, line: 1, column: 1 } });
+  assert.equal(shape(exprOf("-9223372036854775807")), "(-9223372036854775807)");
+  assert.equal((exprOf("-0x8000000000000000") as { value: bigint }).value, -(2n ** 63n));
+  assert.match(refusal("0 - 9223372036854775808")[0], /outside the signed 64-bit range/);
+  assert.match(refusal("-(9223372036854775808)")[0], /outside the signed 64-bit range/);
+  assert.match(refusal("-9223372036854775809")[0], /outside the signed 64-bit range/);
+});
+
 test("0xFF is read as 255", () => {
   assert.equal((exprOf("0xFF") as { value: bigint }).value, 255n);
   assert.equal((exprOf("0x7fffffffffffffff") as { value: bigint }).value, 9223372036854775807n);
@@ -78,7 +87,9 @@ test("the other literals: truth values, the symbol literal, structures and lists
   assert.deepEqual([s.k, (s as { name: string }).name], ["symbol", "name"]);
   const r = exprOf("{a: 1, b: x}");
   assert.equal(r.k, "record");
-  assert.deepEqual((r as Extract<Expr, { k: "record" }>).fields.map((f) => [f.name.name, shape(f.value)]), [["a", "1"], ["b", "x"]]);
+  assert.deepEqual((r as Extract<Expr, { k: "record" }>).fields.map((f) => [f.k === "named" ? f.name.name : "", shape(f.value)]), [["a", "1"], ["b", "x"]]);
+  const c = exprOf("{a: 1, [k]: 2, [f(x)]: 3}") as Extract<Expr, { k: "record" }>;
+  assert.deepEqual(c.fields.map((f) => [f.k, f.k === "named" ? f.name.name : shape(f.key), shape(f.value)]), [["named", "a", "1"], ["computed", "k", "2"], ["computed", "f(x)", "3"]]);
   const l = exprOf("[1, x, [ ]]");
   assert.equal(l.k, "list");
   assert.deepEqual((l as Extract<Expr, { k: "list" }>).items.map((i) => i.k), ["int", "name", "list"]);
@@ -121,12 +132,35 @@ test("precedence and grouping are forms.md's", () => {
   assert.equal(shape(exprOf("a != b == c")), "((a != b) == c)");
 });
 
-test("the header lines come first, then the module's block", () => {
+test("the header lines stand anywhere at the module's top level, in written order, and in no block inside it", () => {
   const m = moduleOf("capability output\ninput name\nimport other\nx = 1\noutput.write(x)");
   assert.deepEqual(m.headers.map((h) => [h.k, h.name.name]), [["capability", "output"], ["input", "name"], ["import", "other"]]);
   assert.deepEqual(m.items.map((i) => i.k), ["binding", "statement"]);
-  assert.match(refusal("x = 1\ncapability output")[0], /header lines come before anything else/);
-  assert.match(refusal("f() =>\n  input x\n  x")[0], /belongs at the start of the text/);
+  const anywhere = moduleOf("x = 1\ncapability output\noutput.write(x)\nkey k\ninput n");
+  assert.deepEqual(anywhere.headers.map((h) => [h.k, h.name.name]), [["capability", "output"], ["key", "k"], ["input", "n"]]);
+  assert.deepEqual(anywhere.items.map((i) => i.k), ["binding", "statement"]);
+  assert.match(refusal("f() =>\n  input x\n  x")[0], /belongs at the top level of the module, not in a block/);
+  assert.match(refusal("f() =>\n  key x\n  x")[0], /the header line key belongs at the top level/);
+});
+
+test("sync before an indented block is the same block, marked sync", () => {
+  const f = moduleOf("f() => sync\n  a()\n  b").items[0] as Extract<Item, { k: "function" }>;
+  assert.deepEqual([f.body.k, f.body.k === "block" && f.body.sync, f.body.k === "block" && f.body.items.length], ["block", true, 2]);
+  const plain = moduleOf("f() =>\n  a()\n  b").items[0] as Extract<Item, { k: "function" }>;
+  assert.equal(plain.body.k === "block" && plain.body.sync, false);
+  const arrow = moduleOf("x <- sync\n  a()\n  b").items[0] as Extract<Item, { k: "arrow" }>;
+  assert.equal(arrow.value.k === "block" && arrow.value.sync, true);
+  assert.equal(shape(exprOf("sync")), "sync", "sync is a name where no block follows");
+});
+
+test("a statement above x <- e that needs x, itself or through a binding, is refused, naming the name and both places", () => {
+  assert.deepEqual(refusal("see(n)\nn <- 1"), ["the statement at 1:1 needs n, which n <- … binds below it at 2:1: it would start that line's value before its place"]);
+  assert.match(refusal("g() => n\ng()\nn <- 1")[0], /^the statement at 2:1 needs n, which n <- … binds below it at 3:1/);
+  assert.match(refusal("a <- n\nn <- 1")[0], /^the statement at 1:1 needs n/);
+  assert.match(refusal("f() =>\n  see(n)\n  n <- 1\n  n")[0], /^the statement at 2:3 needs n, which n <- … binds below it at 3:3/);
+  // A binding may use it before or after; a statement after it may; a parameter or an inner block that binds n again does not need it.
+  moduleOf("before = n\nn <- 1\nafter = n\nsee(after)\nsee(before)");
+  moduleOf("see(n => n)\nm <-\n  n = 2\n  n\nsee(m)\nn <- 1");
 });
 
 test("a block's bindings, function bindings, statements and x <- e, with export at the module's level only", () => {

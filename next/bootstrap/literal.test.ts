@@ -43,6 +43,7 @@ test("each literal form is read as the plain data forms.md §2 says it stands fo
   assert.deepEqual(ok("`name"), { symbol: "name" });
   assert.deepEqual(ok("-7"), int64(-7n));
   assert.deepEqual(ok("-9223372036854775807"), int64(-9223372036854775807n));
+  assert.deepEqual(ok("-9223372036854775808"), int64(-(2n ** 63n)), "the least integer");
   assert.deepEqual(ok("[]"), { entries: [] });
   assert.deepEqual(ok("{}"), { entries: [] });
   assert.deepEqual(ok('{a: 1, b: [true, `x, {c: "t"}], d: -2}'), {
@@ -64,6 +65,7 @@ test("anything else is refused with a finding that says an input's value is a li
     ["--5", /holds a negation of something that is not a whole number$/],
     ["!true", /holds a negation with !$/],
     ["{a: y}", /holds the name y$/],
+    ['{[`k]: 1}', /holds an entry with a computed key$/],
     ["1\n2", /is not one literal$/],
     ["capability output\n1", /is not one literal$/],
     ["", /is not one literal$/],
@@ -91,6 +93,7 @@ test("a literal handed as an input is the same as the same literal written in th
     ["42", "v == 42"],
     ["0xFF", "v == 255"],
     ["-7", "v == -7"],
+    ["-9223372036854775808", "v == -9223372036854775808"],
     ["1.5", "v == 1.5"],
     ["true", "v == true"],
     ["false", "v == false"],

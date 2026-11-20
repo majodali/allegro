@@ -1428,6 +1428,18 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The emitter follows the forms as they stand (B-196, chunk Q5 (the first notation and the bootstrap), part 4)
+
+B-196 (the rebuild's acceptance side). Allegretto's grammar, reader and
+emitter follow `next/ext/allegretto/forms.md` as of 2026-11-19. A
+block's statements are a chain of `also`, and of `then` after `sync`. A
+dropped statement is a claim that its value is no failure, and
+`is_failure` and `handle` are bound for every text. `x <- e` is a
+binding of its block's group. The kernel's other primitives are names,
+a structure literal takes computed keys and private entries, `key`
+header lines declare keys, header lines stand anywhere at the top
+level, and the least integer can be written. Ten programs show the new
+forms. Imports are left for a later part.
 ### 2026-11 — The corpus follows two retitles; 30 new results wait for Part IV (B-196)
 
 B-196 (the rebuild's acceptance side). 35 corpus cases move to the new

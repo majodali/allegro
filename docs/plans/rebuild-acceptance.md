@@ -1657,3 +1657,86 @@ policy is the gate ruled there.
   does not handle a declared failure) is not yet a decision's text.
   Measured:
   `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`.
+- **2026-11-20 — Q5, part 4: the grammar, reader and emitter follow the forms as they stand.**
+  The kernel stream's PRs #245 to #260 grew `next/ext/allegretto/forms.md`,
+  and the waiting test of `next/bootstrap/emit.test.ts` named the kernel
+  primitives the emitter did not write. Built, by item:
+  - **Statements.** A block's statements are a chain of the kernel
+    primitive `also`. `sync` before an indented block makes them a chain
+    of `then`; it is read after `=`, `=>` and `<-`, and in a branch of
+    `if`, where an indented block may stand.
+  - **A dropped statement** is `claim(!is_failure(a))`, in both kinds of
+    block. A block's last statement, `x <- e` and a statement that is
+    itself a claim are not wrapped. Every statement of the module is
+    dropped: the module yields the structure of its bindings.
+  - **`is_failure` and `handle`** are kept as the forms write them, in
+    one constant of `next/bootstrap/emit.ts` (`FAILURE_FUNCTIONS`), read
+    with the same reader. A test reads the two definitions out of
+    forms.md and compares. They are bound in a block around the module's
+    own where the text uses either name, so a text may bind either again
+    and hide it. A dropped statement's claim applies Allegretto's
+    `is_failure` itself, so a text that hides the name does not change
+    what a dropped statement means.
+  - **`x <- e`** is `x: e` among its block's bindings and the statement
+    `x` at its place. The reader refuses a statement above the arrow that
+    needs the name, itself or through a binding of the block, and names
+    the name and both places.
+  - **The kernel's primitives as names**: `also`, `refuse`, `assume`,
+    `undecided`, `put`, `key`, `kind`, `symbol`, `spelling`. The waiting
+    test reports nothing owed.
+  - **A computed key**: `{a: e, [k]: f}` is `put({a: e}, k, f)`, and an
+    entry after it is put too.
+  - **Keys**: a header line `key name` is a parameter before every other,
+    in written order; the record's `keys` counts them; `declares` and the
+    yielded structure leave them out. `[name]: e` with a key's name is the
+    structure's entry keyed by the key's parameter. The forms' example
+    prints `1` then `42` (`keys.alg`).
+  - **`int`, `float`, `text` and `bits`** are structures where used as a
+    value; `int.add` is still the primitive where the text does not bind
+    `int` again, so `needs` lists only what the text names.
+  - **Four primitives** named: `bits.int`, `float.eq`, `float.ge`,
+    `float.gt`.
+  - **Header lines anywhere** at the top level, in any order.
+  - **The least integer**: prefix `-` on the whole number 2^63 is read as
+    `-9223372036854775808`; `readLiteral` follows.
+  - **Programs**: ten under `next/corpus/allegretto/m3/`, written for the
+    purpose: `sync-block`, `dropped-failure`, `handle`, `arrow-binding`,
+    `data`, `keys`, `refuse`, `assume-undecided`, `least-integer`,
+    `namespaces`.
+  - **Left, with the reason.** Imports (`import`, `with`, `without`,
+    `use`): an import is a call of the imported module's function, which
+    needs that module's declarations and identity and a way to find its
+    text. The emitter still writes `import name` as a parameter declared
+    a module, and the launcher refuses such a module. `sync` before the
+    module's own block: the forms do not say where it would be written.
+  - **What changed in a running program.** No printed line, end or
+    yielded key of the 35 programs, the speed tests or `hello.alg`.
+    Steps rose with the claims: the parser speed program from 23,299 to
+    23,329, the typed one from 1,187 to 1,227, and `hello.json` from 4 to
+    14. A test of `next/launch/launcher.test.ts` pinned the fixture's 4
+    steps. It no longer pins a count: how many steps a run takes moves
+    whenever the kernel or the emitter changes what a statement stands
+    for. A module with no export now yields its `x <- e` bindings too.
+  - **Readings taken where the forms are silent**, for the kernel stream
+    and the maintainer to confirm:
+    1. The module's last written statement is claimed like the others.
+       The forms exempt "the last statement of a block", whose value
+       goes to the caller. A module yields the structure of its
+       bindings, so its last statement's value goes nowhere, and an
+       unhandled failure there would be lost.
+    2. A statement that is itself an application of `claim` gets no
+       claim of its own. The hand-off of PR #257 says so; the forms do
+       not list it.
+    3. `sync` is the last word of the line before an indented block:
+       after `=`, `=>` and `<-`, and in a branch of `if`. The module's
+       own block cannot be written `sync`.
+    4. A dropped statement's claim applies Allegretto's own
+       `is_failure`, whatever the text binds that name to.
+  - **Two things for the kernel stream**, each with its smallest text
+    in the PR. The reference kernel holds a statement after
+    `a <- f()` where `f`'s body is a `sync` block that waits: the forms
+    say `<-` holds nothing and a claim holds only its own block. And
+    `n <- n + 1` in an inner block now reads itself, as the forms' "one
+    group" has it, and runs to the step limit with no refutation.
+  - **Measured.**
+    `milestone 3: programs 41 (passing 41, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.

@@ -23,7 +23,9 @@
 // `int.neg` (forms.md §2, "Operators"), so `-1.5` in a program is
 // `int.neg` applied to the bits of 1.5, which is not the fraction -1.5.
 // A negative whole number is `int.neg` of a whole number in the signed
-// 64-bit range, which never wraps, and so is the whole number itself.
+// 64-bit range, which never wraps, and so is the whole number itself. The
+// least integer, `-9223372036854775808`, is read by the reader as one
+// literal, and is that integer here too.
 //
 // The plain data is the launcher's `Plain` (next/launch/launcher.ts). The
 // launcher does not import this file.
@@ -74,7 +76,13 @@ export function readLiteral(text: string): LiteralResult {
       case "symbol":
         return { symbol: e.name };
       case "record":
-        return { entries: e.fields.map((f) => [{ symbol: f.name.name }, plain(f.value)] as const) };
+        return {
+          entries: e.fields.map((f) => {
+            if (f.k === "named") return [{ symbol: f.name.name }, plain(f.value)] as const;
+            refusals.push("an entry with a computed key");
+            return [null, { entries: [] }] as const;
+          }),
+        };
       case "list":
         return { entries: e.items.map((i) => [null, plain(i)] as const) };
       case "unary":
