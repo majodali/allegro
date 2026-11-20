@@ -46,11 +46,11 @@
 // Not here yet, and in later chunks of the plan: the first of two
 // answers, sharing, specialization.
 
-import type { Advance, Cell, CreateKernel2, Kernel2, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
+import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
-import type { Mark, V } from "./values.js";
+import type { Account, Mark, V } from "./values.js";
 
 /** What evaluating gives: a value, or a call still to be run. */
 type Step = V | Call;
@@ -116,14 +116,6 @@ interface Frame {
   remaining: number;
   readonly ctl: Ctl | undefined;
 }
-/** The budget of one evaluation: every task of the evaluation counts against it. */
-interface Account {
-  left: number;
-  /** True once the budget is spent: the evaluation is over, and its tasks are dropped. */
-  dead: boolean;
-  /** What `evaluate` gave as the evaluation's value. */
-  handle: V | undefined;
-}
 /** A suspended stack: the frames of a computation that waits or is paused, and what it waits for. */
 class Task {
   /** Where a slice paused it: what was about to be run, and the marks its value will take. */
@@ -175,7 +167,7 @@ const merge = (inner: Marks | undefined, outer: Marks | undefined): Marks | unde
   inner === undefined ? outer : outer === undefined ? inner : { owner: inner.owner ?? outer.owner, site: inner.site ?? outer.site, group: inner.group ?? outer.group };
 
 /** Creates a machine. It does nothing until it is called. */
-export const createMachine: CreateKernel2 = () => {
+export const createMachine: CreateKernel = () => {
   const core = createCore();
   const {
     symbols, kernelPrims, settled, built, moduleIds, moduleDeclares, modulesById, pureByHash, keys,
@@ -1577,13 +1569,13 @@ export const createMachine: CreateKernel2 = () => {
     }
   };
 
-  const kernel: Kernel2 = {
+  const kernel: Kernel = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
     ...shared,
 
     scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
-    fill: (cell, value) => {
+    fill: (cell, value, how): Advance => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
       if (c.filled) throw new InterfaceError("fill: the cell is already filled");
@@ -1592,15 +1584,18 @@ export const createMachine: CreateKernel2 = () => {
       // What waits for this cell is taken up by the next `advance`, in the order it came to
       // wait, after what waits for cells filled before it.
       for (const r of waitersOf.get(c) ?? []) if (live(r)) enqueue(r.task, false);
+      // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
+      return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
     },
     waiting: () => {
       for (let i = waitedCells.length - 1; i >= 0; i--) if (waitedCells[i].filled) waitedCells.splice(i, 1);
       return waitedCells.filter((c) => (waitersOf.get(c) ?? []).some(live) || (interestOf.get(c) ?? []).some(live)).map((c) => out(c) as Cell);
     },
 
-    evaluate: (expression, scope, limits): Result => {
+    evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {
       const e = into(expression, "the expression");
-      const s = scopeIn(scope, "the scope");
+      // The scope is a token of the deprecated form: it holds nothing.
+      const [s, limits] = a instanceof ScopeV ? [a, b] : [new ScopeV(undefined), a as Limits | undefined];
       tallies.clear();
       cut = false;
       collectors = [];

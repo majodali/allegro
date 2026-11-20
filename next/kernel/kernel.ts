@@ -199,7 +199,7 @@
 
 import type {
   Declaration,
-  Advance, Cell, ClaimRecord, CreateKernel2, Entry, Kernel2, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
+  Advance, Cell, ClaimRecord, CreateKernel, Entry, Kernel, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
   Value,
 } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -209,10 +209,10 @@ export { InterfaceError, KernelFault } from "./interface.js";
 
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
-import type { Binding, Group, Root, V } from "./values.js";
+import type { Account, Binding, Group, Root, V } from "./values.js";
 
 /** Creates a reference kernel. It does nothing until it is called. */
-export const createKernel: CreateKernel2 = () => {
+export const createKernel: CreateKernel = () => {
   const core = createCore();
   const {
     symbols, kernelPrims, settled, built, moduleIds, moduleDeclares, modulesById, pureByHash, keys,
@@ -815,9 +815,16 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
+  /** The evaluation whose work is being done now. */
+  let account: Account = { left: Infinity, dead: false, handle: undefined };
+  /** A spent budget ends an evaluation: what it had waiting is dropped, and an answer that comes for it is ignored. */
+  const over = (a: Account): void => {
+    a.dead = true;
+    for (const root of roots) if (root.account === a) root.done = true;
+  };
   /** Keeps an evaluation that waits, with the cells it waits on. */
   const started = (value: V, scope: ScopeV): Root => {
-    const root: Root = { scope, value, done: false, waits: new Set(), queued: false, groups: [...groups], grouped: false };
+    const root: Root = { scope, value, done: false, waits: new Set(), queued: false, groups: [...groups], grouped: false, account };
     for (const g of root.groups) g.pending.add(root);
     settle(root);
     roots.push(root);
@@ -888,13 +895,13 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
-  const kernel: Kernel2 = {
+  const kernel: Kernel = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
     ...shared,
 
     scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
-    fill: (cell, value) => {
+    fill: (cell, value, how): Advance => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
       if (c.filled) throw new InterfaceError("fill: the cell is already filled");
@@ -908,6 +915,8 @@ export const createKernel: CreateKernel2 = () => {
         root.queued = true;
         ready.push(root);
       }
+      // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
+      return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
     },
     waiting: () => {
       const found = new Set<V>();
@@ -915,13 +924,19 @@ export const createKernel: CreateKernel2 = () => {
       return [...found].map((v) => out(v) as Cell);
     },
 
-    evaluate: (expression, scope, limits): Result => {
+    evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {
       const e = into(expression, "the expression");
-      const s = scopeIn(scope, "the scope");
+      // The scope is a token of the deprecated form: it holds nothing.
+      const [s, limits] = a instanceof ScopeV ? [a, b] : [new ScopeV(undefined), a as Limits | undefined];
       tallies.clear();
       cut = false;
+      // The budget is the evaluation's: what `advance` later does for it counts against what is left.
+      const mine: Account = (account = { left: limits?.steps ?? Infinity, dead: false, handle: undefined });
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
+      mine.left -= r.steps;
+      mine.handle = value;
+      if (r.ended === "limit") over(mine);
       if (r.ended === "complete" && !known(value)) started(value, s);
       return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
@@ -935,6 +950,7 @@ export const createKernel: CreateKernel2 = () => {
       // for a later call to take up in earnest. Whether there is one is the launcher's to say.
       let halted = false;
       const held: Root[] = [];
+      const limited: Value[] = [];
       const r = within(limits, () => {
         // Each is taken up once, in the order its answer arrived. One that a limit stops stays
         // first in the list, so the next call goes on with it.
@@ -946,11 +962,25 @@ export const createKernel: CreateKernel2 = () => {
             if (!root.done) {
               const was = ahead;
               if (onlyAhead) ahead = true;
+              // It is evaluated under what is left of its evaluation's budget, and of this call's.
+              const [mine, spentBefore, callBudget] = [(account = root.account), spent, budget];
+              budget = Math.min(callBudget, spent + mine.left);
               let next: V;
               try {
                 next = evaluate(root.value, root.scope);
+              } catch (e) {
+                // The evaluation's own budget is spent, and not the call's: the evaluation is
+                // over, the call says which, and goes on with the others.
+                if (!(e instanceof LimitReached) || spent - spentBefore < mine.left || spent >= callBudget) throw e;
+                over(mine);
+                if (mine.handle !== undefined) limited.push(out(mine.handle));
+                ready.shift();
+                root.queued = false;
+                continue;
               } finally {
                 ahead = was;
+                mine.left -= spent - spentBefore;
+                budget = callBudget;
               }
               root.value = next;
               rootOf.set(next, root);
@@ -979,7 +1009,7 @@ export const createKernel: CreateKernel2 = () => {
           }
         }
       });
-      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
+      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}), ...(limited.length > 0 ? { limited } : {}) };
     },
     current: (value) => {
       const v = into(value, "the value");

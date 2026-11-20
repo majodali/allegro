@@ -1377,11 +1377,11 @@ for (const slice of MACHINE ? [undefined, 1] : [undefined])
 test(`what a call leaves is the caller's, where the function called is nobody's${slice === undefined ? "" : ", and a pause at every step changes nothing"}`, () => {
   const { k: kernel, add, call, kp } = setup();
   // With a slice, every call is paused again and again, and gone on with until it is over.
-  const k: typeof kernel = slice === undefined ? kernel : { ...kernel, evaluate: (e, s) => {
-    const r = kernel.evaluate(e, s, { slice });
+  const k: typeof kernel = slice === undefined ? kernel : { ...kernel, evaluate: ((e: Value) => {
+    const r = kernel.evaluate(e, { slice });
     while (r.ended === "paused" && kernel.advance({ slice }).ended === "paused");
     return { ...r, value: kernel.current(r.value) };
-  } };
+  }) as typeof kernel.evaluate };
   const scope = k.scope();
   const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
   // Two functions no module made, one calling the other: y => add(y, 1) and x => add(inner(x), 1).
@@ -2660,11 +2660,8 @@ test("a budget is the evaluation's: work done for it later counts against what i
   assert.ok(r.steps < 30);
   k.fill(c, n32(0));
   const a = k.advance();
-  if (!MACHINE) {
-    // On the reference the budget was that call's, and this call has none.
-    assert.equal(noted.length, 10);
-    return;
-  }
+  // Until the interface was made one (2026-11-20) the reference gave a budget to each call,
+  // and this test said so. The budget is the evaluation's on both variants now.
   assert.equal(a.ended, "complete", "the call itself had no limit");
   assert.deepEqual(a.limited, [r.value], "the evaluation is over, at its limit, and the call says which");
   assert.ok(noted.length > 0 && noted.length < 10, "it went as far as its budget");
@@ -2675,7 +2672,6 @@ test("a budget is the evaluation's: work done for it later counts against what i
 });
 
 test("a spent budget drops what the evaluation had waiting, and another evaluation goes on", () => {
-  if (!MACHINE) return; // On the reference a budget is a call's, and nothing is dropped.
   const { k, call, kp, noted, note, program, n32 } = noting();
   const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
   // also(then(c2, go(10)), also(note(c1), 0)): the value is 0 at once, and two pieces of
@@ -2698,7 +2694,6 @@ test("a spent budget drops what the evaluation had waiting, and another evaluati
 });
 
 test("what is left of a budget goes down with every call that works for the evaluation", () => {
-  if (!MACHINE) return; // On the reference a budget is a call's.
   const { k, call, kp, noted, program, n32 } = noting();
   const [c1, c2] = [k.cell(), k.cell()];
   // then(c1, then(go(2), then(c2, go(2)))): two turns when c1 comes, two more when c2 comes.
@@ -2718,4 +2713,67 @@ test("what is left of a budget goes down with every call that works for the eval
   assert.equal(k.advance().limited, undefined, "the second call fits in what the first left");
   k.fill(d2, n32(0));
   assert.deepEqual(k.advance().limited, [tight.value], "the third does not: each call was counted");
+});
+
+// ---- The interface made one (chunk K12) -----------------------------------------------
+
+test("evaluate needs no scope, and the deprecated form with one gives the same", () => {
+  const { k, add, call } = setup();
+  assert.equal(num(k, k.evaluate(call(add, byte(k, 20), byte(k, 22))).value), 42);
+  assert.equal(num(k, k.evaluate(call(add, byte(k, 20), byte(k, 22)), k.scope()).value), 42);
+  assert.equal(k.evaluate(call(add, byte(k, 20), byte(k, 22)), { steps: 0 }).ended, "limit", "the second argument is the limits");
+  assert.equal(k.evaluate(call(add, byte(k, 20), byte(k, 22)), k.scope(), { steps: 0 }).ended, "limit");
+});
+
+test("a fill that does not hold takes up what waited, and returns what advance returns", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const [c1, c2] = [k.cell(), k.cell()];
+  const r = k.evaluate(call(say, c1));
+  const done = k.fill(c1, byte(k, 7), { hold: false });
+  assert.deepEqual(said, [7], "the effect that waited is performed by the call that brought the answer");
+  assert.equal(done.ended, "complete");
+  assert.deepEqual(done.refuted, []);
+  assert.equal(num(k, k.current(r.value)), 7);
+  assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] }, "nothing is left for advance");
+  // A refutation the answer leads to, and the claim's record, come back from the fill.
+  const claim = call(kp("claim"), call(isZero, c2));
+  k.evaluate(claim);
+  const wrong = k.fill(c2, byte(k, 3), { hold: false });
+  assert.equal(wrong.refuted.length, 1);
+  assert.equal(wrong.claims.length, 1);
+  assert.equal(wrong.claims[0].refuted, 1);
+});
+
+test("a fill that holds only records, and several are acted on in the order they were filled", () => {
+  const { k, call, said, say } = sayer();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  k.evaluate(call(say, c1));
+  k.evaluate(call(say, c2));
+  k.evaluate(call(say, c3));
+  const held = k.fill(c2, byte(k, 2), { hold: true });
+  assert.deepEqual(held, { ended: "complete", steps: 0, refuted: [], claims: [] }, "it says that nothing was done");
+  // Leaving `hold` out holds too: the deprecated form.
+  k.fill(c1, byte(k, 1));
+  assert.deepEqual(said, []);
+  // A fill that does not hold goes on with what was held before it, in the order of the fills.
+  k.fill(c3, byte(k, 3), { hold: false });
+  assert.deepEqual(said, [2, 1, 3]);
+});
+
+test("a fill is bounded by the budget of the evaluation it works for", () => {
+  const { k, call, kp, noted, program, n32 } = noting();
+  const c = k.cell();
+  const r = k.evaluate(call(kp("then"), c, program(10)), { steps: 30 });
+  const a = k.fill(c, n32(0), { hold: false });
+  assert.deepEqual(a.limited, [r.value]);
+  assert.ok(noted.length > 0 && noted.length < 10);
+  assert.equal(a.steps, 30 - r.steps);
+});
+
+test("the names of the second version are other names for the one interface", () => {
+  // Checked by the compiler: a kernel is assignable both ways.
+  const k: import("./interface.js").Kernel2 = createKernel();
+  const one: import("./interface.js").Kernel = k;
+  const make: import("./interface.js").CreateKernel2 = createKernel;
+  assert.equal(one.interfaceVersion, make().interfaceVersion);
 });

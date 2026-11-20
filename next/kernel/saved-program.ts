@@ -44,7 +44,7 @@
 // module's body is evaluated, by the extension's own constructors), and
 // the host-code form.
 
-import type { Declaration, Kernel, Kernel2, Rest, Value } from "./interface.js";
+import type { Declaration, Kernel, Rest, Value } from "./interface.js";
 
 export const SAVED_PROGRAM_FORMAT = "allegro-saved-program";
 export const SAVED_PROGRAM_VERSION = 1;
@@ -107,7 +107,7 @@ export interface StoredOutcome {
   readonly restsOn: readonly Rest[];
   /**
    * The outcome's key, as the builder's kernel computed it from the
-   * claim, the module function and `restsOn` (`Kernel2.claimKey`). The
+   * claim, the module function and `restsOn` (`Kernel.claimKey`). The
    * loading kernel computes it again and refuses the record where the
    * two differ.
    */
@@ -360,7 +360,7 @@ function build(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string
         break;
       case "datum":
         if (!("symbolData" in kernel)) throw new Error("a symbol as data needs a kernel of the second interface");
-        values.push((kernel as Kernel2).symbolData(node.fqn));
+        values.push(kernel.symbolData(node.fqn));
         break;
       case "param":
         values.push(kernel.param(node.name));
@@ -396,7 +396,7 @@ function declarationsOf(doc: SavedProgram): Declaration[] {
   return doc.declares.map((d) => (d.identity === undefined ? { role: d.role, name: d.name } : { role: d.role, name: d.name, identity: d.identity }));
 }
 
-export function outcomeKeys(kernel: Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): string[] {
+export function outcomeKeys(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string, Value>): string[] {
   const values = build(kernel, doc, primitives);
   return (doc.outcomes ?? []).map((o) => kernel.claimKey(values[o.claim], values[doc.module], o.restsOn, declarationsOf(doc)));
 }
@@ -417,7 +417,7 @@ export function outcomeKeys(kernel: Kernel2, doc: SavedProgram, primitives: Read
  * builder's name. On a kernel of the first version such a record is an
  * error; a record without them loads on either.
  */
-export function load(kernel: Kernel | Kernel2, doc: SavedProgram, primitives: ReadonlyMap<string, Value>, options: LoadOptions = {}): Value {
+export function load(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string, Value>, options: LoadOptions = {}): Value {
   const findings = check2(doc);
   if (findings.length > 0) throw new Error(`not a saved program: ${findings.join("; ")}`);
   for (const need of doc.needs)
