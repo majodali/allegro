@@ -8,3 +8,4 @@ claim(square(3) > square(2))
 output.write("and so does this one")
 // expect: and so does this one
 // end: completed
+// summary: decided

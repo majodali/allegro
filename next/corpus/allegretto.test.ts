@@ -394,3 +394,15 @@ test("a summary line where nothing is launched, or where the launcher refuses, f
   const refusedRun = await runProgram("capability output\ninput a\noutput.write(a)\n// input: b = 1\n// end: refused: the configuration supplies the input b at the start, which the module does not declare\n// summary: decided\n");
   assert.deepEqual(refusedRun.problems, ["the launcher refused the run, and the program states the summary decided"]);
 });
+
+test("the programs that state a summary: a claim that holds, one refuted, one assumed, one undecided, and one that waits when the run ends", async () => {
+  for (const [name, summary] of [
+    ["claim-holds", "decided"], ["claim-refuted", "refuted"], ["result-assumed", "assumed"], ["assume-undecided", "undecided"], ["input-not-supplied", "undecided"],
+  ] as const) {
+    const file = `${PROGRAMS_DIR}/m3/${name}.alg`;
+    assert.equal(readSummary(text(file)).summary, summary, file);
+    const run = await runProgram(text(file), file);
+    assert.deepEqual(run.problems, [], file);
+    assert.equal(run.result?.summary, summary, file);
+  }
+});
