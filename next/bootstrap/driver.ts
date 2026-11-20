@@ -43,16 +43,17 @@ import { createKernel as referenceKernel } from "../kernel/create.js";
 import { load, type SavedProgram } from "../kernel/saved-program.js";
 import { shippedByName } from "../prims/index.js";
 import { read, type Header, type Place } from "./reader.js";
-import { emitModule, type Finding, type ImportedModule } from "./emit.js";
+import { emitModule, type Finding, type FormId, type ImportedModule } from "./emit.js";
 
 /** Reads the text of a file, or gives undefined where there is none. */
 export type ReadText = (file: string) => string | undefined;
 
-/** One emitted text: where it was read from, its record, and the identity the kernel gives its module. */
+/** One emitted text: where it was read from, its record, the identity the kernel gives its module, and the forms the text uses. */
 export interface DrivenRecord {
   readonly file: string;
   readonly program: SavedProgram;
   readonly identity: string;
+  readonly forms: readonly FormId[];
 }
 
 /** Why a drive gives no records: a finding, in the file it is in. */
@@ -151,7 +152,7 @@ export function drive(text: string, file: string, readText: ReadText, createKern
         for (const f of e.findings) findings.push({ file: at, at: f.at, kind: f.kind, message: f.message });
         return undefined;
       }
-      const record: DrivenRecord = { file: at, program: e.program, identity: identityOf(e.program, at) };
+      const record: DrivenRecord = { file: at, program: e.program, identity: identityOf(e.program, at), forms: e.forms };
       records.push(record);
       return record;
     } finally {

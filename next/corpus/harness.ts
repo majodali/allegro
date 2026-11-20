@@ -62,8 +62,10 @@
 //
 // It runs each program in process with `runProgram` of
 // next/corpus/allegretto.ts, the implementation the programs' test uses:
-// emitted, launched on the reference kernel, and its lines, end and yielded
-// keys compared with its pins. A case is realised when a passing program
+// emitted with the texts it imports, launched on the reference kernel, and
+// its lines, end and yielded keys compared with its pins. The texts a
+// program imports, under a directory of its own, are no programs and are
+// not run alone (next/corpus/allegretto/README.md). A case is realised when a passing program
 // names it in a `// realises:` line. The report gives, per milestone, the
 // programs passing and failing, and of the cases due there those realised,
 // those named only by a failing program, and those not yet named. It exits
@@ -80,7 +82,7 @@ import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import { CASES_PATH, type Case, type CaseClass, type Corpus, type PinCase } from "../tools/corpus.js";
-import { milestoneOf, programFiles, readPins, runProgram } from "./allegretto.js";
+import { milestoneOf, programFiles, readPins, readUnder, runProgram } from "./allegretto.js";
 
 // ── The runner ────────────────────────────────────────────────────────
 
@@ -390,7 +392,7 @@ export async function runNextPrograms(root: string, files: string[]): Promise<Ne
   for (const file of files) {
     const text = fs.readFileSync(path.join(root, file), "utf-8");
     let problems: string[];
-    try { problems = (await runProgram(text, file)).problems; }
+    try { problems = (await runProgram(text, file, readUnder(root))).problems; }
     catch (e) { problems = [`the run threw: ${(e as Error).message}`]; }
     out.push({ file, milestone: milestoneOf(file), realises: readPins(text).realises, problems });
   }
