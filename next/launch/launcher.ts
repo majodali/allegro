@@ -53,7 +53,9 @@
 //   5  builds the application of the module function to those arguments,
 //      its capabilities and inputs only, never an argument for an import,
 //      and has the kernel evaluate it in a fresh scope, under the step
-//      budget;
+//      budget. Where the configuration sets none there is none: the
+//      launcher gives no default, and a run goes on as a host program
+//      does (the maintainer's ruling of 2026-11-20);
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`. When it waits and no capability's
 //      answer is due, it applies the next later phase of the configuration
@@ -142,7 +144,7 @@ export type Inputs = Readonly<Record<string, Plain>>;
 export interface Configuration {
   /** The names of the capabilities the ceiling grants. */
   readonly ceiling: readonly string[];
-  /** The step budget for the whole run: the evaluation and every advance after it. None: no budget. */
+  /** The step budget for the whole run: the evaluation and every advance after it. None: no budget, and the launcher gives no default. */
   readonly steps?: number;
   /**
    * The builder whose stored outcomes this configuration accepts for the
