@@ -26,7 +26,7 @@ import { check2, encode, load, type SavedProgram } from "../kernel/saved-program
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
-import { emit, FAILURE_FUNCTIONS, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, type Finding, type FormId } from "./emit.js";
+import { emit, FAILURE_FUNCTIONS, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, withheldReason, type Finding, type FormId, type ImportedModule, type Imports } from "./emit.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
@@ -35,6 +35,16 @@ const utf8 = new TextEncoder();
 /** Emits a text that must emit, and checks its record. */
 function emitted(text: string): SavedProgram {
   const r = emitTracked(text);
+  assert.ok(r.ok, `${JSON.stringify(text)} is not emitted: ${r.ok ? "" : r.findings.map((f) => f.message).join("; ")}`);
+  const doc = JSON.parse(encode(r.program)) as SavedProgram;
+  assert.deepEqual(check2(doc), []);
+  return doc;
+}
+
+/** Emits a text that imports, with the declarations and identity of each module it imports, and checks its record. */
+function emittedWith(text: string, imports: Imports): SavedProgram {
+  TEXTS.push([text, imports]);
+  const r = emit(text, imports);
   assert.ok(r.ok, `${JSON.stringify(text)} is not emitted: ${r.ok ? "" : r.findings.map((f) => f.message).join("; ")}`);
   const doc = JSON.parse(encode(r.program)) as SavedProgram;
   assert.deepEqual(check2(doc), []);
@@ -115,10 +125,10 @@ const intOf = (k: Kernel2, v: Value | undefined): bigint => {
   return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0);
 };
 const seenInts = (r: Run): bigint[] => seen(r).map((v) => intOf(r.k, v));
-/** The texts the emitter is run on in this file, for the test that every form is written. */
-const TEXTS: string[] = [];
+/** The texts the emitter is run on in this file, each with what it imports, for the test that every form is written. */
+const TEXTS: Array<readonly [string, Imports]> = [];
 const emitTracked = (text: string) => {
-  TEXTS.push(text);
+  TEXTS.push([text, new Map()]);
   return emit(text);
 };
 
@@ -291,7 +301,8 @@ test("a block as a value: its last statement's value; an inner block may bind a 
 // ── The module ────────────────────────────────────────────────────────
 
 test("the header lines are the module function's parameters, in order, and declares names each with its role", () => {
-  const doc = emitted("capability output\ninput see\nimport other");
+  const other: ImportedModule = { declares: [], identity: "sha256:" + "ab".repeat(32) };
+  const doc = emittedWith("capability output\ninput see\nimport other", new Map([["other", other]]));
   const fn = doc.nodes[doc.module];
   assert.equal(fn.k, "function");
   assert.deepEqual(doc.declares.map((d) => [d.role, d.name]), [["capability", "output"], ["input", "see"], ["module", "other"]]);
@@ -592,6 +603,124 @@ test("a module with no export yields all its bindings, keyed by the symbols of t
   assert.deepEqual(some.k.entriesOf(some.value).map(([key]) => some.k.symbolName(key as Value)), ["f"]);
 });
 
+// ── Imports (part 5) ──────────────────────────────────────────────────
+
+/**
+ * Emits each imported text in order, each with the ones before it to
+ * import, loads each record into one reference kernel and takes its
+ * identity with `moduleOf`, as the driver does; then emits the text with
+ * them and instantiates its module with `see` for its input of that name,
+ * passing no argument for an import: the kernel supplies it.
+ */
+function runImporting(libs: ReadonlyArray<readonly [string, string]>, text: string): { k: Kernel2; seen: string[]; value: Value; refuted: boolean; doc: SavedProgram; imports: Map<string, ImportedModule> } {
+  const k = createKernel();
+  const imports = new Map<string, ImportedModule>();
+  for (const [name, lib] of libs) {
+    const doc = emittedWith(lib, imports);
+    const identity = k.moduleOf(load(k, doc, primitivesFor(k, doc)));
+    assert.ok(identity !== undefined);
+    imports.set(name, { declares: doc.declares, identity });
+  }
+  const doc = emittedWith(text, imports);
+  const fn = load(k, doc, primitivesFor(k, doc));
+  const seenTexts: string[] = [];
+  const see = k.primitiveFunction({ purity: "effectful", capability: "test", part: "see", arity: 1, run: ([v]) => {
+    seenTexts.push(new TextDecoder().decode(k.bitsOf(v).bytes));
+    return k.structure([]);
+  } });
+  const args = doc.declares.filter((d) => d.role !== "module").map((d) => {
+    assert.equal(d.name, "see", `the test supplies no input ${d.name}`);
+    return see;
+  });
+  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: 100_000 });
+  return { k, seen: seenTexts, value: r.value, refuted: r.refuted, doc, imports };
+}
+
+const LIB = 'input see\ninput greeting\nexport hello() => see(greeting)\nexport double(n) => n * 2\n';
+
+test("an import is a parameter declared a module, with the imported module's identity, and a binding that calls it", () => {
+  const r = runImporting([["lib", LIB]], 'input see\nimport lib with greeting: "hi"\nlib.hello()\nsee(int.text(lib.double(21)))');
+  assert.equal(r.refuted, false);
+  assert.deepEqual(r.seen, ["hi", "42"]);
+  const fn = r.doc.nodes[r.doc.module];
+  assert.ok(fn.k === "function");
+  const lib = r.doc.declares.find((d) => d.role === "module");
+  assert.deepEqual(lib && [lib.name, lib.identity], ["lib", r.imports.get("lib")?.identity]);
+  assert.ok(lib !== undefined && fn.params.includes(lib.param));
+  // The binding lib = <that parameter>(see, "hi"), in the module's block: an application of the parameter.
+  assert.ok(r.doc.nodes.some((n) => n.k === "expression" && n.fn === lib?.param && n.args.length === 2));
+  assert.ok(r.doc.nodes.some((n) => n.k === "symbol" && n.fqn === "lib"));
+});
+
+test("by default an import is handed the importing module's capability or input of the same name; with hands an expression, which may use the module's bindings", () => {
+  const lib = 'input see\nexport shout(t) => see(t ++ "!")\n';
+  assert.deepEqual(runImporting([["lib", lib]], 'input see\nimport lib\nlib.shout("hello")').seen, ["hello!"]);
+  assert.deepEqual(runImporting([["lib", LIB]], 'input see\nimport lib with greeting: word ++ "?"\nword = "what"\nlib.hello()').seen, ["what?"]);
+});
+
+test("without hands a refusal: the imported module refuses only where it uses what was withheld", () => {
+  const lib = 'input see\ninput greeting\nexport quiet() => 7\nexport loud() => see(greeting)\n';
+  const quiet = runImporting([["lib", lib]], "input see\nimport lib without greeting\nsee(int.text(lib.quiet()))");
+  assert.equal(quiet.refuted, false);
+  assert.deepEqual(quiet.seen, ["7"]);
+  const loud = runImporting([["lib", lib]], 'input see\nimport lib without greeting\nsee("before")\nlib.loud()');
+  assert.equal(loud.refuted, true);
+  assert.deepEqual(loud.seen, ["before"]);
+  assert.equal(loud.k.reasonOf(loud.value), withheldReason("greeting"));
+  assert.equal(withheldReason("c"), "the capability c was withheld by the importing module");
+});
+
+test("two imports of one module with the same arguments are one instance: its top-level statement happens once", () => {
+  const shared = 'input see\nsee("shared")\nx = 42\n';
+  const a = "input see\nimport shared\nexport y = shared.x + 1\n";
+  const b = "input see\nimport shared\nexport z = shared.x + 2\n";
+  const r = runImporting([["shared", shared], ["a", a], ["b", b]], "input see\nimport a\nimport b\nsee(int.text(a.y))\nsee(int.text(b.z))");
+  assert.equal(r.refuted, false);
+  assert.deepEqual(r.seen, ["shared", "43", "44"]);
+});
+
+test("an import nothing needs is never instantiated", () => {
+  const r = runImporting([["noisy", 'input see\nsee("noisy")\n']], 'input see\nimport noisy\nsee("main")');
+  assert.deepEqual(r.seen, ["main"]);
+});
+
+test("an import is a binding: a module with no export yields it, in written order; one with exports does not", () => {
+  const lib = "export one = 1\n";
+  const open = runImporting([["lib", lib]], "input see\nx = 1\nimport lib\ny = 2");
+  assert.deepEqual(open.k.entriesOf(open.value).map(([key]) => open.k.symbolName(key as Value)), ["x", "lib", "y"]);
+  const closed = runImporting([["lib", lib]], "input see\nimport lib\nexport y = lib.one");
+  assert.deepEqual(closed.k.entriesOf(closed.value).map(([key]) => closed.k.symbolName(key as Value)), ["y"]);
+});
+
+test("an import's findings: no pair supplied; a name it declares that nothing supplies; a with or without naming what it does not declare; a name handed and withheld", () => {
+  const lib: ImportedModule = { declares: [{ role: "capability", name: "output" }, { role: "input", name: "n" }], identity: "sha256:" + "cd".repeat(32) };
+  const imports = new Map([["lib", lib]]);
+  const messages = (text: string, given: Imports = imports): string[] => {
+    const r = emit(text, given);
+    assert.equal(r.ok, false, text);
+    return r.ok ? [] : r.findings.map((f) => `${f.at.line}:${f.at.column} ${f.kind} ${f.message}`);
+  };
+  assert.deepEqual(messages("capability output\nimport lib", new Map()), [
+    "2:1 import the module lib is imported, and its declarations and identity were not supplied: the text it is read from is emitted first",
+  ]);
+  assert.deepEqual(messages("capability output\nimport lib"), [
+    "2:1 import lib declares the input n, which this module neither holds under that name, nor hands with with, nor withholds",
+  ]);
+  assert.deepEqual(messages("capability output\nimport lib with n: 1, m: 2 without k"), [
+    "2:23 import the import of lib hands m with with, and lib declares no capability or input m",
+    "2:36 import the import of lib withholds k, and lib declares no capability or input k",
+  ]);
+  assert.deepEqual(messages("capability output\nimport lib with n: 1 without n"), ["2:30 import the import of lib both hands and withholds n"]);
+  assert.deepEqual(messages("import lib with n: 1, n: 2 without output, output"), [
+    "1:23 import the import of lib hands n twice",
+    "1:44 import the import of lib withholds output twice",
+  ]);
+  // The import's name is a binding of the module's block: a binding of the same name is bound twice.
+  assert.deepEqual(messages("capability output\ninput n\nimport lib\nlib = 1").map((m) => m.split(" ").slice(1).join(" ")), ["rebound the name lib is bound twice in one block"]);
+  // Handed and withheld in full, the import emits with no capability or input of the importing module.
+  assert.equal(emit("import lib with n: 1 without output", imports).ok, true);
+});
+
 // What the emitter writes is checked against the kernel of this base,
 // without failing when the kernel stream supplies more: the kernel is lane
 // R's, and a new primitive there must not fail this stream's test. The test
@@ -613,8 +742,8 @@ test("what waits, against the kernel on this base: a thing the kernel now has is
 
 test("every form of the table is written by some text of this file", () => {
   const used = new Set<FormId>();
-  for (const text of TEXTS) {
-    const r = emit(text);
+  for (const [text, imports] of TEXTS) {
+    const r = emit(text, imports);
     if (r.ok) for (const f of r.forms) used.add(f);
   }
   const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f));
@@ -687,3 +816,4 @@ test("recursion, one value with one identity, through the launcher", async () =>
   ].join("\n");
   assert.deepEqual(await launched(text), { lines: ["done", "even", "120"], end: "completed" });
 });
+

@@ -47,6 +47,8 @@ test("every form of forms.md §2 parses", () => {
     // The module's header lines.
     "capability output\ninput name\nimport other\noutput.write(\"hello\")",
     "key secret\ncapability output\nx = 1\ninput n",
+    "import lib with a: 1, b: f(x)", "import lib without c, d", "import lib with a: 1 without c", "import lib without c with a: x + 1",
+    "x = 1\nimport lib\ny = lib.f(x)\nimport other with n: x",
     // Comments.
     "// a line\nx /* between */ = 1",
   ];
@@ -110,4 +112,23 @@ test("sync is a word before an indented block and a name elsewhere; a computed k
   assert.ok(tagsOf("f() => sync\n  a\n  b").includes("sync_block"));
   assert.ok(!tagsOf("x = sync").includes("sync_block"));
   assert.ok(tagsOf("{[k]: 1}").includes("computed_field"));
+});
+
+test("import takes a with list and a without list, each comma-separated, in either order; use is parsed for the reader to refuse", () => {
+  const both = tagsOf("import lib with a: 1, b: x without c, d");
+  assert.ok(both.includes("import_stmt") && both.includes("with_clause") && both.includes("without_clause"));
+  assert.equal(both.filter((t) => t === "with_pair").length, 2);
+  assert.ok(tagsOf("import lib without c with a: 1").includes("with_clause"));
+  assert.ok(tagsOf("use notation").includes("use_decl"));
+  assert.ok(tagsOf("use notation with a: 1").includes("use_decl"));
+  refused("import lib with");
+  refused("import lib with a");
+  refused("import lib without");
+});
+
+test("use, with and without are no keywords: they stay names elsewhere", () => {
+  assert.ok(tagsOf("use(1)").includes("call"));
+  assert.ok(!tagsOf("use(1)").includes("use_decl"));
+  assert.ok(tagsOf("with = 1").includes("binding"));
+  assert.ok(tagsOf("without = with").includes("binding"));
 });

@@ -195,7 +195,7 @@ test("the programs write every form of forms.md §2 that the launcher can run: a
     const r = emit(text(file));
     if (r.ok) for (const f of r.forms) used.add(f);
   }
-  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f) && f !== "import");
+  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f) && !f.startsWith("import"));
   assert.deepEqual(missing, []);
 });
 

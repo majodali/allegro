@@ -17,7 +17,19 @@
 // `is_failure` and `handle`, `x <- e` as a binding of its block's group,
 // the kernel's other primitives as names, computed keys, keys and private
 // entries, the four structures `int`, `float`, `text` and `bits`, and four
-// more shipped primitives. Imports are not in it: see the module below.
+// more shipped primitives.
+//
+// Part 5 brought imports (forms.md §2 "The module", question 7): `emit`
+// takes, for each imported name, the imported module's declarations and
+// identity, which the driver (next/bootstrap/driver.ts) gets by emitting
+// the imported text first and loading its record. An import is then a
+// parameter of the module function declared `{ role: "module", name,
+// identity }`, and the binding `name = <that parameter>(arguments)` in the
+// module's block, with one argument for each capability and input the
+// imported module declares, in its order: the importing module's own of
+// that name, the expression of a `with` pair, or, for a name after
+// `without`, `refuse("the capability c was withheld by the importing
+// module")`.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Allegretto is a small language for the kernel and nothing else"
@@ -90,7 +102,9 @@
 //     keys first, with `declares` naming each but the keys, and the
 //     record's `keys` counting them. Its body is its block, ended by the
 //     structure of the bindings it yields, keyed by the symbols of their
-//     names: those marked `export`, or all of them where none is. So every
+//     names: those marked `export`, or all of them where none is. An
+//     import is a binding, so a module with no export yields it too, in
+//     written order with the others; no form marks an import `export`. So every
 //     statement the module writes has its value dropped. The module's own
 //     block is never a `sync` block: forms.md does not say where `sync`
 //     would be written for it.
@@ -128,7 +142,7 @@ export type FormId =
   | "integer operator" | "== !=" | "++" | "shipped name" | "bits name"
   | "binding" | "function binding" | "x <- e" | "block" | "statements" | "sync block"
   | "dropped statement" | "failure functions"
-  | "capability" | "input" | "key" | "import" | "capability part" | "export";
+  | "capability" | "input" | "key" | "import" | "import with" | "import without" | "capability part" | "export";
 
 export interface FormInfo {
   /** What the form stands for, in forms.md's words, and the node the emitter writes. */
@@ -175,7 +189,9 @@ export const FORMS: Readonly<Record<FormId, FormInfo>> = {
   "capability": { standsFor: "a parameter of the module, declared as a capability" },
   "input": { standsFor: "a parameter of the module, declared as an input" },
   "key": { standsFor: "a parameter of the module placed before every other, counted by the record's keys" },
-  "import": { standsFor: "a parameter of the module, declared as another module" },
+  "import": { standsFor: "a parameter of the module declared { role: module, name, identity }, and the binding name = <that parameter>(arguments): by default the importing module's capability or input of each name" },
+  "import with": { standsFor: "for a name after with, the expression given, as that argument of the imported module" },
+  "import without": { standsFor: "for a name after without, refuse(\"the capability c was withheld by the importing module\"), as that argument" },
   "capability part": { standsFor: "a part of a capability, read as an entry: get(output, `write)" },
   "export": { standsFor: "a binding marked to be yielded by the module" },
 };
@@ -241,14 +257,34 @@ export interface Finding {
   /**
    * "read": the reader refused the text. "unbound", "rebound": a name.
    * "refused": a block with no statement, which has no value. "waits": a
-   * name of forms.md §3 that the shipped primitives lack.
+   * name of forms.md §3 that the shipped primitives lack. "import": an
+   * import whose declarations and identity are not supplied, or whose
+   * arguments do not match what the imported module declares.
    */
-  readonly kind: "read" | "waits" | "unbound" | "rebound" | "refused";
+  readonly kind: "read" | "waits" | "unbound" | "rebound" | "refused" | "import";
   /** The form, for "waits". */
   readonly form?: FormId;
   /** The items of forms.md §4 it waits on, for "waits". */
   readonly items?: readonly ItemNumber[];
   readonly message: string;
+}
+
+/**
+ * What the emitter needs of an imported module: what it declares, in its
+ * order (the `declares` of its record), and its identity, as
+ * `Kernel2.moduleOf` gives it for the loaded record.
+ */
+export interface ImportedModule {
+  readonly declares: ReadonlyArray<Pick<Declared, "role" | "name">>;
+  readonly identity: string;
+}
+
+/** The imported modules a text's imports name, by the name each is imported under. */
+export type Imports = ReadonlyMap<string, ImportedModule>;
+
+/** The reason a withheld capability or input refuses with, where the imported module uses it (forms.md §2, "The module"). */
+export function withheldReason(name: string): string {
+  return `the capability ${name} was withheld by the importing module`;
 }
 
 export type EmitResult =
@@ -382,7 +418,7 @@ const isBinding = (i: Item): i is BindingItem => i.k === "binding" || i.k === "f
  * change version when the text gains a `.`. A record has a key slot for
  * each `key` header line, and no stored outcomes.
  */
-export function emitModule(module: Module): EmitResult {
+export function emitModule(module: Module, imports: Imports = new Map()): EmitResult {
   const b = new Builder();
   const findings: Finding[] = [];
   const forms = new Set<FormId>();
@@ -645,14 +681,23 @@ export function emitModule(module: Module): EmitResult {
    * bindings, after which no written statement is the last. The value is
    * undefined for a block with no statement and no tail.
    */
-  const block = (items: readonly Item[], scope: Scope, tail: (() => Ref) | undefined, sync: boolean): Ref | undefined => {
+  const block = (
+    items: readonly Item[],
+    scope: Scope,
+    tail: (() => Ref) | undefined,
+    sync: boolean,
+    more: ReadonlyArray<{ readonly name: string; readonly value: () => Ref }> = [],
+  ): Ref | undefined => {
     const group = items.filter(isBinding);
     for (const it of group) {
       forms.add(it.k === "binding" ? "binding" : it.k === "function" ? "function binding" : "x <- e");
       if (it.k !== "arrow" && it.exported) forms.add("export");
       bind(scope, it.name, { k: "symbol", name: it.name.name });
     }
-    const values = group.map((it) => [b.symbol(it.name.name), it.k === "arrow" ? expr(it.value, scope) : bindingValue(it, scope)] as const);
+    const values = [
+      ...group.map((it) => [b.symbol(it.name.name), it.k === "arrow" ? expr(it.value, scope) : bindingValue(it, scope)] as const),
+      ...more.map((m) => [b.symbol(m.name), m.value()] as const),
+    ];
 
     const lines = items.filter((i): i is Extract<Item, { k: "statement" | "arrow" }> => i.k === "statement" || i.k === "arrow");
     if (lines.length > 1) forms.add("statements");
@@ -668,31 +713,89 @@ export function emitModule(module: Module): EmitResult {
     if (parts.length === 0) return undefined;
     let chain = parts[parts.length - 1];
     for (let i = parts.length - 2; i >= 0; i--) chain = b.apply(b.kernel(sync ? "then" : "also"), [parts[i], chain]);
-    return group.length === 0 ? chain : b.apply(b.kernel("block"), [b.structure(values), chain]);
+    return values.length === 0 ? chain : b.apply(b.kernel("block"), [b.structure(values), chain]);
   };
 
   // The module: its header lines are its parameters, keys first, each role in written order; its block the body.
-  // An import is a parameter declared as a module and nothing more: what it stands for (forms.md §2 "The
-  // module") needs the imported module's declarations and identity, and the launcher refuses a module that
-  // imports (next/launch/launcher.ts). Imports are not in this part of chunk Q5.
+  // An import is a parameter declared as a module, with the imported module's identity, and a binding of the
+  // module's block that calls that parameter (forms.md §2 "The module"): its name is a binding, not the parameter.
   const top = new Scope(failures);
   const keyParams: Ref[] = [];
   const params: Ref[] = [];
   const declares: Declared[] = [];
+  const importLines: Array<{ readonly h: Header; readonly ref: Ref; readonly imported: ImportedModule | undefined }> = [];
   for (const h of module.headers) {
     forms.add(h.k);
     const ref = b.param(h.name.name);
-    bind(top, h.name, { k: "param", ref, role: h.k });
-    if (h.k === "key") keyParams.push(ref);
-    else {
+    if (h.k === "key") {
+      bind(top, h.name, { k: "param", ref, role: h.k });
+      keyParams.push(ref);
+    } else if (h.k === "import") {
+      bind(top, h.name, { k: "symbol", name: h.name.name });
       params.push(ref);
-      declares.push({ param: ref, role: h.k === "import" ? "module" : h.k, name: h.name.name });
+      const imported = imports.get(h.name.name);
+      declares.push(imported === undefined ? { param: ref, role: "module", name: h.name.name } : { param: ref, role: "module", name: h.name.name, identity: imported.identity });
+      importLines.push({ h, ref, imported });
+    } else {
+      bind(top, h.name, { k: "param", ref, role: h.k });
+      params.push(ref);
+      declares.push({ param: ref, role: h.k, name: h.name.name });
     }
   }
-  // What the module yields: the structure of its bindings, keyed by the symbols of their names. A key's header name is no binding.
+
+  /** The value of an import's binding: the imported module's function applied to one argument for each capability and input it declares. */
+  const importValue = ({ h, ref, imported }: (typeof importLines)[number]) => (): Ref => {
+    const name = h.name.name;
+    if (imported === undefined) {
+      findings.push({ at: h.at, kind: "import", message: `the module ${name} is imported, and its declarations and identity were not supplied: the text it is read from is emitted first` });
+      return NONE;
+    }
+    const takes = imported.declares.filter((d) => d.role !== "module");
+    const declared = new Set(takes.map((d) => d.name));
+    const handed = new Map<string, Expr>();
+    const withheld = new Set<string>();
+    for (const p of h.with) {
+      forms.add("import with");
+      if (!declared.has(p.name.name)) findings.push({ at: p.name.at, kind: "import", message: `the import of ${name} hands ${p.name.name} with with, and ${name} declares no capability or input ${p.name.name}` });
+      else if (handed.has(p.name.name)) findings.push({ at: p.name.at, kind: "import", message: `the import of ${name} hands ${p.name.name} twice` });
+      handed.set(p.name.name, p.value);
+    }
+    for (const c of h.without) {
+      forms.add("import without");
+      if (!declared.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} withholds ${c.name}, and ${name} declares no capability or input ${c.name}` });
+      else if (handed.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} both hands and withholds ${c.name}` });
+      else if (withheld.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} withholds ${c.name} twice` });
+      withheld.add(c.name);
+    }
+    const args = takes.map((d) => {
+      const given = handed.get(d.name);
+      if (given !== undefined) return expr(given, top);
+      if (withheld.has(d.name)) {
+        const reason = new TextEncoder().encode(withheldReason(d.name));
+        return b.apply(b.kernel("refuse"), [b.bits(reason, reason.length * 8)]);
+      }
+      const own = top.names.get(d.name);
+      if (own?.k === "param" && (own.role === "capability" || own.role === "input")) return own.ref;
+      findings.push({
+        at: h.at,
+        kind: "import",
+        message: `${name} declares the ${d.role} ${d.name}, which this module neither holds under that name, nor hands with with, nor withholds`,
+      });
+      return NONE;
+    });
+    return b.apply(ref, args);
+  };
+
+  // What the module yields: the structure of its bindings, keyed by the symbols of their names, in written order. An
+  // import is a binding; a key's header name is none.
   const own = module.items.filter(isBinding);
-  const yielded = own.some((i) => i.k !== "arrow" && i.exported) ? own.filter((i) => i.k !== "arrow" && i.exported) : own;
-  let body = block(module.items, top, () => b.structure(yielded.map((i) => [b.symbol(i.name.name), b.symbol(i.name.name)] as const)), false) as Ref;
+  const exported = own.filter((i) => i.k !== "arrow" && i.exported);
+  const yielded =
+    exported.length > 0
+      ? exported.map((i) => i.name)
+      : [...own.map((i) => i.name), ...importLines.map((l) => l.h.name)].sort((x, y) => x.at.start - y.at.start);
+  const more = importLines.map((l) => ({ name: l.h.name.name, value: importValue(l) }));
+  let body = block(module.items, top, () => b.structure(yielded.map((n) => [b.symbol(n.name), b.symbol(n.name)] as const)), false, more) as Ref;
   if (failuresUsed)
     body = b.apply(b.kernel("block"), [b.structure(FAILURE_NAMES.map((n) => [b.symbol(n), failureFunction(n)] as const)), body]);
   for (const u of unbound) findings.push({ at: u.at, kind: "unbound", message: `the name ${u.name} is bound nowhere in the text` });
@@ -714,11 +817,11 @@ export function emitModule(module: Module): EmitResult {
   return { ok: true, program, forms: used };
 }
 
-/** Reads a text and emits it. */
-export function emit(text: string): EmitResult {
+/** Reads a text and emits it, with the declarations and identity of each module it imports. */
+export function emit(text: string, imports: Imports = new Map()): EmitResult {
   const r = read(text);
   if (!r.ok) return { ok: false, findings: r.findings.map((f) => ({ at: f.at, kind: "read" as const, message: f.message })), forms: [] };
-  return emitModule(r.module);
+  return emitModule(r.module, imports);
 }
 
 // ── The command ───────────────────────────────────────────────────────
