@@ -2,14 +2,16 @@
 // rebuild's acceptance side), chunk Q5 (the first notation and the
 // bootstrap), part 3; chunk Q7 (the minimal launcher and the output
 // capability), part 3, for the inputs, part 4, for imports, and part 5,
-// for the timer capability): it emits
+// for the timer capability; chunk Q13 (check and run as configurations,
+// and what a result holds), part 2, for the configuration's sources, and
+// part 3, for `--phases`): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes and exits 0 when the run
 // completed. Otherwise it writes the end's reason to stderr and exits 1.
@@ -22,24 +24,44 @@
 //
 // The target is the terminal's: `output`, `timer` on the host's real
 // timer, `http` on the host's `fetch` (chunk Q16 (the capabilities the
-// launchers ship), part 1), and the shipped pure primitives. The ceiling
-// grants all three (`TERMINAL_CEILING` of next/launch/terminal.ts). `--steps`
-// sets a step budget. Each `--input name=<literal>` supplies the
-// input `name` at the start. Each `--later name=<literal>` is one later
-// phase that supplies it, in the order written. The value is one
-// Allegretto literal, read by `readLiteral` of next/bootstrap/literal.ts.
-// A value that is not a literal, or a flag with no `=`, is a usage error
-// and exits 1.
+// launchers ship), part 1), and the shipped pure primitives.
+//
+// The configuration comes from four sources, highest first, resolved by
+// `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
+// next/launch/terminal.ts):
+//   - the command line. `--steps` sets a step budget. `--ceiling a,b`
+//     narrows the ceiling. `--phases` sets the phases: `run` or `check`;
+//     check supplies no capability and no input, and run every
+//     capability of the ceiling and the inputs. `check,run` is a finding,
+//     since it is not built yet. Each `--input name=<literal>` supplies
+//     the input `name` at the start. Each `--later name=<literal>` is one
+//     later phase that supplies it, in the order written. The value is
+//     one Allegretto literal, read by `readLiteral` of
+//     next/bootstrap/literal.ts. A value that is not a literal, or a flag
+//     with no `=`, is a usage error and exits 1;
+//   - the project's file, `allegro.json` in the directory of the text,
+//     where there is one (`readProjectFile` of
+//     next/tools/configuration.ts). It may set `steps`, `inputs`,
+//     `later`, each literal written as a JSON string, and `phases`, a
+//     list of names such as `["check"]`. An input it gives is
+//     replaced by an `--input` of the same name;
+//   - the environment: `ALLEGRO_STEPS`;
+//   - the launcher's own value: the ceiling that grants all three
+//     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts).
+// A finding of the file or of the resolution, a setting the file may not
+// set among them, is written to stderr, one line each, and exits 1;
+// nothing is emitted or launched.
 
 import * as fs from "fs";
 import * as path from "path";
 import { describeDriveFinding, drive } from "../bootstrap/driver.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { encode } from "../kernel/saved-program.js";
+import { PROJECT_FILE, readProjectFile, type Settings } from "../tools/configuration.js";
 import type { Inputs, Plain } from "./launcher.js";
-import { runOnTerminal, terminalArguments } from "./terminal.js";
+import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]... [--later name=<literal>]...";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);
@@ -75,9 +97,23 @@ export function inputArguments(argv: readonly string[]): { rest: string[]; input
   return { rest, inputs, later };
 }
 
+/** The settings of the project's file beside the text, where there is one. */
+function projectSettings(file: string): Settings | undefined {
+  const project = path.join(path.dirname(file), PROJECT_FILE);
+  if (!fs.existsSync(project)) return undefined;
+  const r = readProjectFile(project, fs.readFileSync(project, "utf8"));
+  if (!r.ok) failFindings(r.findings);
+  return r.settings;
+}
+
 async function main(argv: readonly string[]): Promise<void> {
   const { rest, inputs, later } = inputArguments(argv);
-  const { file, steps } = terminalArguments(rest, USAGE);
+  const { file, commandLine } = terminalArguments(rest, USAGE);
+  // A source that sets no input, or no later phase, leaves it to the sources below.
+  const resolved = resolveOnTerminal(
+    { ...commandLine, ...(Object.keys(inputs).length === 0 ? {} : { inputs }), ...(later.length === 0 ? {} : { later }) },
+    projectSettings(file),
+  );
   let text: string;
   try {
     text = fs.readFileSync(file, "utf8");
@@ -92,7 +128,7 @@ async function main(argv: readonly string[]): Promise<void> {
   }
   // Each record goes to the launcher as the saved program's JSON, as `npm run launch` reads it.
   const records = r.records.map((x) => JSON.parse(encode(x.program)) as unknown);
-  await runOnTerminal(records[records.length - 1], steps, { inputs, later }, records.slice(0, -1));
+  await runOnTerminal(records[records.length - 1], resolved, records.slice(0, -1));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname))
