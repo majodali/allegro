@@ -64,6 +64,7 @@ test("anything else is refused with a finding that says an input's value is a li
     ["--5", /holds a negation of something that is not a whole number$/],
     ["!true", /holds a negation with !$/],
     ["{a: y}", /holds the name y$/],
+    ['{[`k]: 1}', /holds an entry with a computed key$/],
     ["1\n2", /is not one literal$/],
     ["capability output\n1", /is not one literal$/],
     ["", /is not one literal$/],

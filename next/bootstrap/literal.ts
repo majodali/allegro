@@ -74,7 +74,13 @@ export function readLiteral(text: string): LiteralResult {
       case "symbol":
         return { symbol: e.name };
       case "record":
-        return { entries: e.fields.map((f) => [{ symbol: f.name.name }, plain(f.value)] as const) };
+        return {
+          entries: e.fields.map((f) => {
+            if (f.k === "named") return [{ symbol: f.name.name }, plain(f.value)] as const;
+            refusals.push("an entry with a computed key");
+            return [null, { entries: [] }] as const;
+          }),
+        };
       case "list":
         return { entries: e.items.map((i) => [null, plain(i)] as const) };
       case "unary":

@@ -1,7 +1,7 @@
 // The grammar of Allegretto (B-196 (the rebuild's acceptance side), chunk
-// Q5 (the first notation and the bootstrap), part 2), as
+// Q5 (the first notation and the bootstrap), parts 2 and 4), as
 // next/ext/allegretto/forms.md §5 states it: the present tree's base
-// grammar with the standard language's productions removed, and five
+// grammar with the standard language's productions removed, and seven
 // added.
 //
 // The one file of the new tree that reaches the present tree. It uses the
@@ -56,11 +56,15 @@
 //
 // What it adds (forms.md §5 and §6): the symbol literal `` `name ``; `++`,
 // on a level of its own between the comparisons and `+`; the statement
-// `x <- e`; and the header lines `capability NAME` and `input NAME`, as
-// statements beside `import NAME`. The reader checks that header lines
-// come first. And one change forms.md §5 does not list: `then` is no
-// longer reserved, since forms.md §2 binds the kernel primitive `then` to
-// that name; the word of `if c then a else b` still reads as before.
+// `x <- e`; the header lines `capability NAME`, `input NAME` and
+// `key NAME`, as statements beside `import NAME`, which may stand anywhere
+// at the top level; and an entry `[k]: e` of a structure literal, whose
+// key is any expression, a key's name among them. And two changes
+// forms.md §5 does not list. `sync` before an indented block, a form of
+// forms.md §2 "Bindings and blocks", is read wherever an indented block
+// may stand; `sync` is no keyword, and stays a name elsewhere. `then` is
+// no longer reserved, since forms.md §2 binds the kernel primitive `then`
+// to that name; the word of `if c then a else b` still reads as before.
 //
 // The precedence, loosest first, is forms.md's: `|>`; `||`; `&&`; `==`
 // `!=`; `<` `>` `<=` `>=`; `++`; `+` `-`; `*` `/` `%`; prefix `-` `!`;
@@ -312,9 +316,21 @@ export function allegrettoGrammar(): Grammar {
   production(g, "expr_cmp").rule = retarget(production(g, "expr_cmp").rule, "expr_add", "expr_join");
   // 3. The statement `x <- e`, tried before a bare expression, where it would read as `x < -e`.
   insertAlternative(g, "stmt", undefined, seq([nonterm("ident"), nonterm("hws"), lit("<-"), nonterm("fn_body")], { name: "arrow_binding" }), "expr");
-  // 4 and 5. The header lines `capability NAME` and `input NAME`, beside `import NAME`.
+  // 4, 5 and 6. The header lines `capability NAME`, `input NAME` and `key NAME`, beside `import NAME`.
   insertAlternative(g, "stmt", "export_fn_decl", seq([lit("capability"), nonterm("ws_req"), nonterm("ident")], { name: "capability_decl" }));
   insertAlternative(g, "stmt", "export_fn_decl", seq([lit("input"), nonterm("ws_req"), nonterm("ident")], { name: "input_decl" }));
+  insertAlternative(g, "stmt", "export_fn_decl", seq([lit("key"), nonterm("ws_req"), nonterm("ident")], { name: "key_decl" }));
+  // 7. An entry with a computed key in a structure literal, `[k]: e`, beside `name: e`.
+  const field = production(g, "object_field");
+  field.rule = alt([
+    field.rule,
+    seq([lit("["), wsAny, nonterm("expr"), wsAny, lit("]"), ws, lit(":"), ws, nonterm("expr")], { name: "computed_field" }),
+  ]);
+  // And one form of forms.md §2 that §5 does not count: `sync` before an indented block, where
+  // an indented block may stand, tried after the plain block and before the inline body.
+  const body = production(g, "fn_body");
+  if (body.rule.kind !== "alt" || body.rule.options.length !== 2) throw new Error("the production fn_body of the present base grammar is not a choice of two");
+  body.rule = alt([body.rule.options[0], seq([nonterm("hws"), lit("sync"), nonterm("hws"), nonterm("block_expr")], { name: "sync_block" }), body.rule.options[1]], body.rule.attrs);
 
   // `then` is a name as well as the word of `if c then a else b`: forms.md §2 binds the kernel
   // primitive to it. The base grammar reserves it; nothing reads it as a name where the word is due.

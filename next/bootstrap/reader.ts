@@ -14,17 +14,29 @@
 //     to a signed 64-bit integer, refused outside that range; `0xFF`; a
 //     decimal fraction to IEEE 754 binary64; a text, with the escapes
 //     `\"`, `\\`, `\n`, `\t`, to its UTF-8 bytes;
-//   - the header lines first (`capability`, `input`, `import`), then the
-//     module's block;
+//   - a structure literal's entries, each `name: e` or `[k]: e`, with a
+//     computed key;
+//   - the header lines (`capability`, `input`, `key`, `import`), anywhere
+//     at the module's top level (forms.md §2 "The module", question 7),
+//     and the module's block;
 //   - a block's bindings (`x = e`, `f(x, y) => e`, `export` before
-//     either), its statements, and the statement `x <- e`.
+//     either), its statements, and the statement `x <- e`; and `sync`
+//     before an indented block.
 // What the grammar still parses and forms.md §2 gives no meaning, the
 // reader refuses: the keywords `and` and `or`, and the binary number
-// `0b…`. It also refuses a header line after anything else, and `export`
-// in a block inside the module.
+// `0b…`. It also refuses a header line in a block inside the module, and
+// `export` there.
 //
-// It checks nothing about names: that is the emitter's
-// (next/bootstrap/emit.ts), at the end of the text.
+// It checks one thing about names (forms.md §2 "Failures", the paragraph
+// on `<-`): a statement written above `x <- e` in its block that needs
+// `x`, itself or through a binding of that block, is refused, since it
+// would start `e` before its place. Every other check of names is the
+// emitter's (next/bootstrap/emit.ts), at the end of the text.
+//
+// Imports are read as header lines and go no further here: `with`,
+// `without` and `use` do not parse, and the launcher refuses a module
+// that imports (next/launch/launcher.ts). They need the imported module's
+// declarations and identity, which no part of the bootstrap has yet.
 
 import { LADDER_TAG, parseAllegretto, type ParseTree } from "./allegretto-grammar.js";
 
@@ -63,12 +75,17 @@ export type Expr =
   | { readonly k: "if"; readonly condition: Expr; readonly then: Expr; readonly else: Expr; readonly at: Place }
   | { readonly k: "binary"; readonly op: BinaryOp; readonly left: Expr; readonly right: Expr; readonly at: Place }
   | { readonly k: "unary"; readonly op: "-" | "!"; readonly operand: Expr; readonly at: Place }
-  /** `{a: e, b: f}`. */
-  | { readonly k: "record"; readonly fields: ReadonlyArray<{ readonly name: Name; readonly value: Expr }>; readonly at: Place }
+  /** `{a: e, [k]: f}`. */
+  | { readonly k: "record"; readonly fields: readonly Field[]; readonly at: Place }
   /** `[e, f]`. */
   | { readonly k: "list"; readonly items: readonly Expr[]; readonly at: Place }
-  /** An indented block. */
-  | { readonly k: "block"; readonly items: readonly Item[]; readonly at: Place };
+  /** An indented block; `sync` where `sync` stands before it. */
+  | { readonly k: "block"; readonly items: readonly Item[]; readonly sync: boolean; readonly at: Place };
+
+/** One entry of a structure literal: `name: e`, or `[k]: e` with a computed key. */
+export type Field =
+  | { readonly k: "named"; readonly name: Name; readonly value: Expr }
+  | { readonly k: "computed"; readonly key: Expr; readonly value: Expr; readonly at: Place };
 
 /** A name where it is bound or read as a key, with its place. */
 export interface Name {
@@ -89,12 +106,12 @@ export type Item =
 
 /** A header line. */
 export interface Header {
-  readonly k: "capability" | "input" | "import";
+  readonly k: "capability" | "input" | "key" | "import";
   readonly name: Name;
   readonly at: Place;
 }
 
-/** A text read as one module: its header lines, then its block. */
+/** A text read as one module: its header lines, in written order, and its block. */
 export interface Module {
   readonly headers: readonly Header[];
   readonly items: readonly Item[];
@@ -248,12 +265,14 @@ export function read(text: string): ReadResult {
       case "paren":
         return lastNonClose(t);
       case "neg":
+        return { k: "unary", op: "-", operand: lastExpr(t), at: at(t) };
       case "not":
-        return { k: "unary", op: t.tag === "neg" ? "-" : "!", operand: lastExpr(t), at: at(t) };
+        return { k: "unary", op: "!", operand: lastExpr(t), at: at(t) };
       case "if": {
-        const bodies = branches(t).filter((c) => c.tag === "fn_body");
-        const condition = branches(t).filter((c) => !["ws", "ws_req", "fn_body"].includes(c.tag ?? ""))[0];
-        return { k: "if", condition: expr(condition), then: lastExpr(bodies[0]), else: lastExpr(bodies[1]), at: at(t) };
+        const isBody = (c: Branch): boolean => c.tag === "fn_body" || c.tag === "sync_block";
+        const bodies = branches(t).filter(isBody).map((c) => (c.tag === "sync_block" ? expr(c) : lastExpr(c)));
+        const condition = branches(t).filter((c) => !["ws", "ws_req"].includes(c.tag ?? "") && !isBody(c))[0];
+        return { k: "if", condition: expr(condition), then: bodies[0], else: bodies[1], at: at(t) };
       }
       case "lambda1":
         return { k: "lambda", params: [nameOf(child(t, "ident"))], body: lastExpr(t), at: at(t) };
@@ -265,11 +284,20 @@ export function read(text: string): ReadResult {
       }
       case "object_lit": {
         const fields = t.children[2];
-        const list = fields.kind === "branch" ? branches(fields.children[0]).filter((c) => c.tag === "object_field") : [];
-        return { k: "record", fields: list.map((f) => ({ name: nameOf(child(f, "ident")), value: lastExpr(f) })), at: at(t) };
+        const list = fields.kind === "branch" ? branches(fields.children[0]).filter((c) => c.tag === "object_field" || c.tag === "computed_field") : [];
+        return {
+          k: "record",
+          fields: list.map((f): Field =>
+            f.tag === "object_field"
+              ? { k: "named", name: nameOf(child(f, "ident")), value: lastExpr(f) }
+              : { k: "computed", key: lastNonClose(f), value: lastExpr(f), at: at(f) }),
+          at: at(t),
+        };
       }
       case "block_expr":
-        return { k: "block", items: block(t, false), at: at(t) };
+        return { k: "block", items: block(t), sync: false, at: at(t) };
+      case "sync_block":
+        return { k: "block", items: block(child(t, "block_expr")), sync: true, at: at(t) };
       default:
         return refuse(at(t), `the parse tree has a form ${t.tag ?? "(untagged)"} that Allegretto does not have`);
     }
@@ -280,18 +308,58 @@ export function read(text: string): ReadResult {
     const rep = t.children.find((c) => c.kind === "branch" && c.tag !== "stmt");
     return rep === undefined ? [] : branches(rep).filter((c) => c.tag === "stmt");
   };
-  const block = (t: Branch, top: boolean): Item[] => {
+  const block = (t: Branch): Item[] => {
     const items: Item[] = [];
     for (const s of statementsOf(t)) {
-      const it = statement(s, top);
+      const it = statement(s, false);
       if (it !== undefined) items.push(it);
     }
+    arrowsInPlace(items);
     return items;
   };
 
+  /** The value of a binding, a function or `x <- e`: an indented block, `sync` and one, or an expression. */
+  const bodyOf = (inner: Branch): Expr => {
+    const b = branches(inner).find((c) => c.tag === "fn_body" || c.tag === "sync_block");
+    if (b === undefined) return refuse(at(inner), "the parse tree has no fn_body here");
+    return b.tag === "sync_block" ? expr(b) : lastExpr(b);
+  };
+
+  /**
+   * Refuses each statement written above `x <- e` in its block that needs
+   * `x`, itself or through a binding of the block (forms.md §2, "Failures"):
+   * it would start `e` before its place.
+   */
+  const arrowsInPlace = (items: readonly Item[]): void => {
+    const bindings = new Map<string, Item>();
+    for (const it of items) if (it.k === "binding" || it.k === "function") bindings.set(it.name.name, it);
+    /** The names of this block a line needs: what it uses, and what the bindings it uses use, of this block's names. */
+    const needs = (it: Item): Set<string> => {
+      const out = new Set<string>();
+      const todo = [...freeOfItem(it)];
+      while (todo.length > 0) {
+        const n = todo.pop() as string;
+        if (out.has(n)) continue;
+        out.add(n);
+        const b = bindings.get(n);
+        if (b !== undefined) todo.push(...freeOfItem(b));
+      }
+      return out;
+    };
+    const lines = items.filter((it) => it.k === "statement" || it.k === "arrow");
+    lines.forEach((arrow, j) => {
+      if (arrow.k !== "arrow") return;
+      const x = arrow.name.name;
+      for (const it of lines.slice(0, j))
+        if (needs(it).has(x))
+          findings.push({
+            at: it.at,
+            message: `the statement at ${it.at.line}:${it.at.column} needs ${x}, which ${x} <- … binds below it at ${arrow.at.line}:${arrow.at.column}: it would start that line's value before its place`,
+          });
+    });
+  };
+
   const headers: Header[] = [];
-  /** True once a line of the module's block that is not a header line has been read. */
-  let sawItem = false;
   /** One line. A header line is collected apart and gives no item. */
   const statement = (s: Branch, top: boolean): Item | undefined => {
     try {
@@ -300,10 +368,10 @@ export function read(text: string): ReadResult {
       switch (inner.tag) {
         case "capability_decl":
         case "input_decl":
+        case "key_decl":
         case "import_stmt": {
-          const k = inner.tag === "capability_decl" ? "capability" : inner.tag === "input_decl" ? "input" : "import";
-          if (!top) return refuse(where, `the header line ${k} belongs at the start of the text, not in a block`);
-          if (sawItem) return refuse(where, `the header line ${k} comes after other lines; header lines come before anything else`);
+          const k = inner.tag === "capability_decl" ? "capability" : inner.tag === "input_decl" ? "input" : inner.tag === "key_decl" ? "key" : "import";
+          if (!top) return refuse(where, `the header line ${k} belongs at the top level of the module, not in a block`);
           headers.push({ k, name: nameOf(child(inner, "ident")), at: where });
           return undefined;
         }
@@ -311,22 +379,18 @@ export function read(text: string): ReadResult {
         case "export_binding": {
           const exported = inner.tag === "export_binding";
           if (exported && !top) return refuse(where, "export marks a binding of the module, and this one is in a block inside it");
-          sawItem = top || sawItem;
-          return { k: "binding", name: nameOf(child(inner, "ident")), value: lastExpr(child(inner, "fn_body")), exported, at: where };
+          return { k: "binding", name: nameOf(child(inner, "ident")), value: bodyOf(inner), exported, at: where };
         }
         case "fn_decl":
         case "export_fn_decl": {
           const exported = inner.tag === "export_fn_decl";
           if (exported && !top) return refuse(where, "export marks a binding of the module, and this one is in a block inside it");
-          sawItem = top || sawItem;
           const params = branches(inner).find((c) => c.tag === "param_list");
-          return { k: "function", name: nameOf(child(inner, "ident")), params: paramsOf(params), body: lastExpr(child(inner, "fn_body")), exported, at: where };
+          return { k: "function", name: nameOf(child(inner, "ident")), params: paramsOf(params), body: bodyOf(inner), exported, at: where };
         }
         case "arrow_binding":
-          sawItem = top || sawItem;
-          return { k: "arrow", name: nameOf(child(inner, "ident")), value: lastExpr(child(inner, "fn_body")), at: where };
+          return { k: "arrow", name: nameOf(child(inner, "ident")), value: bodyOf(inner), at: where };
         default:
-          sawItem = top || sawItem;
           return { k: "statement", expr: expr(inner), at: where };
       }
     } catch (e) {
@@ -343,6 +407,81 @@ export function read(text: string): ReadResult {
     const it = statement(s, true);
     if (it !== undefined) items.push(it);
   }
-  if (findings.length > 0) return { ok: false, findings };
+  arrowsInPlace(items);
+  if (findings.length > 0) return { ok: false, findings: [...findings].sort((a, b) => a.at.start - b.at.start) };
   return { ok: true, module: { headers, items } };
+}
+
+// ── The names an expression uses ──────────────────────────────────────
+
+/** The names an expression uses that nothing inside it binds. `int.add` uses `int`. */
+export function freeNames(e: Expr, out: Set<string> = new Set()): Set<string> {
+  switch (e.k) {
+    case "name":
+      out.add(e.name);
+      break;
+    case "lambda": {
+      const inner = freeNames(e.body);
+      for (const p of e.params) inner.delete(p.name);
+      for (const n of inner) out.add(n);
+      break;
+    }
+    case "apply":
+      freeNames(e.fn, out);
+      e.args.forEach((a) => freeNames(a, out));
+      break;
+    case "pipe":
+      freeNames(e.value, out);
+      freeNames(e.fn, out);
+      break;
+    case "dot":
+      freeNames(e.object, out);
+      break;
+    case "index":
+      freeNames(e.object, out);
+      freeNames(e.index, out);
+      break;
+    case "if":
+      freeNames(e.condition, out);
+      freeNames(e.then, out);
+      freeNames(e.else, out);
+      break;
+    case "binary":
+      freeNames(e.left, out);
+      freeNames(e.right, out);
+      break;
+    case "unary":
+      freeNames(e.operand, out);
+      break;
+    case "record":
+      for (const f of e.fields) {
+        if (f.k === "computed") freeNames(f.key, out);
+        freeNames(f.value, out);
+      }
+      break;
+    case "list":
+      e.items.forEach((i) => freeNames(i, out));
+      break;
+    case "block": {
+      const bound = new Set(e.items.flatMap((i) => (i.k === "statement" ? [] : [i.name.name])));
+      const inner = new Set<string>();
+      for (const i of e.items) for (const n of freeOfItem(i)) inner.add(n);
+      for (const n of inner) if (!bound.has(n)) out.add(n);
+      break;
+    }
+    default:
+      break;
+  }
+  return out;
+}
+
+/** The names one line of a block uses: of its value, or of its function's body less the parameters. */
+function freeOfItem(it: Item): Set<string> {
+  if (it.k === "statement") return freeNames(it.expr);
+  if (it.k === "function") {
+    const inner = freeNames(it.body);
+    for (const p of it.params) inner.delete(p.name);
+    return inner;
+  }
+  return freeNames(it.value);
 }

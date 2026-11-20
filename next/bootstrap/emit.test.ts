@@ -26,7 +26,7 @@ import { check2, encode, load, type SavedProgram } from "../kernel/saved-program
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
-import { emit, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, type Finding, type FormId } from "./emit.js";
+import { emit, FAILURE_FUNCTIONS, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, type Finding, type FormId } from "./emit.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
@@ -196,11 +196,67 @@ test("the kernel primitives Allegretto names: then, attempt, describe and build"
 
 // ── Statements and x <- e ──────────────────────────────────────────────
 
-test("a block's statements happen in written order: the module body is a chain of then", () => {
+test("a block's statements are started in written order: the module body is a chain of also", () => {
   const doc = emitted('input see\nsee("one")\nsee("two")\nsee("three")');
-  assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === "then"));
+  assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === "also"));
   assert.ok(!doc.nodes.some((n) => n.k === "structure" && n.entries.length > 0), "no statement is a structure's entry");
   assert.deepEqual(seenTexts(run('input see\nsee("one")\nsee("two")\nsee("three")')), ["one", "two", "three"]);
+});
+
+test("sync before an indented block makes its statements a chain of then", () => {
+  const doc = emitted('input see\nrun() => sync\n  see("one")\n  see("two")\nrun()');
+  const fn = doc.nodes.find((n) => n.k === "function" && n.params.length === 0);
+  assert.ok(fn !== undefined && fn.k === "function");
+  const body = doc.nodes[fn.body];
+  assert.ok(body.k === "expression" && doc.nodes[body.fn].k === "kernel" && (doc.nodes[body.fn] as { name: string }).name === "then", "the sync block's chain is of then");
+  assert.deepEqual(seenTexts(run('input see\nrun() => sync\n  see("one")\n  see("two")\nrun()')), ["one", "two"]);
+  // sync may stand after =, => and <-.
+  assert.deepEqual(seenTexts(run('input see\nx = sync\n  see("a")\n  1\ny <- sync\n  see("b")\n  x\nsee(int.text(y))')), ["b", "a", "1"]);
+});
+
+test("a statement whose value is dropped is a claim that it is no failure: claim(!is_failure(a))", () => {
+  const failing = 'input see\nsee("before")\n{failure: `nope}\nsee("after")';
+  const r = run(failing);
+  assert.deepEqual(seenTexts(r), ["before"]);
+  assert.equal(r.refuted, true);
+  const doc = emitted(failing);
+  const claim = doc.nodes.findIndex((n) => n.k === "kernel" && n.name === "claim");
+  assert.equal(doc.nodes.filter((n) => n.k === "expression" && n.fn === claim).length, 3, "each of the three statements is dropped: the module's value is the structure it yields");
+  // A failure bound with <-, and a block's last statement, are the program's own: no claim.
+  const kept = run('input see\nr <- {failure: `nope}\nsee(if is_failure(r) then "looked at" else "no")\nf() =>\n  see("inner")\n  {failure: `given}\nv <- f()\nsee(spelling(v.failure))');
+  assert.deepEqual(seenTexts(kept), ["looked at", "inner", "given"]);
+  assert.equal(kept.refuted, false);
+  // A statement that is itself a claim needs none of its own.
+  const one = emitted("input see\nclaim(true)\nsee(1)");
+  const c = one.nodes.findIndex((n) => n.k === "kernel" && n.name === "claim");
+  assert.equal(one.nodes.filter((n) => n.k === "expression" && n.fn === c).length, 2);
+});
+
+test("a dropped statement whose answer has not come holds what is written after it", () => {
+  const r = run('input see\ninput ask\nsee("first")\nask()\nsee("after the answer")');
+  assert.deepEqual(seenTexts(r), ["first"]);
+  r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")));
+  r.k.advance();
+  assert.deepEqual(seenTexts(r), ["first", "after the answer"]);
+});
+
+test("is_failure and handle are Allegretto's functions: bound for every text, and hidden where a text binds the name again", () => {
+  const r = run('input see\nsee(is_failure({failure: `x}))\nsee(is_failure([]))\nsee(is_failure({a: 1}))\nsee(is_failure(1))\nsee(handle({failure: `x, n: 2}, `x, f => f.n))\nsee(handle(3, `x, f => 0))');
+  assert.deepEqual(seen(r).slice(0, 4).map((v) => bitsOf(r.k, v)), ["1:01", "1:00", "1:00", "1:00"]);
+  assert.deepEqual(seen(r).slice(4).map((v) => intOf(r.k, v)), [2n, 3n]);
+  const hidden = run('input see\nhandle(x, a, b) => "the text\'s own"\nsee(handle(1, 2, 3))\nsee(is_failure(1))');
+  assert.equal(textOf(hidden.k, seen(hidden)[0]), "the text's own");
+  // A text that uses neither name carries no block that binds them.
+  assert.ok(!emitted('input see\nsee("x")').nodes.some((n) => n.k === "symbol" && n.fqn === "is_failure"));
+});
+
+test("the failure functions the emitter keeps are the text of forms.md, section Failures", () => {
+  const forms = fs.readFileSync(path.join(ROOT, "next/ext/allegretto/forms.md"), "utf8");
+  const section = forms.slice(forms.indexOf("### Failures"), forms.indexOf("### The module"));
+  const blocks = [...section.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const definitions = blocks.find((t) => t.startsWith("is_failure(x) =>"));
+  assert.ok(definitions !== undefined, "forms.md writes is_failure and handle in one block");
+  assert.equal(FAILURE_FUNCTIONS, definitions);
 });
 
 test("x <- e: e happens at its place, once, and x is its value for the rest of the block", () => {
@@ -213,13 +269,18 @@ test("x <- e: e happens at its place, once, and x is its value for the rest of t
   assert.deepEqual(seen(two).map((v) => bitsOf(two.k, v)), ["64:0000000000000002", "64:0000000000000001"]);
 });
 
-test("x <- e on an answer that arrives later: nothing after it is performed until the cell is filled", () => {
-  const r = run('input see\ninput ask\nsee("first")\na <- ask()\nsee("after the answer")\nsee(a)');
-  assert.deepEqual(seenTexts(r), ["first"]);
+test("x <- e on an answer that arrives later holds nothing: only what uses its value waits for the cell; in a sync block all after it waits", () => {
+  const r = run('input see\ninput ask\nsee("first")\na <- ask()\nsee("not held")\nsee(a)');
+  assert.deepEqual(seenTexts(r), ["first", "not held"]);
   assert.equal(r.cells.length, 1);
   r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")));
   r.k.advance();
-  assert.deepEqual(seenTexts(r), ["first", "after the answer", "answer"]);
+  assert.deepEqual(seenTexts(r), ["first", "not held", "answer"]);
+  const s = run('input see\ninput ask\nrun() => sync\n  see("first")\n  a <- ask()\n  see("after the answer")\n  see(a)\nrun()');
+  assert.deepEqual(seenTexts(s), ["first"]);
+  s.k.fill(s.cells[0], s.k.bits(utf8.encode("answer")));
+  s.k.advance();
+  assert.deepEqual(seenTexts(s), ["first", "after the answer", "answer"]);
 });
 
 test("a block as a value: its last statement's value; an inner block may bind a name again", () => {
@@ -267,8 +328,10 @@ test("a name nothing binds is refused, at the end of the text, wherever it is us
     ["unbound", "the name z is bound nowhere in the text"],
   ]);
   assert.deepEqual([f[0].at.line, f[0].at.column], [2, 5]);
-  // A name used before its x <- e line is not bound there: x <- e binds for the rest of the block.
-  assert.deepEqual(findings("input see\nsee(n)\nn <- 1").map((x) => x.kind), ["unbound"]);
+  // A statement above x <- e that needs x is refused by the reader: it would start e before its place.
+  assert.deepEqual(findings("input see\nsee(n)\nn <- 1").map((x) => [x.kind, x.message]), [
+    ["read", "the statement at 2:1 needs n, which n <- … binds below it at 3:1: it would start that line's value before its place"],
+  ]);
   // int.foo is no name of forms.md §3.
   assert.deepEqual(findings("input see\nsee(int.foo(1))").map((x) => x.message), ["the name int.foo is bound nowhere in the text"]);
 });
@@ -326,14 +389,19 @@ test("an inner block binds its own names; a name there means the innermost block
   assert.deepEqual(seenTexts(r), ["inner", "outer"]);
 });
 
-test("x <- e whose e reads an enclosing block's x reads that x, not itself", () => {
-  const r = run("input see\nn <- 1\nm <-\n  n <- n + 1\n  n\nsee(n)\nsee(m)");
-  assert.deepEqual(seenInts(r), [1n, 2n]);
-  // Written as forms.md has it where e does not read x.
-  const doc = emitted("input see\nn <- 1\nsee(n)");
+test("x <- e is a binding of its block's one group: block({…, x: e}, … also(x, rest)), and a binding before or after it may use x", () => {
+  const r = run("input see\ninput tick\nbefore = n * 10\nn <- tick()\nafter = n + 1\nsee(after)\nsee(before)");
+  assert.deepEqual(seenInts(r), [2n, 10n]);
+  assert.deepEqual(r.events.map((e) => e.part), ["tick", "see", "see"]);
+  const doc = emitted("input see\nn <- 1\nm = 2\nsee(n)");
   const block = doc.nodes.findIndex((n) => n.k === "kernel" && n.name === "block");
-  assert.ok(doc.nodes.some((n) => n.k === "expression" && n.fn === block));
-  assert.ok(!doc.nodes.some((n) => n.k === "function" && n.params.length > 0 && doc.nodes[n.params[0]].k === "param" && (doc.nodes[n.params[0]] as { name: string }).name === "n"));
+  const n = doc.nodes.findIndex((x) => x.k === "symbol" && x.fqn === "n");
+  const m = doc.nodes.findIndex((x) => x.k === "symbol" && x.fqn === "m");
+  const group = doc.nodes.find((x) => x.k === "structure" && x.entries.some(([key]) => key === n));
+  assert.ok(group !== undefined && group.k === "structure" && group.entries.some(([key]) => key === m), "n and m are bound in one group");
+  assert.equal(doc.nodes.filter((x) => x.k === "expression" && x.fn === block).length, 1, "x <- e opens no block of its own");
+  // A statement above the arrow that needs the name through a binding is refused too.
+  assert.match(findings("input see\nshow() => see(n)\nshow()\nn <- 1").map((x) => x.message).join(), /needs n, which n <- … binds below it/);
 });
 
 // ── Operators, bits and reading a structure ───────────────────────────
@@ -413,11 +481,95 @@ test("a primitive outside its domain is a refutation with its reason", () => {
   assert.equal(r.k.reasonOf(r.value), "division by zero");
 });
 
+// ── Data, keys and the four structures ───────────────────────────────
+
+test("the five names for data are the kernel's put, key, kind, symbol and spelling, and range is the forms' recursion", () => {
+  const r = run([
+    "input see",
+    "range(n) => if n == 0 then [] else put(range(n - 1), [], n)",
+    "see(count(range(3)))",
+    "see(get(range(3), 2))",
+    "s = put({a: 1}, `b, 2)",
+    "see(spelling(key(s, 1)))",
+    "see(kind(s) == `structure && kind(1) == `bits && kind(`a) == `symbol && kind(range) == `function)",
+    "see(get(s, symbol(\"a\")))",
+  ].join("\n"));
+  assert.deepEqual(seen(r).slice(0, 2).map((v) => intOf(r.k, v)), [3n, 3n]);
+  assert.equal(textOf(r.k, seen(r)[2]), "b");
+  assert.equal(bitsOf(r.k, seen(r)[3]), "1:01");
+  assert.equal(intOf(r.k, seen(r)[4]), 1n);
+  const doc = emitted("input see\nsee(kind(put([], [], 1)))\nsee(spelling(symbol(\"x\")))\nsee(key([1], 0))");
+  for (const name of ["put", "key", "kind", "symbol", "spelling"]) assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === name), name);
+});
+
+test("refuse, assume and undecided are the kernel's primitives of those names", () => {
+  const r = run('input see\nsee("before")\nsee(refuse("no further"))\nsee("after")');
+  assert.deepEqual(seenTexts(r), ["before"]);
+  assert.equal(r.refuted, true);
+  assert.equal(r.k.reasonOf(r.value), "no further");
+  const doc = emitted('input see\nassume(1 == 1)\nclaim(undecided("cannot tell"))\nsee("on")');
+  for (const name of ["assume", "undecided"]) assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === name), name);
+  const w = run('input see\nassume(1 == 1)\nclaim(undecided("cannot tell"))\nsee("on")');
+  assert.deepEqual(seenTexts(w), ["on"]);
+  assert.equal(w.refuted, false);
+});
+
+test("a computed key in a structure literal is put: {a: e, [k]: f} is put({a: e}, k, f), and an entry after it is put too", () => {
+  const text = 'input see\nk = symbol("z")\ns = {a: 1, [k]: 2, b: 3}\nsee(s.z)\nsee(s.b)\nsee(spelling(key(s, 1)))\nsee(count(s))';
+  const doc = emitted(text);
+  const put = doc.nodes.findIndex((n) => n.k === "kernel" && n.name === "put");
+  assert.equal(doc.nodes.filter((n) => n.k === "expression" && n.fn === put).length, 2);
+  const r = run(text);
+  assert.deepEqual(seen(r).map((v, i) => (i === 2 ? textOf(r.k, v) : String(intOf(r.k, v)))), ["2", "3", "z", "3"]);
+});
+
+test("a key header line is a parameter before every other, counted by keys, not declared; [k]: e with its name is a private entry", () => {
+  const text = "input see\nkey secret\nkey other\nmake(n) => {shown: n, [secret]: n * 2}\nbox = make(21)\nsee(count(box))\nsee(box[secret])";
+  const doc = emitted(text);
+  const fn = doc.nodes[doc.module];
+  assert.ok(fn.k === "function");
+  assert.deepEqual(fn.params.map((p) => (doc.nodes[p] as { name: string }).name), ["secret", "other", "see"]);
+  assert.equal(doc.keys, 2);
+  assert.deepEqual(doc.declares.map((d) => d.name), ["see"]);
+  const secret = fn.params[0];
+  assert.ok(doc.nodes.some((n) => n.k === "structure" && n.entries.some(([key]) => key === secret)), "the private entry is keyed by the key's parameter");
+  assert.deepEqual(seenInts(run(text)), [1n, 42n]);
+  // A key's header name is no binding: the module does not yield it.
+  const open = run("input see\nkey secret\nx = 1\nsee(x)");
+  assert.deepEqual(open.k.entriesOf(open.value).map(([key]) => open.k.symbolName(key as Value)), ["x"]);
+});
+
+test("the header lines may stand anywhere at the top level; the parameters are keys first, then the rest in written order", () => {
+  const doc = emitted("x = 1\ninput see\nsee(x)\nkey k\ncapability output\noutput.write(\"w\")\ninput tick");
+  const fn = doc.nodes[doc.module];
+  assert.ok(fn.k === "function");
+  assert.deepEqual(fn.params.map((p) => (doc.nodes[p] as { name: string }).name), ["k", "see", "output", "tick"]);
+  assert.deepEqual(doc.declares.map((d) => [d.role, d.name]), [["input", "see"], ["capability", "output"], ["input", "tick"]]);
+});
+
+test("int, float, text and bits are structures: one handed as a value is the structure of its primitives, and a block may hide one", () => {
+  const r = run("input see\napply(ops, a, b) => ops.add(a, b)\nsee(apply(int, 2, 3))\nsee(bits.length)\nhidden <-\n  int = {add: (a, b) => 0}\n  int.add(1, 2)\nsee(hidden)");
+  assert.equal(intOf(r.k, seen(r)[0]), 5n);
+  assert.equal(r.k.kind(seen(r)[1]), "primitive-function");
+  assert.equal(intOf(r.k, seen(r)[2]), 0n);
+  // Written only as int.<entry>, the text needs only the primitives it names.
+  assert.deepEqual(emitted("input see\nsee(int.add(1, 2))").needs.map((n) => n.name), ["int.add"]);
+  const whole = emitted("input see\nsee(int)");
+  assert.ok(whole.needs.length >= 12 && whole.needs.some((n) => n.name === "int.float"));
+});
+
+test("the four primitives added: bits.int, float.eq, float.ge, float.gt", () => {
+  const r = run('input see\nsee(bits.int(bits.slice("A", 0, 8)))\nsee(float.eq(0.0, -0.0))\nsee(float.ge(2.0, 2.0))\nsee(float.gt(2.0, 2.0))');
+  assert.equal(intOf(r.k, seen(r)[0]), 65n);
+  assert.deepEqual(seen(r).slice(1).map((v) => bitsOf(r.k, v)), ["1:01", "1:01", "1:00"]);
+});
+
 // ── What the module yields ────────────────────────────────────────────
 
 test("a module with no export yields all its bindings, keyed by the symbols of their names; with export, those marked", () => {
+  // x <- e is a binding of the module's block like any other, so it is yielded too.
   const all = run('input see\nf(x) => x\nn = 1\nm <- 2\nsee("ran")');
-  assert.deepEqual(all.k.entriesOf(all.value).map(([key]) => all.k.symbolName(key as Value)), ["f", "n"]);
+  assert.deepEqual(all.k.entriesOf(all.value).map(([key]) => all.k.symbolName(key as Value)), ["f", "n", "m"]);
   // An entry is evaluated when something reads it, so the entry is read through the kernel, not taken from `entriesOf`.
   const f = all.k.evaluate(all.k.expression(all.k.kernelPrimitive("get"), [all.value, all.k.symbolData("f")]), all.k.scope());
   assert.equal(f.refuted, false);
@@ -460,9 +612,7 @@ test("every finding of a text is given, each at its place, and the forms it uses
   assert.equal(r.ok, false);
   if (r.ok) return;
   assert.deepEqual(r.findings.map((f) => [f.at.line, f.kind]), [[3, "rebound"], [4, "unbound"]]);
-  assert.deepEqual(r.forms, ["== !=", "application", "binding", "capability", "capability part", "integer operator", "name", "whole number"]);
-  // A binding cannot read a name bound at a place: the group is bound before any statement.
-  assert.deepEqual(findings("input see\nn <- 1\nm = n\nsee(m)").map((x) => [x.kind, x.message]), [["unbound", "the name n is bound nowhere in the text"]]);
+  assert.deepEqual(r.forms, ["== !=", "application", "binding", "capability", "capability part", "dropped statement", "integer operator", "name", "whole number"]);
   // An inner block with bindings and no statement has no value.
   assert.deepEqual(findings("input see\nb <-\n  a = 1\nsee(b)").map((x) => x.kind), ["refused"]);
 });
