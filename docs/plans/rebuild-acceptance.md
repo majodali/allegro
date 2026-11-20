@@ -167,7 +167,7 @@ saved-program data form.
 
 | Chunk | Deliverable | Oracle | Gate |
 |---|---|---|---|
-| Q1 | **The decision map.** `next/decisions.json`, generated once from the inventory: one row per decision with its part, chapter, type, status against the present code, owning stream, state (none), unit and cases. Its check, `next/tools/decision-map.ts`, run as `npm run lint:decisions`: every decision of the inventory has exactly one row and every row a decision; an owner is R, Q or none; a state other than none names a path that exists. A CI step for the new tree's commands | the check passes on 231 rows; a probe with a row removed fails it | merge on green |
+| Q1 | **The decision map.** `next/decisions.json`, generated once from the inventory: one row per decision with its part, chapter, type, status against the present code, owning stream, state (none), unit and cases (the stored cases were dropped on 2026-11-20 and are derived from the corpus, by the ruling on question B4 of §6). Its check, `next/tools/decision-map.ts`, run as `npm run lint:decisions`: every decision of the inventory has exactly one row and every row a decision; an owner is R, Q or none; a state other than none names a path that exists. A CI step for the new tree's commands | the check passes on 231 rows; a probe with a row removed fails it | merge on green |
 | Q2 | **The corpus, inventoried and classed.** `next/corpus/cases.json`: every [case](#def-case) with its source, its text and its [class](#def-class); a *changes* case names its ruled decision and states the new result; each case that survives or changes lists the decisions it tests, and the decision map's rows gain them. Its check: every pin and every test of the present tree has exactly one case | the check passes; the counts of §2 are met | merge on green; classes reviewed at their milestone (program plan, P5) |
 | Q3 | **The scenarios.** Each of the eleven scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
@@ -2362,3 +2362,43 @@ maintainer rules otherwise.
   decisions against the chunk that moves its rows; and what no
   milestone asks for. §6 gains five questions, B1 to B5, each with a
   default. The header's chunk list gains Q9 to Q22. No code changed.
+- **2026-11-20 — Q10: the decision map made current.**
+  - **The stored lists of cases are gone**, by the ruling on question
+    B4 (the map's stored lists of cases). No row of
+    `next/decisions.json` holds `cases`, the kernel stream's rows
+    included: every list was empty. A row that stores one fails
+    `npm run lint:decisions`. The cases of a decision are derived from
+    `next/corpus/cases.json`, where each case lists its decisions:
+    `npx tsx next/tools/decision-map.ts --cases` gives the count for
+    each decision, and with a title the ids. A case that cites a title
+    a row had before a rename counts for the row.
+  - **Measured.** 181 of the 253 decisions have a case. Of this
+    stream's 69, 36 have one and 33 have none. The most tested is "A
+    plan is an outcome graph with derived wiring", with 114 cases.
+  - **Three rows moved to written**, each with its unit
+    `next/launch/launcher.ts`: "Only the launcher sets the ceiling", "A
+    module is a function of its capabilities, inputs and imports" and
+    "A module's top-level statements happen when it is instantiated".
+    The launcher, with the emitter, does all each decides, and
+    programs of the corpus show it.
+  - **Rows begun and not moved.** The map has no state for a decision
+    realised in part, so these stay at none until the chunk named
+    finishes them:
+    - "Startup, step by step": the seven steps run, as far as milestone
+      2 needs; the loader of step 5 comes with Q20;
+    - "A capability is a named set of effectful primitives": `output`
+      and `timer` exist as host data; the definition in Allegro does
+      not;
+    - "The terminal and the browser ship output, timers and HTTP":
+      output and timers ship on the terminal; HTTP is Q16 and the
+      browser Q21;
+    - "A late answer or its failure fills a cell as plain data": late
+      answers are filled; no shipped capability gives a failure until
+      Q16;
+    - "A saved program names what it needs by content hash" and "A
+      stored outcome is restored with its builder's name": the launcher
+      refuses a record whose primitive or module it lacks, and restores
+      only for a named builder; a mismatch is a refusal before
+      anything is evaluated, where the decision says a refutation.
+  - **From here** each chunk moves its rows in its own pull request.
+  - `decision-map: 253 rows · R 161 · Q 69 · none 23 · state none 233, carried 0, adapted 0, written 20, proved 0 — consistent`.
