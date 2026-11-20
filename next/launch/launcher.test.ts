@@ -1055,7 +1055,7 @@ test("the result holds no kernel handle: it survives JSON unchanged", async () =
 // next/tools/configuration.test.ts.
 
 /** Runs one of the two commands with the environment given, beside this process's own with no ALLEGRO_STEPS. */
-function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: Readonly<Record<string, string>> = {}) {
+function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: { readonly [name: string]: string } = {}) {
   const { ALLEGRO_STEPS: _, ...inherited } = process.env;
   return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
 }
