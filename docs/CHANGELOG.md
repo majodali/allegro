@@ -1436,6 +1436,16 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The corpus follows the retitles of PR #265; five symbol cases restated (B-196)
+
+B-196 (the rebuild's acceptance side). 102 citations in 94 cases move to
+the titles PR #265 gave five decisions; a sixth was withdrawn. The decision on symbols now says a
+fully-qualified name is a spelling a language's reader writes: Allegretto
+does not qualify, the standard language does. Five cases of
+`src/boundary-tests.ts` are restated to it; three of them move to
+milestone 4, and one is realised at milestone 1 by a new program,
+`next/corpus/allegretto/m1/symbol-same-spelling.alg`. No class changes.
+
 ### 2026-11 — The emitter follows the forms as they stand (B-196, chunk Q5 (the first notation and the bootstrap), part 4)
 
 B-196 (the rebuild's acceptance side). Allegretto's grammar, reader and
