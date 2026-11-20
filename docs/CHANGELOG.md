@@ -301,7 +301,6 @@ the baseline is not lowered here); unratified terms 2 in the chapter. Merged as 
 ### 2026-11 — The evaluator chapter's count: round 7 ruled not readable; the meta-review's defaults applied (B-170)
 
 The meta-review of the evaluator chapter's count 1, `docs/records/evaluator-chapter-meta-review.md`, was delivered in PR #138 and merged on 2026-11-02 with no comment; under `docs/book/process.md` §3 the merge approves its four defaults. B-170 (the book, Part II and III chapters writable now) is the item. Round 7's verdict is ruled not readable: M5 (the omitted meaning of *tail call*) counts under the override, so the count should have continued to round 8. The review record `docs/book/allegretto/evaluator.review.md` marks round 7 accordingly, and the IR's Status and the plan's §7 follow. The chapter's text does not change now; PR #129 (the chapter's delivery) stays merged, and count 2 runs at the chapter's next edit, which three unfixed defects already require. Recommendations 1, 4, 5, 6, 8 and 9 are adopted for count 2 in the session's stranger and reasoning-role briefs; recommendations 2, 3 and 7 go to the methodology repository as proposals; the report's two terms are struck after count 2.
-
 ### 2026-11 — The host environments chapter (B-170, chunk A4): IR-only
 
 Chunk A4 of B-170 (the book, Part II and III chapters writable now)
@@ -1199,7 +1198,6 @@ of six load-corpus sources rise (7.0% in `lib/units.alg`, under 4%
 elsewhere), raised by lane P in its own PR; the three web pages'
 generated copies of the library are regenerated, and lane D now holds
 them for that purpose (PR #176).
-
 ### 2026-11 — Logical operators propagate an error value (B-156, chunk PF3)
 
 B-156 (short-circuit over an error value), chunk PF3 of
@@ -1496,6 +1494,7 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+
 ### 2026-11 — A configuration from its sources (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 2)
 
 B-196 (the rebuild's acceptance side). A run's configuration is
@@ -1642,7 +1641,6 @@ reader reads it so: `float.text(-1.5)` prints `-1.5`, where it printed
 `-3`. `readLiteral` no longer refuses a negative fraction as an input's
 value. Before anything but a number written out, prefix `-` is still
 `int.neg`.
-
 ### 2026-11 — The speed tests of milestone 3, measured again (B-196, chunk Q8 (the speed tests of milestone 3))
 
 B-196 (the rebuild's acceptance side). `npm run bench:next` was run on
@@ -1676,7 +1674,6 @@ a structure literal takes computed keys and private entries, `key`
 header lines declare keys, header lines stand anywhere at the top
 level, and the least integer can be written. Ten programs show the new
 forms. Imports are left for a later part.
-
 ### 2026-11 — The corpus follows two retitles; 30 new results wait for Part IV (B-196)
 
 B-196 (the rebuild's acceptance side). 35 corpus cases move to the new
