@@ -2969,3 +2969,8 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   B-071 (the capabilities for input and output) is taken by this chunk
   for HTTP and the two file capabilities. This part gives the reading
   its bound and no capability yet.
+  Tested by `next/launch/files.test.ts`, eight tests: over a file
+  system the test scripts, and over a temporary directory with a link
+  that leads out of it, where the command is run end to end. Measured:
+  `npm run test:next` passes 790 tests on the reference and 791 with
+  `ALLEGRO_KERNEL=machine`; 99 programs pass on both.
