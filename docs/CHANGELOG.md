@@ -1485,6 +1485,19 @@ chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
 
+
+### 2026-11 — The acceptance plan amended for the work after milestone 3 (B-196)
+
+B-196 (the rebuild's acceptance side). The plan's first eight chunks are
+delivered. The amendment plans what the stream owes to milestones 3 to
+9 as chunks Q9 (the launcher on the one interface) to Q22 (the present tree's end): the standard
+language's notation in the bootstrap, the cases of each milestone,
+check and run as configurations, the commands, the tools for proposing,
+the shipped capabilities, the units and planning libraries, the
+bootstrap's retirement, the browser launcher and the present tree's
+end. It lists what no milestone asks for, and puts five questions to
+the maintainer. No code changed.
+
 ### 2026-11 — No default step budget; the launcher's test ends on both kernel variants (B-196, chunk Q7 (the minimal launcher and the output capability))
 
 B-196 (the rebuild's acceptance side). The maintainer ruled that the
