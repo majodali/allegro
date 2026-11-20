@@ -167,9 +167,9 @@ saved-program data form.
 | Q2 | **The corpus, inventoried and classed.** `next/corpus/cases.json`: every [case](#def-case) with its source, its text and its [class](#def-class); a *changes* case names its ruled decision and states the new result; each case that survives or changes lists the decisions it tests, and the decision map's rows gain them. Its check: every pin and every test of the present tree has exactly one case | the check passes; the counts of §2 are met | merge on green; classes reviewed at their milestone (program plan, P5) |
 | Q3 | **The scenarios.** Each of the eleven scenes of rungs 1 to 4 as a [scenario](#def-scenario) under `next/corpus/scenarios/`, with the cases that realise it and the milestone that must pass it | every scene has a scenario; every scenario names a milestone | the maintainer |
 | Q4 | **The model specifications.** A [model specification](#def-model-specification) for the planning model and the loop over it, and one for the software system model (components, data, and the mappings between them and to a plan), under `next/models/specs/`. Each states its use cases first. The measurements of the planning-loop plan's §2b are their evidence; library-only probes may add more. They are the material for the 15 held planning decisions, which the review session rules | the documents' lints | the maintainer, per specification |
-| Q5 | **The first notation and the bootstrap.** The first notation is Allegretto, whose forms the kernel stream's `next/ext/allegretto/forms.md` rules (amended 2026-11-16); under `next/bootstrap/`, a grammar for it made from the present base grammar, a reader of the present parser engine's parse tree, and an emitter that writes a saved program in the data form | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
+| Q5 | **The first notation and the bootstrap.** The first notation is Allegretto, whose forms the kernel stream's `next/ext/allegretto/forms.md` rules (amended 2026-11-16); under `next/bootstrap/`, a grammar for it made from the present base grammar, a reader of the present parser engine's parse tree, and an emitter that writes a saved program in the data form. The bootstrap's driver emits a text's imported texts first (amended 2026-11-20, PR #250 and PR #268) | the emitter's tests against the interface file's types; a round trip on fixture programs | the notation: the maintainer (a contract). The emitter: merge on green |
 | Q6 | **The comparison harness.** Under `next/corpus/`. On the present tree it runs each pinned program and compares its printed lines with its pins by class. On the new tree it runs every Allegretto program under `next/corpus/allegretto/` and reports, per milestone, the cases those programs realise: a case is shown by an Allegretto program that passes, with the present expectation, or the case's stated new result where its class is *changes*. A program may hand a standard-language text to the parser engine once that engine exists in Allegretto (amended 2026-11-16, by the maintainer's ruling that the tests and code of milestones 4 to 7 are written in Allegretto) | its tests on a stub kernel, then on the kernel | merge on green |
-| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs) | milestone 2's command | merge on green; the milestone is the maintainer's |
+| Q7 | **The minimal launcher and the output capability.** Under `next/launch/`: startup as the ruled decision "Startup, step by step" has it, as far as milestone 2 needs, and it supplies the inputs of the module being run, at the start or in a later phase (amended 2026-11-17, PR #238's ruling on inputs). It loads the records of imported modules (amended 2026-11-20, PR #250 and PR #268) | milestone 2's command | merge on green; the milestone is the maintainer's |
 | Q8 | **The speed tests of milestone 3.** A typed extension and a toy parser engine, written in the first notation with the kernel stream, measured against the present tree on the same programs | the measurements, recorded in §7 | the maintainer |
 
 **After milestone 3**, by amendment of this plan: the phases as
@@ -1790,3 +1790,75 @@ policy is the gate ruled there.
   an importing text's emitter gets an imported module's declarations
   and identity before there is a loader: emit the imported text first,
   load its record, and read `moduleOf`. Imports are the next part.
+- **2026-11-20 — Imports: part 5 of chunk Q5 and part 4 of chunk Q7.**
+  Built, after the hand-offs of PR #250 and PR #268. The grammar and
+  the reader (`next/bootstrap/allegretto-grammar.ts`, `reader.ts`) read
+  `import name` with a `with` list and a `without` list, each
+  comma-separated, in either order, anywhere at a module's top level.
+  `use name` is refused with its reason: its notation needs the parser
+  engine written in Allegretto. The emitter (`emit.ts`) takes, for each
+  imported name, the imported module's declarations and identity. It
+  writes the parameter declared `{ role: "module", name, identity }`
+  and the binding `name = <that parameter>(arguments)`, with the
+  importing module's own capability or input, a `with` expression, or a
+  refusal for a name withheld. Its findings name the name and the
+  place. An import is a binding, so an open module yields it, as the
+  forms say. A new file, `next/bootstrap/driver.ts`, emits a text's
+  imported texts first, in dependency order, each once, and takes each
+  identity with `moduleOf` on the loaded record. It refuses an imported
+  text not found, a cycle, naming it, and a finding of an imported text,
+  with its file. The launcher (`next/launch/launcher.ts`) takes the
+  imported records, loads each into the same kernel before the main
+  one, calls none of them, and refuses an identity no supplied record
+  has. The ceiling's capabilities go to the main module alone. The
+  refusal "this launcher supplies no modules yet" is gone.
+  Choices, for the maintainer to ratify at the PR:
+  - Where a text is found: `import name` is the file `name.alg` in the
+    directory of the importing text (`importedFile`), read through a
+    function the caller passes in. Building showed no reason against it.
+    One consequence: a text can import only a file beside it, so one
+    program cannot import two files of the same name.
+  - What `npm run emit` writes for a text that imports: the text's own
+    record, as before, and on stderr one line for each imported text
+    whose record it needs, in load order. Each emitted alone gives the
+    same record. `npm run launch` takes the records by `--import`.
+  - Where a program's imported texts live: a program that imports texts
+    of its own is `main.alg` in a directory of its own under
+    `m<milestone>`, and its imported texts are the other files there,
+    which the harness does not run alone.
+  - The new end: `// end: refused: <the finding>`, for a text the
+    reader, the emitter or the driver refuses. Nothing is launched, and
+    the program passes when one finding's message is the one stated.
+  Realised: ten cases of `src/test/modules.ts` at milestone 3 (load
+  simple module, loaded functions work in evaluation, module with
+  bindings and functions, transitive dependencies, circular dependency
+  detected, caching prevents re-reads, a second loader returns the same
+  Extension, unknown module ID, empty module produces empty
+  extension, recursive function in module); seven `extension:` cases of
+  `src/test/base.ts`, the six that use abs, max and min through an
+  imported module and "not available without being provided" as an
+  expected refusal; "parse error on invalid syntax"; and the boundary
+  case "absent vs unresolved (C2.3b)", by two programs, one for each
+  half. Four programs are written for the purpose: `with`, `without`,
+  an import nothing needs, and a key handed out by an exported binding.
+  Two imports of one module being one instance is
+  `m3/module-shared/main.alg`.
+  Left, with the reason:
+  - "C5.1 FQN symbols": Allegretto has no fully-qualified name.
+  - "an edited file is a new key" and "the harness and the CLI loader
+    share one cache": each is about two configurations, or two
+    callers of the host, which one program's run cannot show.
+  - "the same name in two directories is two keys": one program
+    cannot import two files of the same name, and two files of the same
+    text are one module, since the identity is the content.
+  - "extension: source can shadow extension binding" and "extension:
+    multiple extensions layer correctly": the conflict they become is
+    between bare names, which `use` would bring and `import` does not.
+  - "compile: report lists unresolved imports"
+    (`src/test/types-battery.ts`): its restatement leaves a missing
+    import in the residual; the driver refuses it before anything is
+    evaluated, and whether a missing module is a cell or a refutation is
+    not ruled.
+  Measured: 434 tests pass, none waits; 64 programs pass;
+  `milestone 1: programs 7 (passing 7, failing 0) · cases due 25 · realised 6, named only by a failing program 0, not yet named 19 · up to 1: 6 of 25 realised`;
+  `milestone 3: programs 57 (passing 57, failing 0) · cases due 132 · realised 116, named only by a failing program 0, not yet named 16 · up to 3: 122 of 167 realised`.
