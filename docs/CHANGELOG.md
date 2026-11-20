@@ -1399,6 +1399,15 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The emitter's test no longer reads what an attempt answers (B-196)
+
+B-196 (the rebuild's acceptance side). The kernel stream's PR #261
+could not merge while one test of this stream failed on it: the test
+read the former answer of the kernel primitive `attempt`, a structure
+of a tag and a value. By the ruling of 2026-11-19 an attempt answers
+the value itself, or a failure. The test now holds only what the
+emitter owes, and passes on both kernels.
+
 ### 2026-11 — The launcher and the corpus follow "A free name never gets a value" (B-196)
 
 B-196 (the rebuild's acceptance side). PR #244 ruled that a free name

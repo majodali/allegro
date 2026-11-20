@@ -181,12 +181,17 @@ test("claim is the kernel's claim: a true one lets the module go on, and a refut
 test("the kernel primitives Allegretto names: then, attempt, describe and build", () => {
   // build takes the description and the values for the names it leaves free
   // ("A free name never gets a value"); here it leaves none.
-  const r = run('input see\ninput right\nthen(see("first"), see("second"))\nsee(attempt("tried", 100))\nsee(build(describe(right, x => x), {})("built"))');
+  const text = 'input see\ninput right\nthen(see("first"), see("second"))\nsee(attempt("tried", 100))\nsee(build(describe(right, x => x), {})("built"))';
+  const r = run(text);
   const [first, second, attempted, built] = seen(r);
   assert.deepEqual([textOf(r.k, first), textOf(r.k, second), textOf(r.k, built)], ["first", "second", "built"]);
-  const [head, value] = r.k.entriesOf(attempted);
-  assert.equal(r.k.symbolName(head[1]), "description.value");
-  assert.equal(textOf(r.k, value[1]), "tried");
+  // What an attempt answers is the kernel's to state, and its own tests hold
+  // it (ruled 2026-11-19: the value itself, or a failure). This test holds
+  // what the emitter owes: `attempt` is written as the kernel's primitive of
+  // that name, the run goes on past it, and the call answers something.
+  assert.ok(emitted(text).nodes.some((n) => n.k === "kernel" && n.name === "attempt"), "the record names the kernel primitive attempt");
+  assert.equal(r.refuted, false);
+  assert.notEqual(attempted, undefined);
 });
 
 // ── Statements and x <- e ──────────────────────────────────────────────
