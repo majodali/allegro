@@ -1501,11 +1501,12 @@ of phases, each supplying capabilities and inputs, and gives the result
 of each phase. A declared capability no phase has supplied yet is a
 cell. The setting `phases` (`--phases` on both commands, `"phases"` in
 `allegro.json`, `// phases:` in the corpus) builds `run` alone, as
-before, `check` alone, which supplies no capability and no input, and
-`check, run`. Four programs under `next/corpus/allegretto/m3/` run under
-check. Supplying a capability in a later phase stops at the kernel:
-both variants fill a cell with plain data only, so a launch that waits
-on a capability in check ends in a fault when run supplies it.
+before, and `check` alone, which supplies no capability and no input.
+Four programs under `next/corpus/allegretto/m3/` run under check.
+`check, run` is a finding, and the launcher refuses a later phase that
+supplies a capability before anything is evaluated: both kernel
+variants fill a cell with plain data only, so no later phase can put a
+capability into the cell that check left waiting.
 
 
 ### 2026-11 — A configuration from its sources (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 2)

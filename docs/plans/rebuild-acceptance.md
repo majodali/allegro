@@ -2765,25 +2765,40 @@ PR #283 on 2026-11-20, for the work after milestone 3.
 - **2026-11-20 — Q13, part 3: check, run and a pipeline.**
   Built, with one stop. The launcher (`next/launch/launcher.ts`) applies
   a sequence of phases, each supplying capabilities and inputs, and the
-  resolver (`next/tools/configuration.ts`) ships two of them: check and
-  run. This is part 3 of chunk Q13 (check and run as configurations,
-  and what a result holds), for B-196 (the rebuild's acceptance side).
+  resolver (`next/tools/configuration.ts`) ships two values: check alone
+  and run alone. This is part 3 of chunk Q13 (check and run as
+  configurations, and what a result holds), for B-196 (the rebuild's
+  acceptance side).
   **The stop.** Point 3 asks the phase that supplies a capability to
   fill its cell with the capability, as a structure of its parts. Both
   kernel variants refuse: a cell takes plain data, bits, symbols and
   structures of them ("A late answer or its failure fills a cell as
   plain data"), and a capability's parts are primitive functions. The
   smallest program is `capability output`, `output.write("hello")`,
-  launched with the phases check and then run: check ends waiting on
-  the capability's cell, and the fill that run makes throws "what a cell is
-  filled with is not plain data: bits, symbols and structures of them"
-  on both variants. The launcher makes the call as point 3 says and
-  ends the launch as a fault that says so: "the kernel does not take
-  the capability output into its cell". So check then run works today
-  only where the program does not wait on a capability in check, and
-  the three programs of check then run are not written. Handing a
-  capability to a computation left waiting needs a ruling: a fill that
-  takes a capability, or another way for a phase to supply one.
+  with the phases check and then run: check ends waiting on the
+  capability's cell, and a fill of that cell with the capability throws
+  "what a cell is filled with is not plain data: bits, symbols and
+  structures of them" on both variants. A value that faults on every
+  program that prints is not shipped. So what is built is this. The
+  launcher refuses, before anything is evaluated, a phase after the
+  first that names a capability: "the phase run supplies the capability
+  output after the first phase: the kernel fills a cell with plain data
+  only, so a capability is supplied by the first phase or by none". The
+  resolver gives `check, run` a finding of its own: "the setting phases
+  is "check, run", which is not built yet: a later phase cannot supply a
+  capability, since the kernel fills a cell with plain data only". The
+  three programs of check then run are not written.
+  Three ways a phase could supply a capability to what an earlier phase
+  left waiting are open for the maintainer and the kernel stream, and
+  built by neither:
+  (a) a call of the kernel's interface by which the launcher puts a
+  capability into a cell;
+  (b) chunk K15 (specialization, and the switch) of the kernel stream:
+  check as the module function specialized with its capabilities
+  unknown, and run as a call of what is left;
+  (c) the launcher handing, in check, parts that answer late and are
+  performed when run begins. That needs no change to the kernel, but
+  it calls a part during check.
   The proposal, as built, for the maintainer to ratify at the PR:
   1. **A phase is what it supplies.** `Configuration.phases` is a list,
      in order, of `{name, capabilities, inputs?}` (`Phase`). The first
@@ -2801,7 +2816,10 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      cell.** A phase that names a capability the ceiling does not grant,
      and a capability named by two phases, are refused before anything
      is evaluated. A declared capability the ceiling does not grant is
-     refused as before. The fill is the stop above.
+     refused as before. A phase after the first that names a capability
+     is refused, which is the stop above. It replaces the refusal of a
+     capability named by two phases, which only a later phase could
+     meet.
   4. **The end.** A launch left waiting gains `capabilities`, the
      declared capabilities no phase supplied that the program waits on,
      and its reason names them: "the program waits on the
@@ -2822,28 +2840,30 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      the phases after it are not applied. Building showed no reason
      against it.
   7. **The shipped phases.** The setting `phases`, which any source may
-     set, has three values built (`PHASE_VALUES`, `shapeOf`): `run`
-     alone, which is today's shape and what no setting gives; `check`
-     alone, a phase that supplies no capability and no input; and
-     `check, run`, where run supplies every capability of the ceiling
-     and the inputs, and each entry of `later` is a further phase after
-     run. Any other list is a finding that names the values built.
-     `later` with `check` alone is a finding. Building showed one point:
-     inputs with `check` alone are supplied by no phase, so the run ends
-     waiting on them, by name, and the result's list of sources still
-     names where each came from. A finding there would be the same rule
-     as for `later`, and the maintainer may want it.
-  8. **The command line** gains `--phases run`, `--phases check` and
-     `--phases check,run` on both commands, and the project's file takes
-     `"phases": ["check", "run"]`. Nothing either command prints
-     changes, and each exits as the end says: under check a program that
-     writes ends waiting on output and exits 1. What check shows, and how
-     its command exits, is chunk Q14 (the commands).
-  9. **The corpus convention** gains `// phases: check` and
-     `// phases: check, run` (`readPhases` of `next/corpus/allegretto.ts`),
-     made into the configuration by `shapeOf`. The `// expect:`, `// end:`
-     and `// summary:` lines hold for the whole launch. A program with
-     none runs as before. A malformed line, a list that is not built, two
+     set, has two values built (`PHASE_VALUES`, `shapeOf`): `run` alone,
+     which is today's shape and what no setting gives, where each entry
+     of `later` is a further phase after run; and `check` alone, a phase
+     that supplies no capability and no input. `check, run` is a finding
+     of its own, the stop above. Any other list is a finding that names
+     the two values built. `later` with `check` alone is a finding.
+     Building showed one point: inputs with `check` alone are supplied
+     by no phase, so the run ends waiting on them, by name, and the
+     result's list of sources still names where each came from. A
+     finding there would be the same rule as for `later`, and the
+     maintainer may want it.
+  8. **The command line** gains `--phases run` and `--phases check` on
+     both commands, and the project's file takes `"phases": ["check"]`.
+     `--phases check,run` writes the finding of point 7 and exits 1.
+     Nothing either command prints for a run changes, and each exits as
+     the end says: under check a program that writes ends waiting on
+     output and exits 1. What check shows, and how its command exits, is
+     chunk Q14 (the commands).
+  9. **The corpus convention** gains `// phases: check`
+     (`readPhases` of `next/corpus/allegretto.ts`), made into the
+     configuration by `shapeOf`. `// phases: check, run` fails the
+     program with the resolver's finding. The `// expect:`, `// end:` and
+     `// summary:` lines hold for the whole launch. A program with none
+     runs as before. A malformed line, a list that is not built, two
      lines, and `// later:` with `check` alone each fail the program. The
      README of `next/corpus/allegretto/` says this in the section
      "Phases".
@@ -2887,14 +2907,14 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   What the decisions name that is not built: export; a project defining
   or extending a phase; what a phase must leave decided before the next
   begins; the loader's capability in check; and supplying a capability
-  in a later phase, the stop above.
+  in a later phase, so check then run, the stop above.
   Three existing assertions changed, each because `phases` is a new
   setting: the table of settings and its count of pairs in
   `next/tools/configuration.test.ts`, and the list of settings that an
   unknown key's finding names, there and in
   `next/launch/launcher.test.ts`. No test branches on the variant.
-  Measured: `npm run test:next` passes 782 tests on the reference and
-  783 with `ALLEGRO_KERNEL=machine`; 100 programs pass on both;
+  Measured: `npm run test:next` passes 784 tests on the reference and
+  785 with `ALLEGRO_KERNEL=machine`; 100 programs pass on both;
   `milestone 3: programs 83 (passing 83, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
   No row of the decision map moves in this part. The orchestrating
   session decides which rows it earns.
