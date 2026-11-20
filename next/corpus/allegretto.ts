@@ -196,14 +196,14 @@ export function yieldedKeys(
     cells.set(d.name, cell);
     return cell;
   });
-  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: STEPS });
+  const r = k.evaluate(k.expression(fn, args), { steps: STEPS });
   if (r.refuted) return { problem: "the module was refuted when instantiated by hand" };
   for (const phase of given.later) {
     for (const [name, plain] of Object.entries(phase)) {
       const cell = cells.get(name);
-      if (cell !== undefined && !k.filled(cell)) k.fill(cell, plainValue(k, plain));
+      if (cell !== undefined && !k.filled(cell)) k.fill(cell, plainValue(k, plain), { hold: true });
     }
-    if (k.advance({ steps: STEPS }).refuted.length > 0) return { problem: "the module was refuted when instantiated by hand" };
+    if (k.advance().refuted.length > 0) return { problem: "the module was refuted when instantiated by hand" };
   }
   const value = k.current(r.value);
   if (k.kind(value) !== "structure") return { problem: `the module yields a value of kind ${k.kind(value)}, not a structure` };

@@ -11,7 +11,7 @@ import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { Cell, Kernel2, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
+import type { Cell, Kernel, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/create.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
@@ -193,7 +193,7 @@ function laterCapability(): { capability: CapabilityImplementation; answer: (tex
 }
 
 /** The reference kernel wrapped so every function called on it is recorded by name. */
-function recording(): { createKernel: () => Kernel2; created: () => number; calls: string[]; made: PrimitiveDeclaration[] } {
+function recording(): { createKernel: () => Kernel; created: () => number; calls: string[]; made: PrimitiveDeclaration[] } {
   const calls: string[] = [];
   const made: PrimitiveDeclaration[] = [];
   let created = 0;
@@ -364,15 +364,15 @@ test("with no step budget a run that ends at the kernel's own limit says that no
   // A kernel that stops at a limit of its own: it gives every evaluation 50 steps, though the launcher sets none.
   // The launcher gives no default budget (the maintainer's ruling of 2026-11-20), so on a kernel with no
   // limit of its own this program would not end; the test does not rest on where a kernel's stack runs out.
-  const stopsByItself = (): Kernel2 => {
+  const stopsByItself = (): Kernel => {
     const inner = createKernel();
     return new Proxy(inner, {
       get(target, name, receiver) {
         const v = Reflect.get(target, name, receiver);
         if (name !== "evaluate" || typeof v !== "function") return v;
-        return (expression: unknown, scope: unknown, budget: { steps?: number } = {}) => {
+        return (expression: unknown, budget: { steps?: number } = {}) => {
           assert.equal(budget.steps, undefined, "the launcher sets no budget where the configuration sets none");
-          return (v as (...a: unknown[]) => unknown).call(target, expression, scope, { steps: 50 });
+          return (v as (...a: unknown[]) => unknown).call(target, expression, { steps: 50 });
         };
       },
     });
@@ -458,8 +458,8 @@ test("a claim refuted once its answer arrives ends the run as refuted, and the o
   // what `advance` reports, so the test holds that the outcome keeps all.
   const twice = () => {
     const inner = createKernel();
-    const other = inner.evaluate(inner.expression(inner.kernelPrimitive("if"), [inner.bits(Uint8Array.of(7)), inner.structure([]), inner.structure([])]), inner.scope()).value;
-    return { ...inner, advance: (...a: Parameters<Kernel2["advance"]>) => {
+    const other = inner.evaluate(inner.expression(inner.kernelPrimitive("if"), [inner.bits(Uint8Array.of(7)), inner.structure([]), inner.structure([])])).value;
+    return { ...inner, advance: (...a: Parameters<Kernel["advance"]>) => {
       const r = inner.advance(...a);
       return { ...r, refuted: [...r.refuted, other] };
     } };

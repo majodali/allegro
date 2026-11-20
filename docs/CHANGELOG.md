@@ -1492,6 +1492,24 @@ first, directly below this line.
 
 
 
+
+### 2026-11 — The launcher on the one interface (B-196, chunk Q9 (the launcher on the one interface))
+
+B-196 (the rebuild's acceptance side). The kernel's interface became
+one, and this stream's files moved to it: the launcher gives its step
+budget once, to the evaluation; every `fill` says whether it holds;
+`evaluate` takes no scope; and the names of the second version are gone
+from the launcher, the corpus runner and the bootstrap. The plan's
+amendment merged the same day, with each of its five defaults taken.
+
+### 2026-11 — The decision map made current (B-196, chunk Q10 (the decision map made current))
+
+B-196 (the rebuild's acceptance side). The map's rows no longer store
+lists of cases, which were all empty: `decision-map.ts --cases` derives
+a decision's cases from the corpus, where 181 of the 253 decisions have
+one. Three rows of this stream move to written, each realised by the
+launcher. The record names the rows that are begun and not yet moved.
+
 ### 2026-11 — The acceptance plan amended for the work after milestone 3 (B-196)
 
 B-196 (the rebuild's acceptance side). The plan's first eight chunks are

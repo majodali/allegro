@@ -20,7 +20,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
-import type { Cell, Kernel2, Value } from "../kernel/interface.js";
+import type { Cell, Kernel, Value } from "../kernel/interface.js";
 import { createKernel } from "../kernel/create.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { launch } from "../launch/launcher.js";
@@ -59,7 +59,7 @@ function findings(text: string): Finding[] {
 }
 
 interface Run {
-  readonly k: Kernel2;
+  readonly k: Kernel;
   /** What the effects did, in the order the kernel performed them. */
   readonly events: Array<{ readonly part: string; readonly value?: Value }>;
   /** The cells `ask` answered with, in order. */
@@ -69,7 +69,7 @@ interface Run {
 }
 
 /** The shipped primitives a record needs, made in a kernel, by hash. */
-function primitivesFor(k: Kernel2, doc: SavedProgram): Map<string, Value> {
+function primitivesFor(k: Kernel, doc: SavedProgram): Map<string, Value> {
   const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
   return new Map(doc.needs.map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
 }
@@ -106,21 +106,21 @@ function run(text: string): Run {
     assert.ok(make !== undefined, `the test supplies no input ${d.name}`);
     return make();
   });
-  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: 100_000 });
+  const r = k.evaluate(k.expression(fn, args), { steps: 100_000 });
   assert.equal(r.ended, "complete");
   return { k, events, cells, value: r.value, refuted: r.refuted };
 }
 
 /** What `see` was given, read as the test expects it. */
-const textOf = (k: Kernel2, v: Value | undefined): string => new TextDecoder().decode(k.bitsOf(v as Value).bytes);
-const bitsOf = (k: Kernel2, v: Value | undefined): string => {
+const textOf = (k: Kernel, v: Value | undefined): string => new TextDecoder().decode(k.bitsOf(v as Value).bytes);
+const bitsOf = (k: Kernel, v: Value | undefined): string => {
   const b = k.bitsOf(v as Value);
   return `${b.bitLength}:${Array.from(b.bytes, (x) => x.toString(16).padStart(2, "0")).join("")}`;
 };
 const seen = (r: Run): Value[] => r.events.filter((e) => e.part === "see").map((e) => e.value as Value);
 const seenTexts = (r: Run): string[] => seen(r).map((v) => textOf(r.k, v));
 /** A whole number of 64 bits, read as two's complement. */
-const intOf = (k: Kernel2, v: Value | undefined): bigint => {
+const intOf = (k: Kernel, v: Value | undefined): bigint => {
   const { bytes } = k.bitsOf(v as Value);
   return new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0);
 };
@@ -245,7 +245,7 @@ test("a statement whose value is dropped is a claim that it is no failure: claim
 test("a dropped statement whose answer has not come holds what is written after it", () => {
   const r = run('input see\ninput ask\nsee("first")\nask()\nsee("after the answer")');
   assert.deepEqual(seenTexts(r), ["first"]);
-  r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")));
+  r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")), { hold: true });
   r.k.advance();
   assert.deepEqual(seenTexts(r), ["first", "after the answer"]);
 });
@@ -308,12 +308,12 @@ test("x <- e on an answer that arrives later holds nothing: only what uses its v
   const r = run('input see\ninput ask\nsee("first")\na <- ask()\nsee("not held")\nsee(a)');
   assert.deepEqual(seenTexts(r), ["first", "not held"]);
   assert.equal(r.cells.length, 1);
-  r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")));
+  r.k.fill(r.cells[0], r.k.bits(utf8.encode("answer")), { hold: true });
   r.k.advance();
   assert.deepEqual(seenTexts(r), ["first", "not held", "answer"]);
   const s = run('input see\ninput ask\nrun() => sync\n  see("first")\n  a <- ask()\n  see("after the answer")\n  see(a)\nrun()');
   assert.deepEqual(seenTexts(s), ["first"]);
-  s.k.fill(s.cells[0], s.k.bits(utf8.encode("answer")));
+  s.k.fill(s.cells[0], s.k.bits(utf8.encode("answer")), { hold: true });
   s.k.advance();
   assert.deepEqual(seenTexts(s), ["first", "after the answer", "answer"]);
 });
@@ -621,7 +621,7 @@ test("a module with no export yields all its bindings, keyed by the symbols of t
   const all = run('input see\nf(x) => x\nn = 1\nm <- 2\nsee("ran")');
   assert.deepEqual(all.k.entriesOf(all.value).map(([key]) => all.k.symbolName(key as Value)), ["f", "n", "m"]);
   // An entry is evaluated when something reads it, so the entry is read through the kernel, not taken from `entriesOf`.
-  const f = all.k.evaluate(all.k.expression(all.k.kernelPrimitive("get"), [all.value, all.k.symbolData("f")]), all.k.scope());
+  const f = all.k.evaluate(all.k.expression(all.k.kernelPrimitive("get"), [all.value, all.k.symbolData("f")]));
   assert.equal(f.refuted, false);
   assert.equal(all.k.kind(f.value), "composed-function");
   const some = run('input see\nexport f(x) => x\nn = 1\nsee("ran")');
@@ -637,7 +637,7 @@ test("a module with no export yields all its bindings, keyed by the symbols of t
  * them and instantiates its module with `see` for its input of that name,
  * passing no argument for an import: the kernel supplies it.
  */
-function runImporting(libs: ReadonlyArray<readonly [string, string]>, text: string): { k: Kernel2; seen: string[]; value: Value; refuted: boolean; doc: SavedProgram; imports: Map<string, ImportedModule> } {
+function runImporting(libs: ReadonlyArray<readonly [string, string]>, text: string): { k: Kernel; seen: string[]; value: Value; refuted: boolean; doc: SavedProgram; imports: Map<string, ImportedModule> } {
   const k = createKernel();
   const imports = new Map<string, ImportedModule>();
   for (const [name, lib] of libs) {
@@ -657,7 +657,7 @@ function runImporting(libs: ReadonlyArray<readonly [string, string]>, text: stri
     assert.equal(d.name, "see", `the test supplies no input ${d.name}`);
     return see;
   });
-  const r = k.evaluate(k.expression(fn, args), k.scope(), { steps: 100_000 });
+  const r = k.evaluate(k.expression(fn, args), { steps: 100_000 });
   return { k, seen: seenTexts, value: r.value, refuted: r.refuted, doc, imports };
 }
 
