@@ -1625,6 +1625,9 @@ its approval.
 - **2026-11-20 — the second review's cluster 14, in part** (the review
   session): five of seven points ruled and written; symbols, and what
   a parser returns, are under discussion.
+- **2026-11-20 — the second adversarial review closed** (the review
+  session): cluster 14 ruled; all fourteen clusters are. 249
+  decisions.
 
 ## 8. Sessions
 
