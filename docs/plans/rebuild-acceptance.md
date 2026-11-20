@@ -1740,3 +1740,35 @@ policy is the gate ruled there.
     group" has it, and runs to the step limit with no refutation.
   - **Measured.**
     `milestone 3: programs 41 (passing 41, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.
+- **2026-11-20 — The corpus follows the retitles of PR #265, and five symbol cases are restated.**
+  PR #264 (part 4 of chunk Q5 (the first notation and the bootstrap))
+  merged on the maintainer's auto-merge, so its four readings of the
+  forms stand. PR #265 reworded and retitled decisions after the second
+  adversarial review's cluster 14. `--follow-renames` of
+  `next/tools/corpus.ts` moved 102 citations in 94 cases: 52 to "The standard
+  extension decides without search, and a proposer searches", 23 to "A
+  symbol names something, and the same spelling is the same symbol", 15
+  to "Bindings and extensions may be written in any order", 5 to "There
+  is no separate act of running, and a session at a prompt is a
+  module", 4 to "Symbols interned by spelling", and 3 from the
+  withdrawn "Transient reference symbols resolved by base name". The
+  decision on symbols changed what it says: a fully-qualified name is a
+  spelling a language's reader writes; Allegretto does not qualify and
+  the standard language does. Five cases of `src/boundary-tests.ts`
+  are restated to it. No class changes.
+  - `fqn symbols (C5.1): same FQN is the same object`: the same
+    spelling is the same symbol. It stays at milestone 1 and is realised
+    by `next/corpus/allegretto/m1/symbol-same-spelling.alg`.
+  - `fqn symbols (C5.1): distinct scopes mint distinct symbols with equal base names`
+    and `fqn symbols (C5.1): evalSource registers top-level bindings under the scope FQN`:
+    qualifying is the standard language's reader's. They move to
+    milestone 4, from milestones 1 and 3.
+  - `fqn symbols (C5.1): the ambiguity rule fires identically at all three surfaces`
+    and `draw-from (C5.2b): multi-bind`: they cited the withdrawn
+    decision, which the decision map sends to "A free name never gets a
+    value". The ambiguity error is in a note of the decision on symbols,
+    so they cite that. The first moves from milestone 1 to milestone 4.
+  Measured:
+  `corpus: 1992 cases · pins 613 · tests 1379 · classed 1992 (survives 1583, changes 263, detail 146) · unclassed 0 — consistent`;
+  `milestone 1: programs 5 (passing 5, failing 0) · cases due 25 · realised 5, named only by a failing program 0, not yet named 20 · up to 1: 5 of 25 realised`;
+  `milestone 3: programs 41 (passing 41, failing 0) · cases due 132 · realised 98, named only by a failing program 0, not yet named 34 · up to 3: 103 of 167 realised`.
