@@ -851,7 +851,7 @@ export const createCore = () => {
    * as it is. What is left to a variant is evaluation: `scope`, `fill`, `waiting`,
    * `evaluate`, `advance` and `current`.
    */
-  const shared: Omit<Kernel, "interfaceVersion" | "variant" | "scope" | "fill" | "waiting" | "evaluate" | "advance" | "current"> = {
+  const shared: Omit<Kernel, "interfaceVersion" | "variant" | "scope" | "fill" | "waiting" | "kept" | "evaluate" | "advance" | "current"> = {
 
     bits: (bytes, bitLength) => {
       const n = bitLength ?? bytes.length * 8;

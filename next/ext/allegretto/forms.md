@@ -520,10 +520,14 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    statement at its place; it opens no block. `int`, `float`, `text`
    and `bits` are structures. Four primitives are added: `float.eq`,
    `float.gt`, `float.ge` and `bits.int`.
-13. **The earlier of two answers** (2026-11-20). `first(a, b)` is
-   ruled as a kernel primitive and not built: it starts both, gives the
-   value of whichever is known first, and cancels the other. Until it
-   is built Allegretto has no way to write a timeout.
+13. **The earlier of two answers** (2026-11-20). `first(a, b)` is a
+   kernel primitive, built the same day: it starts both, gives the
+   value of whichever is known first, and drops the work of the other.
+   A refutation of either refutes it at once. A value with a name that
+   loses is worked on again only when something reads it, and until
+   then its answer is kept. The notation's reader does
+   not yet know the name `first`; until the acceptance stream adds it,
+   Allegretto has no way to write a timeout.
 14. **Four readings and two literals** (2026-11-20, from the acceptance
    stream's PR #264). The module's last statement is claimed; a claim
    statement stands for no second claim; `sync` is the last word of

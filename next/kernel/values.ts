@@ -138,7 +138,7 @@ export interface Group {
 }
 
 export const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
-  ["also", 2], ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["get", 2], ["if", 3],
+  ["also", 2], ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["first", 2], ["get", 2], ["if", 3],
   ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["slice", 3], ["spelling", 1],
   ["symbol", 1], ["then", 2], ["undecided", 1],
 ];
