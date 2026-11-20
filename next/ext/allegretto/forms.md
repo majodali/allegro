@@ -62,6 +62,12 @@ text chosen by type.
 | `p.a` | reading the entry of `p` keyed by the symbol `a` |
 | `p[i]` | `get(p, i)`: the entry of `p` at place `i`, counted from 0; or, where `i` is a key, the private entry keyed by it |
 
+`attempt(e, n)` evaluates `e` with at most `n` steps. Its value is `e`'s
+value where there is one. Where `e` is refuted it is the failure
+``{failure: `refuted, reason: "…"}``, and where the steps run out it is
+``{failure: `limit}``. So an attempt is handled as any failure is:
+``handle(attempt(e, 1000), `limit, x => fallback)``.
+
 `int`, `float`, `text` and `bits` are structures Allegretto binds, and
 their entries are the primitives of section 3 and the kernel's
 primitives on bits. So `int.add(a, b)` reads the entry `add` of `int` and
@@ -437,3 +443,7 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    statement at its place; it opens no block. `int`, `float`, `text`
    and `bits` are structures. Four primitives are added: `float.eq`,
    `float.gt`, `float.ge` and `bits.int`.
+13. **The earlier of two answers** (2026-11-20). `first(a, b)` is
+   ruled as a kernel primitive and not built: it starts both, gives the
+   value of whichever is known first, and cancels the other. Until it
+   is built Allegretto has no way to write a timeout.

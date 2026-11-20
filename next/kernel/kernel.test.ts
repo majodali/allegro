@@ -1380,14 +1380,23 @@ test("a built function is its builder's: the module whose code built it may desc
 test("an attempt returns how an evaluation ended, as data, and a refutation inside marks nothing outside", () => {
   const { k, add, isZero, dec, call, kp } = setup();
   const scope = k.scope();
-  const tried = (body: Value, n = 1000) => form(k, k.evaluate(call(kp("attempt"), body, steps(k, n)), scope).value);
-  const ok = tried(call(add, byte(k, 1), byte(k, 2)));
-  assert.equal(ok.form, "value");
-  assert.equal(num(k, ok.parts[0]), 3);
+  // Until the ruling of 2026-11-19 an attempt answered a structure tagged `value`, `refuted`
+  // or `limit`. It now answers the value itself, or a failure in the shape every failure a
+  // program handles has: a structure whose first entry is keyed `failure`.
+  const how = (v: Value): string => {
+    if (k.kind(v) !== "structure") return "value";
+    const [first] = k.entriesOf(v);
+    return first !== undefined && first[0] !== null && k.symbolName(first[0]) === "failure" ? k.symbolName(first[1]) : "value";
+  };
+  const tried = (body: Value, n = 1000) => ({ form: how(k.evaluate(call(kp("attempt"), body, steps(k, n)), scope).value) });
+  const ok = k.evaluate(call(kp("attempt"), call(add, byte(k, 1), byte(k, 2)), steps(k, 1000)), scope);
+  assert.equal(num(k, ok.value), 3, "the value itself");
   const bad = k.evaluate(call(kp("attempt"), call(kp("claim"), call(isZero, byte(k, 5))), steps(k, 1000)), scope);
   assert.equal(bad.refuted, false, "the attempt itself is not wrong");
-  assert.equal(form(k, bad.value).form, "refuted");
-  assert.match(text(k, form(k, bad.value).parts[0]), /claim that is not true/);
+  assert.equal(how(bad.value), "refuted");
+  const [, reason] = k.entriesOf(bad.value);
+  assert.equal(k.symbolName(reason[0] as Value), "reason");
+  assert.match(text(k, reason[1]), /claim that is not true/);
 
   const n = k.param("n");
   const down = k.symbol("m.down");
@@ -1398,7 +1407,7 @@ test("an attempt returns how an evaluation ended, as data, and a refutation insi
   // A search: try candidates until one satisfies a claim.
   const candidate = k.param("candidate");
   const fits = k.composedFunction([candidate], call(kp("attempt"), call(kp("claim"), call(isZero, call(dec, candidate))), steps(k, 100)));
-  assert.deepEqual([0, 1, 2].map((c) => form(k, k.evaluate(call(fits, byte(k, c)), scope).value).form), ["refuted", "value", "refuted"]);
+  assert.deepEqual([0, 1, 2].map((c) => how(k.evaluate(call(fits, byte(k, c)), scope).value)), ["refuted", "value", "refuted"]);
 });
 
 test("an attempt that waits is taken up again from where it stopped, so an effect inside is performed once", () => {
@@ -1411,9 +1420,8 @@ test("an attempt that waits is taken up again from where it stopped, so an effec
   assert.equal(wrote, 1);
   k.fill(c, byte(k, 4));
   k.advance();
-  const done = form(k, k.current(r.value));
-  assert.equal(done.form, "value");
-  assert.equal(num(k, done.parts[0]), 5);
+  // Since the ruling of 2026-11-19 an attempt's answer is the value itself, where there is one.
+  assert.equal(num(k, k.current(r.value)), 5);
   assert.equal(wrote, 1, "the effect was not performed again");
 });
 
@@ -1952,7 +1960,11 @@ test("after a refuted statement the rest is evaluated ahead: a further refutatio
   assert.deepEqual(one.claims.map((c) => c.refuted), [1], "one refutation, one record");
 });
 
-test("looking ahead after a refutation never ends the evaluation at its limit", () => {
+// Until the ruling of 2026-11-20 this test was "looking ahead after a refutation never ends
+// the evaluation at its limit", and asserted that looking took at most half of the steps
+// left. The maintainer ruled that a refutation outranks a limit: looking may use every step
+// that is left, the refutation stands all the same, and the result says it was cut short.
+test("a refutation outranks a limit: the steps may run out while looking for more, and the refutation stands", () => {
   const { k, add, isZero, call, kp } = setup();
   // After the refuted claim, a sum of a hundred additions: more than all the steps that are left.
   let sum: Value = byte(k, 0);
@@ -1960,7 +1972,16 @@ test("looking ahead after a refutation never ends the evaluation at its limit", 
   const r = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 80 });
   assert.equal(r.ended, "complete", "the refutation is the answer, not the limit");
   assert.equal(r.refuted, true);
-  assert.ok(r.steps <= 45, `looking ahead takes at most half of what is left: ${r.steps}`);
+  assert.equal(r.cutShort, true, "and the result says looking for more was cut short");
+  assert.equal(r.steps, 80, "every step that was left went into looking");
+  // With steps to spare nothing is cut short, and the field is absent.
+  const whole = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 1000 });
+  assert.equal(whole.refuted, true);
+  assert.equal("cutShort" in whole, false);
+  // Inside an attempt the same holds: the attempt answers that it was refuted, not that it reached its limit.
+  const tried = k.evaluate(call(kp("attempt"), call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.bits(Uint8Array.of(0, 0, 0, 50))), k.scope());
+  const [first] = k.entriesOf(tried.value);
+  assert.equal(k.symbolName(first[1]), "refuted");
 });
 
 test("a call of advance that meets a refutation performs no further effect, and a later call goes on", () => {
@@ -2091,4 +2112,15 @@ test("a then inside a then: each waits for what its own first started", () => {
   k.fill(c2, byte(k, 2));
   k.advance({ steps: 100 });
   assert.deepEqual(said, [1, 2, 9]);
+});
+
+test("an attempt's answer is handled as any failure is: is_failure and handle work on it", () => {
+  const { k, isZero, call, kp, sd, isFailure, handle } = failures();
+  const scope = k.scope();
+  const x = k.param("x");
+  const refutedOne = call(kp("attempt"), call(kp("claim"), call(isZero, byte(k, 5))), steps(k, 100));
+  assert.equal(k.bitsOf(k.evaluate(call(isFailure, refutedOne), scope).value).bytes[0], 1);
+  const nine = k.composedFunction([x], byte(k, 9));
+  assert.equal(num(k, k.evaluate(call(handle, refutedOne, sd("refuted"), nine), scope).value), 9);
+  assert.equal(num(k, k.evaluate(call(handle, call(kp("attempt"), byte(k, 3), steps(k, 100)), sd("refuted"), nine), scope).value), 3, "a value is itself");
 });

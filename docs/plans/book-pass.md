@@ -1622,6 +1622,15 @@ its approval.
   session): three rules keep "a notation only adds"; a production may
   be marked `unambiguous`; the right to change the grammar is a
   capability. Cluster 14 remains.
+- **2026-11-20 — the second review's cluster 14, in part** (the review
+  session): five of seven points ruled and written; symbols, and what
+  a parser returns, are under discussion.
+- **2026-11-20 — the second adversarial review closed** (the review
+  session): cluster 14 ruled; all fourteen clusters are. 249
+  decisions.
+- **2026-11-20 — B-202 (threads and budgets at run time) held and
+  ruled** (the review session): budget and slice, tasks, `first`. 251
+  decisions.
 
 ## 8. Sessions
 

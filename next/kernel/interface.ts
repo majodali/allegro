@@ -136,6 +136,12 @@ export type PrimitiveDeclaration =
  * the clock is the launcher's business. An evaluation that ends at its
  * limit cannot be continued by this kernel: evaluating the expression
  * again starts again, and performs again any effect already performed.
+ *
+ * Ruled on 2026-11-20 and not built in this version: a count of steps
+ * is to be given in two ways. A budget bounds the whole work of an
+ * evaluation and is never filled up again. A slice bounds one call, and
+ * when it is spent the work is paused for the next call to go on with.
+ * This version has the budget only.
  */
 export interface Limits {
   /** The evaluation ends, with everything unfinished undecided, after this many steps. */
@@ -211,6 +217,12 @@ export interface Result {
   readonly refuted: boolean;
   /** The claims this call evaluated: one record for each claim as written. */
   readonly claims: readonly ClaimRecord[];
+  /**
+   * Present, and true, where the call met a refutation and its steps ran
+   * out while it looked for further ones. A refutation outranks a limit:
+   * the refutation stands, and this says the list of them may be short.
+   */
+  readonly cutShort?: true;
 }
 
 /**
@@ -265,6 +277,12 @@ export interface Advance {
   readonly refuted: readonly Value[];
   /** The claims this call evaluated: one record for each claim as written. */
   readonly claims: readonly ClaimRecord[];
+  /**
+   * Present, and true, where the call met a refutation and its steps ran
+   * out while it looked for further ones. A refutation outranks a limit:
+   * the refutation stands, and this says the list of them may be short.
+   */
+  readonly cutShort?: true;
 }
 
 /**
@@ -337,11 +355,20 @@ export interface Kernel {
    * value true is the byte 1 with `bitLength` 1.
    */
   bits(bytes: Uint8Array, bitLength?: number): Value;
-  /** The symbol with this fully-qualified name. The same name gives the same symbol. */
+  /**
+   * The symbol with this spelling. The same spelling gives the same
+   * symbol; a fully-qualified name is a spelling, and the kernel reads
+   * nothing into it. In an expression the symbol is a name and is looked
+   * up. As the key of a structure's entry it names the entry and is not
+   * evaluated. For a symbol as data, see `Kernel2.symbolData`.
+   */
   symbol(fqn: string): Value;
   /** A new positional parameter. Its name is for reports; a function owns it by listing it. */
   param(name: string): Value;
-  /** A structure. Complete in shape; an entry's value may be a cell. */
+  /**
+   * A structure. Complete in shape; an entry's value may be a cell. An
+   * entry's key is null, a symbol made with `symbol`, or a key.
+   */
   structure(entries: readonly Entry[]): Value;
   /** An unevaluated application of a function value to arguments. */
   expression(fn: Value, args: readonly Value[]): Value;

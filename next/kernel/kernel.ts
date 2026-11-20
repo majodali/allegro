@@ -145,9 +145,12 @@
 //               key reads it. It has no place, is not counted, and is
 //               not handed to a primitive function.
 //   "attempt"   attempt(x, budget). Evaluates its first argument under a
-//               budget of steps and answers how that ended, as data: a
-//               value, a refutation with its reason, or the limit
-//               reached. A refutation inside marks nothing outside.
+//               budget of steps. Its answer is the value where there is
+//               one. Where what was attempted was refuted, or reached
+//               the limit, the answer is a failure, in the shape every
+//               failure a program handles has: {failure: refuted,
+//               reason: <text>} or {failure: limit}. A refutation
+//               inside marks nothing outside.
 // The truth values are the bits of length one: 1 is true, 0 is false.
 // There is no quotation, and no argument can be inspected. A symbol that
 // is data comes from a description, from a cell or from a primitive
@@ -364,6 +367,8 @@ export const createKernel: CreateKernel2 = () => {
   let running: Rest | undefined;
   /** True while evaluating what follows something not yet done: no effect is performed there. */
   let ahead = false;
+  /** True where this call met a refutation and ran out of steps while looking for more. */
+  let cut = false;
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
@@ -935,14 +940,14 @@ export const createKernel: CreateKernel2 = () => {
           // either way the answer is "limit", and what goes on from it rests on a limit.
           if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
             rest({ kind: "limit" });
-            return data("limit");
+            return failure("limit");
           }
           throw e;
         } finally {
           budget = outer;
         }
-        if (r instanceof Refuted) return data("refuted", text(r.reason));
-        if (known(r)) return data("value", r);
+        if (r instanceof Refuted) return failure("refuted", text(r.reason));
+        if (known(r)) return r;
         // It waits on something. What is left is attempted again, so nothing done so far is done twice.
         return new Expr(fn, [r, steps]);
       }
@@ -1217,19 +1222,19 @@ export const createKernel: CreateKernel2 = () => {
   /**
    * After a refutation, what was written after it is still evaluated, ahead of what is done
    * and with no effect, so that a further refutation in it is found and counted now. What it
-   * comes to is dropped. It is given half of the steps that are left, so that looking can
-   * never be what ends the evaluation at its limit.
+   * comes to is dropped. A refutation outranks a limit: where the steps run out while
+   * looking, the looking stops and the refutation stands. The call's result says that it
+   * was cut short, so whoever reads it knows a further refutation may be unreported.
    */
   const lookAhead = (rest: V, scope: ScopeV): void => {
-    const [outer, before] = [budget, ahead];
-    budget = spent + Math.floor((outer - spent) / 2);
+    const before = ahead;
     ahead = true;
     try {
       evaluate(rest, scope);
     } catch (e) {
       if (!(e instanceof LimitReached || e instanceof RangeError)) throw e;
+      cut = true;
     } finally {
-      budget = outer;
       ahead = before;
     }
   };
@@ -1547,6 +1552,18 @@ export const createKernel: CreateKernel2 = () => {
     settled.add(s);
     return s;
   };
+  /**
+   * A failure a program can handle, in the one shape every failure has: a structure whose
+   * first entry is keyed `failure` and holds a symbol naming what failed. An attempt answers
+   * with one where what it attempted was refuted or reached its limit.
+   */
+  const failure = (name: string, reason?: V): V => {
+    const entries: (readonly [V | null, V])[] = [[intern("failure"), new Quoted(intern(name))]];
+    if (reason !== undefined) entries.push([intern("reason"), reason]);
+    const s = new Struct(entries);
+    settled.add(s);
+    return s;
+  };
   const list = (items: readonly V[]): V => {
     const s = new Struct(items.map((p) => [null, p] as const));
     settled.add(s);
@@ -1856,14 +1873,16 @@ export const createKernel: CreateKernel2 = () => {
       const e = into(expression, "the expression");
       const s = scopeIn(scope, "the scope");
       tallies = new Map();
+      cut = false;
       const r = within(limits, () => evaluate(e, s));
       const value = r.value ?? e;
       if (r.ended === "complete" && !known(value)) started(value, s);
-      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords() };
+      return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     advance: (limits): Advance => {
       if (ready.length === 0) return { ended: "complete", steps: 0, refuted: [], claims: [] };
       tallies = new Map();
+      cut = false;
       const refuted: Value[] = [];
       // Once one comes out refuted, no further effect is performed in this call: the rest
       // are evaluated ahead, so their refutations are reported too, and they stay in the list
@@ -1914,7 +1933,7 @@ export const createKernel: CreateKernel2 = () => {
           }
         }
       });
-      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords() };
+      return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}) };
     },
     current: (value) => {
       const v = into(value, "the value");
