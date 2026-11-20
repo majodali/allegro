@@ -69,8 +69,8 @@ launcher's count of the lines printed before each phase
 the text and the texts it imports with the driver of
 `next/bootstrap/driver.ts` and runs the records with the launcher of
 `next/launch/launcher.ts` on the reference kernel, the imported ones
-loaded first, with the output capability, the shipped primitives, its
-inputs and a budget of 1,000,000 steps. A program passes when its printed lines, its end, the
+loaded first, with the output capability, the timer capability, the
+shipped primitives, its inputs and a budget of 1,000,000 steps. A program passes when its printed lines, its end, the
 lines printed before each later phase and its yielded keys are the ones
 stated. The yielded keys are read with the program's inputs handed in
 and its imported records loaded.
@@ -102,6 +102,19 @@ nothing: only what uses `x` waits for it. An indented block written
 after `sync` runs each statement to its end before the next. `sync`
 cannot stand before a program's top level: the forms do not say where it
 would be written.
+
+## Waits
+
+The runner's ceiling grants `output` and `timer`. `timer.wait(n)`
+(`next/launch/timer.ts`) answers late with the number `n` once `n`
+milliseconds have passed. In the runner they pass on a clock that runs
+no real time (`virtualClock` of `next/launch/clock.ts`), made anew for
+each run. It answers the waits in the order they fall due, and among
+waits due at the same time the one asked first. A wait asked when an
+answer arrives falls due counted from that answer. So a program's
+printed order under waits is the order its waits fall due, a run takes
+no wall-clock time for them, and two runs print the same. `npm run
+allegretto` grants the same two capabilities on the host's real timer.
 
 ## A text of the standard language
 

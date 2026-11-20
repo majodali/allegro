@@ -1,5 +1,5 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
-// acceptance side), chunk Q7 (the minimal launcher), parts 1 to 4). The only
+// acceptance side), chunk Q7 (the minimal launcher), parts 1 to 5). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
@@ -23,10 +23,16 @@
 // stdout, and exits 0 when the run completed. Otherwise it writes the
 // reason to stderr and exits 1.
 //
-// The configuration, as far as milestone 2 needs it: the ceiling grants
-// `output`, the one capability the terminal supplies; `--steps` sets a
-// step budget, and without it there is none. The target's pure
-// primitives are the shipped ones, `shipped` of next/prims/index.ts.
+// The target supplies two capabilities: `output` (next/launch/output.ts)
+// and `timer` (next/launch/timer.ts), made with the host's real timer
+// (`realClock` of next/launch/clock.ts). Its pure primitives are the
+// shipped ones, `shipped` of next/prims/index.ts.
+//
+// The configuration, as far as milestone 2 needs it: the ceiling of
+// `npm run launch` grants `output` alone, as before part 5; the ceiling
+// of `npm run allegretto` grants `output` and `timer` (`runOnTerminal`
+// takes the ceiling). `--steps` sets a step budget, and without it there
+// is none.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
 // exporting `createKernel` of type `CreateKernel2`
@@ -41,6 +47,8 @@ import type { CreateKernel2 } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
 import { describe, launch, type Configuration } from "./launcher.js";
 import { output } from "./output.js";
+import { realClock } from "./clock.js";
+import { timer } from "./timer.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
 export const KERNEL_MODULE = "next/kernel/create.ts";
@@ -76,9 +84,14 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
   return { file, steps };
 }
 
+/** The ceiling of `npm run launch`. */
+export const LAUNCH_CEILING: readonly string[] = ["output"];
+/** The ceiling of `npm run allegretto`. */
+export const ALLEGRETTO_CEILING: readonly string[] = ["output", "timer"];
+
 /**
  * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
- * the terminal's configuration and target, and the inputs given: those
+ * the terminal's target, the ceiling given, and the inputs given: those
  * supplied at the start and each later phase. Writes each line to stdout;
  * on any end but completed, writes the reason to stderr and exits 1.
  */
@@ -87,14 +100,15 @@ export async function runOnTerminal(
   steps: number | undefined,
   inputs: Pick<Configuration, "inputs" | "later"> = {},
   imports: readonly unknown[] = [],
+  ceiling: readonly string[] = LAUNCH_CEILING,
 ): Promise<void> {
   const createKernel = await kernelFactory();
   const outcome = await launch({
     createKernel,
     program,
     imports,
-    configuration: { ceiling: ["output"], steps, ...inputs },
-    target: { capabilities: [output], primitives: shipped },
+    configuration: { ceiling, steps, ...inputs },
+    target: { capabilities: [output, timer(realClock)], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
   if (outcome.end.kind !== "completed") fail(describe(outcome.end));

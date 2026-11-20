@@ -167,3 +167,31 @@ test("the timer capability and the clocks reach no host API but the timers", () 
     assert.doesNotMatch(source, /\bprocess\.|from "fs"|from "path"|\bBuffer\b/, file);
   }
 });
+
+test("npm run allegretto grants timer on the host's real timer: a program that waits prints its lines in the order the waits fall due", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-timer-"));
+  try {
+    const file = path.join(dir, "waits.alg");
+    fs.writeFileSync(file, 'capability output\ncapability timer\nslow <- output.write("slow " ++ int.text(timer.wait(40)))\nfast <- output.write("fast " ++ int.text(timer.wait(2)))\noutput.write("started")\n');
+    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    assert.equal(r.stderr, "");
+    assert.equal(r.stdout, "started\nfast 2\nslow 40\n");
+    assert.equal(r.status, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm run launch grants output alone: a record that declares timer is refused", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "launch-timer-"));
+  try {
+    const file = path.join(dir, "waits.json");
+    fs.writeFileSync(file, encode(ONE_WAIT));
+    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    assert.equal(r.stdout, "");
+    assert.equal(r.stderr, "refused: the module declares the capability timer, which the ceiling does not grant\n");
+    assert.equal(r.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
