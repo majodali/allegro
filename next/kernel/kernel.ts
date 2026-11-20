@@ -113,8 +113,10 @@
 //               known and the first still waits, the value is given and
 //               the first goes on as work of the evaluation, taken up by
 //               `advance`. Two things hold the second back as `then`
-//               does: a first that is refuted, and a first that waits
-//               on a claim, so a claim holds what is written after it.
+//               does: a first that is refuted, and a first that is
+//               itself a claim that waits, so a claim holds what is
+//               written after it. A claim inside a function the first
+//               calls holds nothing here.
 //   "same"      same(a, b). Tells two bits values apart, or two symbols:
 //               true where they are the same. Anything else is a
 //               refutation; the kernel gives bits no other meaning.
@@ -271,6 +273,8 @@ class Decided {
  */
 class Lazy {
   done = false;
+  /** True while it is being evaluated: needing it again then means it needs itself. */
+  busy = false;
   rests: readonly Rest[] = [];
   constructor(public value: V, readonly scope: ScopeV) {}
 }
@@ -763,7 +767,16 @@ export const createKernel: CreateKernel2 = () => {
         v.rests.forEach(rest);
         return v.value;
       }
-      const { value: r, rests } = collecting(() => evaluate(v.value, v.scope));
+      // A value that needs itself has no value: `n = n + 1`, read, would never end.
+      if (v.busy) return new Refuted("a value that needs itself to be known", undefined);
+      v.busy = true;
+      let got: { value: V; rests: Rest[] };
+      try {
+        got = collecting(() => evaluate(v.value, v.scope));
+      } finally {
+        v.busy = false;
+      }
+      const { value: r, rests } = got;
       rests.forEach(rest);
       v.rests = [...v.rests, ...rests];
       v.value = r;
@@ -1269,13 +1282,13 @@ export const createKernel: CreateKernel2 = () => {
     }
   };
 
-  /** True where what is left of a statement waits on a claim: such a statement holds what is written after it. */
-  const heldByClaim = (r: V): boolean => {
-    if (r instanceof Lazy) return !r.done && heldByClaim(r.value);
-    if (!(r instanceof Expr)) return false;
-    if (r.site !== undefined || r.fn === kernelPrims.get("claim")) return true;
-    return (r.fn === kernelPrims.get("also") || r.fn === kernelPrims.get("then")) && r.args.some(heldByClaim);
-  };
+  /**
+   * True where a statement is itself a claim that waits: such a statement holds what is
+   * written after it in its block. A claim inside a function the statement calls does not:
+   * a statement that binds its value holds nothing, and a notation writes a claim of its own
+   * for a statement whose value is dropped.
+   */
+  const heldByClaim = (r: V): boolean => r instanceof Expr && (r.site !== undefined || r.fn === kernelPrims.get("claim"));
 
   /** The kernel's primitives that compute on data and do nothing else. */
   const ONE_STEP = new Set(["join", "length", "slice", "same", "count", "kind", "key", "symbol", "spelling"]);

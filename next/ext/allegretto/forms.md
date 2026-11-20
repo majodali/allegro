@@ -39,8 +39,8 @@ by its name in section 3.
 | Form | Stands for |
 |---|---|
 | `"text"`, with the escapes `\"`, `\\`, `\n`, `\t` | bits: the text's UTF-8 bytes |
-| `42`, `0xFF` | bits: 64, the number in two's complement, most significant byte first |
-| `1.5` | bits: 64, IEEE 754 binary64 |
+| `42`, `0xFF` | bits: 64, the number in two's complement, most significant byte first. `-9223372036854775808`, the least integer, is read as one literal |
+| `1.5`, `-1.5` | bits: 64, IEEE 754 binary64. A `-` written before a fraction is part of the literal |
 | `true`, `false` | bits of length one: 1 and 0 |
 | `{a: e, b: f}` | a structure whose keys are the symbols `a` and `b` |
 | `{a: e, [k]: f}` | the same, with an entry whose key is computed: `put({a: e}, k, f)`. `k` is any expression that gives a symbol or a key. Where it is a name a `key` header line declares, the entry is private |
@@ -128,7 +128,9 @@ it says otherwise.
 Precedence, loosest first: `|>`; `||`; `&&`; `==` `!=`; `<` `>` `<=`
 `>=`; `++`; `+` `-`; `*` `/` `%`; prefix `-` `!`; application, `.` and
 `[ ]`. All binary operators group to the left. Float arithmetic has no
-operators: `float.add(a, b)`.
+operators: `float.add(a, b)`. Prefix `-` before anything but a number
+written out is `int.neg`, so `-x` on a float's bits is not its negation:
+that is `float.neg(x)`.
 
 `==` compares bits. `1 == 1.0` is false, and two structures are not
 compared: that is a refutation. Equality by type is the standard
@@ -219,7 +221,20 @@ statements after it until the write's answer is known, and if the
 answer is a failure none of them happens. A statement that binds its
 value, `r <- files.write(f, t)`, stands for no claim and holds nothing:
 `r` is the program's to look at. The last statement of a block is its
-value and goes to the caller, a failure or not. A failure handed to a
+value and goes to the caller, a failure or not. Three points complete
+the rule:
+
+- The last statement written in a module is claimed like the others. A
+  module yields the structure of its bindings, so that statement's
+  value goes to nobody.
+- A statement that is itself `claim(e)` stands for no second claim.
+- The claim uses Allegretto's own `is_failure`, also where the text
+  binds that name to something else.
+
+A claim holds the statements after it where the statement is itself a
+claim, written or stood for. A claim inside a function that a statement
+calls holds nothing of the caller's: after `a <- f()` the next line is
+started at once, whatever waits inside `f`. A failure handed to a
 primitive function is outside its domain, which is a refutation, so
 nothing computes with one unseen. A name is bound once in a block; an inner block may
 bind it again.
@@ -232,7 +247,11 @@ the arrow that needs the name, itself or through a binding, would start
 `e` before its place, and the reader refuses it.
 
 An indented block may stand where the value of a binding or the body of
-a function is written: after `=`, after `=>` and after `<-`.
+a function is written: after `=`, after `=>` and after `<-`, and as a
+branch of `if`. `sync` is written as the last word of the line before
+the block, as in `f() => sync`. A module's own block cannot be written
+`sync`: its statements whose value is dropped already happen in order,
+each held by the one before it.
 
 A block with bindings stands for the kernel's block of bindings (section
 4). A block with none is the chain of `also` alone.
@@ -447,3 +466,10 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    ruled as a kernel primitive and not built: it starts both, gives the
    value of whichever is known first, and cancels the other. Until it
    is built Allegretto has no way to write a timeout.
+14. **Four readings and two literals** (2026-11-20, from the acceptance
+   stream's PR #264). The module's last statement is claimed; a claim
+   statement stands for no second claim; `sync` is the last word of
+   the line before a block and cannot stand at a module's top level;
+   a dropped statement's claim uses Allegretto's own `is_failure`.
+   `-1.5` is one literal, as the least integer is. A claim inside a
+   called function does not hold the caller's statements.
