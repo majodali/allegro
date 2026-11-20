@@ -2385,3 +2385,99 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     No assertion of this stream's tests changed; the test kernel that
     stops by itself reads the limits as the second argument of
     `evaluate`.
+- **2026-11-20 — Q16, part 1: the HTTP capability.**
+  Built. The launcher's target ships a third capability, `http`
+  (`next/launch/http.ts`), beside `output` and `timer`. The transport
+  that reaches no network is in `next/launch/scripted-transport.ts`.
+  The terminal's two commands, `npm run launch` and
+  `npm run allegretto`, and the corpus runner (`runProgram` of
+  `next/corpus/allegretto.ts`) grant it. The launcher
+  (`next/launch/launcher.ts`) is unchanged. Chunk Q16 (the
+  capabilities the launchers ship) has two parts left: file reading
+  for the loader and file writing.
+  The proposal, as built, for the maintainer to ratify at the PR:
+  1. **The capability.** It is `http`, with one part, `request`.
+     `http.request(r)` takes a structure with the entries `method` and
+     `url`, texts, which are required; `headers`, an array of pairs
+     `[name, value]` of texts; and `body`, bits of whole bytes. It
+     returns a cell, which the launcher fills with plain data: the
+     structure `{status, headers, body}`, the status a whole number of
+     64 bits. Any status is an answer, a 404 and a 500 included. A
+     request that gets no answer fills the cell with
+     ``{failure: `unreachable, reason: <a text>}``: the transport
+     rejected, or threw. A value outside the domain is a refutation
+     with a reason that names the part, thrown as the kernel's
+     `Refusal`. Building showed one point the proposal does not state.
+     A private entry of the request is outside no domain: the kernel
+     passes it over when it hands a structure to a primitive function,
+     as forms.md §4, "Keys and private entries", rules. So the part
+     never sees it, and the request is made without it. A test holds
+     this.
+  2. **The transport is the target's.** The capability is made with a
+     function from a request as host data to a promise of an answer as
+     host data. The terminal passes `fetchTransport`, over
+     `globalThis.fetch`. The tests and the corpus runner pass the
+     scripted transport: a table from a method and a URL to an answer,
+     every other request rejected with the reason
+     `nothing serves <METHOD> <url>`. It answers in the order the
+     requests were asked, one at a time, with one host turn between two
+     answers (`nextTurn`, now exported by `next/launch/clock.ts`). Two
+     points about `fetch` that no test can show, since none calls it.
+     It follows a redirect by itself, so the status a program sees is
+     the last one's and a 3xx is seldom seen. It rejects some requests
+     the part accepts, a body on a GET among them, and such a request
+     is then the failure `unreachable` with fetch's reason. Whether
+     those belong to the part's domain is the maintainer's to say.
+  3. **No test and no corpus run reaches a network.** No test calls
+     `fetchTransport`. A test reads the two new files and finds that
+     the capability reaches no host API but `globalThis.fetch`, and the
+     scripted transport none but the host's turn.
+  4. **The ceiling.** `TERMINAL_CEILING` of `next/launch/terminal.ts`
+     gains `http`. A program that declares `capability http` where the
+     ceiling does not grant it is refused, as for any capability, and
+     a program that does not declare it is unaffected. The runner's
+     `CEILING` gains it too. Building showed no reason against it.
+  5. **The corpus convention.** A program states what the network
+     serves in lines `// serves: <METHOD> <url> = <status> <literal>`,
+     one for each request served (`readServes`). The status is a whole
+     number of three digits, and the literal a text literal read by
+     `readLiteral`, whose bytes are the body. The answer has no
+     headers: no program here needed the optional form for them, so it
+     is not built. A request no line serves is unreachable. A line not
+     of the form, a body that is no text literal, and two lines for one
+     request each fail the program, which is not launched. A run gives
+     the requests the transport was handed (`ProgramRun.requests`).
+     The README of `next/corpus/allegretto/` says this in the section
+     "Requests".
+  6. **The launcher needs no new rule.** With several requests in
+     flight each answer is filled when it arrives, in any order, and
+     what waited on it is evaluated again. A test holds it.
+  Eight programs are written for the purpose, under
+  `next/corpus/allegretto/m3/`, and none realises a case of
+  `next/corpus/cases.json`: no case asserts an HTTP request.
+  - `http-get.alg`: a GET answered; it prints the status and the body.
+  - `http-not-found.alg`: a 404 is an answer, no failure, and nothing
+    is refuted.
+  - `http-unreachable-handled.alg`: a request no line serves is the
+    failure `unreachable`, and `handle` answers it.
+  - `http-unreachable-dropped.alg`: the same request as a statement
+    whose value is dropped; its claim holds the line after it and is
+    refuted, as forms.md "Failures" says.
+  - `http-at-once.alg`: two requests whose values are bound, and a line
+    after them that prints first.
+  - `http-each.alg`: `each` over a stream of three URLs. Each call
+    writes that it asks and then the answer, and the lines alternate,
+    so one request is made at a time.
+  - `http-headers-body.alg`: a POST with two headers and a body. Its
+    served answer depends on nothing it sends. A test of
+    `next/corpus/allegretto.test.ts` shows that both arrived: it reads
+    what the runner's transport was handed, the headers in the order
+    written and the body's bytes.
+  - `http-outside-domain.alg`: a request with no `url`, refuted with
+    the part's reason.
+  The kernel and the launcher did nothing the forms or the decisions
+  do not say, in any program or test here, on either variant.
+  No existing test's assertion changed.
+  Measured: `npm run test:next` passes 699 tests on the reference and
+  700 with `ALLEGRO_KERNEL=machine`; 92 programs pass on both;
+  `milestone 3: programs 75 (passing 75, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
