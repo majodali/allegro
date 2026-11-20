@@ -94,6 +94,8 @@ import { createKernel } from "../kernel/create.js";
 import type { Cell } from "../kernel/interface.js";
 import { encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.js";
+import { boundedReader } from "../launch/files.js";
+import { nodeFiles } from "../launch/node-files.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, plainValue, STRENGTHS, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
 import { shapeOf } from "../tools/configuration.js";
@@ -110,12 +112,14 @@ export const PROGRAMS_DIR = "next/corpus/allegretto";
 /** The repository root. */
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 
-/** A reader of the texts under a root: a path relative to it, or absolute; undefined where there is no such file. */
+/**
+ * A reader of the texts under a root: a path relative to it, or absolute;
+ * undefined where there is no such file. It is bounded to the root
+ * (next/launch/files.ts): a file whose real path is outside it is refused.
+ */
 export function readUnder(root: string): ReadText {
-  return (file) => {
-    const p = path.isAbsolute(file) ? file : path.join(root, file);
-    return fs.existsSync(p) && fs.statSync(p).isFile() ? fs.readFileSync(p, "utf-8") : undefined;
-  };
+  const bounded = boundedReader([root], nodeFiles);
+  return (file) => bounded(path.isAbsolute(file) ? file : path.join(root, file));
 }
 
 /** The step budget every program runs under. */

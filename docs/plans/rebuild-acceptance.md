@@ -2922,3 +2922,50 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `milestone 3: programs 82 (passing 82, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
   No row of the decision map moves in this part: check alone is built,
   and the rows of the Phases chapter wait for a pipeline.
+- **2026-11-20 — Q16, part 2: the loader's file reading, bounded.**
+  Built. This is part 2 of chunk Q16 (the capabilities the launchers
+  ship), for B-196 (the rebuild's acceptance side). The decision "The
+  platform ships three phases: check, run and export" says the loader
+  "reads files in the project's and the platform's directories and
+  nowhere else", so that checking a project nobody trusts yet reads
+  nothing else.
+  What was there. The bootstrap's driver (`next/bootstrap/driver.ts`)
+  reads an imported text through a function its caller hands it. Each
+  caller handed it the host's whole file system. `import name` names
+  `name.alg` beside the importing text, and a name is one word, so no
+  text could name a file elsewhere. A link could: a file `lib.alg` in a
+  cloned project that links to a file outside it was read.
+  What is built.
+  1. **A bounded reader** (`boundedReader` of `next/launch/files.ts`).
+     It is given the directories it may read in. It reads a file only
+     where the file's real path, with every link followed, is inside one
+     of them, at any depth. A file that is not there is absent, as
+     before. A file that is there and outside is refused, with a reason
+     that names the file, the directories and where a link leads.
+     Nothing of a refused file is read.
+  2. **It is host-neutral.** It reaches the file system through the host
+     it is handed (`FileHost`): the real path of a name, whether it is a
+     file, its text. The terminal's host is `next/launch/node-files.ts`,
+     the one place this reading touches the file system.
+  3. **The driver reports a refusal** as a finding at the import, of
+     kind `refused`: "the text lib.alg, which import lib names, is not
+     read", with the reader's reason. The importing text is not emitted
+     and nothing is launched.
+  4. **The project's directory is the directory of the text being
+     run**, which is where part 2 of Q13 (check and run as
+     configurations, and what a result holds) looks for `allegro.json`.
+     `npm run allegretto`, `npm run emit` and the corpus's runner read
+     through the bounded reader. The runner's directory is the
+     repository's root, as before.
+  What is not built. The new tree has no platform directory yet, so
+  the directories given are the project's alone. The loader is host
+  code, so the reader is a host function it is handed and no capability
+  a program can declare: when the module loader is written in Allegro
+  it takes the same bound as a capability's part, and its name and
+  shape are proposed then. The main text itself is read by the command
+  from the path the user gave, which the bound does not cover. File
+  writing is part 3, and waits for the store of chunk Q15 (the tools
+  for proposing).
+  B-071 (the capabilities for input and output) is taken by this chunk
+  for HTTP and the two file capabilities. This part gives the reading
+  its bound and no capability yet.
