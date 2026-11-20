@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — A claim holds only where the statement is the claim;
+  four readings and a literal.** From the review of the acceptance
+  stream's PR #264. In `next/kernel/kernel.ts`: `also` holds its second
+  only where its first is itself a claim that waits, so the line after
+  `a <- f()` is started at once, as the forms say. In
+  `next/ext/allegretto/forms.md`: the module's last statement is
+  claimed, a claim statement stands for no second claim, where `sync`
+  is written, and `-1.5` as one literal.
 - **2026-11-20 — A value that needs itself is refuted.** A fault the
   acceptance stream found: `n <- n + 1`, now that the arrow's name is
   a binding of its block's one group, read itself until the steps or

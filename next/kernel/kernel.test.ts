@@ -1760,10 +1760,14 @@ test("a claim holds what is written after it: no later effect until it is decide
   k.fill(refuted.c, byte(k, 7));
   assert.equal(k.advance({ steps: 100 }).refuted.length, 1);
   assert.deepEqual(said, []);
-  // A claim inside a function the statement calls, with a statement of the function's own after it, holds the same way.
+  // A claim inside a function the statement calls does not hold the caller's statements.
+  // (Until the ruling of 2026-11-20 this asserted the opposite. The acceptance stream found
+  // that it held the line after `a <- f()`, which the forms say holds nothing. A statement
+  // whose value is dropped is held by the claim the notation writes for it: see the tests of
+  // failures below.)
   const check = k.composedFunction([x], call(kp("also"), call(kp("claim"), call(isZero, x)), byte(k, 1)));
   const nested = run((c) => call(check, c));
-  assert.deepEqual(said, []);
+  assert.deepEqual(said, [2], "not held: the statement is a call, not a claim");
   k.fill(nested.c, byte(k, 0));
   k.advance({ steps: 100 });
   assert.deepEqual(said, [2]);
@@ -1935,6 +1939,26 @@ test("a statement whose value is dropped holds what follows until its answer com
   k.fill(cells[2] as never, failure("disk_full"));
   assert.deepEqual(k.advance({ steps: 200 }).refuted, [], "no refutation: the program reads the answer");
   assert.equal(k.bitsOf(k.current(bound.value)).bytes[0], 1);
+});
+
+test("a call whose value is dropped is held by its own claim, and one whose value is bound holds nothing, though a claim waits inside", () => {
+  const { k, isZero, call, kp, said, say, dropped } = failures();
+  const scope = k.scope();
+  const x = k.param("x");
+  // check(x) = claim(isZero(x)); 1, as a block of two statements.
+  const check = k.composedFunction([x], call(kp("also"), call(kp("claim"), call(isZero, x)), byte(k, 1)));
+  // check(c); say(2), with check's value dropped: held until the claim inside is decided.
+  const c1 = k.cell();
+  k.evaluate(call(kp("also"), dropped(call(check, c1)), call(say, byte(k, 2))), scope);
+  assert.deepEqual(said, [], "held by the claim the notation writes for a dropped statement");
+  k.fill(c1, byte(k, 0));
+  k.advance({ steps: 200 });
+  assert.deepEqual(said, [2]);
+  // a <- check(c); say(4): bound, so nothing holds, as the forms say.
+  said.length = 0;
+  const [c2, a] = [k.cell(), k.symbol("t.a")];
+  k.evaluate(within(k, [[a, call(check, c2)]], call(kp("also"), a, call(say, byte(k, 4)))), scope);
+  assert.deepEqual(said, [4], "at once");
 });
 
 // ---- What a refutation halts (the second review's cluster 8) -----------------

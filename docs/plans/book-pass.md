@@ -1631,6 +1631,9 @@ its approval.
 - **2026-11-20 — B-202 (threads and budgets at run time) held and
   ruled** (the review session): budget and slice, tasks, `first`. 251
   decisions.
+- **2026-11-20 — the acceptance stream's emitter reviewed** (the
+  review session): no divergence; two kernel faults it found are
+  fixed, and four readings are written into the forms.
 
 ## 8. Sessions
 
