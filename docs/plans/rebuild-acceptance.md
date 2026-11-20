@@ -1841,3 +1841,21 @@ policy is the gate ruled there.
     recursion still ends at the host's stack, at a depth that moves from
     run to run. The bench is run again when the kernel stream lands
     those two.
+- **2026-11-20 — A `-` written before a fraction is part of the literal.**
+  PR #268 answered what part 4 of chunk Q5 (the first notation and the
+  bootstrap) handed over. The reference kernel no longer holds a
+  statement after `a <- f()`, and a value that needs itself is refuted;
+  the four readings are confirmed and written into
+  `next/ext/allegretto/forms.md`. One thing came back to this stream,
+  by the maintainer's ruling of 2026-11-20: `-1.5` is one literal, as
+  the least integer is. The reader (`next/bootstrap/reader.ts`) reads a
+  `-` written before a fraction as part of the literal, so
+  `float.text(-1.5)` prints `-1.5`, where it printed `-3`, and `-0.0` is
+  negative zero. Before anything but a number written out, prefix `-`
+  is still `int.neg`. `readLiteral` (`next/bootstrap/literal.ts`) no
+  longer refuses a negative fraction as an input's value. A program,
+  `next/corpus/allegretto/m3/negative-fraction.alg`, shows it. Measured:
+  383 tests pass, none waits; 47 programs pass. PR #268 also says how
+  an importing text's emitter gets an imported module's declarations
+  and identity before there is a loader: emit the imported text first,
+  load its record, and read `moduleOf`. Imports are the next part.

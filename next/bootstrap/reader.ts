@@ -15,7 +15,9 @@
 //     decimal fraction to IEEE 754 binary64; a text, with the escapes
 //     `\"`, `\\`, `\n`, `\t`, to its UTF-8 bytes. Prefix `-` on a whole
 //     number of exactly 2^63 is read as the least integer, -2^63, which no
-//     other text can write (the hand-off of PR #260);
+//     other text can write (the hand-off of PR #260). A `-` written before
+//     a fraction is part of the literal: `-1.5` is the fraction, where
+//     `int.neg` of its bits would be another number (ruled 2026-11-20);
 //   - a structure literal's entries, each `name: e` or `[k]: e`, with a
 //     computed key;
 //   - the header lines (`capability`, `input`, `key`, `import`), anywhere
@@ -209,11 +211,20 @@ export function read(text: string): ReadResult {
     while (n.kind === "branch" && n.tag === LADDER_TAG && n.children.length === 2 && branches(n.children[1]).length === 0) n = n.children[0];
     return n;
   };
-  /** `-` before a whole number of exactly 2^63: the least integer, read as one literal. Undefined for any other operand. */
-  const leastInteger = (t: Branch): Expr | undefined => {
+  /**
+   * `-` written before a number that is one literal with its sign (forms.md
+   * §2, "Values"): a whole number of exactly 2^63, the least integer, and
+   * any fraction. Undefined for any other operand: there `-` is `int.neg`.
+   */
+  const negativeLiteral = (t: Branch): Expr | undefined => {
     const operand = branches(t).find((c) => !["ws", "ws_any", "ws_req", "hws"].includes(c.tag ?? ""));
     const n = operand === undefined ? undefined : bare(operand);
-    if (n === undefined || n.kind !== "branch" || n.tag !== "number") return undefined;
+    if (n === undefined || n.kind !== "branch") return undefined;
+    if (n.tag === "float") {
+      const f = float(n);
+      return f.k === "float" ? { k: "float", value: -f.value, at: at(t) } : f;
+    }
+    if (n.tag !== "number") return undefined;
     const digits = leafText(n);
     return !/^0[bB]/.test(digits) && BigInt(digits) === -INT_MIN ? { k: "int", value: INT_MIN, at: at(t) } : undefined;
   };
@@ -283,7 +294,7 @@ export function read(text: string): ReadResult {
       case "paren":
         return lastNonClose(t);
       case "neg":
-        return leastInteger(t) ?? { k: "unary", op: "-", operand: lastExpr(t), at: at(t) };
+        return negativeLiteral(t) ?? { k: "unary", op: "-", operand: lastExpr(t), at: at(t) };
       case "not":
         return { k: "unary", op: "!", operand: lastExpr(t), at: at(t) };
       case "if": {
