@@ -1,17 +1,23 @@
 // The terminal's command that runs an Allegretto text (B-196 (the
 // rebuild's acceptance side), chunk Q5 (the first notation and the
 // bootstrap), part 3; chunk Q7 (the minimal launcher and the output
-// capability), part 3, for the inputs): it emits the text with
-// next/bootstrap/emit.ts and launches the record with
-// next/launch/terminal.ts, in one step.
+// capability), part 3, for the inputs, and part 4, for imports): it emits
+// the text and the texts it imports with the bootstrap's driver
+// (next/bootstrap/driver.ts) and launches the records with
+// next/launch/terminal.ts, in one step: the imported records are loaded
+// first, in the order the driver gives, and the text's own is run.
 //
 //   npm run allegretto -- <file.alg> [--steps <n>] [--input name=<literal>]… [--later name=<literal>]…
 //   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes and exits 0 when the run
 // completed. Otherwise it writes the end's reason to stderr and exits 1.
-// A text the emitter refuses prints each finding as `npm run emit` does,
-// `file:line:column: message`, and exits 1; nothing is launched.
+// A text the driver refuses, for a finding of the reader or the emitter in
+// it or in a text it imports, an imported text not found, or a cycle of
+// imports, prints each finding as `npm run emit` does,
+// `file:line:column: message`, and exits 1; nothing is launched. An
+// imported text is `name.alg` in the directory of the text that imports
+// it (`importedFile` of the driver).
 //
 // The configuration and the target are the terminal's: the ceiling grants
 // `output`, the target's pure primitives are the shipped ones, and
@@ -24,7 +30,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { describeFinding, emit } from "../bootstrap/emit.js";
+import { describeDriveFinding, drive } from "../bootstrap/driver.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { encode } from "../kernel/saved-program.js";
 import type { Inputs, Plain } from "./launcher.js";
@@ -76,13 +82,14 @@ async function main(argv: readonly string[]): Promise<void> {
     process.stderr.write(`cannot read ${file}: ${e instanceof Error ? e.message : String(e)}\n`);
     process.exit(1);
   }
-  const r = emit(text);
+  const r = drive(text, file, (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : undefined));
   if (!r.ok) {
-    for (const f of r.findings) process.stderr.write(describeFinding(f, file) + "\n");
+    for (const f of r.findings) process.stderr.write(describeDriveFinding(f) + "\n");
     process.exit(1);
   }
-  // The record goes to the launcher as the saved program's JSON, as `npm run launch` reads it.
-  await runOnTerminal(JSON.parse(encode(r.program)), steps, { inputs, later });
+  // Each record goes to the launcher as the saved program's JSON, as `npm run launch` reads it.
+  const records = r.records.map((x) => JSON.parse(encode(x.program)) as unknown);
+  await runOnTerminal(records[records.length - 1], steps, { inputs, later }, records.slice(0, -1));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname))

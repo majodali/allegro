@@ -1,7 +1,8 @@
 // The minimal launcher (B-196 (the rebuild's acceptance side), chunk Q7
-// (the minimal launcher), parts 1 to 3, docs/plans/rebuild-acceptance.md §5;
+// (the minimal launcher), parts 1 to 4, docs/plans/rebuild-acceptance.md §5;
 // chunk Q5 (the first notation and the bootstrap), part 3, for the
-// capability as a structure of its parts).
+// capability as a structure of its parts). Part 4 loads the records of
+// imported modules.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -22,16 +23,25 @@
 //
 // The steps it performs, numbered as the decision numbers them:
 //   2  creates a kernel, once;
-//   3  checks the saved program, of the first or second version, and
-//      loads it, refusing with the findings when it does not check, a
-//      pure primitive it needs is missing, or the kernel refuses to load
-//      it; the stored outcomes of a record of the second version are
-//      restored only when the configuration names the builder it accepts
-//      them from (`restoreAs`), and are not looked at otherwise;
+//   3  checks the saved program, of the first or second version, and the
+//      records of the modules it imports (`imports`, in the order they
+//      are loaded), and loads each imported record and then the saved
+//      program into that one kernel, refusing with the findings when one
+//      does not check, a pure primitive one needs is missing, or the
+//      kernel refuses to load one. Every module a record declares must be
+//      the module of a supplied imported record, by identity, or the run
+//      is refused. No imported module is called by the launcher: the
+//      kernel supplies it to the module that imports it, which
+//      instantiates it. The stored outcomes of a record of the second
+//      version are restored only when the configuration names the builder
+//      it accepts them from (`restoreAs`), and are not looked at
+//      otherwise;
 //   4  creates the capabilities of the ceiling, each part an effectful
 //      primitive function, and hands the module function exactly those
 //      its `declares` names with role `capability`, in the function's
-//      order. A capability is handed as a structure of its parts, keyed by
+//      order. The ceiling's capabilities go to the main module alone: an
+//      imported module gets a capability only as the module that imports
+//      it hands it on. A capability is handed as a structure of its parts, keyed by
 //      the symbols of the part names, so a program reads a part as an
 //      entry (next/ext/allegretto/forms.md §2: `output.write("hello")`).
 //      A declared capability the ceiling does not grant is refused before
@@ -40,7 +50,8 @@
 //      found by its declared name, or else a fresh cell. An input the module
 //      does not declare, or one supplied more than once, is refused before
 //      anything is evaluated;
-//   5  builds the application of the module function to those arguments
+//   5  builds the application of the module function to those arguments,
+//      its capabilities and inputs only, never an argument for an import,
 //      and has the kernel evaluate it in a fresh scope, under the step
 //      budget;
 //   6  while the kernel waits on cells, fills those whose answers have
@@ -62,12 +73,9 @@
 //      answer. A record whose module uses a name nothing binds is refused
 //      at loading, with the kernel's message: "A free name never gets a
 //      value".
-// Step 1 is the caller's: it passes the configuration. Step 3 loads one
-// saved program; the first extensions are a later part.
-//
-// Left out, refused with a plain reason: a module parameter with role
-// `module`. Inputs are supplied; imports are still refused, since the
-// module loader is the kernel stream's and does not exist yet.
+// Step 1 is the caller's: it passes the configuration and the records.
+// Who finds and emits the imported records is the caller's too: the
+// bootstrap's driver (next/bootstrap/driver.ts) for an Allegretto text.
 //
 // The pure primitives a record needs come from the target, found by hash
 // (`Target.primitives`); the terminal's entry supplies the shipped ones of
@@ -156,6 +164,13 @@ export interface Launch {
   readonly createKernel: CreateKernel2;
   /** A saved program, as parsed JSON. It is checked before it is used. */
   readonly program: unknown;
+  /**
+   * The saved programs of the modules it imports, directly or through
+   * another, as parsed JSON, in the order they are loaded. Each is checked
+   * and loaded into the same kernel before the saved program; none is
+   * called by the launcher.
+   */
+  readonly imports?: readonly unknown[];
   readonly configuration: Configuration;
   readonly target: Target;
   /** Called with each line as it is printed, besides collecting it. */
@@ -258,25 +273,29 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   if (lacking.length > 0)
     return refused(lines, "the kernel is not of the second version of the interface", lacking.map((name) => `the kernel lacks ${name}`));
 
-  // Step 3, the record alone: nothing reaches the kernel until it checks.
+  // Step 3, the records alone: nothing reaches the kernel until each checks.
   const findings = check2(request.program);
   if (findings.length > 0) return refused(lines, "the saved program does not check", findings);
   const program = request.program as SavedProgram;
+  const importedDocs = request.imports ?? [];
+  const importFindings = importedDocs.flatMap((doc, i) => check2(doc).map((f) => `imported record ${i + 1}: ${f}`));
+  if (importFindings.length > 0) return refused(lines, "an imported record does not check", importFindings);
+  const imported = importedDocs as readonly SavedProgram[];
   const pure = new Map<string, PrimitiveDeclaration>();
   for (const p of target.primitives ?? []) if (p.purity === "pure") pure.set(p.hash, p);
-  const missing = program.needs.filter((n) => !pure.has(n.hash));
+  const needed = new Map<string, string>();
+  for (const doc of [...imported, program]) for (const n of doc.needs) needed.set(n.hash, n.name);
+  const missing = [...needed].filter(([hash]) => !pure.has(hash));
   if (missing.length > 0)
-    return refused(lines, "the target lacks a primitive the saved program needs", missing.map((n) => `the target lacks the primitive ${n.name} (${n.hash})`));
+    return refused(lines, "the target lacks a primitive the saved program needs", missing.map(([hash, name]) => `the target lacks the primitive ${name} (${hash})`));
 
   // Step 4, the ceiling against the module's parameters, before any value is made.
   const supplied = new Map(target.capabilities.map((c) => [c.definition.name, c] as const));
   const problems: string[] = [];
   for (const name of configuration.ceiling)
     if (!supplied.has(name)) problems.push(`the ceiling grants ${name}, which this target does not supply`);
-  for (const d of program.declares) {
-    if (d.role === "module") problems.push(`the module imports the module ${d.name}; this launcher supplies no modules yet`);
-    else if (d.role === "capability" && !configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
-  }
+  for (const d of program.declares)
+    if (d.role === "capability" && !configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
   // The inputs, by declared name: each declared, and each supplied once.
   const declaredInputs = new Set(program.declares.filter((d) => d.role === "input").map((d) => d.name));
   const phases = configuration.later ?? [];
@@ -293,17 +312,44 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   if (problems.length > 0) return refused(lines, problems[0], problems);
 
   try {
-    // Step 3, loading: the pure primitives it needs, then the record.
+    // Step 3, loading: the pure primitives every record needs, then each imported record, in order, then the saved program.
     const primitives = new Map<string, Value>();
-    for (const need of program.needs) primitives.set(need.hash, kernel.primitiveFunction(pure.get(need.hash)!));
+    for (const hash of needed.keys()) primitives.set(hash, kernel.primitiveFunction(pure.get(hash)!));
+    const options = configuration.restoreAs === undefined ? {} : { restoreAs: configuration.restoreAs };
+    const loaded = new Set<string>();
+    for (const [i, doc] of imported.entries()) {
+      let fn: Value;
+      try {
+        fn = load(kernel, doc, primitives, options);
+      } catch (e) {
+        if (e instanceof KernelFault) throw e;
+        return refused(lines, "the kernel refused to load an imported record", [`imported record ${i + 1}: ${e instanceof Error ? e.message : String(e)}`]);
+      }
+      const identity = kernel.moduleOf(fn);
+      if (identity === undefined) return refused(lines, "the kernel refused to load an imported record", [`imported record ${i + 1} is of the first version, which makes no module`]);
+      loaded.add(identity);
+    }
     let moduleFn: Value;
     try {
-      moduleFn = load(kernel, program, primitives, configuration.restoreAs === undefined ? {} : { restoreAs: configuration.restoreAs });
+      moduleFn = load(kernel, program, primitives, options);
     } catch (e) {
       if (e instanceof KernelFault) throw e;
       const message = e instanceof Error ? e.message : String(e);
       return refused(lines, "the kernel refused to load the saved program", [message]);
     }
+    // Every module a record declares is the module of a supplied record, by identity: nothing is evaluated until then.
+    const unsupplied: string[] = [];
+    [...imported, program].forEach((doc, i) => {
+      const which = i < imported.length ? `imported record ${i + 1}` : "the saved program";
+      for (const d of doc.declares)
+        if (d.role === "module" && (d.identity === undefined || !loaded.has(d.identity)))
+          unsupplied.push(
+            d.identity === undefined
+              ? `${which} imports the module ${d.name} with no identity declared`
+              : `${which} imports the module ${d.name} with the identity ${d.identity}, which no supplied record has`,
+          );
+    });
+    if (unsupplied.length > 0) return refused(lines, unsupplied[0], unsupplied);
 
     // Step 4: the capabilities of the ceiling, each a structure of its parts keyed by the symbols of their names.
     const granted = new Map<string, Value>();
@@ -318,7 +364,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // Each input: the plain data supplied at the start, or else a fresh cell that a later phase may fill.
     const inputCells = new Map<string, Cell>();
     const atStart = configuration.inputs ?? {};
-    const args = program.declares.map((d) => {
+    // One argument for each capability and input, in order; none for an import, which the kernel supplies.
+    const args = program.declares.filter((d) => d.role !== "module").map((d) => {
       if (d.role !== "input") return granted.get(d.name)!;
       if (Object.hasOwn(atStart, d.name)) return plainValue(kernel, atStart[d.name]);
       const cell = kernel.cell();

@@ -15,6 +15,7 @@ import type { Cell, Kernel2, PrimitiveContext, PrimitiveDeclaration, Value } fro
 import { createKernel } from "../kernel/create.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
+import { drive } from "../bootstrap/driver.js";
 import { describe, launch, type CapabilityImplementation, type Configuration, type Plain, type Target } from "./launcher.js";
 import { OUTPUT, output } from "./output.js";
 import { shipped } from "../prims/index.js";
@@ -299,20 +300,24 @@ test("a ceiling that names a capability the target does not supply is refused", 
   assert.match(describe(outcome.end), /grants files, which this target does not supply/);
 });
 
-test("a module that imports is still refused, with a plain reason, before anything is evaluated", async () => {
+test("a module declaration whose identity no supplied record has is refused, with a plain reason, before anything is evaluated", async () => {
   const withModule: SavedProgram = (() => {
     const r = new Record();
     const out = r.capability("output");
     const lib = r.param("lib");
     r.params.push(lib);
     const doc = r.done(r.apply(r.part(out, "write"), [r.text("never")]));
-    return { ...doc, declares: [...doc.declares, { param: lib, role: "module", name: "lib" }] };
+    return { ...doc, declares: [...doc.declares, { param: lib, role: "module", name: "lib", identity: "sha256:" + "ee".repeat(32) }] };
   })();
   assert.deepEqual(check2(withModule), []);
   const r = recording();
   const outcome = await launch({ createKernel: r.createKernel, program: withModule, configuration: ONLY_OUTPUT, target: TERMINAL });
-  assert.equal(describe(outcome.end), "refused: the module imports the module lib; this launcher supplies no modules yet");
+  assert.equal(describe(outcome.end), `refused: the saved program imports the module lib with the identity sha256:${"ee".repeat(32)}, which no supplied record has`);
   assert.ok(!r.calls.includes("evaluate"));
+  assert.deepEqual(outcome.lines, []);
+  const none = { ...withModule, declares: withModule.declares.map((d) => (d.role === "module" ? { param: d.param, role: d.role, name: d.name } : d)) };
+  const unnamed = await launch({ createKernel, program: none, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(describe(unnamed.end), "refused: the saved program imports the module lib with no identity declared");
 });
 
 test("a record that needs a primitive hash the target lacks is refused, before any kernel call", async () => {
@@ -719,6 +724,137 @@ test("npm run allegretto takes --input and --later: each later phase in the orde
     const undeclared = run(file, "--input", "c=1");
     assert.equal(undeclared.stderr, "refused: the configuration supplies the input c at the start, which the module does not declare\n");
     assert.equal(undeclared.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+// ── Imports (chunk Q7, part 4) ────────────────────────────────────────
+
+/** The records of a main text and the texts it imports, as the bootstrap's driver emits them, in load order, as JSON round-trips them. */
+function drivenRecords(main: string, files: { readonly [name: string]: string }): SavedProgram[] {
+  const r = drive(main, "dir/main.alg", (file) => files[path.basename(file, ".alg")]);
+  assert.ok(r.ok, r.ok ? "" : r.findings.map((f) => f.message).join("; "));
+  return r.records.map((x) => JSON.parse(encode(x.program)) as SavedProgram);
+}
+/** Launches the last record with the others as its imports, in order. */
+async function launchDriven(records: SavedProgram[], configuration: Configuration = ONLY_OUTPUT, createKernelFor = createKernel) {
+  return launch({ createKernel: createKernelFor, program: records[records.length - 1], imports: records.slice(0, -1), configuration, target: SHIPPED_TARGET });
+}
+
+test("the records of imported modules are loaded into the same kernel before the main one, and none is called by the launcher", async () => {
+  const records = drivenRecords('capability output\nimport lib\noutput.write("main")\noutput.write(int.text(lib.double(21)))\n', {
+    lib: 'capability output\noutput.write("lib instantiated")\nexport double(n) => n * 2\n',
+  });
+  const r = recording();
+  const outcome = await launchDriven(records, ONLY_OUTPUT, r.createKernel);
+  assert.deepEqual(outcome.lines, ["main", "lib instantiated", "42"]);
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(r.created(), 1);
+  assert.equal(r.calls.filter((c) => c === "module").length, 2, "load makes each record a module in the one kernel");
+  assert.equal(r.calls.filter((c) => c === "evaluate").length, 1, "only the main module is called");
+  assert.ok(r.calls.indexOf("module") < r.calls.indexOf("evaluate"));
+});
+
+test("an imported module that nothing needs is loaded and never instantiated", async () => {
+  const records = drivenRecords('capability output\nimport lib\noutput.write("main")\n', { lib: 'capability output\noutput.write("lib instantiated")\n' });
+  const outcome = await launchDriven(records);
+  assert.deepEqual(outcome.lines, ["main"]);
+  assert.equal(outcome.end.kind, "completed");
+});
+
+test("an imported module gets a capability only as the importing module hands it: withheld, its use is a refutation with the reason", async () => {
+  const lib = 'capability output\nexport quiet() => 7\nexport loud() => output.write("from lib")\n';
+  const quiet = await launchDriven(drivenRecords("capability output\nimport lib without output\noutput.write(int.text(lib.quiet()))\n", { lib }));
+  assert.deepEqual(quiet.lines, ["7"]);
+  assert.equal(quiet.end.kind, "completed");
+  const loud = await launchDriven(drivenRecords('capability output\nimport lib without output\noutput.write("before")\nlib.loud()\noutput.write("after")\n', { lib }));
+  assert.deepEqual(loud.lines, ["before"]);
+  assert.equal(describe(loud.end), "refuted: the capability output was withheld by the importing module");
+});
+
+test("an imported record is not handed the ceiling's capabilities: one that the importing module does not hold is the emitter's finding", () => {
+  const r = drive("import lib\n", "dir/main.alg", () => "capability output\nexport f() => 1\n");
+  assert.equal(r.ok, false);
+  assert.match(r.ok ? "" : r.findings[0].message, /lib declares the capability output, which this module neither holds under that name/);
+});
+
+test("an imported record that does not check, or that the kernel does not load, is refused before anything is evaluated", async () => {
+  const records = drivenRecords("capability output\nimport lib\noutput.write(lib.t)\n", { lib: 'export t = "x"\n' });
+  const [lib, main] = records;
+  const bad = { ...lib, version: 3 };
+  const r = recording();
+  const notChecked = await launch({ createKernel: r.createKernel, program: main, imports: [bad], configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+  assert.equal(notChecked.end.kind, "refused");
+  assert.equal(notChecked.end.kind === "refused" && notChecked.end.reason, "an imported record does not check");
+  assert.ok(notChecked.end.kind === "refused" && notChecked.end.findings.includes("imported record 1: version is not 1 or 2"));
+  assert.deepEqual(r.calls, []);
+  // A record whose stored outcome's key is wrong does not load where the configuration restores outcomes.
+  const wrongKey = withOutcome("sha256:" + "00".repeat(32));
+  const notLoaded = await launch({ createKernel, program: main, imports: [wrongKey, lib], configuration: { ceiling: ["output"], restoreAs: "builder-a" }, target: SHIPPED_TARGET });
+  assert.match(describe(notLoaded.end), /^refused: the kernel refused to load an imported record\n  imported record 1: restore: the key does not match/);
+  // The record is there, but the main record imports another identity: refused, naming it.
+  const missing = await launch({ createKernel, program: main, imports: [], configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+  assert.match(describe(missing.end), /^refused: the saved program imports the module lib with the identity sha256:[0-9a-f]{64}, which no supplied record has$/);
+  const supplied = await launch({ createKernel, program: main, imports: [lib], configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+  assert.deepEqual(supplied.lines, ["x"]);
+});
+
+test("the pure primitives every record needs are supplied, an imported one's among them", async () => {
+  const records = drivenRecords("capability output\nimport lib\noutput.write(lib.t)\n", { lib: "export t = int.text(6 * 7)\n" });
+  assert.equal(records[1].needs.length, 0);
+  assert.ok(records[0].needs.length > 0);
+  const outcome = await launchDriven(records);
+  assert.deepEqual(outcome.lines, ["42"]);
+  const lacking = await launch({ createKernel, program: records[1], imports: [records[0]], configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.match(describe(lacking.end), /^refused: the target lacks a primitive the saved program needs\n  the target lacks the primitive int\.(mul|text)/);
+});
+
+test("the main module's inputs come from the configuration, and an imported module's from the importing module", async () => {
+  const records = drivenRecords("capability output\ninput n\nimport lib with m: n + 1\noutput.write(int.text(lib.twice))\n", { lib: "input m\nexport twice = m * 2\n" });
+  const outcome = await launchDriven(records, { ceiling: ["output"], inputs: { n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 20), bitLength: 64 } } });
+  assert.deepEqual(outcome.lines, ["42"]);
+  const later = await launchDriven(records, { ceiling: ["output"], later: [{ n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 3), bitLength: 64 } }] });
+  assert.deepEqual(later.lines, ["8"]);
+  assert.deepEqual(later.linesBeforePhase, [0]);
+});
+
+test("npm run launch takes the imported records by --import, in load order", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "launch-imports-"));
+  try {
+    const [lib, main] = drivenRecords("capability output\nimport lib\noutput.write(lib.t)\n", { lib: 'export t = "from lib"\n' });
+    fs.writeFileSync(path.join(dir, "lib.json"), encode(lib));
+    fs.writeFileSync(path.join(dir, "main.json"), encode(main));
+    const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const ok = run(path.join(dir, "main.json"), "--import", path.join(dir, "lib.json"));
+    assert.equal(ok.stderr, "");
+    assert.equal(ok.stdout, "from lib\n");
+    assert.equal(ok.status, 0);
+    const without = run(path.join(dir, "main.json"));
+    assert.match(without.stderr, /^refused: the saved program imports the module lib with the identity sha256:[0-9a-f]{64}, which no supplied record has\n$/);
+    assert.equal(without.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm run allegretto runs a text that imports: the imported texts are found beside it, emitted and loaded first; a text not found is refused", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-imports-"));
+  try {
+    const main = path.join(dir, "main.alg");
+    fs.writeFileSync(main, 'capability output\nimport greeter with name: "world"\ngreeter.greet()\n');
+    fs.writeFileSync(path.join(dir, "greeter.alg"), 'capability output\ninput name\nexport greet() => output.write("hello, " ++ name)\n');
+    const run = () => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const ok = run();
+    assert.equal(ok.stderr, "");
+    assert.equal(ok.stdout, "hello, world\n");
+    assert.equal(ok.status, 0);
+    fs.rmSync(path.join(dir, "greeter.alg"));
+    const missing = run();
+    assert.equal(missing.stdout, "");
+    assert.equal(missing.stderr, `${main}:2:1: the text greeter.alg, which import greeter names, is not found in the directory of main.alg\n`);
+    assert.equal(missing.status, 1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

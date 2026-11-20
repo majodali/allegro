@@ -784,6 +784,33 @@ test("npm run emit writes the record; a text it refuses prints each finding and 
   }
 });
 
+test("npm run emit on a text that imports writes the text's own record, and names each imported text whose record it needs, in load order", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-emit-imports-"));
+  try {
+    fs.writeFileSync(path.join(dir, "main.alg"), "capability output\nimport derived\noutput.write(int.text(derived.four(1)))\n");
+    fs.writeFileSync(path.join(dir, "derived.alg"), "import base\nexport four(n) => base.two(base.two(n))\n");
+    fs.writeFileSync(path.join(dir, "base.alg"), "export two(n) => n * 2\n");
+    const run = spawnSync(process.execPath, ["--import", "tsx", "next/bootstrap/emit.ts", path.join(dir, "main.alg"), "-o", path.join(dir, "main.json")], { cwd: ROOT, encoding: "utf-8" });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(run.stderr.trim().split("\n").map((l) => l.split(dir).join("<dir>")), [
+      "<dir>/main.alg: needs the record of <dir>/base.alg; npm run launch takes it by --import, in the order of these lines",
+      "<dir>/main.alg: needs the record of <dir>/derived.alg; npm run launch takes it by --import, in the order of these lines",
+    ]);
+    const main = JSON.parse(fs.readFileSync(path.join(dir, "main.json"), "utf-8")) as SavedProgram;
+    assert.deepEqual(check2(main), []);
+    assert.deepEqual(main.declares.map((d) => [d.role, d.name]), [["capability", "output"], ["module", "derived"]]);
+    const missing = spawnSync(process.execPath, ["--import", "tsx", "next/bootstrap/emit.ts", path.join(dir, "derived.alg")], { cwd: ROOT, encoding: "utf-8" });
+    assert.equal(missing.status, 0, missing.stderr);
+    fs.rmSync(path.join(dir, "base.alg"));
+    const refused = spawnSync(process.execPath, ["--import", "tsx", "next/bootstrap/emit.ts", path.join(dir, "main.alg")], { cwd: ROOT, encoding: "utf-8" });
+    assert.equal(refused.status, 1);
+    assert.equal(refused.stdout, "");
+    assert.equal(refused.stderr.split(dir).join("<dir>"), "<dir>/derived.alg:1:1: the text base.alg, which import base names, is not found in the directory of derived.alg\n");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ── Through the launcher ──────────────────────────────────────────────
 
 /** Emits a text and runs it through the launcher with the output capability and the shipped primitives. */

@@ -6,6 +6,13 @@
 //   npm run emit -- <file> [-o out.json]
 //   npx tsx next/bootstrap/emit.ts <file> [-o out.json]
 //
+// The command emits the text with the texts it imports, through the
+// bootstrap's driver (next/bootstrap/driver.ts), and writes the text's own
+// record. A record holds one module, so for a text that imports it also
+// writes to stderr one line for each imported text, in the order the
+// records are to be loaded: emitted alone, each gives the same record and
+// identity, and `npm run launch` takes it by `--import`.
+//
 // Each form becomes exactly what next/ext/allegretto/forms.md §2 says it
 // stands for, on the kernel as forms.md §4 lists it built. It never writes
 // an encoding of its own for a form. `emit` returns every finding of a
@@ -826,7 +833,7 @@ export function emit(text: string, imports: Imports = new Map()): EmitResult {
 
 // ── The command ───────────────────────────────────────────────────────
 
-function main(argv: readonly string[]): number {
+async function main(argv: readonly string[]): Promise<number> {
   const usage = "usage: npx tsx next/bootstrap/emit.ts <file> [-o out.json]";
   const o = argv.indexOf("-o");
   const out = o >= 0 ? argv[o + 1] : undefined;
@@ -836,15 +843,20 @@ function main(argv: readonly string[]): number {
     return 2;
   }
   const file = files[0];
-  const r = emit(fs.readFileSync(file, "utf-8"));
+  // The driver imports this file, so the command takes it only when it runs, once this file is evaluated.
+  const { drive, describeDriveFinding } = await import("./driver.js");
+  const r = drive(fs.readFileSync(file, "utf-8"), file, (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : undefined));
   if (!r.ok) {
-    for (const f of r.findings) console.error(describeFinding(f, file));
+    for (const f of r.findings) console.error(describeDriveFinding(f));
     return 1;
   }
-  const text = encode(r.program);
+  const records = r.records;
+  const text = encode(records[records.length - 1].program);
   if (out === undefined) process.stdout.write(text);
   else fs.writeFileSync(out, text);
+  for (const x of records.slice(0, -1))
+    console.error(`${file}: needs the record of ${x.file}; npm run launch takes it by --import, in the order of these lines`);
   return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) void main(process.argv.slice(2)).then((code) => (process.exitCode = code));
