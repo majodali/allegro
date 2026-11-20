@@ -2061,3 +2061,98 @@ policy is the gate ruled there.
   Measured: 475 tests pass, none waits; 84 programs pass;
   `milestone 2: programs 10 (passing 10, failing 0) · cases due 9 · realised 9, named only by a failing program 0, not yet named 0 · up to 2: 15 of 34 realised`;
   `milestone 3: programs 67 (passing 67, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+- **2026-11-20 — Q8: the bench's search is bounded by time, and both kernel variants are measured.**
+  PR #277 gave the kernel a second variant, the machine, chosen by the
+  environment variable `ALLEGRO_KERNEL`. The kernel stream reported
+  that `npm run bench:next` did not finish on it: the search for the
+  largest size that completes ran until the kernel stopped, and the
+  machine stops at no depth.
+  - **What changed in the bench** (`next/corpus/speed/bench.ts`). The
+    search (`largest`) ends its doubling at 65,536 as before, and now
+    also at the first run that completes but takes longer than 10
+    seconds (`LONG_MS`). It then says how far it got and that it did
+    not search further. A run in a fresh process is ended after 60
+    seconds (`FRESH_MS`). The report names the kernel variant. Three
+    tests hold the search, on a clock the test moves.
+  - **How it was measured.** `npm run bench:next`, one run on each
+    variant, one after the other, on main at `4268fd4` with this
+    change, on an Intel Xeon at 2.10 GHz with 4 cores and 16 GiB,
+    Linux 6.18, node 22.23.5. The run on the reference took 5 minutes
+    55 seconds and the run on the machine 8 minutes 22 seconds. The
+    host differs from the earlier runs, so ratios and exponents compare
+    across runs and plain times do not. The step counts are the same
+    on both variants at every size both complete.
+  - **Test 1, the parser.**
+
+    | Terms | Steps | Reference ms | µs per step | Machine ms | µs per step |
+    |---|---|---|---|---|---|
+    | 1 | 9,786 | 115 | 11.7 | 99.2 | 10.1 |
+    | 4 | 38,820 | 394 | 10.2 | 405 | 10.4 |
+    | 16 | 154,956 | 2,078 | 13.4 | 2,115 | 13.6 |
+    | 32 | 309,804 | 5,131 | 16.6 | 5,552 | 17.9 |
+    | 64 | 619,500 | 14,831, one run | 23.9 | 15,264, one run | 24.6 |
+
+  - **Test 2a, the typed loop and fold.**
+
+    | n | Steps | Reference ms | µs per step | Machine ms | µs per step |
+    |---|---|---|---|---|---|
+    | 32 | 2,321 | 17.2 | 7.4 | 18.5 | 8.0 |
+    | 64 | 4,633 | 48.2 | 10.4 | 49.6 | 10.7 |
+    | 128 | 9,645 | kernel limit | | 215 | 22.3 |
+    | 256 | 21,201 | | | 655 | 30.9 |
+    | 512 | 50,461 | | | 2,318 | 45.9 |
+    | 1,024 | 133,553 | | | 9,269 | 69.4 |
+
+    The reference completed 128 in the run before this one and ends at
+    its limit there in this run.
+  - **Test 2b, the typed sum split in halves.**
+
+    | n | Steps | Reference ms | µs per step | Machine ms | µs per step |
+    |---|---|---|---|---|---|
+    | 256 | 12,186 | 56.9 | 4.7 | 64.8 | 5.3 |
+    | 4,096 | 192,666 | 1,155 | 6.0 | 1,257 | 6.5 |
+    | 65,536 | 3,080,346 | 23,025, one run | 7.5 | 25,313, one run | 8.2 |
+
+  - **The largest size that completes.**
+
+    | Program | Reference | Machine | Present tree |
+    |---|---|---|---|
+    | plain `sum(n)`, a fresh process each run | 243 | 65,536 and beyond | 226 |
+    | plain `sum(n)`, in one process | 287 | 65,536 and beyond | 584 |
+    | parser, parentheses nested n deep | 25 | 128 and beyond | 30 |
+    | typed squares, a loop of n | 127 | 2,048 and beyond | 649 |
+    | typed letters, a fold of n | 268 | 2,048 and beyond | 650 |
+
+    On the machine the first two reached the search's cap, and the
+    last three ended at a run past 10 seconds. No run on the machine
+    ended at a limit.
+  - **How time grows.** On the parser the steps grow linearly on both
+    variants (fitted exponent 1.00) and the time faster: 1.18 on the
+    reference and 1.21 on the machine. On the halving sum the time's
+    exponent is 1.09 and 1.08. On the typed loop the machine now runs
+    far enough to fit: the time's exponent is 1.81 over sizes 64 to
+    1,024, and a step costs 10.7 microseconds at 64 and 69.4 at 1,024.
+    The loop's steps also grow faster than n there, 2.65 times from 512
+    to 1,024. The bench's line for one `++` of a text of n characters
+    with itself counts 268 steps at 1,000 characters and 25,018 at
+    100,000, and the fold appends to a text that grows. The time of a
+    step written `pass(n, sum(n - 1))` is 14.4 microseconds at n 50 and
+    51.2 at n 350 on the reference, and 11.5 and 47.7 on the machine.
+  - **The two open findings, now.**
+
+    | Finding | Reference | Machine |
+    |---|---|---|
+    | a step slows as arguments nest | still there | still there |
+    | a recursion ends at the host's stack | still there | closed: no run ended at a limit |
+
+  - **What this means for milestone 3.** The reference is still the
+    default, and the signing condition is not met on either variant:
+    the time of a step grows with nesting on both. The plan of the
+    kernel stream (`docs/plans/book-pass.md` §5, from chunk K10 (the machine: waiting) to chunk K15 (specialization, and the switch))
+    holds the work that is left. The bench now finishes on both
+    variants, so it is run on both when a chunk of that plan lands.
+  - **All else on both variants.** The 84 programs of
+    `npm run harness:next` pass on both. This stream's tests pass on
+    the machine but one, the launcher's test of a run with no step
+    budget, which does not end there. What it should assert waits on
+    the maintainer's ruling on ask 1 of PR #277.
