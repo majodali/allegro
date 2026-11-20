@@ -1465,23 +1465,44 @@ test("a step is a bounded amount of work: bits are charged by size, and a struct
   // Joining two values of 8192 bits handles 16384 bits: 256 steps beyond the call's own.
   const joined = k.evaluate(call(kp("join"), kib, kib));
   assert.equal(k.bitsOf(joined.value).bitLength, 16384);
-  assert.ok(joined.steps >= 256, `${joined.steps} steps`);
-  assert.equal(k.evaluate(call(kp("join"), kib, kib), { steps: 100 }).ended, "limit", "a small budget does not buy a large value");
-  // Doubling a value under an attempt ends at the attempt's budget, long before memory does.
   const twice = k.param("x");
   const double = k.composedFunction([twice], call(kp("join"), twice, twice));
   let grown: Value = kib;
   for (let i = 0; i < 20; i++) grown = call(double, grown);
-  const r = k.evaluate(call(kp("attempt"), grown, steps(k, 5000)));
-  assert.equal(r.ended, "complete");
-  assert.equal(form(k, r.value).form, "limit");
+  if (MACHINE) {
+    // "The kernel shares what an operation does not change", and the steps it charges
+    // follow the work it does. Joining copies nothing, so it costs the call's own step:
+    // the two are kept as the two. The bytes are laid out when something reads them, and
+    // that is charged by their size. So a budget still bounds memory: a value of a
+    // thousand million bytes is twenty small things until it is read, and reading it
+    // under a budget ends at the budget.
+    assert.ok(joined.steps < 8, `${joined.steps} steps`);
+    const huge = k.evaluate(call(kp("attempt"), call(kp("length"), grown), steps(k, 5000)));
+    assert.equal(k.bitsOf(huge.value).bytes.reduce((n, b) => n * 256 + b, 0), 8192 * 2 ** 20, "its length is known, and nothing was laid out");
+    const reads = k.primitiveFunction({ purity: "pure", hash: hash(72), name: "reads", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.bitsOf(a[0]).bytes.length & 255)) });
+    const read = k.evaluate(call(kp("attempt"), call(reads, grown), steps(k, 5000)));
+    assert.equal(read.ended, "complete");
+    assert.equal(form(k, read.value).form, "limit", "handing it to host code lays it out, which the budget does not buy");
+    assert.equal(k.evaluate(call(reads, call(kp("join"), kib, kib)), { steps: 100 }).ended, "limit", "a small budget does not buy a large value laid out");
+    assert.ok(k.evaluate(call(reads, call(kp("join"), kib, kib))).steps >= 256);
+  } else {
+    // The reference copies at the join, and charges there.
+    assert.ok(joined.steps >= 256, `${joined.steps} steps`);
+    assert.equal(k.evaluate(call(kp("join"), kib, kib), { steps: 100 }).ended, "limit", "a small budget does not buy a large value");
+    // Doubling a value under an attempt ends at the attempt's budget, long before memory does.
+    const r = k.evaluate(call(kp("attempt"), grown, steps(k, 5000)));
+    assert.equal(r.ended, "complete");
+    assert.equal(form(k, r.value).form, "limit");
+  }
   // Comparing and slicing are charged too, and give what they gave.
   const same = k.evaluate(call(kp("same"), kib, k.bits(new Uint8Array(1024).fill(0x61))));
   assert.deepEqual(k.bitsOf(same.value), { bytes: Uint8Array.of(1), bitLength: 1 });
   assert.ok(same.steps >= 128);
   const part = k.evaluate(call(kp("slice"), kib, steps(k, 8), steps(k, 4096)));
   assert.equal(k.bitsOf(part.value).bitLength, 4096);
-  assert.ok(part.steps >= 64 && part.steps < 128, "a slice of whole bytes is charged for what it takes");
+  // On the machine a part of whole bytes is a view of the value: nothing is copied, whatever its size.
+  if (MACHINE) assert.ok(part.steps < 8, `${part.steps} steps`);
+  else assert.ok(part.steps >= 64 && part.steps < 128, "a slice of whole bytes is charged for what it takes");
   // A structure handed to a primitive function costs a step for each entry.
   const size = k.primitiveFunction({ purity: "pure", hash: hash(71), name: "size", arity: 1, run: (a, c) => c.bits(Uint8Array.of(c.entriesOf(a[0]).length)) });
   const few = k.evaluate(call(size, k.structure([[null, byte(k, 1)]]))).steps;
@@ -2852,4 +2873,140 @@ test("a claim held back by a claim that waits is counted as waiting until it is 
   // Found by the acceptance stream (PR #288): the machine left this level at 1.
   assert.deepEqual([waitingOf(a.claims, held)?.decided, waitingOf(a.claims, held)?.waiting], [1, 0]);
   assert.deepEqual([waitingOf(a.claims, holder)?.decided, waitingOf(a.claims, holder)?.waiting], [1, 0]);
+});
+
+// ---- Sharing (chunk K14) --------------------------------------------------------------
+//
+// "The kernel shares what an operation does not change". The machine shares; the reference
+// copies, and gives the same values.
+
+/** build(n, out) = if n == 0 then out else build(n - 1, put(out, [], n)): a list of n entries, made by n puts. */
+function building() {
+  const base = counting();
+  const { k, call, kp, less, none } = base;
+  const [build, n, out] = [k.symbol("t.build"), k.param("n"), k.param("out")];
+  const buildFn = k.composedFunction([n, out], call(kp("if"), call(none, n), out, call(build, call(less, n), call(kp("put"), out, k.structure([]), n))));
+  const list = (size: number) => within(k, [[build, buildFn]], call(build, base.n32(size), k.structure([])));
+  return { ...base, list };
+}
+
+test("building a list entry by entry costs about its size", () => {
+  const { k, call, kp, n32, value, list } = building();
+  const stepsFor = (size: number) => {
+    const r = k.evaluate(call(kp("count"), list(size)));
+    assert.equal(r.ended, "complete");
+    assert.equal(k.bitsOf(r.value).bytes.reduce((a, b) => a * 256 + b, 0), size);
+    return r.steps;
+  };
+  if (MACHINE) {
+    const [small, large] = [stepsFor(5_000), stepsFor(40_000)];
+    assert.ok(large < small * 8.2, `eight times the entries cost ${(large / small).toFixed(2)} times the steps`);
+    assert.ok(large < 40_000 * 12, `${large} steps for 40,000 entries`);
+  } else {
+    // The reference copies the entries at every put. It cannot build a list long enough
+    // for that to show in its count of steps: its host's stack ends first. It gives the same list.
+    stepsFor(100);
+  }
+  // The entries are in the order put, and each is read by its place.
+  const size = MACHINE ? 20_000 : 100;
+  const at = (place: number) => value(k.evaluate(call(kp("get"), list(size), n32(place))).value);
+  assert.deepEqual([at(0), at(1), at(size - 1)], [size, size - 1, 1]);
+});
+
+test("structures that share entries do not see each other's", () => {
+  const { k, call, kp } = setup();
+  const [base, a, b, c, name] = [k.symbol("t.base"), k.symbol("t.a"), k.symbol("t.b"), k.symbol("t.c"), k.symbolData("t.name")];
+  const none = k.structure([]);
+  const put = (target: Value, key: Value, value: Value) => call(kp("put"), target, key, value);
+  // base = put(put([], [], 1), [], 2);  a = put(base, [], 3);  b = put(base, [], 4);  c = put(a, `name, 5)
+  const program = (body: Value) => within(k, [[base, put(put(none, none, byte(k, 1)), none, byte(k, 2))], [a, put(base, none, byte(k, 3))], [b, put(base, none, byte(k, 4))], [c, put(a, name, byte(k, 5))]], body);
+  const read = (body: Value) => num(k, k.evaluate(program(body)).value);
+  const count = (s: Value) => k.bitsOf(k.evaluate(program(call(kp("count"), s))).value).bytes.reduce((x, y) => x * 256 + y, 0);
+  // All four in one evaluation, a before b: each has its own third entry.
+  const all = whole(k, program(k.structure([[null, call(kp("get"), a, byte(k, 2))], [null, call(kp("get"), b, byte(k, 2))], [null, call(kp("count"), base)], [null, call(kp("get"), c, name)], [null, call(kp("count"), a)]])));
+  const entries = k.entriesOf(all.value).map(([, v]) => k.bitsOf(k.current(v)).bytes.reduce((x, y) => x * 256 + y, 0));
+  assert.deepEqual(entries, [3, 4, 2, 5, 3], "a's third, b's third, base still has two, c's named entry, a still has three");
+  // Read whole by a host, after the others were made from it: base has its own two entries and no more.
+  const both = whole(k, program(k.structure([[null, a], [null, c], [null, base]])));
+  assert.deepEqual(k.entriesOf(both.value).map(([, v]) => k.entriesOf(k.current(v)).length), [3, 4, 2]);
+  // The entry c has under a name is not in a, which c was made from.
+  assert.equal(k.evaluate(program(call(kp("then"), call(kp("get"), c, name), call(kp("get"), a, name)))).refuted, true);
+  assert.equal(read(call(kp("get"), b, byte(k, 1))), 2);
+  assert.equal(count(c), 4);
+  // An entry put in place of another leaves the structure it was put on as it was.
+  const [s, t] = [k.symbol("t.s"), k.symbol("t.t")];
+  const replaced = k.evaluate(within(k, [[s, put(put(none, name, byte(k, 1)), none, byte(k, 2))], [t, put(s, name, byte(k, 9))]], call(kp("join"), call(kp("get"), s, name), call(kp("get"), t, name))));
+  assert.deepEqual([...k.bitsOf(replaced.value).bytes], [1, 9]);
+  // A structure written in the text is never added to: two puts on it give two structures of two entries.
+  const lit = k.structure([[null, byte(k, 7)]]);
+  const two = k.evaluate(call(kp("join"), call(kp("get"), put(lit, none, byte(k, 8)), byte(k, 1)), call(kp("get"), put(lit, none, byte(k, 9)), byte(k, 1))));
+  assert.deepEqual([...k.bitsOf(two.value).bytes], [8, 9]);
+  assert.equal(k.entriesOf(lit).length, 1);
+});
+
+test("a private entry has no place in a structure that shares its entries", () => {
+  const { k, call, kp } = setup();
+  const [key, c] = [k.param("key"), k.param("c")];
+  // One module: (key, c) => put(put(put([], [], 1), key, 2), [], 3)
+  const none = k.structure([]);
+  const m = k.module(k.composedFunction([key, c], call(kp("put"), call(kp("put"), call(kp("put"), none, none, byte(k, 1)), key, byte(k, 2)), none, byte(k, 3))), 1, [{ role: "input", name: "c" }]);
+  const made = call(m, byte(k, 0));
+  assert.equal(k.bitsOf(k.evaluate(call(kp("count"), made)).value).bytes.reduce((x, y) => x * 256 + y, 0), 2, "the private entry is not counted");
+  assert.equal(num(k, k.evaluate(call(kp("get"), made, byte(k, 1))).value), 3, "and the entry after it is at place 1");
+});
+
+test("a part of a bits value and two joined give what copying gives", () => {
+  const { k, call, kp } = setup();
+  const text = (t: string) => k.bits(new TextEncoder().encode(t));
+  const read = (e: Value) => new TextDecoder().decode(k.bitsOf(k.evaluate(e).value).bytes);
+  const n = (x: number) => steps(k, x);
+  const slice = (v: Value, from: number, count: number) => call(kp("slice"), v, n(from * 8), n(count * 8));
+  const join = (a: Value, b: Value) => call(kp("join"), a, b);
+  const abc = text("abcdefghij");
+  assert.equal(read(slice(slice(abc, 2, 6), 1, 3)), "def", "a part of a part");
+  assert.equal(read(join(slice(abc, 7, 3), slice(abc, 0, 2))), "hijab", "parts joined");
+  assert.equal(read(slice(join(join(abc, abc), abc), 8, 14)), "ijabcdefghijab", "a part across three joined");
+  assert.equal(read(join(abc, text(""))), "abcdefghij");
+  assert.equal(num(k, k.evaluate(call(kp("same"), join(slice(abc, 0, 5), slice(abc, 5, 5)), abc)).value), 1, "the same bits, however they were put together");
+  // Bits that are not whole bytes are joined and taken apart as before.
+  const three = k.bits(Uint8Array.of(0b101), 3);
+  const six = k.evaluate(join(three, three)).value;
+  assert.deepEqual(k.bitsOf(six), { bytes: Uint8Array.of(0b101101), bitLength: 6 });
+  assert.deepEqual(k.bitsOf(k.evaluate(call(kp("slice"), join(abc, three), n(80), n(3))).value), { bytes: Uint8Array.of(0b101), bitLength: 3 });
+  // The value a part was taken from is unchanged.
+  assert.equal(new TextDecoder().decode(k.bitsOf(abc).bytes), "abcdefghij");
+});
+
+test("a text built by joining many pieces costs about its size, and is laid out once", () => {
+  const { k, call, kp, n32, less, none } = counting();
+  const piece = k.bits(new TextEncoder().encode("ab"));
+  const [grow, n, out] = [k.symbol("t.grow"), k.param("n"), k.param("out")];
+  // grow(n, out) = if n == 0 then out else grow(n - 1, join(out, "ab"))
+  const growFn = k.composedFunction([n, out], call(kp("if"), call(none, n), out, call(grow, call(less, n), call(kp("join"), out, piece))));
+  const grown = (size: number) => k.evaluate(within(k, [[grow, growFn]], call(grow, n32(size), k.bits(new Uint8Array(0)))));
+  const size = MACHINE ? 50_000 : 100;
+  const r = grown(size);
+  assert.equal(r.ended, "complete");
+  const bytes = k.bitsOf(r.value).bytes;
+  assert.equal(bytes.length, 2 * size);
+  assert.ok(bytes.every((b, i) => b === (i % 2 === 0 ? 0x61 : 0x62)));
+  if (MACHINE) {
+    assert.ok(r.steps < size * 12, `${r.steps} steps for ${size} pieces`);
+    const [small, large] = [grown(5_000).steps, grown(40_000).steps];
+    assert.ok(large < small * 8.2, `eight times the pieces cost ${(large / small).toFixed(2)} times the steps`);
+  }
+});
+
+test("a claim rests on what its value came through: a name, an argument, and a call inside both", () => {
+  const { k, isZero, call, kp } = setup();
+  const probe = k.primitiveFunction({ purity: "effectful", capability: "probe", part: "read", arity: 0, run: (_a, c) => c.bits(Uint8Array.of(0)) });
+  const [x, a] = [k.symbol("t.x"), k.param("a")];
+  const onCapability = (r: { claims: readonly { restsOn: readonly Rest[] }[] }) => r.claims.map((c) => c.restsOn.some((rest) => rest.kind === "capability" && rest.capability === "probe"));
+  // Through a name: x = probe(); claim(isZero(x)).
+  assert.deepEqual(onCapability(k.evaluate(within(k, [[x, call(probe)]], call(kp("claim"), call(isZero, x))))), [true]);
+  // Through an argument: (a => claim(isZero(a)))(probe()).
+  assert.deepEqual(onCapability(k.evaluate(call(k.composedFunction([a], call(kp("claim"), call(isZero, a))), call(probe)))), [true]);
+  // Through both, and a second name: x = probe(); y = x; (a => claim(isZero(a)))(y).
+  const y = k.symbol("t.y");
+  assert.deepEqual(onCapability(k.evaluate(within(k, [[x, call(probe)], [y, x]], call(k.composedFunction([a], call(kp("claim"), call(isZero, a))), y)))), [true]);
 });

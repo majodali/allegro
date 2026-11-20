@@ -724,6 +724,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-20 (../records/book-pass/adversarial-review-2.md, Rulings taken, streams, large data and iteration)
 - Use case: a parser builds a tree of a hundred thousand nodes with a hundred thousand puts, not ten thousand million copies.
 - Notes: new, by ruling. A requirement on the kernel that is rebuilt to keep its own stack, beside "A loop written as a recursion runs in constant space".
+- Notes (2026-11-20, built): built on the kernel variant that keeps its own stack; the reference kernel still copies. An entry put at the end of a structure shares the list of entries where nothing else has added to that list, and is copied once otherwise; an entry put in place of another copies. A key and a place are found without a search. A part of whole bytes is a view. Two values of whole bytes joined are kept as the two and laid out when something reads the bytes; that is when the steps are charged, by the size laid out, so a budget still bounds memory. Bits that are not whole bytes are copied as before.
 - Chapter: Values
 
 #### Structures immutable by default; derive, never mutate

@@ -353,7 +353,7 @@ export const createCore = () => {
   };
   /** A bits value from its bits, held in as few bytes as hold them. */
   /** True where a bits value is whole bytes, so it can be handled a byte at a time. */
-  const whole = (b: Bits): boolean => b.bitLength === b.bytes.length * 8;
+  const whole = (b: Bits): boolean => b.whole;
   const packed = (bits: readonly number[]): V => {
     const bytes = new Uint8Array(Math.ceil(bits.length / 8));
     const pad = bytes.length * 8 - bits.length;
