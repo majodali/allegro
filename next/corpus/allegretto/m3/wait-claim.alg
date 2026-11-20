@@ -10,3 +10,4 @@ output.write("after the claim")
 // expect: before the claim: 5
 // expect: after the claim
 // end: completed
+// summary: decided

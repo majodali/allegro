@@ -1494,6 +1494,14 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+
+### 2026-11 — The notation writes `first` (B-196, chunk Q5 (the first notation and the bootstrap))
+
+B-196 (the rebuild's acceptance side). The emitter binds the name
+`first` to the kernel primitive the kernel stream built, so Allegretto
+can write the earlier of two answers, and with the timer a timeout.
+Three programs show it, on both kernel variants.
+
 ### 2026-11 — What a result holds (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 1)
 
 B-196 (the rebuild's acceptance side). The launcher gives back, with
