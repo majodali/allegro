@@ -1469,6 +1469,17 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+
+### 2026-11 — No default step budget; the launcher's test ends on both kernel variants (B-196, chunk Q7 (the minimal launcher and the output capability))
+
+B-196 (the rebuild's acceptance side). The maintainer ruled that the
+launcher gives no default step budget: a run whose configuration sets
+none goes on. The launcher's test of such a run relied on the host's
+stack to end a program that never ends, and did not end on the kernel
+variant that keeps its own stack. It now uses a kernel that stops at a
+limit of its own, and passes on both variants. The maintainer signed
+milestone 2 the same day.
+
 ### 2026-11 — The bench finishes on both kernel variants (B-196, chunk Q8 (the speed tests of milestone 3))
 
 B-196 (the rebuild's acceptance side). `npm run bench:next` did not
