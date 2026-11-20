@@ -3895,7 +3895,14 @@ table and the stream plans.
   (`docs/records/book-pass/adversarial-review.md`, issue 31). To
   decide when the tools are rebuilt: whether the summary sets the
   platform's own assumptions apart from a project's.
-- [ ] **B-202** (threads and budgets at run time) · L0 · A discussion
+- [x] **B-202** (threads and budgets at run time) · L0 · HELD AND RULED
+  2026-11-20: a budget and a slice are two things; one task runs at a
+  time and a slice never changes what happens; a refutation outranks a
+  limit; `first(a, b)` for the earlier of two answers, with the other
+  cancelled. Recorded in the inventory and in
+  `docs/records/book-pass/adversarial-review-2.md`. Built: a refutation
+  outranks a limit. The rest is built with the evaluator that keeps its
+  own stack. As filed: A discussion
   to hold before the evaluator is rebuilt to keep its own stack. A
   launcher bounds one call's time at run time by a budget of steps, so
   that a page can yield and a server stay fair. Not designed: how that

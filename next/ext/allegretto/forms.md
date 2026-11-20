@@ -443,3 +443,7 @@ The maintainer approved each proposal on 2026-11-16, with one change.
    statement at its place; it opens no block. `int`, `float`, `text`
    and `bits` are structures. Four primitives are added: `float.eq`,
    `float.gt`, `float.ge` and `bits.int`.
+13. **The earlier of two answers** (2026-11-20). `first(a, b)` is
+   ruled as a kernel primitive and not built: it starts both, gives the
+   value of whichever is known first, and cancels the other. Until it
+   is built Allegretto has no way to write a timeout.

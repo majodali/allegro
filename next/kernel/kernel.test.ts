@@ -1960,7 +1960,11 @@ test("after a refuted statement the rest is evaluated ahead: a further refutatio
   assert.deepEqual(one.claims.map((c) => c.refuted), [1], "one refutation, one record");
 });
 
-test("looking ahead after a refutation never ends the evaluation at its limit", () => {
+// Until the ruling of 2026-11-20 this test was "looking ahead after a refutation never ends
+// the evaluation at its limit", and asserted that looking took at most half of the steps
+// left. The maintainer ruled that a refutation outranks a limit: looking may use every step
+// that is left, the refutation stands all the same, and the result says it was cut short.
+test("a refutation outranks a limit: the steps may run out while looking for more, and the refutation stands", () => {
   const { k, add, isZero, call, kp } = setup();
   // After the refuted claim, a sum of a hundred additions: more than all the steps that are left.
   let sum: Value = byte(k, 0);
@@ -1968,7 +1972,16 @@ test("looking ahead after a refutation never ends the evaluation at its limit", 
   const r = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 80 });
   assert.equal(r.ended, "complete", "the refutation is the answer, not the limit");
   assert.equal(r.refuted, true);
-  assert.ok(r.steps <= 45, `looking ahead takes at most half of what is left: ${r.steps}`);
+  assert.equal(r.cutShort, true, "and the result says looking for more was cut short");
+  assert.equal(r.steps, 80, "every step that was left went into looking");
+  // With steps to spare nothing is cut short, and the field is absent.
+  const whole = k.evaluate(call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.scope(), { steps: 1000 });
+  assert.equal(whole.refuted, true);
+  assert.equal("cutShort" in whole, false);
+  // Inside an attempt the same holds: the attempt answers that it was refuted, not that it reached its limit.
+  const tried = k.evaluate(call(kp("attempt"), call(kp("then"), call(kp("claim"), call(isZero, byte(k, 3))), sum), k.bits(Uint8Array.of(0, 0, 0, 50))), k.scope());
+  const [first] = k.entriesOf(tried.value);
+  assert.equal(k.symbolName(first[1]), "refuted");
 });
 
 test("a call of advance that meets a refutation performs no further effect, and a later call goes on", () => {
