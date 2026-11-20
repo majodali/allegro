@@ -13,9 +13,10 @@
 // What runs, for each test and each input size:
 //   new kernel      the Allegretto program, emitted once by
 //                   next/bootstrap/emit.ts and launched in process by
-//                   next/launch/launcher.ts on the reference kernel, with the
-//                   output capability, the shipped primitives and no step
-//                   budget. The time is the launch: kernel creation, loading
+//                   next/launch/launcher.ts on the kernel next/kernel/create.ts
+//                   gives (the environment variable ALLEGRO_KERNEL chooses the
+//                   variant; the report names it), with the output
+//                   capability, the shipped primitives and no step budget. The time is the launch: kernel creation, loading
 //                   the record, evaluation. The emit time is the bootstrap's,
 //                   reported in its own column.
 //   present (same)  the twin under next/corpus/speed/present/, in the
@@ -32,17 +33,26 @@
 // implementation stops at the first size that does not complete, that
 // prints a wrong answer, or that passes LONG_MS; larger sizes are not run
 // on it. The present tree is imported, read and run, never changed.
+//
+// The search for the largest size that completes doubles the size, then
+// halves the gap. It ends its doubling at 65,536, or at the first run
+// that completes but passes LONG_MS: a kernel that stops at no depth
+// would otherwise be searched until the cap whatever a run costs. A run
+// in a fresh process is ended after FRESH_MS.
 
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
+import { chosenVariant } from "../../kernel/create.js";
 import {
   emitTimed, endWord, flatInput, lettersTo, nestedInput, read, ROOT, runNew, SPEED_DIR, squaresTo, typedLines, UNIT, withInput, withSizes,
 } from "./programs.js";
 
 /** A run longer than this ends an implementation's series, and is run once. */
 export const LONG_MS = 10_000;
+/** A run in a fresh process is ended after this long, and counts as not completed. */
+export const FRESH_MS = 60_000;
 /** Timed runs after the warm-up. */
 export const RUNS = 5;
 
@@ -288,18 +298,52 @@ async function typedTest(p: Present, shape: "loop" | "halving", log: (line: stri
 
 // ---- The recursion ceiling ----------------------------------------------------------
 
-/** The largest n in [1, cap] for which `completes(n)` holds, assuming it holds up to some n and fails beyond; null if it fails at 1. */
-async function largest(completes: (n: number) => Promise<boolean>, cap = 1 << 16): Promise<{ n: number | null; capped: boolean }> {
-  if (!(await completes(1))) return { n: null, capped: false };
+/** What the search for the largest size found. */
+export interface Largest {
+  /** The largest size seen to complete; null if size 1 does not. */
+  readonly n: number | null;
+  /** The doubling reached the cap with every run completing. */
+  readonly capped: boolean;
+  /** The doubling ended at a run that completed but took longer than `longMs`. */
+  readonly long: boolean;
+}
+
+/**
+ * The largest n in [1, cap] for which `completes(n)` holds, assuming it
+ * holds up to some n and fails beyond; null if it fails at 1. The size is
+ * doubled, then the gap is halved. The doubling ends at the cap, or at
+ * the first run that completes but takes longer than `longMs`: the
+ * search then says how far it got and does not look further.
+ */
+export async function largest(
+  completes: (n: number) => Promise<boolean>,
+  cap = 1 << 16,
+  longMs = LONG_MS,
+  now: () => number = () => performance.now(),
+): Promise<Largest> {
+  const timed = async (n: number): Promise<{ ok: boolean; long: boolean }> => {
+    const t0 = now();
+    const ok = await completes(n);
+    return { ok, long: now() - t0 > longMs };
+  };
+  const first = await timed(1);
+  if (!first.ok) return { n: null, capped: false, long: false };
+  if (first.long) return { n: 1, capped: false, long: true };
   let lo = 1, hi = 2;
-  while (hi <= cap && (await completes(hi))) { lo = hi; hi *= 2; }
-  if (hi > cap) return { n: lo, capped: true };
+  while (hi <= cap) {
+    const r = await timed(hi);
+    if (!r.ok) break;
+    lo = hi;
+    if (r.long) return { n: lo, capped: false, long: true };
+    hi *= 2;
+  }
+  if (hi > cap) return { n: lo, capped: true, long: false };
   while (hi - lo > 1) {
     const mid = Math.floor((lo + hi) / 2);
     if (await completes(mid)) lo = mid;
     else hi = mid;
   }
-  return { n: lo, capped: false };
+  return { n: lo, capped: false, long: false };
 }
 
 /** The plain recursion of the known limit, `sum(n)`, in each language. */
@@ -323,8 +367,9 @@ async function ceilings(p: Present, log: (line: string) => void): Promise<string
   const fresh = (args: (file: string) => string[], text: string, want: string): Probe => {
     const file = path.join(dir, "probe.alg");
     fs.writeFileSync(file, text);
-    const r = spawnSync(process.execPath, ["--import", "tsx", ...args(file)], { cwd: ROOT, encoding: "utf8" });
+    const r = spawnSync(process.execPath, ["--import", "tsx", ...args(file)], { cwd: ROOT, encoding: "utf8", timeout: FRESH_MS });
     const ok = r.status === 0 && r.stdout.trim() === want;
+    if (!ok && r.status === null) return { ok, end: `no end within ${FRESH_MS} ms` };
     const why = /limit|stack/i.exec(`${r.stdout}\n${r.stderr}`);
     return { ok, end: ok ? "completed" : why === null ? `exit ${r.status}` : /stack/i.test(why[0]) ? "stack" : "kernel limit" };
   };
@@ -360,7 +405,8 @@ async function ceilings(p: Present, log: (line: string) => void): Promise<string
     let nextStop = "", sameStop = "";
     const a = await largest(async (n) => { const r = await c.next(n); if (!r.ok) nextStop = r.end; return r.ok; });
     const b = await largest(async (n) => { const r = await c.same(n); if (!r.ok) sameStop = r.end; return r.ok; });
-    const say = (x: { n: number | null; capped: boolean }, stop: string): string => (x.capped ? `${x.n} and beyond (not reached)` : `${x.n ?? "none"}, then ${stop}`);
+    const say = (x: Largest, stop: string): string =>
+      x.capped ? `${x.n} and beyond (not reached)` : x.long ? `${x.n} and beyond (not searched: that run passed ${LONG_MS} ms)` : `${x.n ?? "none"}, then ${stop}`;
     const line = `  ${pad(c.name, 44)} new kernel ${say(a, nextStop)}; present ${say(b, sameStop)}`;
     log(line);
     out.push(line);
@@ -493,7 +539,7 @@ async function main(): Promise<void> {
   const progress = (l: string): void => { process.stderr.write(l + "\n"); };
   for (const l of machine()) say(l);
   say(`timing: median of ${RUNS} runs after a warm-up, in ms; a run past ${LONG_MS} ms is run once and ends its series`);
-  say("new: the reference kernel, in process, launch only; emit: the bootstrap's emit of the text; present: the twin in the present tree's base language, evalSource in process (its parse included, start-up left out); native: the present tree's own engine or typed language");
+  say(`new: the kernel variant "${chosenVariant()}", in process, launch only; emit: the bootstrap's emit of the text; present: the twin in the present tree's base language, evalSource in process (its parse included, start-up left out); native: the present tree's own engine or typed language`);
   say("");
   const p = await present();
 
@@ -528,7 +574,7 @@ async function main(): Promise<void> {
   }
   say("");
   progress("ceilings…");
-  say("The recursion ceiling: the largest n that completes, found by doubling then halving, one run each:");
+  say(`The recursion ceiling: the largest n that completes, found by doubling then halving, one run each; the doubling ends at 65536 or at a run past ${LONG_MS} ms:`);
   for (const l of await ceilings(p, progress)) say(l);
   say("");
   progress("where the time goes…");
