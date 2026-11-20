@@ -1,7 +1,8 @@
 // The Allegretto programs of the acceptance corpus (B-196 (the rebuild's
 // acceptance side), chunk Q6 (the comparison harness), part 2; chunk Q7
 // (the minimal launcher and the output capability), part 3, for the
-// inputs, and part 4, for imports and the expected refusal): how a
+// inputs, part 4, for imports and the expected refusal, and part 5, for
+// the timer capability): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -31,9 +32,18 @@
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
 // next/launch/launcher.ts on the reference kernel, the imported ones
-// loaded first, with the output capability, the shipped primitives and its
-// inputs. It passes when its lines, its end, the lines printed before each
-// later phase and, where stated, its yielded keys are the expected ones.
+// loaded first, with the output capability, the timer capability, the
+// shipped primitives and its inputs. It passes when its lines, its end,
+// the lines printed before each later phase and, where stated, its yielded
+// keys are the expected ones.
+//
+// The ceiling grants `output` and `timer`. The timer capability
+// (next/launch/timer.ts) is made, for each run, with a new virtual clock
+// (`virtualClock` of next/launch/clock.ts): it runs no real time, and
+// answers the waits in the order they fall due, the earlier asked first
+// among waits due at the same time. So a program's printed order under
+// waits is the order its waits fall due, and a run takes no wall-clock
+// time for them.
 //
 // Where a program is, and where its imported texts are: a program is a
 // `.alg` file directly in a directory `m<milestone>`, or the file
@@ -52,6 +62,8 @@ import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, plainValue, type Inputs, type LaunchEnd, type Plain } from "../launch/launcher.js";
 import { output, outputWrite } from "../launch/output.js";
+import { timer } from "../launch/timer.js";
+import { virtualClock } from "../launch/clock.js";
 import { shipped, shippedByName } from "../prims/index.js";
 
 /** Where the programs are, relative to the repository root. */
@@ -70,6 +82,9 @@ export function readUnder(root: string): ReadText {
 
 /** The step budget every program runs under. */
 export const STEPS = 1_000_000;
+
+/** The capabilities the ceiling grants every program. */
+export const CEILING: readonly string[] = ["output", "timer"];
 
 /** What a program's comments say it must do, and the cases it names. */
 export interface Pins {
@@ -245,8 +260,8 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     createKernel,
     program: e.program,
     imports: e.imports,
-    configuration: { ceiling: ["output"], steps: STEPS, inputs: given.inputs, later: given.later },
-    target: { capabilities: [output], primitives: shipped },
+    configuration: { ceiling: CEILING, steps: STEPS, inputs: given.inputs, later: given.later },
+    target: { capabilities: [output, timer(virtualClock().clock)], primitives: shipped },
   });
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))

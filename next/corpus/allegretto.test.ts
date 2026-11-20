@@ -15,7 +15,10 @@
 // on 2026-11-19, under m3/. Chunk Q5, part 5, and chunk Q7, part 4, added
 // imports and the `// end: refused:` line, and the programs that use
 // them: a program that imports texts of its own is `main.alg` in a
-// directory beside them.
+// directory beside them. Chunk Q7, part 5, added the timer capability,
+// which the runner grants on a virtual clock (`virtualClock` of
+// next/launch/clock.ts), the programs of milestone 2 under m2/, and the
+// programs under m3/ that show the forms over answers that arrive late.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -59,6 +62,29 @@ test("the programs that use inputs are there, in milestone 1's directory and mil
   for (const name of ["m1/phase-fills-input", "m1/phase-re-evaluates", "m1/input-filled-once", "m1/unknown-condition", "m3/input-at-start", "m3/input-not-supplied", "m3/input-later-binding"])
     assert.ok(FILES.includes(`${PROGRAMS_DIR}/${name}.alg`), name);
   assert.equal(milestoneOf(`${PROGRAMS_DIR}/m1/a.alg`), 1);
+});
+
+test("the programs that wait on the timer are there: milestone 2's under m2/, and the forms over late answers under m3/", () => {
+  for (const name of [
+    "m2/delay-pending", "m2/delay-propagates", "m2/print-defers", "m2/independent-waits", "m2/dependent-chain", "m2/later-entry",
+    "m2/module-waits/main", "m2/module-without-timer/main", "m2/print-capability", "m2/top-level-print",
+    "m3/wait-statements", "m3/wait-sync", "m3/wait-then", "m3/wait-claim", "m3/wait-each", "m3/wait-each-at-once", "m3/wait-each-within", "m3/wait-all",
+  ]) assert.ok(FILES.includes(`${PROGRAMS_DIR}/${name}.alg`), name);
+});
+
+test("the runner grants timer on a virtual clock: the lines print in the order the waits fall due, and no wait is waited in real time", async () => {
+  const program = [
+    "capability output",
+    "capability timer",
+    'slow <- output.write("slow " ++ int.text(timer.wait(9223372036854775807)))',
+    'fast <- output.write("fast " ++ int.text(timer.wait(4611686018427387904)))',
+    'equal <- output.write("equal " ++ int.text(timer.wait(4611686018427387904)))',
+    "// expect: fast 4611686018427387904",
+    "// expect: equal 4611686018427387904",
+    "// expect: slow 9223372036854775807",
+    "// end: completed",
+  ].join("\n");
+  assert.deepEqual((await runProgram(program)).problems, []);
 });
 
 test("the input lines are read as the convention states: at the start, and each later phase with the expect lines above it", () => {

@@ -1,7 +1,8 @@
 // The terminal's command that runs an Allegretto text (B-196 (the
 // rebuild's acceptance side), chunk Q5 (the first notation and the
 // bootstrap), part 3; chunk Q7 (the minimal launcher and the output
-// capability), part 3, for the inputs, and part 4, for imports): it emits
+// capability), part 3, for the inputs, part 4, for imports, and part 5,
+// for the timer capability): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
@@ -19,9 +20,10 @@
 // imported text is `name.alg` in the directory of the text that imports
 // it (`importedFile` of the driver).
 //
-// The configuration and the target are the terminal's: the ceiling grants
-// `output`, the target's pure primitives are the shipped ones, and
-// `--steps` sets a step budget. Each `--input name=<literal>` supplies the
+// The target is the terminal's: `output`, and `timer` on the host's real
+// timer, and the shipped pure primitives. The ceiling grants `output` and
+// `timer` (`TERMINAL_CEILING` of next/launch/terminal.ts). `--steps`
+// sets a step budget. Each `--input name=<literal>` supplies the
 // input `name` at the start. Each `--later name=<literal>` is one later
 // phase that supplies it, in the order written. The value is one
 // Allegretto literal, read by `readLiteral` of next/bootstrap/literal.ts.
