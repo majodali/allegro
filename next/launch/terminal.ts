@@ -23,13 +23,15 @@
 // stdout, and exits 0 when the run completed. Otherwise it writes the
 // reason to stderr and exits 1.
 //
-// The target supplies two capabilities: `output` (next/launch/output.ts)
-// and `timer` (next/launch/timer.ts), made with the host's real timer
-// (`realClock` of next/launch/clock.ts). Its pure primitives are the
-// shipped ones, `shipped` of next/prims/index.ts.
+// The target supplies three capabilities: `output` (next/launch/output.ts);
+// `timer` (next/launch/timer.ts), made with the host's real timer
+// (`realClock` of next/launch/clock.ts); and `http` (next/launch/http.ts,
+// chunk Q16 (the capabilities the launchers ship), part 1), made with the
+// host's `fetch` (`fetchTransport`). Its pure primitives are the shipped
+// ones, `shipped` of next/prims/index.ts.
 //
 // The configuration, as far as milestone 2 needs it: the ceiling grants
-// both capabilities the terminal supplies (`TERMINAL_CEILING`), for
+// every capability the terminal supplies (`TERMINAL_CEILING`), for
 // `npm run launch` and `npm run allegretto` alike. `--steps` sets a step
 // budget, and without it there is none.
 //
@@ -48,6 +50,7 @@ import { describe, launch, type Configuration } from "./launcher.js";
 import { output } from "./output.js";
 import { realClock } from "./clock.js";
 import { timer } from "./timer.js";
+import { fetchTransport, http } from "./http.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
 export const KERNEL_MODULE = "next/kernel/create.ts";
@@ -84,7 +87,7 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
 }
 
 /** The ceiling of both terminal commands: every capability the terminal supplies. */
-export const TERMINAL_CEILING: readonly string[] = ["output", "timer"];
+export const TERMINAL_CEILING: readonly string[] = ["output", "timer", "http"];
 
 /**
  * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
@@ -104,7 +107,7 @@ export async function runOnTerminal(
     program,
     imports,
     configuration: { ceiling: TERMINAL_CEILING, steps, ...inputs },
-    target: { capabilities: [output, timer(realClock)], primitives: shipped },
+    target: { capabilities: [output, timer(realClock), http(fetchTransport)], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
   if (outcome.end.kind !== "completed") fail(describe(outcome.end));

@@ -11,3 +11,6 @@ claim(undecided("no rule decides this yet"))
 output.write("after the undecided claim")
 // expect: after the undecided claim
 // end: completed
+// The undecided claim is the weakest of the two, so the summary is
+// undecided.
+// summary: undecided

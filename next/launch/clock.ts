@@ -48,8 +48,8 @@ export interface VirtualClock {
   pending(): number;
 }
 
-/** One host turn: what lets the launcher go on before the next answer. */
-const nextTurn: (f: () => void) => void =
+/** One host turn: what lets the launcher go on before the next answer. The scripted transport of next/launch/scripted-transport.ts uses it too. */
+export const nextTurn: (f: () => void) => void =
   typeof (globalThis as { setImmediate?: unknown }).setImmediate === "function"
     ? (f) => (globalThis as unknown as { setImmediate: (f: () => void) => void }).setImmediate(f)
     : (f) => setTimeout(f, 0);

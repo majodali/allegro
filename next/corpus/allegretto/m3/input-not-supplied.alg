@@ -9,3 +9,6 @@ output.write(int.text(x))
 // expect: 42
 output.write(foo)
 // end: waiting: the program waits on the input(s) foo, which the configuration does not supply
+// The write of foo waits on the input when the run ends, so its claim is
+// undecided.
+// summary: undecided
