@@ -37,10 +37,16 @@
 // would start `e` before its place. Every other check of names is the
 // emitter's (next/bootstrap/emit.ts), at the end of the text.
 //
-// Imports are read as header lines and go no further here: `with`,
-// `without` and `use` do not parse, and the launcher refuses a module
-// that imports (next/launch/launcher.ts). They need the imported module's
-// declarations and identity, which no part of the bootstrap has yet.
+// An import is read as a header line with its two lists (chunk Q5, part
+// 5): the pairs after `with`, each a name and an expression, and the
+// names after `without`, each in written order. Each list may be written
+// once. What an import stands for is the emitter's, which needs the
+// imported module's declarations and identity: the driver
+// (next/bootstrap/driver.ts) supplies them. The `<-` check above counts an
+// import as a binding of the module's block, which needs the names its
+// `with` expressions use. `use name` is refused here with a reason: its
+// notation needs the parser engine written in Allegretto, which is not
+// built.
 
 import { LADDER_TAG, parseAllegretto, type ParseTree } from "./allegretto-grammar.js";
 
@@ -108,11 +114,21 @@ export type Item =
   /** A bare expression. */
   | { readonly k: "statement"; readonly expr: Expr; readonly at: Place };
 
+/** One pair of an import's `with` list: the name the imported module declares, and the expression handed for it. */
+export interface WithPair {
+  readonly name: Name;
+  readonly value: Expr;
+}
+
 /** A header line. */
 export interface Header {
   readonly k: "capability" | "input" | "key" | "import";
   readonly name: Name;
   readonly at: Place;
+  /** For an import: the pairs of its `with` list, in written order. Empty for every other header line. */
+  readonly with: readonly WithPair[];
+  /** For an import: the names of its `without` list, in written order. Empty for every other header line. */
+  readonly without: readonly Name[];
 }
 
 /** A text read as one module: its header lines, in written order, and its block. */
@@ -343,9 +359,12 @@ export function read(text: string): ReadResult {
       const it = statement(s, false);
       if (it !== undefined) items.push(it);
     }
-    arrowsInPlace(items);
+    arrowsInPlace(items, []);
     return items;
   };
+  /** The branches under a node that have one of the tags, not looking inside one found. */
+  const tagged = (t: ParseTree, tags: readonly string[]): Branch[] =>
+    branches(t).flatMap((c) => (tags.includes(c.tag ?? "") ? [c] : tagged(c, tags)));
 
   /** The value of a binding, a function or `x <- e`: an indented block, `sync` and one, or an expression. */
   const bodyOf = (inner: Branch): Expr => {
@@ -357,11 +376,18 @@ export function read(text: string): ReadResult {
   /**
    * Refuses each statement written above `x <- e` in its block that needs
    * `x`, itself or through a binding of the block (forms.md §2, "Failures"):
-   * it would start `e` before its place.
+   * it would start `e` before its place. `imports` are the module's
+   * imports, each a binding of its block that uses the names of its
+   * `with` expressions.
    */
-  const arrowsInPlace = (items: readonly Item[]): void => {
-    const bindings = new Map<string, Item>();
-    for (const it of items) if (it.k === "binding" || it.k === "function") bindings.set(it.name.name, it);
+  const arrowsInPlace = (items: readonly Item[], imports: readonly Header[]): void => {
+    const uses = new Map<string, Set<string>>();
+    for (const it of items) if (it.k === "binding" || it.k === "function") uses.set(it.name.name, freeOfItem(it));
+    for (const h of imports) {
+      const used = new Set<string>();
+      for (const p of h.with) freeNames(p.value, used);
+      uses.set(h.name.name, used);
+    }
     /** The names of this block a line needs: what it uses, and what the bindings it uses use, of this block's names. */
     const needs = (it: Item): Set<string> => {
       const out = new Set<string>();
@@ -370,8 +396,8 @@ export function read(text: string): ReadResult {
         const n = todo.pop() as string;
         if (out.has(n)) continue;
         out.add(n);
-        const b = bindings.get(n);
-        if (b !== undefined) todo.push(...freeOfItem(b));
+        const b = uses.get(n);
+        if (b !== undefined) todo.push(...b);
       }
       return out;
     };
@@ -401,9 +427,28 @@ export function read(text: string): ReadResult {
         case "import_stmt": {
           const k = inner.tag === "capability_decl" ? "capability" : inner.tag === "input_decl" ? "input" : inner.tag === "key_decl" ? "key" : "import";
           if (!top) return refuse(where, `the header line ${k} belongs at the top level of the module, not in a block`);
-          headers.push({ k, name: nameOf(child(inner, "ident")), at: where });
+          const name = nameOf(child(inner, "ident"));
+          const lists = tagged(inner, ["with_clause", "without_clause"]);
+          for (const word of ["with", "without"]) {
+            const written = lists.filter((c) => c.tag === `${word}_clause`);
+            if (written.length > 1) return refuse(at(written[1]), `the import of ${name.name} has two ${word} lists: write one, its entries separated by commas`);
+          }
+          const pairs = lists.filter((c) => c.tag === "with_clause").flatMap((c) => tagged(c, ["with_pair"]));
+          const withheld = lists.filter((c) => c.tag === "without_clause").flatMap((c) => tagged(c, ["ident"]));
+          headers.push({
+            k,
+            name,
+            at: where,
+            with: pairs.map((p) => ({ name: nameOf(child(p, "ident")), value: lastExpr(p) })),
+            without: withheld.map(nameOf),
+          });
           return undefined;
         }
+        case "use_decl":
+          return refuse(
+            where,
+            `use ${leafText(child(inner, "ident"))} brings a module's notation, which needs the parser engine written in Allegretto; that engine is not built, so use is not read yet (forms.md §2, "The module")`,
+          );
         case "binding":
         case "export_binding": {
           const exported = inner.tag === "export_binding";
@@ -436,7 +481,7 @@ export function read(text: string): ReadResult {
     const it = statement(s, true);
     if (it !== undefined) items.push(it);
   }
-  arrowsInPlace(items);
+  arrowsInPlace(items, headers.filter((h) => h.k === "import"));
   if (findings.length > 0) return { ok: false, findings: [...findings].sort((a, b) => a.at.start - b.at.start) };
   return { ok: true, module: { headers, items } };
 }

@@ -1,7 +1,7 @@
 // The Allegretto programs of the acceptance corpus (B-196 (the rebuild's
 // acceptance side), chunk Q6 (the comparison harness), part 2; chunk Q7
 // (the minimal launcher and the output capability), part 3, for the
-// inputs): how a
+// inputs, and part 4, for imports and the expected refusal): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -12,8 +12,11 @@
 //   // realises: <case id>   a case of next/corpus/cases.json it shows, one per line;
 //   // expect: <line>        each line it prints, in order;
 //   // end: <how>            how the run ends: `completed`, `refuted: <the
-//                             reason the kernel gives>`, or `waiting: <the
-//                             launcher's reason>`;
+//                             reason the kernel gives>`, `waiting: <the
+//                             launcher's reason>`, or `refused: <a
+//                             finding's message>` for a text the reader, the
+//                             emitter or the driver refuses, or `refused:
+//                             <the launcher's reason>`;
 //   // yields: a, b          the keys of the structure the module yields, in
 //                             order, read through the kernel's interface;
 //   // input: n = <literal>  the configuration supplies the input n at the
@@ -25,18 +28,27 @@
 //                             below it in that phase or after, as the
 //                             launcher's count of lines before each phase
 //                             (`linesBeforePhase`) shows.
-// A program is emitted with next/bootstrap/emit.ts and its record run by
-// the launcher of next/launch/launcher.ts on the reference kernel, with the
-// output capability, the shipped primitives and its inputs. It passes when
-// its lines, its end, the lines printed before each later phase and, where
-// stated, its yielded keys are the expected ones.
+// A program is emitted with the texts it imports by the bootstrap's driver
+// (next/bootstrap/driver.ts), and its records run by the launcher of
+// next/launch/launcher.ts on the reference kernel, the imported ones
+// loaded first, with the output capability, the shipped primitives and its
+// inputs. It passes when its lines, its end, the lines printed before each
+// later phase and, where stated, its yielded keys are the expected ones.
+//
+// Where a program is, and where its imported texts are: a program is a
+// `.alg` file directly in a directory `m<milestone>`, or the file
+// `main.alg` in a directory directly under one. The other `.alg` files of
+// such a directory are the texts `main.alg` imports, found by the driver's
+// rule (`importedFile`): they are no programs of their own. A program
+// directly in `m<milestone>` may import another file there, which is then
+// a program too.
 
 import * as fs from "fs";
 import * as path from "path";
 import { createKernel } from "../kernel/create.js";
 import type { Cell } from "../kernel/interface.js";
 import { encode, load, type SavedProgram } from "../kernel/saved-program.js";
-import { emit, describeFinding } from "../bootstrap/emit.js";
+import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, plainValue, type Inputs, type LaunchEnd, type Plain } from "../launch/launcher.js";
 import { output, outputWrite } from "../launch/output.js";
@@ -44,6 +56,17 @@ import { shipped, shippedByName } from "../prims/index.js";
 
 /** Where the programs are, relative to the repository root. */
 export const PROGRAMS_DIR = "next/corpus/allegretto";
+
+/** The repository root. */
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+
+/** A reader of the texts under a root: a path relative to it, or absolute; undefined where there is no such file. */
+export function readUnder(root: string): ReadText {
+  return (file) => {
+    const p = path.isAbsolute(file) ? file : path.join(root, file);
+    return fs.existsSync(p) && fs.statSync(p).isFile() ? fs.readFileSync(p, "utf-8") : undefined;
+  };
+}
 
 /** The step budget every program runs under. */
 export const STEPS = 1_000_000;
@@ -117,30 +140,41 @@ export function endText(end: LaunchEnd): string {
   return `${end.kind}: ${"reason" in end ? end.reason : ""}`;
 }
 
-/** The emitted record of a text, as JSON round-trips it, or the emitter's findings. */
-export function emitted(text: string, file = "<text>"): { program: SavedProgram } | { findings: string[] } {
-  const r = emit(text);
-  if (!r.ok) return { findings: r.findings.map((f) => describeFinding(f, file)) };
-  return { program: JSON.parse(encode(r.program)) as SavedProgram };
+/**
+ * The emitted record of a text and the records of the texts it imports, in
+ * the order they are loaded, as JSON round-trips them; or the driver's
+ * findings, each as a person reads it and as its message alone.
+ */
+export function emitted(text: string, file = "<text>", readText: ReadText = readUnder(ROOT)): { program: SavedProgram; imports: SavedProgram[] } | { findings: string[]; messages: string[] } {
+  const r = drive(text, file, readText);
+  if (!r.ok) return { findings: r.findings.map(describeDriveFinding), messages: r.findings.map((f) => f.message) };
+  const records = r.records.map((x) => JSON.parse(encode(x.program)) as SavedProgram);
+  return { program: records[records.length - 1], imports: records.slice(0, -1) };
 }
 
 /**
  * The keys of the structure a module yields, read through the kernel's
- * interface: the record is loaded into a kernel and the module applied by
- * hand to an output capability and its inputs, since nothing imports a
- * module yet. An input supplied at the start is its plain data; any other
- * is a cell, filled by the later phase that supplies it, in order.
+ * interface: the records it imports and then its own are loaded into a
+ * kernel, and the module applied by hand to an output capability and its
+ * inputs, with no argument for an import, which the kernel supplies. An
+ * input supplied at the start is its plain data; any other is a cell,
+ * filled by the later phase that supplies it, in order.
  */
-export function yieldedKeys(program: SavedProgram, given: { inputs: Inputs; later: Inputs[] } = { inputs: {}, later: [] }): { keys: (string | null)[] } | { problem: string } {
+export function yieldedKeys(
+  program: SavedProgram,
+  given: { inputs: Inputs; later: Inputs[] } = { inputs: {}, later: [] },
+  imports: readonly SavedProgram[] = [],
+): { keys: (string | null)[] } | { problem: string } {
   const k = createKernel();
   const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
-  const primitives = new Map(program.needs.map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+  const primitives = new Map([...imports, program].flatMap((doc) => doc.needs).map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+  for (const doc of imports) load(k, doc, primitives);
   const fn = load(k, program, primitives);
-  // One argument for each header line: the output capability, and the inputs.
-  const other = program.declares.find((d) => d.role !== "input" && (d.role !== "capability" || d.name !== "output"));
+  // One argument for each capability and input: the output capability, and the inputs.
+  const other = program.declares.find((d) => d.role === "capability" && d.name !== "output");
   if (other !== undefined) return { problem: `the module declares the ${other.role} ${other.name}, which this reading of a yield cannot supply` };
   const cells = new Map<string, Cell>();
-  const args = program.declares.map((d) => {
+  const args = program.declares.filter((d) => d.role !== "module").map((d) => {
     if (d.role === "capability") return k.structure([[k.symbol("write"), k.primitiveFunction(outputWrite(() => {}))]]);
     if (Object.hasOwn(given.inputs, d.name)) return plainValue(k, given.inputs[d.name]);
     const cell = k.cell();
@@ -164,10 +198,14 @@ export function yieldedKeys(program: SavedProgram, given: { inputs: Inputs; late
 /** What a run of one program gave, and what differs from its pins. */
 export interface ProgramRun {
   readonly pins: Pins;
-  /** The emitter's findings; empty when the text emitted. */
+  /** The driver's findings, for the text or a text it imports; empty when the text emitted. */
   readonly findings: string[];
   readonly lines: string[];
-  /** The end as `// end:` writes it; null when nothing was launched. */
+  /**
+   * The end as `// end:` writes it. Where the driver refused the text and
+   * nothing was launched, `refused:` and the refusal as the program states
+   * it where a finding matches, else the first finding's message.
+   */
   readonly end: string | null;
   /** The yielded keys, when the program states `// yields:`. */
   readonly yields: (string | null)[] | undefined;
@@ -175,15 +213,28 @@ export interface ProgramRun {
   readonly problems: string[];
 }
 
-/** Emits a text, launches it, and compares lines, end and yields with its pins. */
-export async function runProgram(text: string, file = "<text>"): Promise<ProgramRun> {
+/**
+ * Emits a text with the texts it imports, launches it, and compares lines,
+ * end and yields with its pins. `readText` reads the imported texts; by
+ * default, files relative to the repository root. A text the driver
+ * refuses is launched not at all: it passes where its `// end: refused:`
+ * line states the message of one of the findings, or the part of one
+ * before a colon, and it states no line.
+ */
+export async function runProgram(text: string, file = "<text>", readText: ReadText = readUnder(ROOT)): Promise<ProgramRun> {
   const pins = readPins(text);
   const problems: string[] = [];
   if (pins.end === undefined) problems.push("the program states no `// end:` line");
-  const e = emitted(text, file);
+  const e = emitted(text, file, readText);
   if ("findings" in e) {
-    problems.push(`the emitter refuses the text: ${e.findings.join("; ")}`);
-    return { pins, findings: e.findings, lines: [], end: null, yields: undefined, problems };
+    const stated = pins.end !== undefined && pins.end.startsWith("refused: ") ? pins.end.slice("refused: ".length) : undefined;
+    // The message itself, or its part before a colon: a failed parse is stated as `not Allegretto`, without the engine's own words.
+    const states = (message: string): boolean => stated !== undefined && (message === stated || message.startsWith(`${stated}: `));
+    if (!e.messages.some(states)) problems.push(`the emitter refuses the text: ${e.findings.join("; ")}`);
+    if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
+    if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
+    // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
+    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, problems };
   }
   const given = inputsOf(pins);
   if ("problems" in given) {
@@ -193,6 +244,7 @@ export async function runProgram(text: string, file = "<text>"): Promise<Program
   const outcome = await launch({
     createKernel,
     program: e.program,
+    imports: e.imports,
     configuration: { ceiling: ["output"], steps: STEPS, inputs: given.inputs, later: given.later },
     target: { capabilities: [output], primitives: shipped },
   });
@@ -209,7 +261,7 @@ export async function runProgram(text: string, file = "<text>"): Promise<Program
   if (pins.end !== undefined && end !== pins.end) problems.push(`ended ${JSON.stringify(end)}, expected ${JSON.stringify(pins.end)}`);
   let yields: (string | null)[] | undefined;
   if (pins.yields !== undefined) {
-    const y = yieldedKeys(e.program, given);
+    const y = yieldedKeys(e.program, given, e.imports);
     if ("problem" in y) problems.push(y.problem);
     else {
       yields = y.keys;
@@ -219,22 +271,34 @@ export async function runProgram(text: string, file = "<text>"): Promise<Program
   return { pins, findings: [], lines: outcome.lines, end, yields, problems };
 }
 
-/** Every program under next/corpus/allegretto/, relative to the repository root, in name order. */
+/**
+ * True for a text a program imports and no program of its own: a `.alg`
+ * file in a directory directly under `m<milestone>`, other than `main.alg`.
+ */
+export function isImportedText(file: string): boolean {
+  return new RegExp(`^${PROGRAMS_DIR}/m[1-9]/[^/]+/[^/]+\\.alg$`).test(file) && path.basename(file) !== "main.alg";
+}
+
+/** Every program under next/corpus/allegretto/, relative to the repository root, in name order: every `.alg` file but the imported texts. */
 export function programFiles(root: string): string[] {
   const out: string[] = [];
   const walk = (rel: string): void => {
     for (const d of fs.readdirSync(path.join(root, rel), { withFileTypes: true })) {
       const r = `${rel}/${d.name}`;
       if (d.isDirectory()) walk(r);
-      else if (d.name.endsWith(".alg")) out.push(r);
+      else if (d.name.endsWith(".alg") && !isImportedText(r)) out.push(r);
     }
   };
   if (fs.existsSync(path.join(root, PROGRAMS_DIR))) walk(PROGRAMS_DIR);
   return out.sort();
 }
 
-/** A program's milestone: its directory's, `m<milestone>` directly under next/corpus/allegretto/; null elsewhere. */
+/**
+ * A program's milestone: its directory's, `m<milestone>` directly under
+ * next/corpus/allegretto/, for a file directly in it or the `main.alg` of
+ * a directory directly under it; null elsewhere.
+ */
 export function milestoneOf(file: string): number | null {
-  const m = new RegExp(`^${PROGRAMS_DIR}/m([1-9])/[^/]+\\.alg$`).exec(file);
+  const m = new RegExp(`^${PROGRAMS_DIR}/m([1-9])/(?:[^/]+\\.alg|[^/]+/main\\.alg)$`).exec(file);
   return m === null ? null : Number(m[1]);
 }

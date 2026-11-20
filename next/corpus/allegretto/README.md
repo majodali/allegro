@@ -10,6 +10,15 @@ Allegretto too, by the maintainer's ruling of 2026-11-16.
 A program is a `.alg` file in a directory `m<milestone>` directly under
 `next/corpus/allegretto/`. Its milestone is its directory's.
 
+A program may import. `import name` reads the file `name.alg` in the
+directory of the importing text (`importedFile` of
+`next/bootstrap/driver.ts`). A program that imports texts which are no
+programs of their own is the file `main.alg` in a directory of its own
+directly under `m<milestone>`, and its imported texts are the other
+`.alg` files of that directory. Those are not run alone and state no
+lines. A program directly in `m<milestone>` may import another file
+there, which is then a program too, with its own lines.
+
 ## What a program states
 
 Each statement is a comment line of its own:
@@ -18,13 +27,26 @@ Each statement is a comment line of its own:
 |---|---|
 | `// realises: <case id>` | the program shows this case; one line per case, the id exactly as in `next/corpus/cases.json` |
 | `// expect: <line>` | a line the program prints; the lines in order, each compared exactly |
-| `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, or `waiting: <the reason the launcher gives>`; every program has one |
+| `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, `waiting: <the reason the launcher gives>`, or `refused: <the reason>`; every program has one |
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
 
 A program written for the purpose that shows no case of the present
 tree has no `// realises:` line.
+
+## An expected refusal
+
+`// end: refused: <the finding>` states that the reader, the emitter or
+the driver refuses the text: nothing is launched. The program passes
+when the message of one of the findings, without its place, is the one
+stated, and it states no `// expect:`, `// later:` or `// yields:` line.
+The part of a message before a colon may be stated alone: a text that
+does not parse is stated as `not Allegretto`, since the words after it
+are the parser engine's and change with the engine.
+A finding in an imported text counts. A refusal by the launcher, before
+anything is evaluated, is written the same way with the launcher's
+reason.
 
 An input's value is one Allegretto literal: a text, a whole number, a
 decimal fraction, `true`, `false`, a symbol literal, a negative number,
@@ -44,12 +66,14 @@ launcher's count of the lines printed before each phase
 `// later:` line whose phase is never applied fails the program.
 
 `runProgram` of `next/corpus/allegretto.ts` reads these lines. It emits
-the text with `next/bootstrap/emit.ts` and runs the record with the
-launcher of `next/launch/launcher.ts` on the reference kernel, with the
-output capability, the shipped primitives, its inputs and a budget of
-1,000,000 steps. A program passes when its printed lines, its end, the
+the text and the texts it imports with the driver of
+`next/bootstrap/driver.ts` and runs the records with the launcher of
+`next/launch/launcher.ts` on the reference kernel, the imported ones
+loaded first, with the output capability, the shipped primitives, its
+inputs and a budget of 1,000,000 steps. A program passes when its printed lines, its end, the
 lines printed before each later phase and its yielded keys are the ones
-stated. The yielded keys are read with the program's inputs handed in.
+stated. The yielded keys are read with the program's inputs handed in
+and its imported records loaded.
 
 ## When a case is realised
 

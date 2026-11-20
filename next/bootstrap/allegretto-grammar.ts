@@ -59,7 +59,12 @@
 // `x <- e`; the header lines `capability NAME`, `input NAME` and
 // `key NAME`, as statements beside `import NAME`, which may stand anywhere
 // at the top level; and an entry `[k]: e` of a structure literal, whose
-// key is any expression, a key's name among them. And two changes
+// key is any expression, a key's name among them. `import NAME` takes the
+// lists of forms.md §2 "The module", `with a: e, b: f` and `without c, d`,
+// each comma-separated, in either order (chunk Q5, part 5). `use NAME`,
+// with the same lists, is parsed so that the reader can refuse it with a
+// reason: its notation needs the parser engine written in Allegretto.
+// `use`, `with` and `without` are no keywords. And two changes
 // forms.md §5 does not list. `sync` before an indented block, a form of
 // forms.md §2 "Bindings and blocks", is read wherever an indented block
 // may stand; `sync` is no keyword, and stays a name elsewhere. `then` is
@@ -320,6 +325,17 @@ export function allegrettoGrammar(): Grammar {
   insertAlternative(g, "stmt", "export_fn_decl", seq([lit("capability"), nonterm("ws_req"), nonterm("ident")], { name: "capability_decl" }));
   insertAlternative(g, "stmt", "export_fn_decl", seq([lit("input"), nonterm("ws_req"), nonterm("ident")], { name: "input_decl" }));
   insertAlternative(g, "stmt", "export_fn_decl", seq([lit("key"), nonterm("ws_req"), nonterm("ident")], { name: "key_decl" }));
+  // `import NAME` with its lists: `with a: e, b: f` and `without c, d`, in either order (forms.md §2, "The module").
+  // `use NAME` takes the same lists; it is read so that the reader can refuse it with a reason.
+  addProduction(g, "with_pair", seq([nonterm("ident"), ws, lit(":"), ws, nonterm("expr")], { name: "with_pair" }));
+  const clause = alt([
+    seq([lit("with"), nonterm("ws_req"), commaList("with_pair")], { name: "with_clause" }),
+    seq([lit("without"), nonterm("ws_req"), commaList("ident")], { name: "without_clause" }),
+  ]);
+  const moduleLine = (word: string, tag: string): Rule =>
+    seq([lit(word), nonterm("ws_req"), nonterm("ident"), rep(seq([nonterm("ws_req"), clause]), { min: 0 })], { name: tag });
+  editAlternative(g, "stmt", "import_stmt", moduleLine("import", "import_stmt"));
+  insertAlternative(g, "stmt", "export_fn_decl", moduleLine("use", "use_decl"));
   // 7. An entry with a computed key in a structure literal, `[k]: e`, beside `name: e`.
   const field = production(g, "object_field");
   field.rule = alt([

@@ -1,10 +1,15 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
-// acceptance side), chunk Q7 (the minimal launcher), parts 1 to 3). The only
+// acceptance side), chunk Q7 (the minimal launcher), parts 1 to 4). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--steps <n>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--steps <n>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>]
+//
+// Each `--import` names the saved program of a module the program
+// imports, directly or through another, in the order they are loaded: a
+// module before every module that imports it. `npm run emit` names the
+// texts whose records a program needs.
 //
 // The command that runs an Allegretto text directly, next/launch/allegretto.ts,
 // uses `terminalArguments` and `runOnTerminal` of this file.
@@ -81,11 +86,13 @@ export async function runOnTerminal(
   program: unknown,
   steps: number | undefined,
   inputs: Pick<Configuration, "inputs" | "later"> = {},
+  imports: readonly unknown[] = [],
 ): Promise<void> {
   const createKernel = await kernelFactory();
   const outcome = await launch({
     createKernel,
     program,
+    imports,
     configuration: { ceiling: ["output"], steps, ...inputs },
     target: { capabilities: [output], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
@@ -93,15 +100,26 @@ export async function runOnTerminal(
   if (outcome.end.kind !== "completed") fail(describe(outcome.end));
 }
 
-async function main(argv: readonly string[]): Promise<void> {
-  const { file, steps } = terminalArguments(argv, "usage: npm run launch -- <saved-program.json> [--steps <n>]");
-  let program: unknown;
+/** Reads a saved program's JSON, or fails saying why. */
+function readRecord(file: string): unknown {
   try {
-    program = JSON.parse(fs.readFileSync(file, "utf8"));
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (e) {
     fail(`cannot read ${file} as JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
-  await runOnTerminal(program, steps);
+}
+
+async function main(argv: readonly string[]): Promise<void> {
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>]";
+  const rest: string[] = [];
+  const imported: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--import") rest.push(argv[i]);
+    else if (argv[i + 1] === undefined) fail(`--import takes a saved program's file\n${usage}`);
+    else imported.push(argv[++i]);
+  }
+  const { file, steps } = terminalArguments(rest, usage);
+  await runOnTerminal(readRecord(file), steps, {}, imported.map(readRecord));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname))

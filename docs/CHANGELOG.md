@@ -1444,6 +1444,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — Imports: the driver, the emitter and the launcher (B-196, chunks Q5 (the first notation and the bootstrap) and Q7 (the minimal launcher and the output capability))
+
+B-196 (the rebuild's acceptance side). Allegretto reads `import name`
+with `with` and `without`, and refuses `use name` with its reason. The
+emitter writes an import as a module parameter with its identity and a
+binding that calls it. A new driver, `next/bootstrap/driver.ts`, emits
+a text's imported texts first, in dependency order, finding each as
+`name.alg` beside the importing text, and takes each identity from the
+kernel. The launcher loads the imported records into the same kernel
+before the main one and no longer refuses a module that imports.
+`npm run allegretto`, `npm run emit` and `npm run launch` follow. The
+corpus convention gains imports and the end `// end: refused:`, and
+programs realise ten module cases, seven extension cases, the parse
+error and the boundary case on a name bound nowhere.
+
 ### 2026-11 — A `-` written before a fraction is part of the literal (B-196)
 
 B-196 (the rebuild's acceptance side). By the maintainer's ruling of

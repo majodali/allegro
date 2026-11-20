@@ -204,3 +204,32 @@ test("a text the grammar refuses is one finding, at the place the parse stopped"
 test("each refusal in a text is reported, not only the first", () => {
   assert.equal(refusal("a = 9223372036854775808\nb = \"\\q\"\nc = 0b1").length, 3);
 });
+
+test("an import is a header line with its with pairs and its without names, each in written order", () => {
+  const m = moduleOf("capability output\nimport lib with a: 1, b: f(x) without c, d\nimport plain");
+  const [, lib, plain] = m.headers;
+  assert.deepEqual([lib.k, lib.name.name], ["import", "lib"]);
+  assert.deepEqual(lib.with.map((p) => [p.name.name, p.value.k]), [["a", "int"], ["b", "apply"]]);
+  assert.deepEqual(lib.without.map((c) => c.name), ["c", "d"]);
+  assert.deepEqual([plain.with, plain.without], [[], []]);
+  assert.deepEqual(moduleOf("import lib without c with a: 1").headers[0].with.map((p) => p.name.name), ["a"]);
+  assert.deepEqual(m.headers[0].with, []);
+  assert.deepEqual([lib.with[1].name.at.line, lib.with[1].name.at.column], [2, 23]);
+});
+
+test("an import's with list and its without list may each be written once", () => {
+  assert.match(refusal("import lib with a: 1 with b: 2")[0], /^the import of lib has two with lists: write one, its entries separated by commas$/);
+  assert.match(refusal("import lib without a without b")[0], /^the import of lib has two without lists/);
+  assert.match(refusal("f() =>\n  import lib\n  1")[0], /the header line import belongs at the top level/);
+});
+
+test("use is refused with its reason: its notation needs the parser engine written in Allegretto", () => {
+  assert.deepEqual(refusal("use notation\nx = 1"), [
+    'use notation brings a module\'s notation, which needs the parser engine written in Allegretto; that engine is not built, so use is not read yet (forms.md §2, "The module")',
+  ]);
+});
+
+test("an import is a binding for the check of x <- e: a statement above the arrow that needs it, through its with list, is refused", () => {
+  assert.match(refusal("import lib with a: n\nsee(lib)\nn <- 1")[0], /^the statement at 2:1 needs n, which n <- … binds below it at 3:1/);
+  moduleOf("import lib with a: n\nn <- 1\nsee(lib)");
+});

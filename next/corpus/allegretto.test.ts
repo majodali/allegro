@@ -12,9 +12,12 @@
 // capability), part 3, added the `// input:`, `// later:` and
 // `// end: waiting:` lines and the programs that use them, under m1/ and
 // m3/. Chunk Q5, part 4, added the programs for the forms as they stood
-// on 2026-11-19, under m3/.
+// on 2026-11-19, under m3/. Chunk Q5, part 5, and chunk Q7, part 4, added
+// imports and the `// end: refused:` line, and the programs that use
+// them: a program that imports texts of its own is `main.alg` in a
+// directory beside them.
 //
-// Each program is emitted and launched by `runProgram` of
+// Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
 // `--next` uses too, and its lines, end and yielded keys are compared with
 // its `// expect:`, `// end:` and `// yields:` lines, and the lines printed
@@ -31,8 +34,9 @@ import type { Value } from "../kernel/interface.js";
 import { load } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
-import { emit, FORMS, type FormId } from "../bootstrap/emit.js";
-import { emitted, milestoneOf, programFiles, readPins, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { FORMS, type FormId } from "../bootstrap/emit.js";
+import { drive } from "../bootstrap/driver.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPins, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -149,7 +153,8 @@ test("a program's comments are read as the convention states", () => {
 for (const file of FILES) {
   test(`program ${file}: the lines it prints, how it ends, and what it yields`, async () => {
     const run = await runProgram(text(file), file);
-    assert.deepEqual(run.findings, []);
+    // A text the driver refuses has findings, and its end states one of them; any other has none.
+    if (run.findings.length > 0) assert.match(run.pins.end ?? "", /^refused: /);
     assert.deepEqual(run.lines, run.pins.lines);
     assert.ok(run.pins.end !== undefined, "every program states how it ends");
     assert.equal(run.end, run.pins.end);
@@ -167,7 +172,8 @@ test("what a module yields, read through the kernel's interface: all its binding
     const doc = e.program;
     const k = createKernel();
     const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
-    const primitives = new Map(doc.needs.map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+    const primitives = new Map([...e.imports, doc].flatMap((d) => d.needs).map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+    for (const d of e.imports) load(k, d, primitives);
     const fn = load(k, doc, primitives);
     assert.equal(typeof k.moduleOf(fn), "string", `${file}: the record is a module, with an identity`);
     const capability = k.structure([[k.symbol("write"), k.primitiveFunction(outputWrite(() => {}))]]);
@@ -183,19 +189,56 @@ test("what a module yields, read through the kernel's interface: all its binding
   }
 });
 
+test("a program may import: its imported texts are in a directory of its own beside main.alg, and they are no programs", () => {
+  assert.equal(milestoneOf(`${PROGRAMS_DIR}/m3/x/main.alg`), 3);
+  assert.equal(milestoneOf(`${PROGRAMS_DIR}/m3/x/lib.alg`), null);
+  assert.equal(isImportedText(`${PROGRAMS_DIR}/m3/x/lib.alg`), true);
+  assert.equal(isImportedText(`${PROGRAMS_DIR}/m3/x/main.alg`), false);
+  assert.equal(isImportedText(`${PROGRAMS_DIR}/m3/lib.alg`), false);
+  assert.equal(isImportedText(`${PROGRAMS_DIR}/m3/x/y/lib.alg`), false);
+  for (const f of FILES) assert.equal(isImportedText(f), false, f);
+  for (const name of ["module-load", "module-constants", "module-transitive", "module-cycle", "module-shared", "module-empty", "module-recursive", "extension", "import-with", "import-without", "import-key", "import-unused"])
+    assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/${name}/main.alg`), name);
+  assert.ok(!FILES.includes(`${PROGRAMS_DIR}/m3/module-shared/shared.alg`));
+});
+
+test("a program that imports is emitted with its imported texts and launched with their records, read through the reader it is given", async () => {
+  const files: Record<string, string> = { [path.join("dir", "lib.alg")]: 'capability output\noutput.write("lib")\nexport n = 41\n' };
+  const main = "capability output\nimport lib\noutput.write(int.text(lib.n + 1))\n// expect: lib\n// expect: 42\n// yields: lib\n// end: completed\n";
+  const run = await runProgram(main, path.join("dir", "main.alg"), (f) => files[f]);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.yields, ["lib"]);
+});
+
+test("an expected refusal: a text the driver refuses passes where its end states one finding's message and nothing else is stated", async () => {
+  const text = "capability output\noutput.write(x)\noutput.write(y)\n";
+  const first = await runProgram(text + "// end: refused: the name x is bound nowhere in the text\n");
+  assert.deepEqual(first.problems, []);
+  assert.equal(first.end, "refused: the name x is bound nowhere in the text");
+  assert.deepEqual((await runProgram(text + "// end: refused: the name y is bound nowhere in the text\n")).problems, []);
+  const wrong = await runProgram(text + "// end: refused: the name z is bound nowhere in the text\n");
+  assert.deepEqual(wrong.problems, ["the emitter refuses the text: <text>:2:14: the name x is bound nowhere in the text; <text>:3:14: the name y is bound nowhere in the text"]);
+  const completed = await runProgram(text + "// end: completed\n");
+  assert.equal(completed.problems.length, 1);
+  const withLine = await runProgram(text + "// expect: never\n// end: refused: the name x is bound nowhere in the text\n");
+  assert.deepEqual(withLine.problems, ["nothing was launched, and 1 `// expect:` line(s) are stated"]);
+  const notFound = await runProgram("import lib\n// end: refused: the text lib.alg, which import lib names, is not found in the directory of main.alg\n", "dir/main.alg", () => undefined);
+  assert.deepEqual(notFound.problems, []);
+});
+
 test("a module that declares no capability still yields: it is handed only what it declares", async () => {
   const run = await runProgram("double(n) => n * 2\ndouble(2)\n// yields: double\n// end: completed\n");
   assert.deepEqual(run.problems, []);
   assert.deepEqual(run.yields, ["double"]);
 });
 
-test("the programs write every form of forms.md §2 that the launcher can run: all but import", () => {
+test("the programs and the texts they import write every form of forms.md §2, import and its with and without among them", () => {
   const used = new Set<FormId>();
   for (const file of FILES) {
-    const r = emit(text(file));
-    if (r.ok) for (const f of r.forms) used.add(f);
+    const r = drive(text(file), file, readUnder(ROOT));
+    if (r.ok) for (const record of r.records) for (const f of record.forms) used.add(f);
   }
-  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f) && f !== "import");
+  const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f));
   assert.deepEqual(missing, []);
 });
 
