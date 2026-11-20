@@ -1373,8 +1373,15 @@ test("what an evaluation leaves in place of a part keeps the part's mark", () =>
   assert.equal(body.form, "apply", "the module still sees its own part");
 });
 
-test("what a call leaves is the caller's, where the function called is nobody's", () => {
-  const { k, add, call, kp } = setup();
+for (const slice of MACHINE ? [undefined, 1] : [undefined])
+test(`what a call leaves is the caller's, where the function called is nobody's${slice === undefined ? "" : ", and a pause at every step changes nothing"}`, () => {
+  const { k: kernel, add, call, kp } = setup();
+  // With a slice, every call is paused again and again, and gone on with until it is over.
+  const k: typeof kernel = slice === undefined ? kernel : { ...kernel, evaluate: (e, s) => {
+    const r = kernel.evaluate(e, s, { slice });
+    while (r.ended === "paused" && kernel.advance({ slice }).ended === "paused");
+    return { ...r, value: kernel.current(r.value) };
+  } };
   const scope = k.scope();
   const entry = (v: Value, i: number) => k.evaluate(k.entriesOf(v)[i][1], scope).value;
   // Two functions no module made, one calling the other: y => add(y, 1) and x => add(inner(x), 1).
@@ -1387,7 +1394,9 @@ test("what a call leaves is the caller's, where the function called is nobody's"
     [null, call(k.composedFunction([a], k.composedFunction([], a)), call(g, c))],
     [null, k.composedFunction([f], call(kp("describe"), key, f))],
   ])), 1, [{ role: "input", name: "c" }, { role: "input", name: "g" }]);
-  const made = k.evaluate(call(m, k.cell(), plain), scope).value;
+  // c is a parameter left unknown, not a cell: no answer will come for it, so on either
+  // variant what the call leaves is an expression.
+  const made = k.evaluate(call(m, k.param("unknown"), plain), scope).value;
   const [closure, look] = [entry(made, 0), entry(made, 1)];
   // The call g(c) is the module's. While c is unknown what it leaves is add(add(c, 1), 1),
   // written by nobody: it stands where the module's call stood, so it is the module's to see.
@@ -2537,4 +2546,176 @@ test("two evaluations refuted by answers that arrive together are both reported,
   // machine cannot look ahead into a computation it has suspended: it leaves what is in
   // line where it is, and the second refutation is reported by the call that takes it up.
   assert.equal(first.refuted.length, MACHINE ? 1 : 2);
+});
+
+// ---- Budgets and slices (chunk K11) ------------------------------------------------
+//
+// "Limits are step budgets": a budget bounds the whole work of an evaluation and is never
+// filled up again; a slice bounds one call, and pauses. The reference kernel has no slices
+// and gives a budget to each call. Each test says what the reference does in its place.
+
+/** go(n) = if n == 0 then 0 else then(note(n), go(n - 1)): an effect at every turn. */
+function noting() {
+  const base = counting();
+  const { k, call, kp, less, none, n32, value } = base;
+  const noted: number[] = [];
+  const note = k.primitiveFunction({ purity: "effectful", capability: "output", part: "write", arity: 1, run: (a) => (noted.push(value(a[0])), a[0]) });
+  const [go, n] = [k.symbol("t.go"), k.param("n")];
+  const goFn = k.composedFunction([n], call(kp("if"), call(none, n), n32(0), call(kp("then"), call(note, n), call(go, call(less, n)))));
+  const program = (turns: number) => within(k, [[go, goFn]], call(go, n32(turns)));
+  const down = (turns: number) => Array.from({ length: turns }, (_x, i) => turns - i);
+  return { ...base, noted, note, program, down };
+}
+
+test("a slice pauses a call and the next goes on: the effects, their order and the count of steps are those of one call", () => {
+  const whole = noting();
+  const all = whole.k.evaluate(whole.program(40), whole.k.scope());
+  assert.equal(all.ended, "complete");
+  assert.deepEqual(whole.noted, whole.down(40));
+
+  const { k, noted, program, down, value } = noting();
+  const first = k.evaluate(program(40), k.scope(), { slice: 25 });
+  if (!MACHINE) {
+    // The reference has no slices: the call runs to its end.
+    assert.equal(first.ended, "complete");
+    return;
+  }
+  assert.equal(first.ended, "paused");
+  assert.equal(k.kind(first.value), "expression", "what is given stands for the value");
+  assert.ok(noted.length > 0 && noted.length < 40, "some of the effects are performed, and not all");
+  let [calls, steps] = [1, first.steps];
+  for (;;) {
+    const a = k.advance({ slice: 25 });
+    calls++;
+    steps += a.steps;
+    if (a.ended === "complete") break;
+    assert.equal(a.ended, "paused");
+    assert.ok(calls < 100);
+  }
+  assert.ok(calls > 3, "it took several calls");
+  assert.deepEqual(noted, down(40), "every effect once, in the order of one call");
+  assert.equal(steps, all.steps, "pausing costs no step");
+  assert.equal(value(k.current(first.value)), 0);
+  assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] });
+});
+
+test("a call counts at most a little more than its slice", () => {
+  if (!MACHINE) return; // The reference has no slices.
+  const { k, program } = noting();
+  const first = k.evaluate(program(200), k.scope(), { slice: 50 });
+  assert.equal(first.ended, "paused");
+  assert.ok(first.steps >= 50 && first.steps < 60, `a slice of 50 counted ${first.steps}`);
+});
+
+test("a paused task is the first to go on, before one whose answer arrived meanwhile", () => {
+  if (!MACHINE) return; // The reference has no slices.
+  const { k, call, noted, note, program, n32 } = noting();
+  const c = k.cell();
+  k.evaluate(call(note, c), k.scope());
+  // The answer is in line before the other evaluation is begun, and paused.
+  k.fill(c, n32(999));
+  const paused = k.evaluate(program(30), k.scope(), { slice: 25 });
+  assert.equal(paused.ended, "paused");
+  const before = noted.length;
+  assert.equal(k.advance().ended, "complete");
+  assert.equal(noted.length, 31);
+  assert.equal(noted[noted.length - 1], 999, "the answer that arrived is acted on after the paused task is over");
+  assert.ok(before < 30);
+});
+
+test("a recursion is paused at any depth and gone on with", () => {
+  if (!MACHINE) return; // The reference has no slices.
+  const { k, call, kp, n32, value, less, more, none } = counting();
+  const [down, n] = [k.symbol("t.down"), k.param("n")];
+  const downFn = k.composedFunction([n], call(kp("if"), call(none, n), n32(0), call(more, call(down, call(less, n)))));
+  const r = k.evaluate(within(k, [[down, downFn]], call(down, n32(3_000))), k.scope(), { slice: 1_000 });
+  assert.equal(r.ended, "paused");
+  let calls = 1;
+  while (k.advance({ slice: 1_000 }).ended === "paused") assert.ok(++calls < 100);
+  assert.ok(calls >= 10);
+  assert.equal(value(k.current(r.value)), 3_000);
+});
+
+test("an attempt's budget runs across pauses: its answer is the one a single call gives", () => {
+  if (!MACHINE) return; // The reference has no slices.
+  const run = (budget: number, slice: number | undefined) => {
+    const { k, call, kp, program } = noting();
+    const r = k.evaluate(call(kp("attempt"), program(20), steps(k, budget)), k.scope(), slice === undefined ? undefined : { slice });
+    while (slice !== undefined && k.advance({ slice }).ended === "paused");
+    const now = k.current(r.value);
+    return k.kind(now) === "structure" ? form(k, now).form : "value";
+  };
+  assert.equal(run(1_000, undefined), "value");
+  assert.equal(run(1_000, 15), "value");
+  assert.equal(run(60, undefined), "limit");
+  assert.equal(run(60, 15), "limit", "the attempt's budget is not filled up again by a new call");
+});
+
+test("a budget is the evaluation's: work done for it later counts against what is left", () => {
+  const { k, call, kp, noted, program, n32 } = noting();
+  const c = k.cell();
+  // then(c, go(10)): the then and what it looks at ahead are counted now, the ten turns when c comes.
+  const r = k.evaluate(call(kp("then"), c, program(10)), k.scope(), { steps: 30 });
+  assert.equal(r.ended, "complete");
+  assert.ok(r.steps < 30);
+  k.fill(c, n32(0));
+  const a = k.advance();
+  if (!MACHINE) {
+    // On the reference the budget was that call's, and this call has none.
+    assert.equal(noted.length, 10);
+    return;
+  }
+  assert.equal(a.ended, "complete", "the call itself had no limit");
+  assert.deepEqual(a.limited, [r.value], "the evaluation is over, at its limit, and the call says which");
+  assert.ok(noted.length > 0 && noted.length < 10, "it went as far as its budget");
+  assert.equal(a.steps, 30 - r.steps, "all that was left of the budget, and no more");
+  const stopped = noted.length;
+  assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] }, "it is not gone on with");
+  assert.equal(noted.length, stopped);
+});
+
+test("a spent budget drops what the evaluation had waiting, and another evaluation goes on", () => {
+  if (!MACHINE) return; // On the reference a budget is a call's, and nothing is dropped.
+  const { k, call, kp, noted, note, program, n32 } = noting();
+  const [c1, c2, c3] = [k.cell(), k.cell(), k.cell()];
+  // also(then(c2, go(10)), also(note(c1), 0)): the value is 0 at once, and two pieces of
+  // work are left going, one waiting for c2 and one for c1.
+  const r = k.evaluate(call(kp("also"), call(kp("then"), c2, program(10)), call(kp("also"), call(note, c1), n32(0))), k.scope(), { steps: 30 });
+  assert.equal(r.ended, "complete");
+  k.evaluate(call(note, c3), k.scope());
+  assert.equal(k.waiting().length, 3);
+  // Both answers are in line when the budget is spent on the first.
+  k.fill(c2, n32(0));
+  k.fill(c1, n32(777));
+  const a = k.advance();
+  assert.deepEqual(a.limited, [r.value], "the evaluation is named by the value it gave");
+  assert.ok(!noted.includes(777), "the answer already in line for the evaluation that is over is dropped");
+  assert.deepEqual(k.waiting(), [c3], "the first evaluation waits for nothing any more");
+  const stopped = noted.length;
+  k.fill(c3, n32(888));
+  k.advance();
+  assert.deepEqual(noted.slice(stopped), [888], "the other evaluation's answer is acted on");
+});
+
+test("what is left of a budget goes down with every call that works for the evaluation", () => {
+  if (!MACHINE) return; // On the reference a budget is a call's.
+  const { k, call, kp, noted, program, n32 } = noting();
+  const [c1, c2] = [k.cell(), k.cell()];
+  // then(c1, then(go(2), then(c2, go(2)))): two turns when c1 comes, two more when c2 comes.
+  const body = call(kp("then"), c1, call(kp("then"), program(2), call(kp("then"), c2, program(2))));
+  const free = k.evaluate(body, k.scope());
+  k.fill(c1, n32(0));
+  const first = k.advance().steps;
+  k.fill(c2, n32(0));
+  const second = k.advance().steps;
+  assert.deepEqual(noted, [2, 1, 2, 1]);
+  assert.ok(first > 0 && second > 1);
+  // The same again, with a budget that the first two calls leave one step short for the third.
+  noted.length = 0;
+  const [d1, d2] = [k.cell(), k.cell()];
+  const tight = k.evaluate(call(kp("then"), d1, call(kp("then"), program(2), call(kp("then"), d2, program(2)))), k.scope(), { steps: free.steps + first + second - 1 });
+  k.fill(d1, n32(0));
+  assert.equal(k.advance().limited, undefined, "the second call fits in what the first left");
+  k.fill(d2, n32(0));
+  assert.deepEqual(k.advance().limited, [tight.value], "the third does not: each call was counted");
 });

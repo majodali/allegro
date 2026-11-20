@@ -137,15 +137,31 @@ export type PrimitiveDeclaration =
  * limit cannot be continued by this kernel: evaluating the expression
  * again starts again, and performs again any effect already performed.
  *
- * Ruled on 2026-11-20 and not built in this version: a count of steps
- * is to be given in two ways. A budget bounds the whole work of an
- * evaluation and is never filled up again. A slice bounds one call, and
- * when it is spent the work is paused for the next call to go on with.
- * This version has the budget only.
+ * A count of steps is given in two ways (ruled on 2026-11-20).
+ *
+ * A budget, `steps`, bounds the whole work of an evaluation and is never
+ * filled up again. On the kernel variant that keeps its own stack the
+ * budget given to `evaluate` is the evaluation's: the work `advance`
+ * later does for that evaluation is counted against what is left of it.
+ * When it is spent the evaluation is over, at its limit: what it had
+ * paused or waiting is dropped, and an answer that arrives for it later
+ * is ignored. Given to `advance`, `steps` bounds that call, as it always
+ * did; a call it ends has ended "limit", and the evaluation it stopped is
+ * over.
+ *
+ * A slice, `slice`, bounds one call. When it is spent nothing is over:
+ * the call returns "paused", the task that was running is the first to go
+ * on, and the next call of `advance` goes on with it. A slice never
+ * changes what happens, only when. The kernel pauses at the first point
+ * it can after the slice is spent, so a call may count a few steps more
+ * than its slice. The reference kernel has no slices and ignores this
+ * field.
  */
 export interface Limits {
-  /** The evaluation ends, with everything unfinished undecided, after this many steps. */
+  /** A budget: the evaluation ends, with everything unfinished undecided, after this many steps. */
   readonly steps?: number;
+  /** A slice: the call returns after about this many steps, and what it was doing is paused. */
+  readonly slice?: number;
 }
 
 /**
@@ -209,8 +225,10 @@ export interface Result {
   /**
    * "complete": evaluation went as far as the information allows.
    * "limit": a limit was reached; what was unfinished is undecided.
+   * "paused": the call's slice was spent. `value` stands for the value,
+   * as it does for an evaluation that waits, and `advance` goes on.
    */
-  readonly ended: "complete" | "limit";
+  readonly ended: "complete" | "limit" | "paused";
   /** The number of steps spent. */
   readonly steps: number;
   /** True when a refutation is recorded on `value`: the program is wrong. */
@@ -268,9 +286,10 @@ export interface ClaimRecord {
 export interface Advance {
   /**
    * "complete": everything that was ready has been evaluated again.
-   * "limit": the budget ran out first; call `advance` again to go on.
+   * "limit": the call's own budget ran out first.
+   * "paused": the call's slice was spent; call `advance` again to go on.
    */
-  readonly ended: "complete" | "limit";
+  readonly ended: "complete" | "limit" | "paused";
   /** The number of steps spent. */
   readonly steps: number;
   /** The values on which a refutation was recorded during this call. */
@@ -283,6 +302,12 @@ export interface Advance {
    * the refutation stands, and this says the list of them may be short.
    */
   readonly cutShort?: true;
+  /**
+   * Present where the budget of an evaluation was spent during this
+   * call: what `evaluate` gave as the value of each such evaluation. Each
+   * is over, at its limit. The call went on with the others.
+   */
+  readonly limited?: readonly Value[];
 }
 
 /**
