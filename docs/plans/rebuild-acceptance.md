@@ -1944,3 +1944,30 @@ policy is the gate ruled there.
   Measured: 435 tests pass, none waits; 65 programs pass;
   `milestone 1: programs 7 (passing 7, failing 0) · cases due 25 · realised 6, named only by a failing program 0, not yet named 19 · up to 1: 6 of 25 realised`;
   `milestone 3: programs 58 (passing 58, failing 0) · cases due 132 · realised 117, named only by a failing program 0, not yet named 15 · up to 3: 123 of 167 realised`.
+- **2026-11-20 — Imports ratified; the four iteration functions shipped.**
+  The maintainer confirmed every ask of the imports PR (PR #272) on
+  2026-11-20: "All asks confirmed." So these stand: `import name` is the
+  file `name.alg` beside the importing text; a corpus program that
+  imports is `main.alg` in a directory of its own; the end
+  `// end: refused: <the finding>`, whose first part before a colon may
+  be stated alone; the seven `extension:` cases shown by an import; the
+  reclass of "P2 — the same name in two directories is two keys"; rows
+  Q5 and Q7. The entry above calls them choices to ratify; they are
+  ratified.
+  PR #271 ruled streams: a stream is a structure of an item and a rest,
+  and `each`, `each_at_once`, `each_within` and `all` are Allegretto's
+  functions for iteration, written out in
+  `next/ext/allegretto/forms.md`. It asked this stream to ship them. The
+  emitter (`next/bootstrap/emit.ts`) keeps their text in one constant
+  (`STREAM_FUNCTIONS`) beside the two failure functions, and a test
+  holds it to the forms' text. It binds, in the block around the
+  module's own, the functions a text names and those they name in turn,
+  and no others. The four helpers the forms write beside them (`window`,
+  `go`, `without_first`, `start`) are bound there when needed and are no
+  names of a text: a text that writes `window` is refused, and a text
+  may bind any of these names itself. A program,
+  `next/corpus/allegretto/m3/streams.alg`, runs the four on streams
+  computed in the program, one ending in a failure. Not shown: the four
+  over late answers, since no capability of the launcher answers late
+  with a stream. Measured: 441 tests pass, none waits; 66 programs
+  pass.
