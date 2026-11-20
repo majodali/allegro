@@ -1676,7 +1676,11 @@ its approval.
   paused task first. A spent budget ends the evaluation, and `advance`
   names it. Ruled on the pull request of the chunk before: after a
   refutation `advance` leaves what is in line where it is, and what is
-  held back is evaluated ahead once.
+  held back is evaluated ahead once. Corrected: the line above says
+  the launcher gives a default step budget. The maintainer later ruled
+  the opposite to the acceptance stream, and that ruling stands: no
+  default, and a run with no budget goes on. The inventory's note is
+  corrected.
 
 ## 8. Sessions
 
