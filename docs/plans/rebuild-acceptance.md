@@ -1713,8 +1713,30 @@ policy is the gate ruled there.
     yielded key of the 35 programs, the speed tests or `hello.alg`.
     Steps rose with the claims: the parser speed program from 23,299 to
     23,329, the typed one from 1,187 to 1,227, and `hello.json` from 4 to
-    14. The test of `next/launch/launcher.test.ts` that pins the fixture's
-    4 steps is outside this part's files and fails until it follows. A
-    module with no export now yields its `x <- e` bindings too.
+    14. A test of `next/launch/launcher.test.ts` pinned the fixture's 4
+    steps. It no longer pins a count: how many steps a run takes moves
+    whenever the kernel or the emitter changes what a statement stands
+    for. A module with no export now yields its `x <- e` bindings too.
+  - **Readings taken where the forms are silent**, for the kernel stream
+    and the maintainer to confirm:
+    1. The module's last written statement is claimed like the others.
+       The forms exempt "the last statement of a block", whose value
+       goes to the caller. A module yields the structure of its
+       bindings, so its last statement's value goes nowhere, and an
+       unhandled failure there would be lost.
+    2. A statement that is itself an application of `claim` gets no
+       claim of its own. The hand-off of PR #257 says so; the forms do
+       not list it.
+    3. `sync` is the last word of the line before an indented block:
+       after `=`, `=>` and `<-`, and in a branch of `if`. The module's
+       own block cannot be written `sync`.
+    4. A dropped statement's claim applies Allegretto's own
+       `is_failure`, whatever the text binds that name to.
+  - **Two things for the kernel stream**, each with its smallest text
+    in the PR. The reference kernel holds a statement after
+    `a <- f()` where `f`'s body is a `sync` block that waits: the forms
+    say `<-` holds nothing and a claim holds only its own block. And
+    `n <- n + 1` in an inner block now reads itself, as the forms' "one
+    group" has it, and runs to the step limit with no refutation.
   - **Measured.**
     `milestone 3: programs 41 (passing 41, failing 0) · cases due 133 · realised 98, named only by a failing program 0, not yet named 35 · up to 3: 102 of 170 realised`.

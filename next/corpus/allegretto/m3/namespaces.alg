@@ -11,7 +11,7 @@ output.write(int.text(apply(int, 2, 3)) ++ " " ++ float.text(apply(float, 0.5, 0
 output.write(int.text(text.int("12") + bits.int(bits.slice("A", 0, 8))))
 // expect: 77
 yes(b) => if b then "true" else "false"
-output.write(yes(float.eq(0.0, -0.0)) ++ " " ++ yes(0.0 == float.neg(0.0)) ++ " " ++ yes(float.ge(2.0, 2.0)) ++ " " ++ yes(float.gt(2.0, 2.0)))
+output.write(yes(float.eq(0.0, float.neg(0.0))) ++ " " ++ yes(0.0 == float.neg(0.0)) ++ " " ++ yes(float.ge(2.0, 2.0)) ++ " " ++ yes(float.gt(2.0, 2.0)))
 // expect: true false true false
 hidden <-
   int = {text: n => "int is bound again here"}
