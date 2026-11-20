@@ -2743,3 +2743,10 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `milestone 3: programs 76 (passing 76, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
   No row of the decision map moves in this part. The orchestrating
   session decides which rows it earns.
+- **2026-11-20 — The asks of PR #287 and PR #288 confirmed.**
+  The maintainer, in session on 2026-11-20: the confirmation recorded
+  under Q16, part 1 was for PR #287, and "I also confirm all asks on
+  #288". So the result's form, the key by which a claim is told from
+  another, the two choices about the summary, one entry for the
+  assumptions of one module, and the corpus line `// summary:` stand as
+  built. Both pull requests are merged.
