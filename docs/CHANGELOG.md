@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — Notation (the second review's cluster 12, closed).**
+  Ruled for the parser engine, not built: three rules keep "a notation
+  only adds", checked on the grammar; a production may be marked
+  `unambiguous`, and the form that changes the grammar is one; the
+  right to call `parser.extend` is a capability that a notation
+  brought in with `use` does not hold.
+- **2026-11-19 — Allegretto's forms and four primitives (the second
+  review's cluster 12, in part).** `x <- e` is a binding of its
+  block's one group and a statement at its place; `int`, `float`,
+  `text` and `bits` are structures. In `next/prims/index.ts`:
+  `float.eq`, `float.gt`, `float.ge` and `bits.int`, 26 shipped. The
+  forms document's wording gaps are closed. Ruled for the parser
+  engine, not built: its table is kept by rule, position and state.
 - **2026-11-19 — `then` waits for all of its first; an assumption is
   named and can be withdrawn.** Three rulings after cluster 8. In
   `next/kernel/kernel.ts`: `then` starts its second when its first's

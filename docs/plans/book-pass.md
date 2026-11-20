@@ -1615,6 +1615,13 @@ its approval.
 - **2026-11-19 — three rulings after cluster 8, built** (the review
   session): `then` waits for all of its first; an assumption is named
   and can be withdrawn; two discussions filed.
+- **2026-11-19 — the second review's cluster 12, in part** (the
+  review session): three of five points ruled and built; two agreed in
+  principle with questions open.
+- **2026-11-20 — the second review's cluster 12 closed** (the review
+  session): three rules keep "a notation only adds"; a production may
+  be marked `unambiguous`; the right to change the grammar is a
+  capability. Cluster 14 remains.
 
 ## 8. Sessions
 

@@ -905,6 +905,69 @@ runs after everything the body started.
 
 Built in the reference kernel: all three.
 
+### Cluster 12: the wording of Allegretto's forms (2026-11-19)
+
+Fixed in `next/ext/allegretto/forms.md`, with no ruling needed: the
+name `count` and the four primitives that have a form and no name; a
+row for `export`; where an indented block may stand; that `read` in
+the examples is no shipped operation; how emptiness and a number as a
+condition are written. The example `is_int` had gone with cluster 11.
+
+Five points were put to the maintainer. Ruled on 2026-11-19:
+
+1. `x <- e` is a binding of its block's one group and a statement at
+   its place. A statement above the arrow that needs the name is
+   refused by the reader. ("Agreed")
+4. The parser's state has an equality and the engine keeps what it has
+   tried by rule, position and state. A left-recursive rule entered
+   again at one position with a changed state is refused: "Agreed - or
+   the parser engine simply prevents it."
+5. `int`, `float`, `text` and `bits` are structures Allegretto binds.
+   `attempt` answers the value itself, or a failure named `refuted` or
+   `limit`. Four primitives are added: `float.eq`, `float.gt`,
+   `float.ge` and `bits.int`. ("Agreed on all")
+
+Built: the four primitives; the forms document. `attempt`'s answer is
+built in a pull request of its own, because a test of the acceptance
+stream reads the answer's present shape.
+
+2. "A notation only adds" is kept by three rules, checked on the
+   grammar when the notation is brought in. The maintainer asked what
+   an owner's alternative is (one in force before the `use`), what
+   state a terminal owns (what its own grammar declares), and
+   "couldn't analysis of the grammar additions directly tell us if it
+   breaks those rules?" It can: with the rules every earlier parse is
+   still a parse, so a change shows as a second parse, which the
+   engine reports. The review session withdrew its proposal to parse
+   the text twice. A fourth case was found on the way and the second
+   rule widened to it: an alternative appended to what a rule in force
+   tests negatively. Ruled: "I agree with point 2 as it stands."
+
+3. The form that changes the grammar. The review session proposed a
+   boundary between statements. The maintainer: "If it's a wholly new
+   grammar, can we use 'statement boundary'?" and "It seems we only
+   need to identify one thing - which is the phrase that returns the
+   parser extension operation. I think in general we should be able
+   to flag any phrase as needing to be unambiguous." And: "If a
+   grammar is extending the standard language, I'd be hesitant to
+   allow it to change how the grammar is then further extended ... I
+   would at a minimum have a configurable policy to prevent that. For
+   new self-contained grammars, they can do what they want." Ruled on
+   2026-11-20 ("Agreed on point 3. Both terms ratified."):
+   - any production may be marked `unambiguous`: where a parse of it
+     is complete, another reading still open is a refutation;
+   - the engine changes the grammar only from such a production, whose
+     value calls `parser.extend`;
+   - the right to call it is a capability, which a notation brought in
+     with `use` is not handed unless a configuration says so.
+
+With this cluster 12 is ruled. What of it is for the parser engine is
+recorded and not built. One cluster remains: wording (14).
+
 ## Terms introduced
 
-No terms introduced.
+- **`unambiguous`**: a mark on a production. Where a parse of it is
+  complete, it must be the only reading of the text so far. Ratified
+  by the maintainer on 2026-11-20.
+- **`parser.extend`**: the engine's operation that changes the grammar
+  a text is read in. Ratified the same day.

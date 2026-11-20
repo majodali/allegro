@@ -62,6 +62,12 @@ text chosen by type.
 | `p.a` | reading the entry of `p` keyed by the symbol `a` |
 | `p[i]` | `get(p, i)`: the entry of `p` at place `i`, counted from 0; or, where `i` is a key, the private entry keyed by it |
 
+`int`, `float`, `text` and `bits` are structures Allegretto binds, and
+their entries are the primitives of section 3 and the kernel's
+primitives on bits. So `int.add(a, b)` reads the entry `add` of `int` and
+applies it, as `p.a` reads any entry. A block that binds one of these
+four names hides it, as with any name.
+
 ### Control and claims
 
 | Form | Stands for |
@@ -72,8 +78,10 @@ text chosen by type.
 
 The kernel's other primitives are reached as names Allegretto binds:
 `then`, `also`, `attempt`, `describe`, `build(description, names)`, `refuse(reason)`,
-`assume(x)`, `undecided(reason)`, and those ruled and not yet
-built. What `describe` gives is a program that means the same as the
+`assume(x)`, `undecided(reason)`, `count(s)` for the number of entries
+of a structure, and those ruled and not yet built. Four primitives have
+a form and no name: `get` is written `p.a` and `p[i]`, `same` is `==`,
+`if` is `if c then a else b`, and `block` is the indented block. What `describe` gives is a program that means the same as the
 function: where the function reads names of a block, or holds an
 argument used more than once and not yet evaluated, the description is
 a block around the function that binds them. A check the standard
@@ -118,7 +126,10 @@ operators: `float.add(a, b)`.
 
 `==` compares bits. `1 == 1.0` is false, and two structures are not
 compared: that is a refutation. Equality by type is the standard
-language's.
+language's. So whether a structure is empty is asked with
+`count(s) == 0`, never with `s == []`. A truth value is one bit and a
+number is 64, and nothing converts between them: `if n then a else b` on
+a number is a refutation, and the test is written `n != 0`.
 
 ### Bindings and blocks
 
@@ -126,7 +137,8 @@ language's.
 |---|---|
 | `x = e` | a binding of `x` in the enclosing block |
 | `f(x, y) => e` | the binding `f = (x, y) => e` |
-| `x <- e` | a statement: `e` is started here, and `x` is bound to its value for the rest of the block |
+| `export x = e`, `export f(x, y) => e` | the same binding, marked as one the module yields (see "The module") |
+| `x <- e` | the binding `x = e` in the block's one group, and a statement at this place: `e` is started here |
 | an indented block | a block of bindings around a chain of `also` |
 | `sync` and an indented block | the same block around a chain of `then`: each statement is over before the next is started |
 
@@ -134,6 +146,8 @@ A block's bindings are one group, whatever lines they are written on.
 Each may use any other, and itself. A binding's value is evaluated when
 something needs it, at most once. So a binding is never the place where
 an effect happens: `line = read()` reads when `line` is first needed.
+(`read` in these examples stands for an operation of a capability the
+text declares. No shipped capability has one of that name.)
 
 A block's statements are started in written order, and the block's value
 is its last statement's. A statement does not wait for the one before it
@@ -204,6 +218,16 @@ primitive function is outside its domain, which is a refutation, so
 nothing computes with one unseen. A name is bound once in a block; an inner block may
 bind it again.
 
+A name bound with `<-` is a binding of its block like any other: a
+binding written before or after it may use it, so `x <- read()` followed
+by `y = x + 1` means what it reads. What `<-` adds is the place: `e` is
+started when the statements reach that line. A statement written above
+the arrow that needs the name, itself or through a binding, would start
+`e` before its place, and the reader refuses it.
+
+An indented block may stand where the value of a binding or the body of
+a function is written: after `=`, after `=>` and after `<-`.
+
 A block with bindings stands for the kernel's block of bindings (section
 4). A block with none is the chain of `also` alone.
 
@@ -272,7 +296,14 @@ is not a number.
 - `int.lt`, `int.gt`, `int.le`, `int.ge`: signed.
 - `int.text`: an integer's decimal text. `text.int`: the reverse.
 - `float.add`, `float.sub`, `float.mul`, `float.div`, `float.neg`,
-  `float.lt`, `float.le`, `float.text`, `int.float`, `float.int`.
+  `float.text`, `int.float`, `float.int`.
+- `float.lt`, `float.le`, `float.gt`, `float.ge`, `float.eq`: by number.
+  `==` on two floats compares their bits, so `0.0 == -0.0` is false and
+  what is not a number equals itself; `float.eq` answers the other way
+  in both cases.
+- `bits.int`: at most 64 bits read as a whole number, as an integer. It
+  is how one byte of a text becomes a number to compare:
+  `bits.int(bits.slice(t, i * 8, 8)) >= 65`.
 
 ## 4. What the kernel stream owes for this
 
@@ -281,8 +312,10 @@ is not a number.
    group, each may use any other and itself, and a recursive function is
    one value with one identity. In the data form a block is an
    application of the primitive, so it needs no node of its own. `x <- e`
-   is `block({x: e}, also(x, rest))`, and in a `sync` block
-   `block({x: e}, then(x, rest))`. *Built.*
+   opens no block of its own: it adds `x: e` to the bindings of the
+   block it stands in and stands for the statement `x` at its place, so
+   that block is `block({…, x: e}, … also(x, rest))`, with `then` in a
+   `sync` block. *Built.*
 2. **The kernel's primitives on bits**: `same` tells two bits values or
    two symbols apart; `join`, `length` and `slice` join two bits values,
    measure one and take a part of one. Allegretto binds the last three
@@ -399,3 +432,8 @@ The maintainer approved each proposal on 2026-11-16, with one change.
 11. **`then` waits for all of its first** (2026-11-19). A function may
    give its value and leave work going; a caller who writes `then` or
    `sync` waits for that work too, and one who does not, does not.
+12. **`<-` and the dotted names** (2026-11-19, the second review's
+   cluster 12). `x <- e` is a binding of its block's one group and a
+   statement at its place; it opens no block. `int`, `float`, `text`
+   and `bits` are structures. Four primitives are added: `float.eq`,
+   `float.gt`, `float.ge` and `bits.int`.
