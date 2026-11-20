@@ -27,8 +27,8 @@ A program written for the purpose that shows no case of the present
 tree has no `// realises:` line.
 
 An input's value is one Allegretto literal: a text, a whole number, a
-decimal fraction, `true`, `false`, a symbol literal, a negative whole
-number, or a structure or array literal of these. `readLiteral` of
+decimal fraction, `true`, `false`, a symbol literal, a negative number,
+or a structure or array literal of these. `readLiteral` of
 `next/bootstrap/literal.ts` reads it. A module's input that no line
 supplies is a cell for the whole run.
 
