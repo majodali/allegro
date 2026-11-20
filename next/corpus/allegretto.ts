@@ -203,8 +203,8 @@ export interface ProgramRun {
   readonly lines: string[];
   /**
    * The end as `// end:` writes it. Where the driver refused the text and
-   * nothing was launched, `refused:` and the first finding's message; the
-   * program's stated one may be any of the findings'.
+   * nothing was launched, `refused:` and the refusal as the program states
+   * it where a finding matches, else the first finding's message.
    */
   readonly end: string | null;
   /** The yielded keys, when the program states `// yields:`. */
@@ -218,7 +218,8 @@ export interface ProgramRun {
  * end and yields with its pins. `readText` reads the imported texts; by
  * default, files relative to the repository root. A text the driver
  * refuses is launched not at all: it passes where its `// end: refused:`
- * line states the message of one of the findings and it states no line.
+ * line states the message of one of the findings, or the part of one
+ * before a colon, and it states no line.
  */
 export async function runProgram(text: string, file = "<text>", readText: ReadText = readUnder(ROOT)): Promise<ProgramRun> {
   const pins = readPins(text);
@@ -227,10 +228,13 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   const e = emitted(text, file, readText);
   if ("findings" in e) {
     const stated = pins.end !== undefined && pins.end.startsWith("refused: ") ? pins.end.slice("refused: ".length) : undefined;
-    if (stated === undefined || !e.messages.includes(stated)) problems.push(`the emitter refuses the text: ${e.findings.join("; ")}`);
+    // The message itself, or its part before a colon: a failed parse is stated as `not Allegretto`, without the engine's own words.
+    const states = (message: string): boolean => stated !== undefined && (message === stated || message.startsWith(`${stated}: `));
+    if (!e.messages.some(states)) problems.push(`the emitter refuses the text: ${e.findings.join("; ")}`);
     if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
-    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages[0]}`, yields: undefined, problems };
+    // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
+    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, problems };
   }
   const given = inputsOf(pins);
   if ("problems" in given) {

@@ -41,6 +41,9 @@ tree has no `// realises:` line.
 the driver refuses the text: nothing is launched. The program passes
 when the message of one of the findings, without its place, is the one
 stated, and it states no `// expect:`, `// later:` or `// yields:` line.
+The part of a message before a colon may be stated alone: a text that
+does not parse is stated as `not Allegretto`, since the words after it
+are the parser engine's and change with the engine.
 A finding in an imported text counts. A refusal by the launcher, before
 anything is evaluated, is written the same way with the launcher's
 reason.
