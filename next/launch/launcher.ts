@@ -3,7 +3,8 @@
 // chunk Q5 (the first notation and the bootstrap), part 3, for the
 // capability as a structure of its parts). Part 4 loads the records of
 // imported modules. Chunk Q13 (check and run as configurations, and what a
-// result holds), part 1, adds the result: what the run found.
+// result holds), part 1, adds the result: what the run found; part 2 adds
+// to it the source of each value of the configuration.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -96,11 +97,16 @@
 //      - `summary`, the weakest strength among the claims (`summaryOf`);
 //      - `restsOn`, what the run as a whole rests on: the kernel variant,
 //        the pure primitives the records name, the modules loaded, the
-//        capabilities the module run declares, and the builder whose
-//        stored outcomes the configuration accepts.
+//        capabilities the module run declares, the builder whose
+//        stored outcomes the configuration accepts, and the source of
+//        each value of the configuration, as the caller gives it
+//        (`Launch.sources`).
 //      The launcher adds no analysis: it sums what the kernel reports and
 //      names what it was given. It decides no claim and drops none.
 // Step 1 is the caller's: it passes the configuration and the records.
+// The launcher does not resolve a configuration from its sources: the
+// terminal's entries do, with `resolve` of next/tools/configuration.ts,
+// and hand the launcher the configuration and the list of its sources.
 // Who finds and emits the imported records is the caller's too: the
 // bootstrap's driver (next/bootstrap/driver.ts) for an Allegretto text.
 //
@@ -187,6 +193,18 @@ export interface Configuration {
   readonly later?: readonly Inputs[];
 }
 
+/**
+ * A source of configuration, highest first: the command line, the
+ * project's file, the environment, what is built into the launcher.
+ */
+export type SourceName = "command line" | "file" | "environment" | "launcher";
+
+/** Which source supplied one value of the configuration. `setting` is the setting's name, or `inputs.<name>` for one input. */
+export interface ConfigurationSource {
+  readonly setting: string;
+  readonly source: SourceName;
+}
+
 export interface Launch {
   readonly createKernel: CreateKernel;
   /** A saved program, as parsed JSON. It is checked before it is used. */
@@ -199,6 +217,12 @@ export interface Launch {
    */
   readonly imports?: readonly unknown[];
   readonly configuration: Configuration;
+  /**
+   * For each value of the configuration, the source that supplied it, as
+   * the caller resolved it. The launcher puts the list in the result as
+   * given. None: the result names no sources.
+   */
+  readonly sources?: readonly ConfigurationSource[];
   readonly target: Target;
   /** Called with each line as it is printed, besides collecting it. */
   readonly onLine?: (line: string) => void;
@@ -296,10 +320,7 @@ export const STRENGTHS: readonly Strength[] = ["refuted", "undecided", "assumed"
 /**
  * What the run as a whole rests on, as far as the launcher was given it.
  * The decision "A result names everything it rests on" also names the
- * configuration and its sources, the loader, the parser and the target.
- * Those come with the configuration's sources, a later part of chunk Q13
- * (check and run as configurations, and what a result holds), and are not
- * named here.
+ * loader, the parser and the target. Those are not named here yet.
  */
 export interface RunRestsOn {
   /** The kernel's `variant`. */
@@ -312,6 +333,14 @@ export interface RunRestsOn {
   readonly capabilities: readonly string[];
   /** The builder the configuration accepts stored outcomes from (`restoreAs`), where it names one. */
   readonly builder?: string;
+  /**
+   * For each setting of the configuration that has a value, the source
+   * that supplied it, in the order of the settings: `steps`, one entry
+   * `inputs.<name>` for each input, `later`, `ceiling`, `restore`,
+   * `kernel`. It is the caller's list (`Launch.sources`), as given, and
+   * is absent where the caller gives none.
+   */
+  readonly configuration?: readonly ConfigurationSource[];
 }
 
 /**
@@ -541,6 +570,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   const result = (): LaunchResult => {
     const claims = tallies.claims();
     const builder = configuration.restoreAs === undefined ? {} : { builder: configuration.restoreAs };
+    const sources = request.sources === undefined ? {} : { configuration: request.sources.map((s) => ({ setting: s.setting, source: s.source })) };
     return {
       claims,
       summary: summaryOf(claims),
@@ -550,6 +580,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         modules: [...modules.keys()],
         capabilities: program.declares.filter((d) => d.role === "capability").map((d) => d.name),
         ...builder,
+        ...sources,
       },
     };
   };
