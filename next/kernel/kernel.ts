@@ -499,6 +499,18 @@ export const createKernel: CreateKernel = () => {
         }
         return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
       }
+      if (fn.name === "first") {
+        // Both are started, and the value is that of whichever is known first; where both
+        // are known at once, the first written. This kernel evaluates what is left of the
+        // whole again each time an answer comes, so "at once" here is "by the same call".
+        // What is left of the one that lost is not kept, so nothing goes on with it.
+        const one = evaluate(v.args[0], scope);
+        if (one instanceof Refuted || known(one)) return one;
+        const other = evaluate(v.args[1], scope);
+        if (other instanceof Refuted || known(other)) return other;
+        const kept = (x: V): V => (x instanceof Lazy || !(x instanceof Expr || x instanceof NameRef) ? x : later(x, scope));
+        return new Expr(fn, [kept(one), kept(other)]);
+      }
       if (fn.name === "attempt") {
         // The budget is needed; what is attempted is evaluated inside the attempt.
         const steps = evaluate(v.args[1], scope);
@@ -918,6 +930,7 @@ export const createKernel: CreateKernel = () => {
       // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
       return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
     },
+    kept: () => [],
     waiting: () => {
       const found = new Set<V>();
       for (const root of roots) if (!root.done) waitsOn(root.value, found, new Set());

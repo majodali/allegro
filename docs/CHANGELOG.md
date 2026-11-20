@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-20 — The first of two answers.** `first(a, b)` is the
+  kernel's 23rd primitive: it starts both arguments and gives the value
+  of whichever is known first. On the machine the work of the one that
+  lost is dropped, and `waiting` no longer reports its cells, so a
+  launcher may abort the operation behind them. A value with a name
+  that loses is worked on again only when something reads it; until
+  then its answer is kept, and `kept` reports the cell. A refutation of
+  either argument refutes `first` at once. Fixed on the machine: a
+  claim held by a waiting claim kept a waiting count after it was
+  decided. The notation cannot write `first` yet.
 - **2026-11-20 — The interface made one, first half.** `Kernel` and
   `Kernel2` are one interface; `Kernel2` and `CreateKernel2` stay as
   other names for it. `evaluate` needs no scope. `fill` with
