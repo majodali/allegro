@@ -2527,3 +2527,105 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   A shipped capability now gives a failure in the one shape, which was
   what the row lacked. "The terminal and the browser ship output,
   timers and HTTP" stays at none until the browser launcher of Q21.
+  **Confirmed by the maintainer on 2026-11-20, for now**: "I confirm
+  all the asks for now, noting that this capability is not final, and
+  we'll rework various features as it matures". Three reworks were
+  named:
+  - request and answer bodies that are streamed;
+  - argument types and values checked more closely against the HTTP
+    standard, a body on a GET request refused among them;
+  - more transports and protocols.
+  So a body on a GET stays the failure `unreachable` with the host's
+  reason until the second rework, and the answer's body stays whole
+  bytes until the first. None of the three is scheduled by this plan;
+  each is taken up when a case or a library needs it.
+- **2026-11-20 — Q13, part 1: what a result holds.**
+  Built. The launcher (`next/launch/launcher.ts`) gives back, with how a
+  run ended, what the run found: its result (`LaunchResult`). This is
+  part 1 of chunk Q13 (check and run as configurations, and what a
+  result holds). Configuration sources, check as a configuration and
+  pipelines are later parts, and none is built. Nothing printed
+  changes: `npm run launch` and `npm run allegretto` print what they
+  printed. Showing a result is chunk Q14's (the commands).
+  The proposal, as built, for the maintainer to ratify at the PR:
+  1. **`LaunchOutcome` gains `result`.** It is present for every end
+     but `refused`, a fault included. It is plain data: every field is
+     a string, a number, or a list or record of those. A test holds
+     that it survives `JSON.stringify` and `JSON.parse` unchanged.
+     Building showed no reason against it.
+  2. **`result.claims`.** One entry for each claim as written, in the
+     order the run first reported it. An entry holds `module`, where
+     the kernel gives it; the four counts, summed over the evaluation
+     and every later call; `waiting`, the level of the last record;
+     each reason once; and each thing it rests on once, as plain data.
+     An assumption keeps `by` and loses its `at`, which is a kernel
+     handle. So two assumptions made by one module are one thing in an
+     entry's list. Records of one claim are matched by the handle
+     `ClaimRecord.claim`. The claims of a `fill` that holds are summed
+     too, though such a call reports none.
+  3. **How a reader tells claims apart.** `at` is the claim's key in
+     the function of its module, resting on nothing: `claimKey` with
+     the module function the loader returned, an empty list of what it
+     rests on, and the record's declarations. `originOf` gives nothing
+     on either variant: neither keeps origins, and a saved program
+     carries none. A key is a hash, so a tool can use it and a person
+     can only compare it. It is computed from the claim's content and
+     its module's, so it is the same on both variants and in every run
+     of the same records. It looks like this: `claim(square(7) == 49)`
+     of `m3/claim-holds.alg` is `sha256:f17efc297897…`, and the line
+     `output.write("the claim holds")` after it, a claim by "Failures"
+     of `next/ext/allegretto/forms.md`, is `sha256:ed828b2068d8…`. What is missing: two
+     claims of the same content in the same function have the same
+     key, so `output.write("x")` written twice gives two entries with
+     one `at`; a claim of no module has none; and nothing gives the
+     place in the text. A source position needs origins, which the
+     saved program leaves out.
+  4. **`result.summary`.** One word, the weakest strength among the
+     claims, from weakest: refuted, undecided, assumed, sampled,
+     decided (`summaryOf`). A claim with a refuted evaluation is
+     refuted; else one with an undecided evaluation, or one that still
+     waits, is undecided; else one with an assumed evaluation is
+     assumed; else it is decided. The kernel's records have no count
+     for sampled, so no run gives sampled yet. A run with no claim is
+     decided, a choice the maintainer may change.
+  5. **`result.restsOn`.** The kernel's `variant`; the pure primitives
+     the loaded records name, each once, by hash and name; the identity
+     of each imported module and then of the module run, in the order
+     loaded; the capabilities the module run declares, which the
+     ceiling grants; and the builder, where the configuration names one
+     (`restoreAs`). The configuration's sources, the loader, the parser
+     and the target come with configuration sources, a later part.
+  6. **The launcher adds no analysis.** It sums what the kernel reports
+     and names what it was given. `at` is the kernel's own answer to
+     `claimKey`.
+  7. **Nothing printed changes.** The terminal's files are unchanged.
+  The corpus runner (`runProgram` of `next/corpus/allegretto.ts`) gives
+  the result of a run (`ProgramRun.result`). A program may state its
+  summary in a line `// summary: <word>` (`readSummary`), and passes
+  only if the run's summary is that word. A word that is not a
+  strength, two lines, and a line in a program that is not launched or
+  that the launcher refuses each fail the program. The README of
+  `next/corpus/allegretto/` says this in the section "The summary".
+  Five programs state a summary: `m3/claim-holds.alg` decided,
+  `m3/claim-refuted.alg` refuted, `m3/assume-undecided.alg` undecided,
+  `m3/input-not-supplied.alg` undecided, for a claim that waits when
+  the run ends, and the new `m3/result-assumed.alg` assumed. No
+  existing program showed an assumed claim alone. None realises a case.
+  **What the kernel did that the decisions do not say.** On the
+  variant that keeps its own stack, a claim that a waiting claim holds
+  keeps the level 1 after it is taken up and decided, though nothing
+  waits any more. The reference gives 0. The smallest text:
+  `capability output`, `capability timer`,
+  `claim(timer.wait(15) == 15)`, `output.write("after")`. The run
+  completes on both. The second claim's last record is decided 1,
+  waiting 0 on the reference and decided 1, waiting 1 on the other
+  (`ALLEGRO_KERNEL=machine`), so the summary is decided on one and undecided on the other.
+  `m3/wait-claim.alg` shows it too, and states no summary for that
+  reason. The launcher does not work around it.
+  No existing test's assertion changed. No test branches on the
+  variant.
+  Measured: `npm run test:next` passes 718 tests on the reference and
+  719 with `ALLEGRO_KERNEL=machine`; 93 programs pass on both;
+  `milestone 3: programs 76 (passing 76, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  No row of the decision map moves in this part. The orchestrating
+  session decides which rows it earns.

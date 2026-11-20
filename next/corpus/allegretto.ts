@@ -3,7 +3,9 @@
 // (the minimal launcher and the output capability), part 3, for the
 // inputs, part 4, for imports and the expected refusal, and part 5, for
 // the timer capability; chunk Q16 (the capabilities the launchers ship),
-// part 1, for the HTTP capability and the `// serves:` lines): how a
+// part 1, for the HTTP capability and the `// serves:` lines; chunk Q13
+// (check and run as configurations, and what a result holds), part 1, for
+// the result and the `// summary:` line): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -37,13 +39,21 @@
 //                             next/bootstrap/literal.ts; one line per
 //                             request served. Any other request is
 //                             unreachable.
+//   // summary: <word>       the run's summary, the weakest strength among
+//                             its claims (`summaryOf` of
+//                             next/launch/launcher.ts): `refuted`,
+//                             `undecided`, `assumed`, `sampled` or
+//                             `decided`. At most one line. A program that
+//                             states none is not compared on it.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
 // next/launch/launcher.ts on the reference kernel, the imported ones
 // loaded first, with the output capability, the timer capability, the
 // shipped primitives and its inputs. It passes when its lines, its end,
 // the lines printed before each later phase and, where stated, its yielded
-// keys are the expected ones.
+// keys and its summary are the expected ones. A run gives the launcher's
+// result (`ProgramRun.result`): its claims, its summary and what it rests
+// on.
 //
 // The ceiling grants `output`, `timer` and `http`. The timer capability
 // (next/launch/timer.ts) is made, for each run, with a new virtual clock
@@ -73,7 +83,7 @@ import type { Cell } from "../kernel/interface.js";
 import { encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.js";
 import { readLiteral } from "../bootstrap/literal.js";
-import { launch, plainValue, type Inputs, type LaunchEnd, type Plain } from "../launch/launcher.js";
+import { launch, plainValue, STRENGTHS, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
 import { virtualClock } from "../launch/clock.js";
@@ -201,6 +211,26 @@ export function readServes(text: string): { served: Served[]; problems: string[]
   return { served, problems };
 }
 
+/**
+ * A program's `// summary:` line: the word it states, and the problems of
+ * the lines that cannot be read. The word is a strength of `STRENGTHS`.
+ * Two lines are a problem.
+ */
+export function readSummary(text: string): { summary: Strength | undefined; problems: string[] } {
+  let summary: Strength | undefined;
+  const problems: string[] = [];
+  let lines = 0;
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*summary:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    if (++lines === 2) problems.push("the program has two `// summary:` lines");
+    const word = m[1].trim();
+    if ((STRENGTHS as readonly string[]).includes(word)) summary ??= word as Strength;
+    else problems.push(`the line ${JSON.stringify(line.trim())} states no summary: the words are ${STRENGTHS.join(", ")}`);
+  }
+  return { summary, problems };
+}
+
 /** A run's end as a program's `// end:` line writes it. */
 export function endText(end: LaunchEnd): string {
   if (end.kind === "refuted") return `refuted: ${end.reason}`;
@@ -279,6 +309,8 @@ export interface ProgramRun {
   readonly yields: (string | null)[] | undefined;
   /** The requests the program handed the HTTP capability's transport, in the order asked; empty when it was not launched. */
   readonly requests: HttpRequest[];
+  /** The launcher's result: the claims, the summary and what the run rests on. Undefined where nothing was launched or the launcher refused. */
+  readonly result: LaunchResult | undefined;
   /** Each way the run differs from the pins; empty when the program passes. */
   readonly problems: string[];
 }
@@ -295,6 +327,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   const pins = readPins(text);
   const problems: string[] = [];
   if (pins.end === undefined) problems.push("the program states no `// end:` line");
+  const summaryLine = readSummary(text);
   const e = emitted(text, file, readText);
   if ("findings" in e) {
     const stated = pins.end !== undefined && pins.end.startsWith("refused: ") ? pins.end.slice("refused: ".length) : undefined;
@@ -303,14 +336,15 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (!e.messages.some(states)) problems.push(`the emitter refuses the text: ${e.findings.join("; ")}`);
     if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
+    if (summaryLine.summary !== undefined) problems.push("nothing was launched, and the program states a `// summary:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
-    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], problems };
+    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], result: undefined, problems };
   }
   const given = inputsOf(pins);
   const network = readServes(text);
-  if ("problems" in given || network.problems.length > 0) {
-    problems.push(...("problems" in given ? given.problems : []), ...network.problems);
-    return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], problems };
+  if ("problems" in given || network.problems.length > 0 || summaryLine.problems.length > 0) {
+    problems.push(...("problems" in given ? given.problems : []), ...network.problems, ...summaryLine.problems);
+    return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, problems };
   }
   const transport = scriptedTransport(network.served);
   const outcome = await launch({
@@ -331,6 +365,12 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
       problems.push(`${before} line(s) were printed before the later phase that supplies ${l.name} (phase ${i + 1}), and ${l.expectsAbove} \`// expect:\` line(s) are above it`);
   });
   if (pins.end !== undefined && end !== pins.end) problems.push(`ended ${JSON.stringify(end)}, expected ${JSON.stringify(pins.end)}`);
+  // The summary, where the program states one: the launcher's word, compared as it is.
+  if (summaryLine.summary !== undefined) {
+    if (outcome.result === undefined) problems.push(`the launcher refused the run, and the program states the summary ${summaryLine.summary}`);
+    else if (outcome.result.summary !== summaryLine.summary)
+      problems.push(`the summary is ${JSON.stringify(outcome.result.summary)}, expected ${JSON.stringify(summaryLine.summary)}`);
+  }
   let yields: (string | null)[] | undefined;
   if (pins.yields !== undefined) {
     const y = yieldedKeys(e.program, given, e.imports);
@@ -340,7 +380,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
       if (JSON.stringify(y.keys) !== JSON.stringify(pins.yields)) problems.push(`yields ${JSON.stringify(y.keys)}, expected ${JSON.stringify(pins.yields)}`);
     }
   }
-  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, problems };
+  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, result: outcome.result, problems };
 }
 
 /**

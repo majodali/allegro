@@ -28,6 +28,7 @@ Each statement is a comment line of its own:
 | `// realises: <case id>` | the program shows this case; one line per case, the id exactly as in `next/corpus/cases.json` |
 | `// expect: <line>` | a line the program prints; the lines in order, each compared exactly |
 | `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, `waiting: <the reason the launcher gives>`, or `refused: <the reason>`; every program has one |
+| `// summary: <word>` | the run's summary, the weakest strength among its claims: `refuted`, `undecided`, `assumed`, `sampled` or `decided`; at most one line (see "The summary") |
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
@@ -74,8 +75,30 @@ loaded first, with the output capability, the timer capability, the
 HTTP capability, the shipped primitives, its inputs and a budget of
 1,000,000 steps. A program passes when its printed lines, its end, the
 lines printed before each later phase and its yielded keys are the ones
-stated. The yielded keys are read with the program's inputs handed in
-and its imported records loaded.
+stated, and its summary where it states one. The yielded keys are read
+with the program's inputs handed in and its imported records loaded.
+
+## The summary
+
+The launcher gives, with how a run ended, what the run found: its result
+(`LaunchResult` of `next/launch/launcher.ts`). The result lists each
+claim as written with its counts, says what the run rests on, and gives
+the summary: one word, the weakest strength among the claims, by the
+decision "A module's summary is the weakest strength among its claims".
+A claim with a refuted evaluation is `refuted`. Else one with an
+undecided evaluation, or one that still waits when the run ends, is
+`undecided`. Else one with an assumed evaluation is `assumed`. Else it is
+`decided`. A run with no claim is `decided`. No run gives `sampled` yet.
+
+`// summary: <word>` states the summary. A program that states one
+passes only if the run's summary is that word. A program that states
+none is not compared on it, so the line is written only where it says
+something worth holding. Every statement whose
+value is dropped stands for a claim, so a line written with
+`output.write` is a claim too. A word that is not one of the five, two
+lines, and a line in a program that is not launched or that the
+launcher refuses each fail the program. `runProgram` gives the result
+of the run (`ProgramRun.result`).
 
 ## When a case is realised
 

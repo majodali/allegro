@@ -1494,6 +1494,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — What a result holds (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 1)
+
+B-196 (the rebuild's acceptance side). The launcher gives back, with
+how a run ended, what the run found. The result lists each claim as
+written, with its counts of decided, assumed, undecided and refuted
+evaluations summed over the run, the level that waits, the reasons and
+what it rests on. It says what the run rests on: the kernel variant,
+the primitives, the modules, the capabilities and the builder. Its
+summary is one word, the weakest strength among the claims. It is plain
+data with no kernel handle. A corpus program may state its summary in a
+`// summary:` line. Nothing printed changes.
+
+
+
+
 ### 2026-11 — The HTTP capability (B-196, chunk Q16 (the capabilities the launchers ship), part 1)
 
 B-196 (the rebuild's acceptance side). The launcher's target ships a

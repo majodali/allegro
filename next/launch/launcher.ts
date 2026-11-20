@@ -2,7 +2,8 @@
 // (the minimal launcher), parts 1 to 4, docs/plans/rebuild-acceptance.md §5;
 // chunk Q5 (the first notation and the bootstrap), part 3, for the
 // capability as a structure of its parts). Part 4 loads the records of
-// imported modules.
+// imported modules. Chunk Q13 (check and run as configurations, and what a
+// result holds), part 1, adds the result: what the run found.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -14,6 +15,10 @@
 //   "Phases are configuration", "When information arrives, what waited on
 //    it is evaluated again": a later phase of the configuration supplies
 //    an input, and what waited on it is evaluated again in the same launch
+//   "A result names everything it rests on", as far as this part goes,
+//   "A tool reads a phase's result and adds no analysis of its own" and
+//   "A module's summary is the weakest strength among its claims": the
+//    result
 //
 // It is a library and host-neutral: no process, no fs, no Buffer. It is
 // built against the kernel's interface (`Kernel` of
@@ -78,6 +83,23 @@
 //      answer. A record whose module uses a name nothing binds is refused
 //      at loading, with the kernel's message: "A free name never gets a
 //      value".
+//      With every end but a refusal it also returns the result
+//      (`LaunchResult`), plain data with no handle of the kernel in it:
+//      - `claims`, one entry for each claim as written, in the order the
+//        run first reported it. Its four counts are the sums of what the
+//        evaluation and every later call reported for that claim, its
+//        level of waiting is the last one reported, and its reasons and
+//        what it rests on are each listed once. Records of one claim are
+//        matched by the handle `ClaimRecord.claim`. An entry's `at` is the
+//        key the kernel gives the claim in its module's function, resting
+//        on nothing (`claimKey`), so a reader can tell claims apart;
+//      - `summary`, the weakest strength among the claims (`summaryOf`);
+//      - `restsOn`, what the run as a whole rests on: the kernel variant,
+//        the pure primitives the records name, the modules loaded, the
+//        capabilities the module run declares, and the builder whose
+//        stored outcomes the configuration accepts.
+//      The launcher adds no analysis: it sums what the kernel reports and
+//      names what it was given. It decides no claim and drops none.
 // Step 1 is the caller's: it passes the configuration and the records.
 // Who finds and emits the imported records is the caller's too: the
 // bootstrap's driver (next/bootstrap/driver.ts) for an Allegretto text.
@@ -94,8 +116,8 @@
 // Tested by next/launch/launcher.test.ts, on the reference kernel of
 // next/kernel/create.ts.
 
-import type { Cell, CreateKernel, Kernel, PrimitiveDeclaration, Value } from "../kernel/interface.js";
-import { INTERFACE_VERSION, KernelFault } from "../kernel/interface.js";
+import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, PrimitiveDeclaration, Rest, Value } from "../kernel/interface.js";
+import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
 
 /** A capability's definition: its name and the names of its parts. */
@@ -213,6 +235,98 @@ export type LaunchEnd =
   /** The kernel or a capability threw. */
   | { readonly kind: "fault"; readonly reason: string };
 
+/**
+ * One thing a claim's outcomes rest on, as plain data: a `Rest` of the
+ * kernel's interface with the kernel's handle left out. An assumption
+ * keeps the module that made it (`by`) and loses the assumption as
+ * written (`at`), which is a value of the kernel and means nothing
+ * outside it.
+ */
+export type RestData =
+  | { readonly kind: "kernel"; readonly variant: string }
+  | { readonly kind: "primitive"; readonly hash: string; readonly name: string }
+  | { readonly kind: "capability"; readonly capability: string; readonly part: string }
+  | { readonly kind: "builder"; readonly builder: string }
+  | { readonly kind: "assumption"; readonly by: string }
+  | { readonly kind: "limit" };
+
+/**
+ * What the run found of one claim as written, summed over the evaluation
+ * and every later call of the run that reported it.
+ */
+export interface ClaimResult {
+  /**
+   * Which claim it is, for a reader: the key the kernel gives the claim in
+   * the function of its module, resting on nothing (`claimKey`, with an
+   * empty list of what it rests on). It is computed from the claim's
+   * content and its module's, so it is the same on every kernel variant
+   * and in every run of the same records. Two claims of the same content
+   * in the same function have the same key. Absent where the kernel names
+   * no module for the claim, or does not give a key for it.
+   */
+  readonly at?: string;
+  /** The identity of the module whose code wrote the claim, where the kernel gives one. */
+  readonly module?: string;
+  /** Evaluations that came out decided, over the whole run. */
+  readonly decided: number;
+  /** Evaluations that came out resting on an assumption. */
+  readonly assumed: number;
+  /** Evaluations where what decides the claim answered that it cannot tell. */
+  readonly undecided: number;
+  /** Evaluations that were refuted. */
+  readonly refuted: number;
+  /** How many evaluations of the claim wait: the level its last record gave. */
+  readonly waiting: number;
+  /** Each reason given, once, in the order first given. */
+  readonly reasons: readonly string[];
+  /** Each thing the outcomes rest on, once, in the order first named. */
+  readonly restsOn: readonly RestData[];
+}
+
+/**
+ * A strength, in the order from weakest: the word of "A module's summary
+ * is the weakest strength among its claims". Refuted is an outcome and
+ * no strength; it is the weakest word a summary can give.
+ */
+export type Strength = "refuted" | "undecided" | "assumed" | "sampled" | "decided";
+
+/** The words of `Strength`, weakest first. */
+export const STRENGTHS: readonly Strength[] = ["refuted", "undecided", "assumed", "sampled", "decided"];
+
+/**
+ * What the run as a whole rests on, as far as the launcher was given it.
+ * The decision "A result names everything it rests on" also names the
+ * configuration and its sources, the loader, the parser and the target.
+ * Those come with the configuration's sources, a later part of chunk Q13
+ * (check and run as configurations, and what a result holds), and are not
+ * named here.
+ */
+export interface RunRestsOn {
+  /** The kernel's `variant`. */
+  readonly kernel: string;
+  /** The pure primitives the loaded records name, each once, by hash and name, in the order the records name them. */
+  readonly primitives: ReadonlyArray<{ readonly hash: string; readonly name: string }>;
+  /** The identity of each imported module and then of the module run, in the order loaded. A record of the first version makes no module and is not listed. */
+  readonly modules: readonly string[];
+  /** The capabilities the module run declares, which the ceiling grants, by name, in the order declared. */
+  readonly capabilities: readonly string[];
+  /** The builder the configuration accepts stored outcomes from (`restoreAs`), where it names one. */
+  readonly builder?: string;
+}
+
+/**
+ * What a run found: its claims, its summary and what it rests on. It is
+ * plain data a tool reads: every field is a string, a number, or a list
+ * or record of those, and no handle of the kernel is in it.
+ */
+export interface LaunchResult {
+  /** One entry for each claim as written, in the order the run first reported it. */
+  readonly claims: readonly ClaimResult[];
+  /** The weakest strength among the claims (`summaryOf`). */
+  readonly summary: Strength;
+  readonly restsOn: RunRestsOn;
+}
+
 export interface LaunchOutcome {
   /** The lines printed, in order. */
   readonly lines: string[];
@@ -222,10 +336,112 @@ export interface LaunchOutcome {
    */
   readonly linesBeforePhase: number[];
   readonly end: LaunchEnd;
+  /** What the run found. Present for every end but `refused`, where nothing was evaluated. */
+  readonly result?: LaunchResult;
 }
 
 function refused(lines: string[], reason: string, findings: readonly string[] = []): LaunchOutcome {
   return { lines, linesBeforePhase: [], end: { kind: "refused", reason, findings } };
+}
+
+/**
+ * The weakest strength among the claims. A claim with any refuted
+ * evaluation is refuted. Else one with any undecided evaluation, or one
+ * that still waits, is undecided. Else one with any assumed evaluation is
+ * assumed. Else it is decided. The kernel's records have no count for
+ * sampled today, so no run gives `sampled` yet.
+ *
+ * A run with no claim at all is `decided`: nothing in it is weaker. That
+ * is a choice the maintainer may change.
+ */
+export function summaryOf(claims: readonly ClaimResult[]): Strength {
+  const strengthOf = (c: ClaimResult): Strength =>
+    c.refuted > 0 ? "refuted" : c.undecided > 0 || c.waiting > 0 ? "undecided" : c.assumed > 0 ? "assumed" : "decided";
+  let weakest = STRENGTHS.length - 1;
+  for (const c of claims) weakest = Math.min(weakest, STRENGTHS.indexOf(strengthOf(c)));
+  return STRENGTHS[weakest];
+}
+
+/** A `Rest` as plain data: the kernel's handle left out. */
+function restData(rest: Rest): RestData {
+  switch (rest.kind) {
+    case "kernel":
+      return { kind: "kernel", variant: rest.variant };
+    case "primitive":
+      return { kind: "primitive", hash: rest.hash, name: rest.name };
+    case "capability":
+      return { kind: "capability", capability: rest.capability, part: rest.part };
+    case "builder":
+      return { kind: "builder", builder: rest.builder };
+    case "assumption":
+      return { kind: "assumption", by: rest.by };
+    case "limit":
+      return { kind: "limit" };
+  }
+}
+
+/** One claim's records, as they are summed. */
+interface Tally {
+  at?: string;
+  module?: string;
+  decided: number;
+  assumed: number;
+  undecided: number;
+  refuted: number;
+  waiting: number;
+  reasons: string[];
+  restsOn: RestData[];
+  /** The plain data of each thing in `restsOn`, as JSON, so each is listed once. */
+  seen: Set<string>;
+}
+
+/**
+ * Sums the kernel's claim records over a run. Records of one claim are
+ * matched by the handle `ClaimRecord.claim`, as the kernel's interface
+ * says a host finds a claim. It adds nothing of its own: each count is
+ * the sum of the counts the kernel reported, the level the last one.
+ */
+class ClaimTallies {
+  private readonly byClaim = new Map<Value, Tally>();
+  constructor(private readonly atOf: (record: ClaimRecord) => string | undefined) {}
+
+  add(records: readonly ClaimRecord[]): void {
+    for (const r of records) {
+      let t = this.byClaim.get(r.claim);
+      if (t === undefined) {
+        const at = this.atOf(r);
+        t = {
+          ...(at === undefined ? {} : { at }),
+          ...(r.module === undefined ? {} : { module: r.module }),
+          decided: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], seen: new Set(),
+        };
+        this.byClaim.set(r.claim, t);
+      }
+      t.decided += r.decided;
+      t.assumed += r.assumed;
+      t.undecided += r.undecided;
+      t.refuted += r.refuted;
+      t.waiting = r.waiting;
+      for (const reason of r.reasons) if (!t.reasons.includes(reason)) t.reasons.push(reason);
+      for (const rest of r.restsOn) {
+        const data = restData(rest);
+        const key = JSON.stringify(data);
+        if (!t.seen.has(key)) {
+          t.seen.add(key);
+          t.restsOn.push(data);
+        }
+      }
+    }
+  }
+
+  claims(): ClaimResult[] {
+    return [...this.byClaim.values()].map(({ seen: _, ...t }) => ({ ...t, reasons: [...t.reasons], restsOn: [...t.restsOn] }));
+  }
+}
+
+/** What a record declares of each parameter, as the kernel takes it. */
+function declarationsOf(doc: SavedProgram): Declaration[] {
+  return doc.declares.map((d) => (d.identity === undefined ? { role: d.role, name: d.name } : { role: d.role, name: d.name, identity: d.identity }));
 }
 
 /**
@@ -310,6 +526,35 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   });
   if (problems.length > 0) return refused(lines, problems[0], problems);
 
+  // Step 7's result: the claims the kernel reports, summed, and what the run rests on.
+  const modules = new Map<string, { readonly fn: Value; readonly declares: readonly Declaration[] }>();
+  const tallies = new ClaimTallies((record) => {
+    const within = record.module === undefined ? undefined : modules.get(record.module);
+    if (within === undefined) return undefined;
+    try {
+      return kernel.claimKey(record.claim, within.fn, [], within.declares);
+    } catch (e) {
+      if (e instanceof InterfaceError) return undefined;
+      throw e;
+    }
+  });
+  const result = (): LaunchResult => {
+    const claims = tallies.claims();
+    const builder = configuration.restoreAs === undefined ? {} : { builder: configuration.restoreAs };
+    return {
+      claims,
+      summary: summaryOf(claims),
+      restsOn: {
+        kernel: kernel.variant,
+        primitives: [...needed].map(([hash, name]) => ({ hash, name })),
+        modules: [...modules.keys()],
+        capabilities: program.declares.filter((d) => d.role === "capability").map((d) => d.name),
+        ...builder,
+      },
+    };
+  };
+  const ended = (end: LaunchEnd): LaunchOutcome => ({ lines, linesBeforePhase, end, result: result() });
+
   try {
     // Step 3, loading: the pure primitives every record needs, then each imported record, in order, then the saved program.
     const primitives = new Map<string, Value>();
@@ -327,6 +572,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const identity = kernel.moduleOf(fn);
       if (identity === undefined) return refused(lines, "the kernel refused to load an imported record", [`imported record ${i + 1} is of the first version, which makes no module`]);
       loaded.add(identity);
+      modules.set(identity, { fn, declares: declarationsOf(doc) });
     }
     let moduleFn: Value;
     try {
@@ -336,6 +582,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const message = e instanceof Error ? e.message : String(e);
       return refused(lines, "the kernel refused to load the saved program", [message]);
     }
+    const identity = kernel.moduleOf(moduleFn);
+    if (identity !== undefined) modules.set(identity, { fn: moduleFn, declares: declarationsOf(program) });
     // Every module a record declares is the module of a supplied record, by identity: nothing is evaluated until then.
     const unsupplied: string[] = [];
     [...imported, program].forEach((doc, i) => {
@@ -356,7 +604,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const implementation = supplied.get(name)!;
       const parts = implementation.create(host);
       if (parts.length !== implementation.definition.parts.length || parts.some((p) => p.purity !== "effectful"))
-        return { lines, linesBeforePhase, end: { kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` } };
+        return ended({ kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` });
       const names = implementation.definition.parts;
       granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
     }
@@ -375,25 +623,29 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // Step 5: instantiate the module, under the budget. The budget is the
     // evaluation's: the kernel counts the work every later call does for it.
     const budget = configuration.steps;
-    const result = kernel.evaluate(kernel.expression(moduleFn, args), budget === undefined ? {} : { steps: budget });
-    let steps = result.steps;
+    const evaluated = kernel.evaluate(kernel.expression(moduleFn, args), budget === undefined ? {} : { steps: budget });
+    tallies.add(evaluated.claims);
+    let steps = evaluated.steps;
     // A kernel may end at a limit of its own with no budget set (its stack runs out).
-    const atLimit = (): LaunchOutcome => ({
-      lines,
-      linesBeforePhase,
-      end: { kind: "limit", steps, reason: budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out` },
-    });
+    const atLimit = (): LaunchOutcome =>
+      ended({ kind: "limit", steps, reason: budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out` });
     const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
       const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
-      return { lines, linesBeforePhase, end: { kind: "refuted", steps, reason: reasons.join("; "), reasons } };
+      return ended({ kind: "refuted", steps, reason: reasons.join("; "), reasons });
     };
-    if (result.refuted) return refutedEnd([result.value]);
-    if (result.ended === "limit") return atLimit();
+    if (evaluated.refuted) return refutedEnd([evaluated.value]);
+    if (evaluated.ended === "limit") return atLimit();
+    // A fill that holds evaluates nothing, and its claims are summed like any call's.
+    const fill = (cell: Cell, value: Value): void => {
+      const held: Advance = kernel.fill(cell, value, { hold: true });
+      tallies.add(held.claims);
+    };
 
     // Step 6: deliver the values that arrive later, and apply the later phases.
     let nextPhase = 0;
     const advanceOnce = (): LaunchOutcome | undefined => {
       const advanced = kernel.advance();
+      tallies.add(advanced.claims);
       steps += advanced.steps;
       if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
       // The launch is one evaluation: named in `limited`, its budget is spent and it is over.
@@ -401,13 +653,13 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       return undefined;
     };
     for (;;) {
-      if (capabilityFault !== null) return { lines, linesBeforePhase, end: { kind: "fault", reason: capabilityFault } };
+      if (capabilityFault !== null) return ended({ kind: "fault", reason: capabilityFault });
       const waiting = kernel.waiting();
       if (waiting.length === 0) break;
       let filled = 0;
       for (const [cell, plain] of arrived) {
         if (!kernel.filled(cell)) {
-          kernel.fill(cell, plainValue(kernel, plain), { hold: true });
+          fill(cell, plainValue(kernel, plain));
           filled++;
         }
         arrived.delete(cell);
@@ -429,7 +681,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         const inputs = phases[nextPhase++];
         for (const name of namesOf(inputs)) {
           const cell = inputCells.get(name)!;
-          kernel.fill(cell, plainValue(kernel, inputs[name]), { hold: true });
+          fill(cell, plainValue(kernel, inputs[name]));
           inputCells.delete(name);
         }
         const ended = advanceOnce();
@@ -444,13 +696,13 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
         ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
       ];
-      return { lines, linesBeforePhase, end: { kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs } };
+      return ended({ kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs });
     }
 
     // Step 7.
-    return { lines, linesBeforePhase, end: { kind: "completed", steps } };
+    return ended({ kind: "completed", steps });
   } catch (e) {
-    return { lines, linesBeforePhase, end: { kind: "fault", reason: e instanceof Error ? e.message : String(e) } };
+    return ended({ kind: "fault", reason: e instanceof Error ? e.message : String(e) });
   }
 }
 

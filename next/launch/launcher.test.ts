@@ -1,9 +1,11 @@
 // Tests of the minimal launcher (B-196 (the rebuild's acceptance side),
 // chunk Q7 (the minimal launcher), parts 1 to 3, and chunk Q5 (the first
 // notation and the bootstrap), part 3): next/launch/launcher.ts
-// and the output capability next/launch/output.ts, on the reference
-// kernel, `createKernel` of next/kernel/create.ts. Run by
-// `npm run test:next`.
+// and the output capability next/launch/output.ts, on the kernel
+// `createKernel` of next/kernel/create.ts gives: the reference kernel, or
+// the variant that keeps its own stack with `ALLEGRO_KERNEL=machine`. Run
+// by `npm run test:next`. The tests of what a result holds are chunk Q13
+// (check and run as configurations, and what a result holds), part 1.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,7 +18,9 @@ import { createKernel } from "../kernel/create.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { describe, launch, type CapabilityImplementation, type Configuration, type Plain, type Target } from "./launcher.js";
+import { describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Plain, type Target } from "./launcher.js";
+import { timer } from "./timer.js";
+import { virtualClock } from "./clock.js";
 import { OUTPUT, output } from "./output.js";
 import { shipped } from "../prims/index.js";
 
@@ -875,5 +879,170 @@ test("npm run allegretto runs a text that imports: the imported texts are found 
     assert.equal(missing.status, 1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+// ── What a result holds (chunk Q13, part 1) ───────────────────────────
+//
+// Every test here passes on both kernel variants. It asserts what must be
+// present in a result, never that something is absent, and no step count.
+
+/** The result of a run, which every end but a refusal carries. */
+function resultOf(outcome: LaunchOutcome): LaunchResult {
+  assert.notEqual(outcome.end.kind, "refused", describe(outcome.end));
+  assert.ok(outcome.result !== undefined, "every end but a refusal carries a result");
+  return outcome.result;
+}
+/** The four counts and the level of a claim's entry, in that order. */
+const counts = (c: ClaimResult) => [c.decided, c.assumed, c.undecided, c.refuted, c.waiting];
+/** The entry with these counts and level; it fails when there is none. */
+function entryWith(result: LaunchResult, expected: readonly number[]): ClaimResult {
+  const found = result.claims.find((c) => JSON.stringify(counts(c)) === JSON.stringify(expected));
+  assert.ok(found !== undefined, `no claim with the counts ${JSON.stringify(expected)} among ${JSON.stringify(result.claims.map(counts))}`);
+  return found;
+}
+const run = (program: SavedProgram, configuration: Configuration = ONLY_OUTPUT) => launch({ createKernel, program, configuration, target: SHIPPED_TARGET });
+const variant = createKernel().variant;
+const primitiveNames = (c: ClaimResult) => c.restsOn.flatMap((r) => (r.kind === "primitive" ? [r.name] : []));
+
+test("a claim evaluated once is one entry with one decided evaluation, the module that wrote it, and what it rests on", async () => {
+  const outcome = await run(emitted("capability output\nsquare(n) => n * n\nclaim(square(7) == 49)\n"));
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  const claim = entryWith(result, [1, 0, 0, 0, 0]);
+  assert.equal(claim.module, result.restsOn.modules[result.restsOn.modules.length - 1], "the module run wrote it");
+  assert.ok(claim.restsOn.some((r) => r.kind === "kernel" && r.variant === variant));
+  assert.ok(primitiveNames(claim).includes("int.mul"));
+  assert.match(claim.at ?? "", /^sha256:[0-9a-f]{64}$/, "a claim of a module is told apart by its key");
+  assert.equal(result.summary, "decided");
+});
+
+test("a claim inside a recursion is one entry, its counts summed over every evaluation", async () => {
+  // f(5) evaluates the claim in f's body six times, for 5 down to 0.
+  const outcome = await run(emitted("capability output\nf(n) => sync\n  claim(n >= 0)\n  if n == 0 then 0 else f(n - 1)\nclaim(f(5) == 0)\n"));
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  const inBody = entryWith(result, [6, 0, 0, 0, 0]);
+  assert.ok(primitiveNames(inBody).includes("int.ge"));
+  assert.equal(result.summary, "decided");
+});
+
+test("a claim that waits on an answer is counted once it is decided, and its level is back at zero", async () => {
+  const later = laterCapability();
+  const program = emitted('capability later\nclaim(later.ask() == "yes")\n');
+  const pending = launch({ createKernel, program, configuration: { ceiling: ["later"] }, target: { capabilities: [later.capability], primitives: shipped } });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  later.answer("yes");
+  const outcome = await pending;
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  const claim = entryWith(result, [1, 0, 0, 0, 0]);
+  assert.ok(claim.restsOn.some((r) => r.kind === "capability" && r.capability === "later" && r.part === "ask"), "it rests on the answer it read");
+  assert.equal(result.summary, "decided");
+});
+
+test("a claim that still waits when the run ends gives its level, and the summary is undecided", async () => {
+  const outcome = await run(PRINTS_N);
+  assert.equal(outcome.end.kind, "waiting");
+  const result = resultOf(outcome);
+  // The write of n is a statement whose value is dropped: its claim waits on the input.
+  assert.ok(result.claims.some((c) => c.waiting > 0), JSON.stringify(result.claims.map(counts)));
+  assert.equal(result.summary, "undecided");
+});
+
+test("a refuted claim is an entry with its refuted evaluation and the reason the kernel gives", async () => {
+  const outcome = await run(FALSE_CLAIM);
+  assert.equal(outcome.end.kind, "refuted");
+  const result = resultOf(outcome);
+  const claim = result.claims.find((c) => c.refuted === 1);
+  assert.ok(claim !== undefined, JSON.stringify(result.claims.map(counts)));
+  assert.deepEqual(claim.reasons, ["a claim that is not true"]);
+  assert.equal(result.summary, "refuted");
+});
+
+test("an assumed claim is counted assumed and rests on the module that made the assumption", async () => {
+  const outcome = await run(emitted('capability output\nassume(1 == 2)\noutput.write("after")\n'));
+  assert.deepEqual(outcome.lines, ["after"]);
+  const result = resultOf(outcome);
+  const main = result.restsOn.modules[result.restsOn.modules.length - 1];
+  const claim = entryWith(result, [0, 1, 0, 0, 0]);
+  assert.ok(claim.restsOn.some((r) => r.kind === "assumption" && r.by === main), JSON.stringify(claim.restsOn));
+  assert.equal(result.summary, "assumed");
+});
+
+test("an attempt that reaches its limit: the claim that goes on from its answer rests on a limit", async () => {
+  const outcome = await run(emitted("capability output\ndown(n) => if n == 0 then 0 else down(n - 1)\nr <- attempt(down(1000), 50)\nclaim(is_failure(r))\n"));
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  const claim = entryWith(result, [1, 0, 0, 0, 0]);
+  assert.ok(claim.restsOn.some((r) => r.kind === "limit"), JSON.stringify(claim.restsOn));
+  // What rests on a limit is recorded beside the word and never changes it.
+  assert.equal(result.summary, "decided");
+});
+
+test("the summary is the weakest strength among the claims: each word the kernel can give", async () => {
+  const cases: Array<[string, string]> = [
+    ["capability output\nclaim(1 == 1)\n", "decided"],
+    ["capability output\nclaim(1 == 1)\nassume(1 == 1)\n", "assumed"],
+    ['capability output\nassume(1 == 1)\nclaim(undecided("no rule decides this"))\n', "undecided"],
+    ['capability output\nclaim(undecided("no rule decides this"))\nclaim(1 == 2)\n', "refuted"],
+  ];
+  for (const [text, summary] of cases) {
+    const result = resultOf(await run(emitted(text)));
+    assert.equal(result.summary, summary, text);
+  }
+  // The undecided claim gives its reason.
+  const undecided = resultOf(await run(emitted('capability output\nclaim(undecided("no rule decides this"))\n')));
+  assert.deepEqual(entryWith(undecided, [0, 0, 1, 0, 0]).reasons, ["no rule decides this"]);
+});
+
+test("the summary's rule, on entries written by hand: refuted, then undecided or waiting, then assumed, then decided; with no claim, decided", () => {
+  const entry = (over: Partial<ClaimResult>): ClaimResult => ({ decided: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], ...over });
+  const decided = entry({ decided: 3 });
+  assert.equal(summaryOf([]), "decided", "a run with no claim: nothing in it is weaker");
+  assert.equal(summaryOf([decided]), "decided");
+  assert.equal(summaryOf([decided, entry({ decided: 1, assumed: 1 })]), "assumed");
+  assert.equal(summaryOf([decided, entry({ decided: 1, waiting: 1 })]), "undecided", "a claim that still waits is undecided");
+  assert.equal(summaryOf([entry({ assumed: 2 }), entry({ undecided: 1 })]), "undecided");
+  assert.equal(summaryOf([entry({ undecided: 1 }), entry({ decided: 5, refuted: 1 })]), "refuted");
+});
+
+test("a run with no claim has the summary decided", async () => {
+  // TWO is a chain of `then` written by hand: it holds no claim.
+  const outcome = await launch({ createKernel, program: TWO, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(resultOf(outcome).summary, "decided");
+});
+
+test("what the run rests on: the kernel variant, the primitives, the modules in load order, the capabilities declared, the builder", async () => {
+  const records = drivenRecords("capability output\ncapability timer\nimport lib\noutput.write(int.text(lib.double(timer.wait(21))))\n", {
+    lib: "export double(n) => n * 2\n",
+  });
+  const [lib, main] = records;
+  const configuration: Configuration = { ceiling: ["output", "timer"], restoreAs: "builder-a" };
+  const target: Target = { capabilities: [output, timer(virtualClock().clock)], primitives: shipped };
+  const outcome = await launch({ createKernel, program: main, imports: [lib], configuration, target });
+  assert.deepEqual(outcome.lines, ["42"]);
+  const { restsOn } = resultOf(outcome);
+  assert.equal(restsOn.kernel, variant);
+  for (const n of [...lib.needs, ...main.needs]) assert.ok(restsOn.primitives.some((p) => p.hash === n.hash && p.name === n.name), n.name);
+  assert.equal(new Set(restsOn.primitives.map((p) => p.hash)).size, restsOn.primitives.length, "each primitive once");
+  const libIdentity = main.declares.find((d) => d.role === "module")?.identity;
+  assert.equal(restsOn.modules[0], libIdentity, "the imported module is loaded first");
+  assert.match(restsOn.modules[1] ?? "", /^sha256:[0-9a-f]{64}$/, "and then the module run");
+  assert.deepEqual(restsOn.capabilities, ["output", "timer"]);
+  assert.equal(restsOn.builder, "builder-a");
+});
+
+test("the result holds no kernel handle: it survives JSON unchanged", async () => {
+  const outcomes = [
+    await run(emitted("capability output\ndown(n) => if n == 0 then 0 else down(n - 1)\nr <- attempt(down(1000), 50)\nclaim(is_failure(r))\nassume(1 == 2)\n")),
+    await run(FALSE_CLAIM),
+    await run(PRINTS_N),
+  ];
+  for (const outcome of outcomes) {
+    const result = resultOf(outcome);
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
   }
 });
