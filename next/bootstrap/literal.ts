@@ -23,7 +23,9 @@
 // `int.neg` (forms.md §2, "Operators"), so `-1.5` in a program is
 // `int.neg` applied to the bits of 1.5, which is not the fraction -1.5.
 // A negative whole number is `int.neg` of a whole number in the signed
-// 64-bit range, which never wraps, and so is the whole number itself.
+// 64-bit range, which never wraps, and so is the whole number itself. The
+// least integer, `-9223372036854775808`, is read by the reader as one
+// literal, and is that integer here too.
 //
 // The plain data is the launcher's `Plain` (next/launch/launcher.ts). The
 // launcher does not import this file.

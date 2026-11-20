@@ -13,7 +13,9 @@
 //   - a literal from its digits or characters in the text: a whole number
 //     to a signed 64-bit integer, refused outside that range; `0xFF`; a
 //     decimal fraction to IEEE 754 binary64; a text, with the escapes
-//     `\"`, `\\`, `\n`, `\t`, to its UTF-8 bytes;
+//     `\"`, `\\`, `\n`, `\t`, to its UTF-8 bytes. Prefix `-` on a whole
+//     number of exactly 2^63 is read as the least integer, -2^63, which no
+//     other text can write (the hand-off of PR #260);
 //   - a structure literal's entries, each `name: e` or `[k]: e`, with a
 //     computed key;
 //   - the header lines (`capability`, `input`, `key`, `import`), anywhere
@@ -128,6 +130,8 @@ export type ReadResult = { readonly ok: true; readonly module: Module } | { read
 // ── Reading ────────────────────────────────────────────────────────────
 
 const INT_MAX = (1n << 63n) - 1n;
+/** The least integer, -2^63: written only as prefix `-` on the whole number 2^63. */
+const INT_MIN = -(1n << 63n);
 const ESCAPES: Readonly<Record<string, string>> = { '\\"': '"', "\\\\": "\\", "\\n": "\n", "\\t": "\t" };
 const BINARY_TAGS: Readonly<Record<string, BinaryOp>> = {
   or: "||", and: "&&", eq: "==", neq: "!=", lt: "<", gt: ">", lte: "<=", gte: ">=", join: "++", add: "+", sub: "-", mul: "*", div: "/", mod: "%",
@@ -199,6 +203,20 @@ export function read(text: string): ReadResult {
     if (value > INT_MAX) return refuse(at(t), `the whole number ${digits} is outside the signed 64-bit range`);
     return { k: "int", value, at: at(t) };
   };
+  /** A node with the levels of the ladder that hold no operator taken off: the operand itself. */
+  const bare = (t: ParseTree): ParseTree => {
+    let n = t;
+    while (n.kind === "branch" && n.tag === LADDER_TAG && n.children.length === 2 && branches(n.children[1]).length === 0) n = n.children[0];
+    return n;
+  };
+  /** `-` before a whole number of exactly 2^63: the least integer, read as one literal. Undefined for any other operand. */
+  const leastInteger = (t: Branch): Expr | undefined => {
+    const operand = branches(t).find((c) => !["ws", "ws_any", "ws_req", "hws"].includes(c.tag ?? ""));
+    const n = operand === undefined ? undefined : bare(operand);
+    if (n === undefined || n.kind !== "branch" || n.tag !== "number") return undefined;
+    const digits = leafText(n);
+    return !/^0[bB]/.test(digits) && BigInt(digits) === -INT_MIN ? { k: "int", value: INT_MIN, at: at(t) } : undefined;
+  };
   const float = (t: ParseTree): Expr => {
     const digits = leafText(t);
     const value = Number(digits);
@@ -265,7 +283,7 @@ export function read(text: string): ReadResult {
       case "paren":
         return lastNonClose(t);
       case "neg":
-        return { k: "unary", op: "-", operand: lastExpr(t), at: at(t) };
+        return leastInteger(t) ?? { k: "unary", op: "-", operand: lastExpr(t), at: at(t) };
       case "not":
         return { k: "unary", op: "!", operand: lastExpr(t), at: at(t) };
       case "if": {

@@ -54,6 +54,15 @@ test("a whole number is read from its digits, within the signed 64-bit range; ou
   assert.match(refusal("0x8000000000000000")[0], /outside the signed 64-bit range/);
 });
 
+test("prefix - on the whole number 2^63 is the least integer, one literal; 2^63 is refused anywhere else", () => {
+  assert.deepEqual(exprOf("-9223372036854775808"), { k: "int", value: -(2n ** 63n), at: { start: 0, end: 20, line: 1, column: 1 } });
+  assert.equal(shape(exprOf("-9223372036854775807")), "(-9223372036854775807)");
+  assert.equal((exprOf("-0x8000000000000000") as { value: bigint }).value, -(2n ** 63n));
+  assert.match(refusal("0 - 9223372036854775808")[0], /outside the signed 64-bit range/);
+  assert.match(refusal("-(9223372036854775808)")[0], /outside the signed 64-bit range/);
+  assert.match(refusal("-9223372036854775809")[0], /outside the signed 64-bit range/);
+});
+
 test("0xFF is read as 255", () => {
   assert.equal((exprOf("0xFF") as { value: bigint }).value, 255n);
   assert.equal((exprOf("0x7fffffffffffffff") as { value: bigint }).value, 9223372036854775807n);

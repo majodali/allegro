@@ -564,6 +564,12 @@ test("the four primitives added: bits.int, float.eq, float.ge, float.gt", () => 
   assert.deepEqual(seen(r).slice(1).map((v) => bitsOf(r.k, v)), ["1:01", "1:01", "1:00"]);
 });
 
+test("the least integer is written -9223372036854775808: one literal, with no int.neg", () => {
+  const doc = emitted("input see\nsee(-9223372036854775808)");
+  assert.deepEqual(doc.needs, []);
+  assert.deepEqual(seenInts(run("input see\nsee(-9223372036854775808)\nsee(-9223372036854775807 - 1)")), [-(2n ** 63n), -(2n ** 63n)]);
+});
+
 // ── What the module yields ────────────────────────────────────────────
 
 test("a module with no export yields all its bindings, keyed by the symbols of their names; with export, those marked", () => {
