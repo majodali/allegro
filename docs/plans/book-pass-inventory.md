@@ -192,7 +192,7 @@ A reader who did not know the project found these ten used before the entry that
 
 1. **Claim.** A claim is an expression that someone states to be true of a program, such as a type, a contract or a law; nothing is a claim until someone makes it, and the kernel decides it by evaluating it.
 2. **Configuration.** A configuration is everything that determines one execution and is not the program: the kernel, the extensions, the capabilities and inputs handed over, the limits, and what must be decided.
-3. **Capability.** A capability is the right to perform an effect, held as a value: a named set of operations, such as writing output, that code can use only if it was handed it.
+3. **Capability.** A capability provides the right and ability to perform a set of effects, held as a value: a named set of operations, such as writing output, that code can use only if it was handed it.
 4. **Refutation and halting.** A refutation is the kernel's record that a claim came out false, which means the program is wrong; a refuted claim halts its phase, so the phase's result is refuted and it performs no further effect, though evaluation goes on to report other refutations.
 5. **Strength.** A strength says how a claim was settled: decided (the kernel evaluated it in full), sampled (evaluated on some cases), assumed (accepted without evaluation) or undecided (not yet settled), from strongest to weakest.
 6. **Policy.** A policy is a requirement on what a result may rest on before it is used: what a phase must leave decided, or what the inputs of a capability must rest on.
