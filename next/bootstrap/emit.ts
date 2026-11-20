@@ -65,10 +65,13 @@
 //     it is used, and finds the innermost block's binding.
 // A name Allegretto binds is the node it stands for: a kernel node, a
 // primitive node of a shipped primitive, or the structure of one of `int`,
-// `float`, `text` and `bits`. `is_failure` and `handle` are bound in a
-// block around the module's own (`FAILURE_FUNCTIONS`), written only where
-// the text uses one of the names. The emitter resolves every name
-// lexically first, and refuses one nothing binds.
+// `float`, `text` and `bits`. Allegretto's own functions, `is_failure` and
+// `handle` (`FAILURE_FUNCTIONS`) and `each`, `each_at_once`, `each_within`
+// and `all` (`STREAM_FUNCTIONS`), are bound in a block around the module's
+// own: those the text uses, and those they use in turn. The helpers the
+// forms write beside them are bound there too and are no names of a text.
+// The emitter resolves every name lexically first, and refuses one nothing
+// binds.
 //
 // How each form is written:
 //   - `"text"`, `42`, `0xFF`, `1.5`, `true`, `false`: a bits node.
@@ -148,7 +151,7 @@ export type FormId =
   | "if" | "&& || !" | "claim" | "kernel name"
   | "integer operator" | "== !=" | "++" | "shipped name" | "bits name"
   | "binding" | "function binding" | "x <- e" | "block" | "statements" | "sync block"
-  | "dropped statement" | "failure functions"
+  | "dropped statement" | "failure functions" | "iteration functions"
   | "capability" | "input" | "key" | "import" | "import with" | "import without" | "capability part" | "export";
 
 export interface FormInfo {
@@ -192,7 +195,8 @@ export const FORMS: Readonly<Record<FormId, FormInfo>> = {
   "statements": { standsFor: "a chain of the kernel primitive also" },
   "sync block": { standsFor: "sync and an indented block: the same block around a chain of then" },
   "dropped statement": { standsFor: "a statement whose value is dropped: claim(!is_failure(a))" },
-  "failure functions": { standsFor: "is_failure and handle, Allegretto's two functions, bound in a block around the module's own" },
+  "failure functions": { standsFor: "is_failure and handle, Allegretto's two functions for a failure, bound in a block around the module's own" },
+  "iteration functions": { standsFor: "each, each_at_once, each_within and all, Allegretto's four functions for iteration, bound in the same block" },
   "capability": { standsFor: "a parameter of the module, declared as a capability" },
   "input": { standsFor: "a parameter of the module, declared as an input" },
   "key": { standsFor: "a parameter of the module placed before every other, counted by the record's keys" },
@@ -243,19 +247,67 @@ export const FAILURE_FUNCTIONS = `is_failure(x) =>
 handle(x, name, handler) =>
   if is_failure(x) && x.failure == name then handler(x) else x
 `;
-/** The names `FAILURE_FUNCTIONS` binds. */
-const FAILURE_NAMES: readonly string[] = ["is_failure", "handle"];
+/**
+ * Allegretto's four functions for iteration, with the helpers they are
+ * written with, as forms.md §2 "Streams" writes them. Kept, read and
+ * bound as `FAILURE_FUNCTIONS` is, and held to the forms' text by a test.
+ */
+export const STREAM_FUNCTIONS = `each(s, f) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else sync
+    f(s.item)
+    each(s.rest, f)
 
-let failureItems: ReadonlyArray<Extract<Item, { k: "function" }>> | undefined;
-/** The two functions, read once. */
-function failureFunctions(): ReadonlyArray<Extract<Item, { k: "function" }>> {
-  if (failureItems !== undefined) return failureItems;
-  const r = read(FAILURE_FUNCTIONS);
-  if (!r.ok) throw new Error(`the failure functions are not Allegretto: ${r.findings.map((f) => f.message).join("; ")}`);
-  const fns = r.module.items.filter((i): i is Extract<Item, { k: "function" }> => i.k === "function");
-  if (r.module.headers.length > 0 || fns.length !== r.module.items.length || fns.map((f) => f.name.name).join() !== FAILURE_NAMES.join())
-    throw new Error("the failure functions are not the two function bindings is_failure and handle");
-  return (failureItems = fns);
+each_at_once(s, f) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else
+    r <- f(s.item)
+    each_at_once(s.rest, f)
+
+each_within(s, n, f) => window(s, n, f, [])
+window(s, n, f, q) =>
+  if is_failure(s) then s
+  else if count(s) == 0 then []
+  else if count(q) < n then go(s, n, f, q)
+  else then(q[0], go(s, n, f, without_first(q, 1, [])))
+go(s, n, f, q) =>
+  r <- f(s.item)
+  window(s.rest, n, f, put(q, [], r))
+without_first(q, i, out) =>
+  if i == count(q) then out else without_first(q, i + 1, put(out, [], q[i]))
+
+all(xs) => then(start(xs, 0), xs)
+start(xs, i) => if i == count(xs) then [] else also(xs[i], start(xs, i + 1))
+`;
+/** The names of Allegretto's own functions that a text may use, with the form each is counted under. */
+const OWN_PUBLIC: Readonly<Record<string, FormId>> = {
+  is_failure: "failure functions",
+  handle: "failure functions",
+  each: "iteration functions",
+  each_at_once: "iteration functions",
+  each_within: "iteration functions",
+  all: "iteration functions",
+};
+
+type FunctionItem = Extract<Item, { k: "function" }>;
+let ownItems: readonly FunctionItem[] | undefined;
+/** Allegretto's own functions, the helpers among them, read once, in the order the forms write them. */
+function ownFunctions(): readonly FunctionItem[] {
+  if (ownItems !== undefined) return ownItems;
+  const fns: FunctionItem[] = [];
+  for (const [what, text] of [["failure", FAILURE_FUNCTIONS], ["stream", STREAM_FUNCTIONS]] as const) {
+    const r = read(text);
+    if (!r.ok) throw new Error(`the ${what} functions are not Allegretto: ${r.findings.map((f) => f.message).join("; ")}`);
+    const own = r.module.items.filter((i): i is FunctionItem => i.k === "function");
+    if (r.module.headers.length > 0 || own.length !== r.module.items.length) throw new Error(`the ${what} functions are not function bindings alone`);
+    fns.push(...own);
+  }
+  const names = fns.map((f) => f.name.name);
+  const lacking = Object.keys(OWN_PUBLIC).filter((n) => !names.includes(n));
+  if (lacking.length > 0 || new Set(names).size !== names.length) throw new Error(`Allegretto's own functions lack ${lacking.join(", ")} or bind a name twice`);
+  return (ownItems = fns);
 }
 
 /** Why a text is not emitted, at a place. */
@@ -394,8 +446,8 @@ type Meaning =
   | { readonly k: "kernel"; readonly name: string }
   /** `int`, `float`, `text` or `bits`: a structure Allegretto binds. */
   | { readonly k: "namespace"; readonly name: string }
-  /** `is_failure` or `handle`: bound in the block around the module's own. */
-  | { readonly k: "failure function"; readonly name: string };
+  /** One of Allegretto's own functions, a helper included: bound in the block around the module's own. */
+  | { readonly k: "own function"; readonly name: string };
 
 class Scope {
   readonly names = new Map<string, Meaning>();
@@ -444,10 +496,14 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
   const allegretto = new Scope(undefined);
   for (const name of KERNEL_NAMES) allegretto.names.set(name, { k: "kernel", name });
   for (const name of NAMESPACES) allegretto.names.set(name, { k: "namespace", name });
-  const failures = new Scope(allegretto);
-  for (const name of FAILURE_NAMES) failures.names.set(name, { k: "failure function", name });
-  /** True once the text uses `is_failure` or `handle` by name: the module's block is then put in the block that binds them. */
-  let failuresUsed = false;
+  /** The scope Allegretto's own functions are written in: each may name any of them, the helpers too. */
+  const ownScope = new Scope(allegretto);
+  for (const f of ownFunctions()) ownScope.names.set(f.name.name, { k: "own function", name: f.name.name });
+  /** The scope a text is written in: of Allegretto's own functions it may name the ones the forms give it. */
+  const visible = new Scope(allegretto);
+  for (const name of Object.keys(OWN_PUBLIC)) visible.names.set(name, { k: "own function", name });
+  /** The own functions named so far, by the text or by one another: the module's block is put in the block that binds them. */
+  const ownUsed = new Set<string>();
 
   const truth = (value: boolean): Ref => {
     const { bytes, bitLength } = literalBits({ k: "truth", value, at: { start: 0, end: 0, line: 1, column: 1 } });
@@ -480,17 +536,17 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
     return r;
   };
 
-  /** The function nodes of `is_failure` and `handle`, each written once, in the scope that binds the two, with the forms of the text left as they were. */
-  const failureNodes = new Map<string, Ref>();
-  const failureFunction = (name: string): Ref => {
-    let r = failureNodes.get(name);
+  /** The function node of one of Allegretto's own functions, written once, in the scope that binds them all, with the forms of the text left as they were. */
+  const ownNodes = new Map<string, Ref>();
+  const ownFunction = (name: string): Ref => {
+    let r = ownNodes.get(name);
     if (r !== undefined) return r;
     const kept = [...forms];
-    const it = failureFunctions().find((f) => f.name.name === name) as Extract<Item, { k: "function" }>;
-    r = bindingValue(it, failures);
+    const it = ownFunctions().find((f) => f.name.name === name) as FunctionItem;
+    r = bindingValue(it, ownScope);
     forms.clear();
     for (const f of kept) forms.add(f);
-    failureNodes.set(name, r);
+    ownNodes.set(name, r);
     return r;
   };
 
@@ -504,8 +560,8 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
         return b.kernel(m.name);
       case "namespace":
         return namespace(m.name, at);
-      case "failure function":
-        failuresUsed = true;
+      case "own function":
+        ownUsed.add(m.name);
         return b.symbol(m.name);
     }
   };
@@ -537,7 +593,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
           return NONE;
         }
         forms.add(
-          m.k === "kernel" ? (m.name === "claim" ? "claim" : "kernel name") : m.k === "namespace" ? "namespace" : m.k === "failure function" ? "failure functions" : "name",
+          m.k === "kernel" ? (m.name === "claim" ? "claim" : "kernel name") : m.k === "namespace" ? "namespace" : m.k === "own function" ? OWN_PUBLIC[m.name] ?? "name" : "name",
         );
         return named(m, e.at);
       }
@@ -714,7 +770,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       const value = expr(it.expr, scope);
       if ((tail === undefined && i === lines.length - 1) || isClaim(it.expr, scope)) return value;
       forms.add("dropped statement");
-      return b.apply(b.kernel("claim"), [cond(b.apply(failureFunction("is_failure"), [value]), FALSE(), TRUE())]);
+      return b.apply(b.kernel("claim"), [cond(b.apply(ownFunction("is_failure"), [value]), FALSE(), TRUE())]);
     });
     if (tail !== undefined) parts.push(tail());
     if (parts.length === 0) return undefined;
@@ -726,7 +782,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
   // The module: its header lines are its parameters, keys first, each role in written order; its block the body.
   // An import is a parameter declared as a module, with the imported module's identity, and a binding of the
   // module's block that calls that parameter (forms.md §2 "The module"): its name is a binding, not the parameter.
-  const top = new Scope(failures);
+  const top = new Scope(visible);
   const keyParams: Ref[] = [];
   const params: Ref[] = [];
   const declares: Declared[] = [];
@@ -803,8 +859,17 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       : [...own.map((i) => i.name), ...importLines.map((l) => l.h.name)].sort((x, y) => x.at.start - y.at.start);
   const more = importLines.map((l) => ({ name: l.h.name.name, value: importValue(l) }));
   let body = block(module.items, top, () => b.structure(yielded.map((n) => [b.symbol(n.name), b.symbol(n.name)] as const)), false, more) as Ref;
-  if (failuresUsed)
-    body = b.apply(b.kernel("block"), [b.structure(FAILURE_NAMES.map((n) => [b.symbol(n), failureFunction(n)] as const)), body]);
+  // The own functions the text names, and those they name in turn, until none is added: one block around the module's own.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of ownFunctions())
+      if (ownUsed.has(f.name.name) && !ownNodes.has(f.name.name)) {
+        ownFunction(f.name.name);
+        grew = true;
+      }
+  }
+  const ownBound = ownFunctions().map((f) => f.name.name).filter((n) => ownUsed.has(n));
+  if (ownBound.length > 0) body = b.apply(b.kernel("block"), [b.structure(ownBound.map((n) => [b.symbol(n), ownFunction(n)] as const)), body]);
   for (const u of unbound) findings.push({ at: u.at, kind: "unbound", message: `the name ${u.name} is bound nowhere in the text` });
 
   const used = [...forms].sort() as FormId[];

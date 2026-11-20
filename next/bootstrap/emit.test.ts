@@ -26,7 +26,7 @@ import { check2, encode, load, type SavedProgram } from "../kernel/saved-program
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
-import { emit, FAILURE_FUNCTIONS, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, withheldReason, type Finding, type FormId, type ImportedModule, type Imports } from "./emit.js";
+import { emit, FAILURE_FUNCTIONS, STREAM_FUNCTIONS, FORMS, KERNEL_WRITTEN, SHIPPED_NAMES, withheldReason, type Finding, type FormId, type ImportedModule, type Imports } from "./emit.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(here, "../..");
@@ -267,6 +267,31 @@ test("the failure functions the emitter keeps are the text of forms.md, section 
   const definitions = blocks.find((t) => t.startsWith("is_failure(x) =>"));
   assert.ok(definitions !== undefined, "forms.md writes is_failure and handle in one block");
   assert.equal(FAILURE_FUNCTIONS, definitions);
+});
+
+test("the stream functions the emitter keeps are the text of forms.md, section Streams", () => {
+  const forms = fs.readFileSync(path.join(ROOT, "next/ext/allegretto/forms.md"), "utf8");
+  const section = forms.slice(forms.indexOf("### Streams"));
+  const blocks = [...section.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const definitions = blocks.find((t) => t.startsWith("each(s, f) =>"));
+  assert.ok(definitions !== undefined, "forms.md writes each, each_at_once, each_within and all in one block");
+  assert.equal(STREAM_FUNCTIONS, definitions);
+});
+
+test("each, each_at_once, each_within and all are Allegretto's functions for iteration; the helpers they are written with are no names of a text", () => {
+  const stream = "from(n, last) => if n > last then [] else {item: n, rest: from(n + 1, last)}";
+  // each: one item at a time, in order; its value is [] at a stream's end, and the failure a stream ends in.
+  const r = run(`input see\n${stream}\nend <- each(from(1, 3), see)\nsee(count(end))\nbroken <- each({item: 9, rest: {failure: \`closed}}, see)\nsee(is_failure(broken))`);
+  assert.deepEqual(seenInts({ ...r, events: r.events.slice(0, 4) }), [1n, 2n, 3n, 0n]);
+  assert.deepEqual(bitsOf(r.k, seen(r)[4]), "64:0000000000000009");
+  assert.deepEqual(bitsOf(r.k, seen(r)[5]), "1:01");
+  // The other three, each on a short stream or list.
+  assert.deepEqual(seenInts(run(`input see\n${stream}\neach_at_once(from(4, 5), see)`)), [4n, 5n]);
+  assert.deepEqual(seenInts(run(`input see\n${stream}\neach_within(from(6, 9), 2, see)`)), [6n, 7n, 8n, 9n]);
+  assert.deepEqual(seenInts(run("input see\nxs = all([1 + 1, 3])\nsee(xs[0] + xs[1])")), [5n]);
+  // A helper of the forms' text is not a name a text may use, and a text may bind any of the names itself.
+  assert.deepEqual(findings("input see\nsee(window([], 1, see, []))").map((x) => [x.kind, x.message]), [["unbound", "the name window is bound nowhere in the text"]]);
+  assert.deepEqual(seenInts(run("input see\ngo(n) => n + 1\neach(s, f) => 41\nsee(go(each(1, 2)))")), [42n]);
 });
 
 test("x <- e: e happens at its place, once, and x is its value for the rest of the block", () => {

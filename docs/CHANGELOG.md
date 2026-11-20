@@ -1444,6 +1444,16 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The four iteration functions shipped (B-196)
+
+B-196 (the rebuild's acceptance side). PR #271 ruled streams and asked
+this stream to ship `each`, `each_at_once`, `each_within` and `all`,
+written in Allegretto in the forms. The emitter keeps their text beside
+the two failure functions, held to the forms' text by a test, and binds
+those a text names and those they name in turn. Their four helpers are
+no names of a text. A program runs the four on streams it computes. The
+maintainer's confirmation of every ask of the imports PR is recorded.
+
 ### 2026-11 — Imports: the driver, the emitter and the launcher (B-196, chunks Q5 (the first notation and the bootstrap) and Q7 (the minimal launcher and the output capability))
 
 B-196 (the rebuild's acceptance side). Allegretto reads `import name`
