@@ -4,10 +4,13 @@
 // and ends as its `// end:` line says, on every `npm run test:next`. The
 // measured sizes are run by `npm run bench:next` (next/corpus/speed/bench.ts)
 // only, never here.
+// The bench's search for the largest size that completes (`largest`) is
+// tested here on a clock the test moves, with no real run.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runProgram } from "../allegretto.js";
+import { largest } from "./bench.js";
 import { emitTimed, flatInput, nestedInput, read, runNew, SPEED_DIR, typedLines, withInput, withSizes } from "./programs.js";
 
 for (const name of ["parser", "typed"]) {
@@ -46,4 +49,28 @@ test("dispatch is by the left operand's type, and a right operand of another typ
   const mixed = await runNew(emitTimed(`${head}output.write(show(plus(anInt(1), aText("a"))))\n`).program);
   assert.equal(mixed.end.kind, "refuted");
   assert.equal(mixed.end.kind === "refuted" ? mixed.end.reason : "", "a claim that is not true");
+});
+
+// ---- The bench's search for the largest size that completes ---------------------------
+
+test("the search finds the largest size that completes, by doubling then halving", async () => {
+  assert.deepEqual(await largest(async (n) => n <= 37), { n: 37, capped: false, long: false });
+  assert.deepEqual(await largest(async (n) => n <= 1), { n: 1, capped: false, long: false });
+  assert.deepEqual(await largest(async () => false), { n: null, capped: false, long: false });
+});
+
+test("the search ends its doubling at the cap where every run completes", async () => {
+  const asked: number[] = [];
+  const found = await largest(async (n) => { asked.push(n); return true; }, 64);
+  assert.deepEqual(found, { n: 64, capped: true, long: false });
+  assert.equal(Math.max(...asked), 64);
+});
+
+test("the search ends at the first run that completes but takes too long, and asks no larger size", async () => {
+  // A clock the test moves: a run of size n takes n of its units.
+  let clock = 0;
+  const asked: number[] = [];
+  const found = await largest(async (n) => { asked.push(n); clock += n; return true; }, 1 << 16, 10, () => clock);
+  assert.deepEqual(found, { n: 16, capped: false, long: true });
+  assert.deepEqual(asked, [1, 2, 4, 8, 16]);
 });

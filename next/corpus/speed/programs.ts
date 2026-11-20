@@ -72,7 +72,7 @@ export function emitTimed(text: string): { program: SavedProgram; ms: number } {
   return { program, ms: performance.now() - t0 };
 }
 
-/** Launches a record on the reference kernel, with no step budget. */
+/** Launches a record on the kernel `next/kernel/create.ts` gives, with no step budget. */
 export async function runNew(program: SavedProgram): Promise<NewRun> {
   const t0 = performance.now();
   const o = await launch({

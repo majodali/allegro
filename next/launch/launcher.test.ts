@@ -361,7 +361,23 @@ const NEVER_ENDS: SavedProgram = (() => {
 })();
 
 test("with no step budget a run that ends at the kernel's own limit says that no budget was set", async () => {
-  const outcome = await launch({ createKernel, program: NEVER_ENDS, configuration: ONLY_OUTPUT, target: TERMINAL });
+  // A kernel that stops at a limit of its own: it gives every evaluation 50 steps, though the launcher sets none.
+  // The launcher gives no default budget (the maintainer's ruling of 2026-11-20), so on a kernel with no
+  // limit of its own this program would not end; the test does not rest on where a kernel's stack runs out.
+  const stopsByItself = (): Kernel2 => {
+    const inner = createKernel();
+    return new Proxy(inner, {
+      get(target, name, receiver) {
+        const v = Reflect.get(target, name, receiver);
+        if (name !== "evaluate" || typeof v !== "function") return v;
+        return (expression: unknown, scope: unknown, budget: { steps?: number } = {}) => {
+          assert.equal(budget.steps, undefined, "the launcher sets no budget where the configuration sets none");
+          return (v as (...a: unknown[]) => unknown).call(target, expression, scope, { steps: 50 });
+        };
+      },
+    });
+  };
+  const outcome = await launch({ createKernel: stopsByItself, program: NEVER_ENDS, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.equal(outcome.end.kind, "limit");
   assert.equal(describe(outcome.end), "limit: the kernel reached its own limit; no step budget was set");
 });
