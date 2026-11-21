@@ -139,7 +139,7 @@ export class Quoted {
 /** A value with the kernel's record of a claim's outcome on it. */
 /** A value with the outcome of a claim on it: decided, assumed, or undecided with the reason nothing could tell. */
 export class Decided {
-  constructor(readonly inner: V, readonly rests: readonly Rest[], readonly outcome: "decided" | "assumed" | "undecided" = "decided", readonly reason?: string) {}
+  constructor(readonly inner: V, readonly rests: readonly Rest[], readonly outcome: "decided" | "sampled" | "assumed" | "undecided" = "decided", readonly reason?: string) {}
 }
 /**
  * An argument that has not been needed yet: an expression, the scope it
@@ -208,7 +208,7 @@ export interface Group {
 
 export const KERNEL_PRIMITIVES: ReadonlyArray<readonly [string, number]> = [
   ["also", 2], ["assume", 1], ["attempt", 2], ["block", 2], ["build", 2], ["claim", 1], ["count", 1], ["describe", 2], ["first", 2], ["get", 2], ["if", 3],
-  ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["slice", 3], ["spelling", 1],
+  ["join", 2], ["key", 2], ["kind", 1], ["length", 1], ["put", 3], ["refuse", 1], ["same", 2], ["sample", 2], ["slice", 3], ["specialize", 2], ["spelling", 1],
   ["symbol", 1], ["then", 2], ["undecided", 1],
 ];
 /** The module name under which the kernel makes the inspection right. No content hashes to it. */

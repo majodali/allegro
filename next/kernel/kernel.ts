@@ -222,7 +222,7 @@ export const createKernel: CreateKernel = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody,
     shared,
   } = core;
   const roots: Root[] = [];
@@ -248,6 +248,8 @@ export const createKernel: CreateKernel = () => {
   let ahead = false;
   /** True where this call met a refutation and ran out of steps while looking for more. */
   let cut = false;
+  /** True while a function is specialized: both branches of a conditional whose condition is unknown are evaluated. */
+  let speculative = false;
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
@@ -377,8 +379,10 @@ export const createKernel: CreateKernel = () => {
         if (told instanceof Decided && told.outcome === "undecided") return tallied(v, new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason), rests);
         if (truthOf(claimed) === true) {
           // A claim that rests on an assumption is no stronger than assumed.
+          // And one that rests on a sample is no stronger than sampled.
           const assumed = rests.some((r) => r.kind === "assumption");
-          return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided"), rests);
+          const sampled = rests.some((r) => r.kind === "kernel" && r.sampled !== undefined);
+          return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : sampled ? "sampled" : "decided"), rests);
         }
         if (known(claimed)) return tallied(v, new Refuted("a claim that is not true", claimed), rests);
         return tallied(v, new Expr(fn, [claimed]), rests);
@@ -398,7 +402,79 @@ export const createKernel: CreateKernel = () => {
         if (truth === true) return evaluate(v.args[1], scope);
         if (truth === false) return evaluate(v.args[2], scope);
         if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
+        // Specializing, both branches are evaluated though the condition is unknown. A
+        // refutation inside a branch stays in that branch.
+        if (speculative) return new Expr(fn, [condition, evaluate(v.args[1], scope), evaluate(v.args[2], scope)]);
         return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
+      }
+      if (fn.name === "specialize") {
+        // A function's body evaluated with its parameters unknown, under a budget. Nothing is
+        // performed: an effect stays in what is left. A call to the function itself, met
+        // while its body is evaluated, is not opened again. The answer is a function of the
+        // same parameters whose body is what is left, of the module that made the original.
+        const args = v.args.map((a) => evaluate(a, scope));
+        const wrong = args.find((a) => a instanceof Refuted);
+        if (wrong !== undefined) return wrong;
+        if (!known(args[0]) || !known(args[1])) return new Expr(fn, args);
+        const [f, budgetBits] = [seen(args[0]), seen(args[1])];
+        if (!(budgetBits instanceof Bits)) return new Refuted("a specialization's budget is a number of steps, as bits", args[1]);
+        if (f instanceof Prim || f instanceof KernelPrim) return f;
+        if (!(f instanceof Fn)) return new Refuted("only a function can be specialized", args[0]);
+        const [outer, wasAhead, wasSpeculative] = [budget, ahead, speculative];
+        budget = Math.min(outer, spent + numberOf(budgetBits));
+        ahead = true;
+        speculative = true;
+    // The body is evaluated with parameters of its own. What is left may hold the original
+        // function, as a call to itself that was not opened, and the two must not share theirs.
+        const params = f.params.map((p) => new Param(p.name));
+        const body = substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map());
+        opening.push(f);
+        let left: V;
+        try {
+          left = evaluate(body, scope);
+        } catch (e) {
+          if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
+            rest({ kind: "limit" });
+            return failure("limit");
+          }
+          throw e;
+        } finally {
+          budget = outer;
+          ahead = wasAhead;
+          speculative = wasSpeculative;
+          opening.pop();
+        }
+        // A body refuted whatever its parameters is a refutation of the whole.
+        if (left instanceof Refuted) return left;
+        const made = new Fn(params, asBody(left));
+        made.owner = f.owner;
+        return close(made, scope);
+      }
+      if (fn.name === "sample") {
+        // A claim evaluated on the cases it is given. True of each, it is sampled. A case it
+        // is not true of refutes it, and is the counterexample.
+        const args = v.args.map((a) => evaluate(a, scope));
+        const wrong = args.find((a) => a instanceof Refuted);
+        if (wrong !== undefined) return wrong;
+        if (!known(args[0]) || !known(args[1])) return new Expr(fn, args);
+        const cases = seen(args[1]);
+        if (!(cases instanceof Struct)) return new Refuted("the cases of a sample are a structure", args[1]);
+        const open = cases.entries.filter(([k]) => !hidden(k));
+        const { value: verdict, rests } = collecting((): V => {
+          for (const [, one] of open) {
+            const r = evaluate(new Expr(args[0], [one]), scope);
+            if (r instanceof Refuted) return r;
+            if (truthOf(r) === true) continue;
+            if (known(r)) return new Refuted("a claim that is not true of a case it was sampled on", one);
+            return new Expr(fn, args);
+          }
+          return TRUE;
+        });
+        rests.forEach(rest);
+        if (verdict !== TRUE) return tallied(v, verdict, rests);
+        const sample: Rest = { kind: "kernel", variant: VARIANT, sampled: open.length };
+        rest(sample);
+        return tallied(v, new Decided(TRUE, [sample, ...rests], "sampled"), rests);
       }
       if (fn.name === "block") {
         // The bindings are one group in a scope of their own: each may use any other, and
