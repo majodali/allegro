@@ -16,8 +16,8 @@
 // It prints the lines the program writes and exits 0 when the run
 // completed. Otherwise it writes the end's reason to stderr and exits 1.
 // A text the driver refuses, for a finding of the reader or the emitter in
-// it or in a text it imports, an imported text not found, or a cycle of
-// imports, prints each finding as `npm run emit` does,
+// it or in a text it imports, an imported text not found or outside the
+// project's directory, or a cycle of imports, prints each finding as `npm run emit` does,
 // `file:line:column: message`, and exits 1; nothing is launched. An
 // imported text is `name.alg` in the directory of the text that imports
 // it (`importedFile` of the driver).
@@ -59,6 +59,7 @@ import { readLiteral } from "../bootstrap/literal.js";
 import { encode } from "../kernel/saved-program.js";
 import { PROJECT_FILE, readProjectFile, type Settings } from "../tools/configuration.js";
 import type { Inputs, Plain } from "./launcher.js";
+import { projectReader } from "./node-files.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
 const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]... [--later name=<literal>]...";
@@ -121,7 +122,8 @@ async function main(argv: readonly string[]): Promise<void> {
     process.stderr.write(`cannot read ${file}: ${e instanceof Error ? e.message : String(e)}\n`);
     process.exit(1);
   }
-  const r = drive(text, file, (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : undefined));
+  // The imported texts are read in the project's directory and nowhere else.
+  const r = drive(text, file, projectReader(file));
   if (!r.ok) {
     for (const f of r.findings) process.stderr.write(describeDriveFinding(f) + "\n");
     process.exit(1);
