@@ -318,6 +318,24 @@ export class KernelFault extends Error {
 }
 
 /**
+ * Thrown to a host that reads the bytes of a value which the budget of
+ * the evaluation that made it does not cover. A value made by joining is
+ * kept as its parts until its bytes are read; laying them out is the
+ * last of the work of calculating it, and is counted against the
+ * evaluation that made it. Where what is left of that budget is too
+ * little, the bytes are not laid out, this is thrown, and the evaluation
+ * is over, at its limit. It is a failure, not a fault of the kernel and
+ * not a misuse: a host that means to avoid it reads `bitLength` first,
+ * which lays nothing out. Inside an evaluation the same shortfall ends
+ * the evaluation at its limit, as any spent budget does.
+ */
+export class LimitFailure extends Error {
+  constructor(readonly bits: number, readonly left: number) {
+    super(`a value of ${bits} bit(s) is not laid out: ${left} step(s) are left of the budget of the evaluation that made it`);
+  }
+}
+
+/**
  * Thrown when the host misuses the interface: a value of another
  * kernel, a call on the wrong kind, a symbol bound twice in one scope,
  * a cell filled twice.
@@ -518,6 +536,12 @@ export interface Kernel {
   // ---- Reading --------------------------------------------------------
 
   kind(value: Value): Kind;
+  /**
+   * The bits of a bits value. `bitLength` is known at once. Reading
+   * `bytes` lays out a value made by joining, which is counted against
+   * the evaluation that made it, and throws `LimitFailure` where that
+   * evaluation's budget does not cover it.
+   */
   bitsOf(value: Value): { readonly bytes: Uint8Array; readonly bitLength: number };
   symbolName(value: Value): string;
   paramName(value: Value): string;
