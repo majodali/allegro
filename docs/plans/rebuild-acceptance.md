@@ -3110,3 +3110,34 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   asks confirmed." So a file that is there and outside the directories
   the loader may read is a finding at the import, of kind `refused`,
   and the project's directory is the directory of the text being run.
+- **2026-11-21 — The maintainer on check, in session.**
+  This stream put five questions on check to the maintainer after the
+  merge of PR #293. The answers, in the maintainer's words:
+  - Check alone on `specialize`, with the largest budget where no
+    source sets one: "Agreed".
+  - What check decides after a dropped statement that calls a
+    capability: "Needs a more detailed discussion. I believe we need to
+    adjust how held capabilities' methods are handled, so we still get
+    information that can be used in subsequent expressions. I assume
+    that conversation should happen in the kernel session."
+  - Inputs under check: "Same as 1. Check is useless if we can't decide
+    any claims on missing inputs and capabilities. Deciding claims
+    against sample inputs is not much better." So check leaves an input
+    unknown and does not take a given value as known. What is decided
+    over an unknown input or a missing capability's answer is the
+    kernel stream's, with the point above.
+  - What check prints and how it exits: "While check doesn't have any
+    capability for program output, it should have a capability for
+    check output to allow messaging, exit status and other integrations
+    with external build tools."
+  - Whether a plain run becomes check and then run: "if check
+    capabilities and run capabilities are provided, then `run` does the
+    same work as `check, run`."
+  The maintainer then asked how check capabilities change things. That
+  is under discussion, and nothing is built on it. One point this
+  stream raised: `specialize` performs no effect, on a capability it is
+  given as on one it lacks, so a module that calls a check capability
+  would not act under a check that is `specialize` alone. Whether the
+  first answer stands as built depends on who may call a check
+  capability. "Check capabilities" and "check output" are the
+  maintainer's words and are not yet defined in a decision.
