@@ -34,7 +34,7 @@ export const createCore = () => {
   const keys = new Map<string, Key>();
 
   const restKey = (r: Rest): string =>
-    r.kind === "kernel" ? `kernel ${r.variant}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : r.kind === "limit" ? "limit" : `builder ${r.builder}`;
+    r.kind === "kernel" ? `kernel ${r.variant}${r.sampled === undefined ? "" : ` sampled ${r.sampled}`}` : r.kind === "primitive" ? `primitive ${r.hash}` : r.kind === "capability" ? `capability ${r.capability}.${r.part}` : r.kind === "assumption" ? `assumption ${r.by}` : r.kind === "limit" ? "limit" : `builder ${r.builder}`;
 
   const TRUE = new Bits(Uint8Array.of(1), 1);
   const FALSE = new Bits(Uint8Array.of(0), 1);
@@ -513,7 +513,7 @@ export const createCore = () => {
   //
   // One tally for each claim as written, however often it was evaluated.
 
-  interface Tally { decided: number; assumed: number; undecided: number; refuted: number; reasons: Set<string>; rests: Map<string, Rest> }
+  interface Tally { decided: number; sampled: number; assumed: number; undecided: number; refuted: number; reasons: Set<string>; rests: Map<string, Rest> }
   /** The tallies of the call of `evaluate` or `advance` now running. */
   const tallies = new Map<Expr, Tally>();
   /** How many evaluations of each written claim wait now, and which residuals they are. */
@@ -523,7 +523,7 @@ export const createCore = () => {
   const counted = new WeakSet<Refuted>();
   const tallyOf = (site: Expr): Tally => {
     let t = tallies.get(site);
-    if (t === undefined) tallies.set(site, (t = { decided: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
+    if (t === undefined) tallies.set(site, (t = { decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
     return t;
   };
   /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
@@ -557,6 +557,7 @@ export const createCore = () => {
       claim: out(site),
       ...(site.owner === undefined ? {} : { module: site.owner.module }),
       decided: t.decided,
+      sampled: t.sampled,
       assumed: t.assumed,
       undecided: t.undecided,
       refuted: t.refuted,
@@ -564,6 +565,68 @@ export const createCore = () => {
       reasons: [...t.reasons],
       restsOn: [...t.rests.values()],
     }));
+
+  // ---- What is left, as a function's body ----------------------------------
+
+  let sharedNames = 0;
+  /**
+   * What an evaluation left, made fit to be a function's body. What is left holds values
+   * evaluated when needed, each one thing evaluated at most once. In a body such a value
+   * must be worked out afresh at every call. So one that is used once is written where it
+   * is used, and one used more than once is bound in a block around the body, which gives
+   * every call a value of its own, still evaluated at most once.
+   */
+  const asBody = (left: V): V => {
+    const uses = new Map<Lazy, number>();
+    const count = (v: V, inside: Set<V>): void => {
+      if (v instanceof Lazy) {
+        if (v.done) return count(v.value, inside);
+        uses.set(v, (uses.get(v) ?? 0) + 1);
+        if (uses.get(v) === 1) count(v.value, inside);
+      } else if (v instanceof Expr) {
+        if (inside.has(v)) return;
+        inside.add(v);
+        count(v.fn, inside);
+        v.args.forEach((a) => count(a, inside));
+        inside.delete(v);
+      } else if (v instanceof Struct) {
+        if (!settled.has(v)) v.entries.forEach(([, e]) => count(e, inside));
+      } else if (v instanceof Fn) count(v.body, inside);
+      else if (v instanceof Decided) count(v.inner, inside);
+    };
+    count(left, new Set());
+    const names = new Map<Lazy, Sym>();
+    const bound: (readonly [V, V])[] = [];
+    const plain = (v: V): V => {
+      if (v instanceof Lazy) {
+        if (v.done) return plain(v.value);
+        if ((uses.get(v) ?? 0) < 2) return plain(v.value);
+        let name = names.get(v);
+        if (name === undefined) {
+          names.set(v, (name = intern(`kernel.shared.${++sharedNames}`)));
+          bound.push([name, plain(v.value)]);
+        }
+        return name;
+      }
+      if (v instanceof Expr) {
+        if (restored.has(v)) return v;
+        const [fn, args] = [plain(v.fn), v.args.map(plain)];
+        return fn === v.fn && args.every((a, i) => a === v.args[i]) ? v : keep(v, new Expr(fn, args));
+      }
+      if (v instanceof Struct) {
+        if (settled.has(v)) return v;
+        const entries = v.entries.map(([k, e]) => [k, plain(e)] as const);
+        return entries.every(([, e], i) => e === v.entries[i][1]) ? v : keep(v, new Struct(entries));
+      }
+      if (v instanceof Fn) {
+        const body = plain(v.body);
+        return body === v.body ? v : keep(v, new Fn(v.params, body));
+      }
+      return v;
+    };
+    const body = plain(left);
+    return bound.length === 0 ? body : new Expr(kernelPrims.get("block") as V, [new Struct(bound), body]);
+  };
 
   /** A value with each free name replaced by the value supplied for it. */
   const supply = (v: V, values: ReadonlyMap<Sym, V>, bound: ReadonlySet<Sym>): V => keep(v, supplied(v, values, bound));
@@ -1031,7 +1094,7 @@ export const createCore = () => {
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    restored, thenGroups, localKey, keep, asBody, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,

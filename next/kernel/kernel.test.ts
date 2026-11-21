@@ -82,7 +82,7 @@ test("the kernel is passive and states its interface", () => {
   assert.deepEqual(k.waiting(), []);
   // The record of claims was added on 2026-11-18 (cluster 13 of the second review): with nothing to do, there are none.
   assert.deepEqual(k.advance(), { ended: "complete", steps: 0, refuted: [], claims: [] });
-  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["also", "assume", "attempt", "block", "build", "claim", "count", "describe", "first", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "slice", "spelling", "symbol", "then", "undecided"]);
+  assert.deepEqual([...k.kernelPrimitiveNames()].sort(), ["also", "assume", "attempt", "block", "build", "claim", "count", "describe", "first", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same", "sample", "slice", "specialize", "spelling", "symbol", "then", "undecided"]);
 });
 
 test("values of the seven kinds are made and read back", () => {
@@ -3054,4 +3054,161 @@ test("a host's read is counted against the evaluation: work left for it then has
   const after = run(true);
   assert.equal(after.limited, 1, "read, what is left does not");
   assert.ok(after.turns < 10);
+});
+
+// ---- Specialization and sampling (chunk K15) ---------------------------------------------
+//
+// "A function can be specialized with its parameters unknown", and the kernel's record
+// "sampled". Both variants evaluate these the same way: ahead of what is done, with no effect.
+
+test("specialize evaluates what it can of a function's body, and the function it gives answers as the original", () => {
+  const { k, add, mul, isZero, call, kp } = setup();
+  const x = k.param("x");
+  // f(x) = if isZero(x) then (1 + 2) * 3 else x + (4 + 5)
+  const f = k.composedFunction([x], call(kp("if"), call(isZero, x), call(mul, call(add, byte(k, 1), byte(k, 2)), byte(k, 3)), call(add, x, call(add, byte(k, 4), byte(k, 5)))));
+  const made = k.evaluate(call(kp("specialize"), f, steps(k, 1_000)));
+  assert.equal(made.ended, "complete");
+  assert.equal(k.kind(made.value), "composed-function");
+  const special = made.value;
+  for (const n of [0, 1, 7]) assert.equal(num(k, k.evaluate(call(special, byte(k, n))).value), num(k, k.evaluate(call(f, byte(k, n))).value));
+  // Both branches were evaluated though the condition was unknown: what is left to do at a call is less.
+  assert.ok(k.evaluate(call(special, byte(k, 0))).steps < k.evaluate(call(f, byte(k, 0))).steps, "the branch taken was worked out before");
+  assert.ok(k.evaluate(call(special, byte(k, 7))).steps < k.evaluate(call(f, byte(k, 7))).steps);
+  // What is left reads as a conditional whose branches are a value and one addition.
+  const body = form(k, form(k, k.evaluate(call(kp("describe"), k.inspectionRight(), special)).value).parts[1]);
+  assert.equal(body.form, "apply");
+  // A primitive has no body: it is its own specialization.
+  assert.equal(k.evaluate(call(kp("specialize"), add, steps(k, 10))).value, add);
+  assert.equal(k.evaluate(call(kp("specialize"), byte(k, 1), steps(k, 10))).refuted, true, "only a function is specialized");
+});
+
+test("specialize performs no effect, and an effect left in the body is performed at every call", () => {
+  const { k, add, call, kp, said, say } = sayer();
+  const [x, a] = [k.param("x"), k.param("a")];
+  // f(x) = x + say(7)
+  const special = k.evaluate(call(kp("specialize"), k.composedFunction([x], call(add, x, call(say, byte(k, 7)))), steps(k, 1_000))).value;
+  assert.deepEqual(said, [], "nothing is said while the function is specialized");
+  assert.equal(num(k, k.evaluate(call(special, byte(k, 1))).value), 8);
+  assert.equal(num(k, k.evaluate(call(special, byte(k, 2))).value), 9);
+  assert.deepEqual(said, [7, 7], "said at each call");
+  // An argument used twice is evaluated once at each call, as in the original: g(a) = a + a; f(x) = g(say(x)).
+  said.length = 0;
+  const twice = k.composedFunction([a], call(add, a, a));
+  const shared = k.evaluate(call(kp("specialize"), k.composedFunction([x], call(twice, call(say, x))), steps(k, 1_000))).value;
+  assert.deepEqual(said, []);
+  assert.equal(num(k, k.evaluate(call(shared, byte(k, 5))).value), 10);
+  assert.equal(num(k, k.evaluate(call(shared, byte(k, 6))).value), 12);
+  assert.deepEqual(said, [5, 6], "once for each call: not twice in one, and not once for both");
+  // An argument used once is evaluated at each call too: h(a) = a + 1; f(x) = h(say(x)).
+  said.length = 0;
+  const once = k.composedFunction([a], call(add, a, byte(k, 1)));
+  const single = k.evaluate(call(kp("specialize"), k.composedFunction([x], call(once, call(say, x))), steps(k, 1_000))).value;
+  assert.equal(num(k, k.evaluate(call(single, byte(k, 3))).value), 4);
+  assert.equal(num(k, k.evaluate(call(single, byte(k, 4))).value), 5);
+  assert.deepEqual(said, [3, 4]);
+});
+
+test("a refutation inside a branch stays in the branch, and a body refuted whatever its parameters refutes the specialization", () => {
+  const { k, isZero, call, kp } = setup();
+  const fails = k.primitiveFunction({ ...pure("fails", 91, 1, (v) => v), run: () => { throw new Refusal("no"); } });
+  const x = k.param("x");
+  // f(x) = if isZero(x) then 1 else fails(0)
+  const special = k.evaluate(call(kp("specialize"), k.composedFunction([x], call(kp("if"), call(isZero, x), byte(k, 1), call(fails, byte(k, 0)))), steps(k, 1_000)));
+  assert.equal(special.refuted, false, "one branch is refuted, and the function is not");
+  assert.equal(num(k, k.evaluate(call(special.value, byte(k, 0))).value), 1);
+  assert.equal(k.evaluate(call(special.value, byte(k, 3))).refuted, true, "the call that takes the refuted branch is refuted");
+  // g(x) = then(fails(0), x): refuted whatever x is.
+  assert.equal(k.evaluate(call(kp("specialize"), k.composedFunction([x], call(kp("then"), call(fails, byte(k, 0)), x)), steps(k, 1_000))).refuted, true);
+});
+
+test("specializing a function that calls itself ends: the call to itself is left as a call", () => {
+  const { k, add, dec, isZero, call, kp } = setup();
+  const [count, n] = [k.symbol("t.count"), k.param("n")];
+  // count(n) = if isZero(n) then 0 else 1 + count(n - 1)
+  const countFn = k.composedFunction([n], call(kp("if"), call(isZero, n), byte(k, 0), call(add, byte(k, 1), call(count, call(dec, n)))));
+  for (const size of [0, 1, 4]) {
+    const r = k.evaluate(within(k, [[count, countFn]], call(call(kp("specialize"), count, steps(k, 1_000)), byte(k, size))));
+    assert.equal(r.ended, "complete");
+    assert.equal(num(k, r.value), size, "the function left as a call is the original, with parameters of its own");
+  }
+});
+
+test("a specialization that its budget does not cover answers limit, as an attempt does", () => {
+  const { k, add, call, kp } = setup();
+  const x = k.param("x");
+  let body: Value = x;
+  for (let i = 0; i < 40; i++) body = call(add, body, call(add, byte(k, 1), byte(k, 1)));
+  const f = k.composedFunction([x], body);
+  assert.equal(form(k, k.evaluate(call(kp("specialize"), f, steps(k, 10))).value).form, "limit");
+  assert.equal(k.kind(k.evaluate(call(kp("specialize"), f, steps(k, 1_000))).value), "composed-function");
+});
+
+test("a specialized function is of the module that made the original", () => {
+  const { k, call, kp, ownKey, inc } = moduleWithFunction();
+  const special = k.evaluate(call(kp("specialize"), inc, steps(k, 100))).value;
+  assert.equal(num(k, k.evaluate(call(special, byte(k, 4))).value), 5);
+  assert.equal(form(k, k.evaluate(call(kp("describe"), ownKey, special)).value).form, "function", "the module's key describes it");
+  const other = moduleWithFunction();
+  // A key of another kernel's module is no key here; a second module of this kernel has another key.
+  const [key2, n] = [k.param("key"), k.param("n")];
+  const m2 = k.module(k.composedFunction([key2], k.structure([[null, key2], [null, k.composedFunction([n], n)]])), 1);
+  const otherKey = k.entriesOf(k.evaluate(call(m2)).value)[0][1];
+  assert.equal(k.evaluate(call(kp("describe"), otherKey, special)).refuted, true, "another module's key does not");
+  void other;
+});
+
+test("sample evaluates a claim on the cases it is given: true of each it is sampled, and a case it fails is the counterexample", () => {
+  const { k, dec, isZero, call, kp } = setup();
+  const x = k.param("x");
+  // p(x) = isZero(x - 1)
+  const p = k.composedFunction([x], call(isZero, call(dec, x)));
+  const list = (...ns: number[]) => k.structure(ns.map((n) => [null, byte(k, n)] as const));
+  const sampled = call(kp("sample"), p, list(1, 1, 1));
+  const r = k.evaluate(sampled);
+  assert.equal(k.outcomeOf(r.value), "sampled");
+  assert.deepEqual(r.claims.map((c) => [c.decided, c.sampled, c.refuted]), [[0, 1, 0]]);
+  assert.ok(r.claims[0].restsOn.some((rest) => rest.kind === "kernel" && rest.sampled === 3), "the record says how many cases");
+  // A case it is not true of refutes it.
+  const wrong = k.evaluate(call(kp("sample"), p, list(1, 2, 1)));
+  assert.equal(wrong.refuted, true);
+  assert.match(k.reasonOf(wrong.value) ?? "", /not true of a case/);
+  assert.deepEqual(wrong.claims.map((c) => [c.sampled, c.refuted]), [[0, 1]]);
+  // A claim that rests on a sample is no stronger than sampled.
+  const resting = k.evaluate(call(kp("claim"), sampled));
+  assert.equal(k.outcomeOf(resting.value), "sampled");
+  // With no case nothing was evaluated, and the record says so.
+  const none = k.evaluate(call(kp("sample"), p, list()));
+  assert.ok(none.claims[0].restsOn.some((rest) => rest.kind === "kernel" && rest.sampled === 0));
+  assert.equal(k.evaluate(call(kp("sample"), p, byte(k, 1))).refuted, true, "the cases are a structure");
+});
+
+test("a sample whose case waits for an answer is sampled when the answer comes", () => {
+  const { k, dec, isZero, call, kp } = setup();
+  const x = k.param("x");
+  const p = k.composedFunction([x], call(isZero, call(dec, x)));
+  const c = k.cell();
+  const r = k.evaluate(call(kp("sample"), p, k.structure([[null, byte(k, 1)], [null, c]])));
+  assert.equal(k.kind(r.value), "expression");
+  const a = k.fill(c, byte(k, 1));
+  assert.equal(k.outcomeOf(k.current(r.value)), "sampled");
+  assert.deepEqual(a.refuted, []);
+});
+
+test("a slice does not pause what is evaluated ahead: the next evaluation performs its effects", () => {
+  if (!MACHINE) return; // The reference has no slices.
+  const { k, add, call, kp, said, say } = sayer();
+  const fails = k.primitiveFunction({ ...pure("fails", 92, 1, (v) => v), run: () => { throw new Refusal("no"); } });
+  // then(fails(0), g200(... g2(g1(0)))), each g a function of its own: after the refutation
+  // the rest is looked at ahead, two hundred calls one inside the other.
+  let long: Value = byte(k, 0);
+  for (let i = 0; i < 200; i++) {
+    const a = k.param("a");
+    long = call(k.composedFunction([a], call(add, a, byte(k, 0))), long);
+  }
+  const r = k.evaluate(call(kp("then"), call(fails, byte(k, 0)), long), { slice: 10 });
+  assert.equal(r.ended, "complete", "looking ahead is not paused");
+  assert.equal(r.refuted, true);
+  assert.ok(r.steps > 100, "though it took many times the slice");
+  k.evaluate(call(say, byte(k, 1)));
+  assert.deepEqual(said, [1], "the kernel is not left looking ahead");
 });
