@@ -1520,6 +1520,15 @@ step of the parser costs about 4 microseconds from 4 terms to 256, and
 no run ends at a limit. On the reference both findings stand. Milestone
 3 is brought for signing when the machine is the default. The plan's
 record also holds what stands and what is open of PR #293.
+### 2026-11 — The loader's file reading, bounded (B-196, chunk Q16 (the capabilities the launchers ship), part 2)
+
+B-196 (the rebuild's acceptance side). The texts a text imports are read
+through a reader bounded to the project's directory
+(`next/launch/files.ts`): a file whose real path, with every link
+followed, is outside it is refused, and the driver reports the refusal
+as a finding at the import. `npm run allegretto`, `npm run emit` and the
+corpus's runner read through it. It is a host function the loader is
+handed, and no capability a program can declare yet.
 
 ### 2026-11 — Check and run as phases (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 3)
 
