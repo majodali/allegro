@@ -24,7 +24,7 @@ const float = (x: number): Value => {
   return k.bits(bytes);
 };
 const text = (t: string): Value => k.bits(new TextEncoder().encode(t));
-const run = (name: string, ...args: Value[]) => k.evaluate(k.expression(fns.get(name)!, args), k.scope());
+const run = (name: string, ...args: Value[]) => k.evaluate(k.expression(fns.get(name)!, args));
 const view = (v: Value) => { const { bytes } = k.bitsOf(v); return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); };
 const asInt = (name: string, ...args: Value[]) => view(run(name, ...args).value).getBigInt64(0);
 const asFloat = (name: string, ...args: Value[]) => view(run(name, ...args).value).getFloat64(0);
@@ -160,10 +160,9 @@ test("an argument that is not 64 bits is refused, and an unknown argument leaves
   assert.match(refusal("int.text", k.structure([])), /64 bits/);
   assert.match(refusal("text.int", k.structure([])), /not a value of kind structure/);
   const c = k.cell();
-  const scope = k.scope();
-  const waits = k.evaluate(k.expression(fns.get("int.add")!, [int(1n), c]), scope);
+  const waits = k.evaluate(k.expression(fns.get("int.add")!, [int(1n), c]));
   assert.equal(k.kind(waits.value), "expression");
-  k.fill(c, int(2n));
-  k.advance({ steps: 100 });
+  k.fill(c, int(2n), { hold: true });
+  k.advance();
   assert.equal(view(k.current(waits.value)).getBigInt64(0), 3n);
 });

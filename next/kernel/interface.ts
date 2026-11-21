@@ -18,18 +18,12 @@
 // this interface; what Allegro code may do is the kernel's primitives,
 // which are Part II's and are not stated here.
 //
-// One interface, `Kernel`. Until 2026-11-20 it was stated in two
-// versions, `Kernel` and `Kernel2`, so that code written against the
-// first kept compiling. Nothing implements only the first any more, and
-// they are one. Four things of the older shape are still accepted, each
-// marked deprecated where it is declared, until the acceptance stream's
-// launcher has stopped using them:
-//   - the names `Kernel2` and `CreateKernel2`, now other names for
-//     `Kernel` and `CreateKernel`;
-//   - `scope()` and the scope argument of `evaluate`;
-//   - `fill` that only records, where `hold` is left out;
-//   - `steps` given to `advance`.
-// When they go, `INTERFACE_VERSION` becomes 2.
+// One interface, `Kernel`, version 2. Until 2026-11-20 it was stated in
+// two versions, `Kernel` and `Kernel2`. Version 2 is the two made one,
+// with four older forms removed: the names `Kernel2` and
+// `CreateKernel2`; `scope()` and the scope argument of `evaluate`;
+// `fill` that only records unless told otherwise; and `steps` given to
+// `advance`.
 //
 // The kernel is passive. Creating one does nothing but create it. It
 // reads no file, no text, no environment and no clock. Every effect a
@@ -37,14 +31,13 @@
 // host supplied.
 
 /** The version of this interface. A kernel states the one it implements. */
-export const INTERFACE_VERSION = 1;
+export const INTERFACE_VERSION = 2;
 
 // Brands. Each is a type-level marker with no run-time existence: it
-// keeps the three handle types apart for the compiler, so a scope cannot
-// be passed where a value is wanted. A kernel implements the handles as
+// keeps the handle types apart for the compiler, so a plain value cannot
+// be passed where a cell is wanted. A kernel implements the handles as
 // it likes; no property of these names exists on them.
 declare const valueBrand: unique symbol;
-declare const scopeBrand: unique symbol;
 declare const cellBrand: unique symbol;
 
 /**
@@ -53,11 +46,6 @@ declare const cellBrand: unique symbol;
  */
 export interface Value {
   readonly [valueBrand]: true;
-}
-
-/** A scope in a kernel. Opaque. Inside Allegro the environment is not a value; this handle is the host's only. */
-export interface Scope {
-  readonly [scopeBrand]: true;
 }
 
 /**
@@ -146,9 +134,8 @@ export type PrimitiveDeclaration =
  * its limit: what it had paused or waiting is dropped, and an answer that
  * arrives for it later is ignored.
  *
- * Deprecated: `steps` given to `advance` or `fill` bounds that call, and
- * a call it ends has ended "limit". A launcher gives its budget once, to
- * `evaluate`.
+ * A launcher gives its budget once, to `evaluate`. `advance` and `fill`
+ * take a slice and no budget.
  *
  * A slice, `slice`, bounds one call. When it is spent nothing is over:
  * the call returns "paused", the task that was running is the first to go
@@ -158,6 +145,12 @@ export type PrimitiveDeclaration =
  * than its slice. The reference kernel has no slices and ignores this
  * field.
  */
+/** What bounds one call of `advance` or `fill`: a slice, and nothing else. */
+export interface Slice {
+  /** The call returns after about this many steps, and what it was doing is paused. */
+  readonly slice?: number;
+}
+
 export interface Limits {
   /** A budget: the evaluation ends, with everything unfinished undecided, after this many steps. */
   readonly steps?: number;
@@ -287,7 +280,9 @@ export interface ClaimRecord {
 export interface Advance {
   /**
    * "complete": everything that was ready has been evaluated again.
-   * "limit": the call's own budget ran out first.
+   * "limit": the kernel reached a limit of its own in the middle of the
+   * call. Only the reference kernel has one: its host's stack. An
+   * evaluation whose budget is spent does not end the call: see `limited`.
    * "paused": the call's slice was spent; call `advance` again to go on.
    */
   readonly ended: "complete" | "limit" | "paused";
@@ -423,19 +418,6 @@ export interface Kernel {
   kernelPrimitive(name: string): Value;
   kernelPrimitiveNames(): readonly string[];
 
-  // ---- Scopes ---------------------------------------------------------
-
-  /**
-   * A token `evaluate` takes and ignores. It holds nothing and nothing can
-   * be put in it: a name means the binding of the innermost block that
-   * binds it, and a host gives a program a value by passing it as an
-   * argument, or by building a block that binds a name to it. This call and
-   * `evaluate`'s scope argument go with the other deprecated forms.
-   *
-   * @deprecated `evaluate` needs no scope.
-   */
-  scope(parent?: Scope): Scope;
-
   // ---- Cells ----------------------------------------------------------
 
   /** A new, unfilled cell. */
@@ -444,10 +426,10 @@ export interface Kernel {
    * Fills a cell with plain data: bits, symbols and structures of them,
    * carrying no metadata. Once only.
    *
-   * With `hold: false` it then takes up what waited on the cell, as
-   * `advance` does and within the same limits, and returns what `advance`
-   * returns: a refutation the answer leads to, and its claim records,
-   * come back from the call that brought the answer.
+   * It then takes up what waited on the cell, as `advance` does and with
+   * the same slice, and returns what `advance` returns: a refutation the
+   * answer leads to, and its claim records, come back from the call that
+   * brought the answer.
    *
    * With `hold: true` it records the value and evaluates nothing: what
    * waited on the cell is taken up by the next `advance`, or by the next
@@ -459,16 +441,13 @@ export interface Kernel {
    * Either way the order of the calls to `fill` is the order in which
    * answers are acted on.
    *
-   * Where `hold` is left out, this version holds. That is the deprecated
-   * form: when it goes, leaving `hold` out will mean `hold: false`.
-   *
    * Only the launcher fills. A capability's host code does not hold the
    * kernel: it returns a cell and hands the launcher the promise of its
    * answer, and the launcher fills the cell when the answer comes. So
    * every refutation and every claim record that an answer leads to
    * reaches the launcher, in one place.
    */
-  fill(cell: Cell, value: Value, how?: Limits & { readonly hold?: boolean }): Advance;
+  fill(cell: Cell, value: Value, how?: Slice & { readonly hold?: boolean }): Advance;
   /** True when the cell has been filled. */
   filled(cell: Cell): boolean;
   /**
@@ -501,8 +480,6 @@ export interface Kernel {
    * it.
    */
   evaluate(expression: Value, limits?: Limits): Result;
-  /** @deprecated The scope is ignored. */
-  evaluate(expression: Value, scope: Scope, limits?: Limits): Result;
   /**
    * Takes up every evaluation in this kernel that waited on a cell filled
    * since the last call, within the limits. The kernel knows which
@@ -531,7 +508,7 @@ export interface Kernel {
    * keeps its own stack takes a computation up at the point where it
    * stopped.
    */
-  advance(limits?: Limits): Advance;
+  advance(limits?: Slice): Advance;
   /**
    * The value as it now stands: where a residual has since been
    * evaluated further, the result of that; otherwise the value itself.
@@ -674,7 +651,5 @@ export interface Kernel {
 
 /** How a host obtains a kernel. Creating one performs nothing else. */
 export type CreateKernel = () => Kernel;
-/** @deprecated Another name for `Kernel`, kept until the acceptance stream's code has stopped using it. */
-export type Kernel2 = Kernel;
-/** @deprecated Another name for `CreateKernel`. */
-export type CreateKernel2 = CreateKernel;
+
+
