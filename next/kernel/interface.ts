@@ -182,7 +182,17 @@ export type Outcome = "decided" | "refuted" | "undecided" | "sampled" | "assumed
  */
 export type Rest =
   /** The kernel variant that evaluated it. */
-  | { readonly kind: "kernel"; readonly variant: string }
+  | {
+      readonly kind: "kernel";
+      readonly variant: string;
+      /**
+       * Present where the kernel did not evaluate the claim in full: its
+       * `sample` evaluated it on this many cases and found it true of
+       * each. What rests on such a record holds for those cases, and is no
+       * stronger than sampled.
+       */
+      readonly sampled?: number;
+    }
   /** A pure primitive function, by content hash. */
   | { readonly kind: "primitive"; readonly hash: string; readonly name: string }
   /** An effectful primitive whose answer was an input: a part of a capability. */
@@ -262,6 +272,8 @@ export interface ClaimRecord {
   readonly module?: string;
   /** Evaluations that came out decided, a restored outcome among them. */
   readonly decided: number;
+  /** Evaluations that came out sampled: true of each case tried, or resting on such a sample. */
+  readonly sampled: number;
   /** Evaluations that came out resting on an assumption. */
   readonly assumed: number;
   /** Evaluations where what decides the claim answered that it cannot tell. */

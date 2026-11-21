@@ -1372,6 +1372,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: an argument a function can inspect, restored for solvers (rejected: the reasons it was removed stand); a primitive that asks whether a value is resolved (removed in the Part IV review)
 - Sources: the maintainer's rulings of 2026-11-15 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling. It is the operation "A claim about every value is decided by evaluating it with the value unknown" needs, offered to Allegro code. Fixing some parameters is a second specialization, of a function that calls the first with those values. The policy for which calls are opened is the next decision's, proved by building.
+- Notes (2026-11-21, built): built on both kernel variants as the kernel primitive `specialize(f, steps)`. The body is evaluated ahead of what is done, with parameters of its own, and a call to the function itself is not opened again. Where the budget does not cover it the answer is the failure "limit", as an attempt's. What is left is made a body: a value evaluated when needed is written where it is used, and one used more than once is bound in a block around the body, so each call evaluates it at most once and no two calls share it. Parts that came from another module's function keep that module's mark, so the module that specializes cannot describe them. A claim inside a branch that is evaluated though its condition is unknown is recorded as it comes out. A primitive is its own specialization.
 - Chapter: Evaluation
 
 #### A recursive call is evaluated once for each state of knowledge
@@ -2706,6 +2707,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Book home (fragments' proposal): Proving in Allegro
 - Notes: `prove_induction` returns an ordinary discharged Proof (`src/primitives.ts:4377`, `makeProof` in `src/types-std.ts:4681` writes `discharged` 1 and no tier); the sampled strength appears only in the proposition text "[verified base + 4 inductive steps]". That seems to fall short of principle 9 (a sampled check must not borrow a stronger vocabulary). `proven` is limited to one Int, NonNeg, PositiveInt or Bool parameter.
 - Notes (2026-11-16, hand-off from the acceptance stream): reworded by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling 5): the entry fixed the base and four inductive steps, and four sampled inputs.
+- Notes (2026-11-21, the kernel's part built): the kernel primitive `sample(claim, cases)` evaluates a function of one parameter on each entry of a structure. True of each, the outcome is sampled, and the record says how many cases; a case it is not true of refutes it and is the counterexample; a claim that rests on a sample is no stronger than sampled. Which cases, how many, and the cap of steps for each are the standard language's, which calls this with the cases it chose.
 - Chapter: Claims and proofs
 
 #### Four strengths, one vocabulary
