@@ -3252,14 +3252,16 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     the write waits), `report-answer` (the answers bound, `count` of
     each 0) and `report-import/main.alg` (report handed on to an
     imported module, which reports).
-  - **What the reader did that the forms do not say.** The reader
-    refuses a reserved word as a symbol literal: `` x = `error `` is
-    "not Allegretto", as is `` x = `else ``. forms.md §2 says `` `name ``
-    is the symbol `name` and names no exception. The symbol literal is
-    `` ` `` and an identifier, and an identifier excludes the reserved
-    words (`next/bootstrap/allegretto-grammar.ts`). The programs write
-    the level `symbol("error")`. A level named by another word would
-    avoid it; that is the maintainer's.
+  - **A fault of the bootstrap's reader, found and fixed here.** The
+    reader refused a reserved word as a symbol literal: `` x = `error ``
+    was "not Allegretto", as were `` `else ``, `` `if ``, `` `none `` and
+    `` `when ``. forms.md §2 says `` `name `` is the symbol `name` and
+    names no exception. The symbol literal was `` ` `` and an
+    identifier, and an identifier excludes the reserved words. It is
+    now `` ` `` and any word (`symbol_name` of
+    `next/bootstrap/allegretto-grammar.ts`): a symbol's name is data
+    and is never read as a name or a keyword. The reader's test holds
+    seven such words. So a program writes the level `` `error ``.
   - **What follows from the forms and may surprise.** A text is bits of
     whole bytes, so a number written out is a text where its bytes are
     UTF-8: `report.message(42)` is a note whose text is seven NUL bytes

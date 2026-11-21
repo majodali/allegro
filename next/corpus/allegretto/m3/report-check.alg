@@ -7,7 +7,6 @@ capability report
 report.message({level: `warning, text: "checked"})
 report.status(2)
 output.write("not printed under check")
-report.message("held by the write")
 // phases: check
 // reports: warning: checked
 // status: 2

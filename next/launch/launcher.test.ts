@@ -1340,7 +1340,7 @@ test("both commands exit with the higher of the end's code and the highest statu
     const programs: Array<[string, string, string, string, number]> = [
       // name, text, stdout, stderr, exit code
       ["completed-3", 'capability output\ncapability report\nreport.message({level: `warning, text: "w", file: "a.alg", line: 2, column: 5})\nreport.status(3)\noutput.write("done")\n', "done\n", "a.alg:2:5: warning: w\n", 3],
-      ["refuted-0", 'capability output\ncapability report\nreport.message({level: symbol("error"), text: "e"})\nclaim(1 == 2)\n', "", "error: e\nrefuted: a claim that is not true\n", 1],
+      ["refuted-0", 'capability output\ncapability report\nreport.message({level: `error, text: "e"})\nclaim(1 == 2)\n', "", "error: e\nrefuted: a claim that is not true\n", 1],
       ["refuted-7", 'capability output\ncapability report\nreport.status(7)\noutput.write("before")\nclaim(1 == 2)\n', "before\n", "refuted: a claim that is not true\n", 7],
       ["completed-0", 'capability output\ncapability report\nreport.message("a note")\noutput.write("done")\n', "done\n", "note: a note\n", 0],
     ];

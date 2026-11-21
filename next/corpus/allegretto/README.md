@@ -217,8 +217,7 @@ one of the symbols `` `error ``, `` `warning `` and `` `note ``, and
 `text`, a text; `file`, a text, and `line` and `column`, whole numbers,
 may be added. A text alone is a note. Any other value is a note that
 says it was no message and names its kind. A message does not set the
-status. The reader keeps `error` a reserved word, so a program writes
-its symbol `symbol("error")`.
+status.
 
 `report.status(n)` hands a status, a whole number from 0 to 255. The
 highest handed over in a run stands. A value that is no status counts as

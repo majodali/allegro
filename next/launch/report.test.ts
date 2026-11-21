@@ -49,8 +49,8 @@ async function run(lines: readonly string[], configuration: Configuration = CEIL
   return { outcome, messages: c.messages, status: c.status() };
 }
 const lines = (messages: readonly ReportMessage[]) => messages.map(messageLine);
-/** `error` is a reserved word of the reader, so its symbol is written with `symbol`. */
-const ERROR = 'symbol("error")';
+/** The level `error`, as a program writes its symbol. */
+const ERROR = "`error";
 
 test("the check-output capability is report, with two parts, message and status, and it is a check capability", () => {
   assert.deepEqual(REPORT, { name: "report", parts: ["message", "status"] });

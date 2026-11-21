@@ -3,7 +3,7 @@
 // that must fail refutes a claim.
 capability output
 capability report
-report.message({level: symbol("error"), text: "an error, and no status"})
+report.message({level: `error, text: "an error, and no status"})
 output.write("after the error")
 // expect: after the error
 // reports: error: an error, and no status
