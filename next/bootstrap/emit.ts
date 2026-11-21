@@ -91,7 +91,7 @@
 //     structure, and is written so where the text does not bind the first
 //     part again, so a record's `needs` lists only what the text uses.
 //     `int` and its kin used as a value: the structure of the primitives.
-//   - `then`, `also`, `attempt`, `describe`, `build`, `refuse`, `assume`,
+//   - `then`, `also`, `first`, `attempt`, `describe`, `build`, `refuse`, `assume`,
 //     `undecided`, `get`, `count`, `claim`, `put`, `key`, `kind`, `symbol`,
 //     `spelling`: the kernel primitive of that name.
 //   - `if c then a else b`: `if(c, a, b)`; `a && b`, `a || b`, `!a`:
@@ -181,7 +181,7 @@ export const FORMS: Readonly<Record<FormId, FormInfo>> = {
   "&& || !": { standsFor: "the kernel's conditional" },
   "claim": { standsFor: "the kernel's claim" },
   "kernel name": {
-    standsFor: "a kernel primitive Allegretto binds a name to: then, also, attempt, describe, build, refuse, assume, undecided, get, count, put, key, kind, symbol, spelling",
+    standsFor: "a kernel primitive Allegretto binds a name to: then, also, first, attempt, describe, build, refuse, assume, undecided, get, count, put, key, kind, symbol, spelling",
   },
   "integer operator": { standsFor: "a shipped primitive on signed 64-bit integers: int.add and its kin" },
   "== !=": { standsFor: "same(a, b), and if(same(a, b), false, true)" },
@@ -219,11 +219,11 @@ const BITS_NAMES: Readonly<Record<string, string>> = { "bits.join": "join", "bit
 const NAMESPACES: readonly string[] = ["int", "float", "text", "bits"];
 /** The kernel primitives Allegretto binds a name to (forms.md §2, "Control and claims", and `get` and `count` of §4 item 3). */
 export const KERNEL_NAMES: readonly string[] = [
-  "then", "also", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling",
+  "then", "also", "first", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling",
 ];
 /** Every kernel primitive a record of this emitter may name. */
 export const KERNEL_WRITTEN: readonly string[] = [
-  "also", "assume", "attempt", "block", "build", "claim", "count", "describe", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same",
+  "also", "assume", "attempt", "block", "build", "claim", "count", "describe", "first", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same",
   "slice", "spelling", "symbol", "then", "undecided",
 ];
 /** The operators of forms.md §2 that stand for a shipped primitive, with its name. */

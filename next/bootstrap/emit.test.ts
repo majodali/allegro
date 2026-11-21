@@ -204,6 +204,12 @@ test("the kernel primitives Allegretto names: then, attempt, describe and build"
   assert.notEqual(attempted, undefined);
 });
 
+test("first is the kernel's primitive by its name: its value is that of the argument known at once", () => {
+  const text = 'input see\nsee(first("one", "two"))';
+  assert.ok(emitted(text).nodes.some((n) => n.k === "kernel" && n.name === "first"));
+  assert.deepEqual(seenTexts(run(text)), ["one"]);
+});
+
 // ── Statements and x <- e ──────────────────────────────────────────────
 
 test("a block's statements are started in written order: the module body is a chain of also", () => {
