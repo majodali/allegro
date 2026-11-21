@@ -199,7 +199,7 @@
 
 import type {
   Declaration,
-  Advance, Cell, ClaimRecord, CreateKernel, Entry, Kernel, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result, Scope,
+  Advance, Cell, ClaimRecord, CreateKernel, Entry, Kernel, KeyDescription, Kind, Limits, Outcome, PrimitiveContext, PrimitiveDeclaration, Rest, Result,
   Value,
 } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
@@ -266,10 +266,6 @@ export const createKernel: CreateKernel = () => {
     } finally {
       collectors.pop();
     }
-  };
-  const scopeIn = (x: Scope | undefined, what: string): ScopeV => {
-    if (!(x instanceof ScopeV)) throw new InterfaceError(`${what} is not a scope of this kernel`);
-    return x;
   };
 
   // ---- Evaluation ---------------------------------------------------------
@@ -912,7 +908,6 @@ export const createKernel: CreateKernel = () => {
     variant: VARIANT,
     ...shared,
 
-    scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
     fill: (cell, value, how): Advance => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
@@ -927,8 +922,8 @@ export const createKernel: CreateKernel = () => {
         root.queued = true;
         ready.push(root);
       }
-      // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
-      return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
+      // Held, the value is only recorded.
+      return how?.hold === true ? { ended: "complete", steps: 0, refuted: [], claims: [] } : kernel.advance(how);
     },
     kept: () => [],
     waiting: () => {
@@ -937,10 +932,9 @@ export const createKernel: CreateKernel = () => {
       return [...found].map((v) => out(v) as Cell);
     },
 
-    evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {
+    evaluate: (expression, limits): Result => {
       const e = into(expression, "the expression");
-      // The scope is a token of the deprecated form: it holds nothing.
-      const [s, limits] = a instanceof ScopeV ? [a, b] : [new ScopeV(undefined), a as Limits | undefined];
+      const s = new ScopeV(undefined);
       tallies.clear();
       cut = false;
       // The budget is the evaluation's: what `advance` later does for it counts against what is left.

@@ -49,10 +49,15 @@
 // was working out. A cell that such a value with a name waits for is
 // kept, and reported apart from the cells waited for.
 //
-// Not here yet, and in later chunks of the plan: sharing, specialization.
+// Values are shared, since none ever changes. A structure made by putting
+// an entry at the end of another holds the same list of entries. A part
+// of a bits value is a view of it. Two bits values joined are kept as the
+// two, and laid out once when something reads the bytes.
+//
+// Not here yet, and in the plan's last chunk: specialization.
 
-import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
-import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
+import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Value } from "./interface.js";
+import { INTERFACE_VERSION, InterfaceError, KernelFault, LimitFailure, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
 import type { Account, Mark, V } from "./values.js";
@@ -191,7 +196,7 @@ export const createMachine: CreateKernel = () => {
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k13";
+  const VARIANT = "machine-k14";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -244,12 +249,13 @@ export const createMachine: CreateKernel = () => {
   const groupOf = thenGroups as unknown as WeakMap<Expr, MGroup>;
   /** What stands in a value being worked out by a task until the task writes it. */
   const PENDING = new Expr(new Param("pending"), []);
+  /**
+   * Records something the evaluation now under way rests on. Only the innermost collector
+   * is written: each collector hands what it holds to the one around it when its
+   * evaluation ends, so a deep evaluation does not pay for its depth at every record.
+   */
   const rest = (r: Rest): void => {
-    for (const c of collectors) c.set(localKey(r), r);
-  };
-  const scopeIn = (x: Scope | undefined, what: string): ScopeV => {
-    if (!(x instanceof ScopeV)) throw new InterfaceError(`${what} is not a scope of this kernel`);
-    return x;
+    if (collectors.length > 0) collectors[collectors.length - 1].set(localKey(r), r);
   };
 
   const step = (): void => {
@@ -265,6 +271,76 @@ export const createMachine: CreateKernel = () => {
       throw new LimitReached();
     }
     spent += steps;
+  };
+
+  // ---- Sharing --------------------------------------------------------------
+  //
+  // "The kernel shares what an operation does not change."
+
+  type Entry = readonly [V | null, V];
+  /** The lists of entries this kernel made, and so may add to. One a host or the program's text gave is never added to. */
+  const owned = new WeakSet<readonly Entry[]>();
+  /** What is known of a list of entries: where each key is, and which entries are private. Brought up to date as the list grows. */
+  interface Known {
+    scanned: number;
+    readonly byKey: Map<V, number>;
+    readonly hiddenAt: number[];
+  }
+  const knownOf = new WeakMap<readonly Entry[], Known>();
+  const viewOf = (s: Struct): { items: readonly Entry[]; length: number } => s.shared ?? { items: s.entries, length: s.entries.length };
+  const scanned = (items: readonly Entry[]): Known => {
+    let k = knownOf.get(items);
+    if (k === undefined) knownOf.set(items, (k = { scanned: 0, byKey: new Map(), hiddenAt: [] }));
+    for (; k.scanned < items.length; k.scanned++) {
+      const key = items[k.scanned][0];
+      if (key === null) continue;
+      const name = seen(key);
+      if (name instanceof Key) k.hiddenAt.push(k.scanned);
+      if (!k.byKey.has(name)) k.byKey.set(name, k.scanned);
+    }
+    return k;
+  };
+  /** The place of the entry under a key among a structure's own entries, or -1. */
+  const placeOfKey = (items: readonly Entry[], length: number, key: V): number => {
+    const at = scanned(items).byKey.get(key);
+    return at !== undefined && at < length ? at : -1;
+  };
+  /** The entry at a place, counting only the entries a place can reach, and how many of those there are. */
+  const openEntries = (s: Struct): { count: number; at: (place: number) => Entry } => {
+    const { items, length } = viewOf(s);
+    const hiddenAt = scanned(items).hiddenAt;
+    // No private entry among its own: a place is a position in the list.
+    if (hiddenAt.length === 0 || hiddenAt[0] >= length) return { count: length, at: (place) => items[place] };
+    const open = items.slice(0, length).filter(([k]) => !hidden(k));
+    return { count: open.length, at: (place) => open[place] };
+  };
+  /** True while a call into the kernel is running: only then is laying out a joined value charged. */
+  let evaluating = false;
+  /**
+   * The charge for laying out a value joined in an evaluation. The evaluation running
+   * when the bytes are read pays. With none running, a host is reading a result: the
+   * evaluation that made the value pays, and where its budget does not cover the work the
+   * read fails and that evaluation is over.
+   */
+  const layingOut = new WeakMap<Account, (bits: number) => void>();
+  const laidOutFor = (maker: Account): ((bits: number) => void) => {
+    let f = layingOut.get(maker);
+    if (f === undefined)
+      layingOut.set(
+        maker,
+        (f = (bits) => {
+          if (evaluating) return charge(bits);
+          const steps = Math.floor(bits / 64);
+          if (steps > maker.left) {
+            const left = maker.left;
+            maker.left = 0;
+            maker.dead = true;
+            throw new LimitFailure(bits, left);
+          }
+          maker.left -= steps;
+        }),
+      );
+    return f;
   };
 
   const context: PrimitiveContext = {
@@ -1112,11 +1188,25 @@ export const createMachine: CreateKernel = () => {
             const key = seen(k);
             const none = key instanceof Struct && key.entries.length === 0;
             if (!none && !(key instanceof Sym) && !(key instanceof Key)) return new Refuted("an entry's key is a symbol, a key, or the empty structure for none", k);
-            charge(s.entries.length);
             const value = later(v.args[2], scope);
-            const at = none ? -1 : s.entries.findIndex(([x]) => x !== null && seen(x) === key);
-            const entries = at < 0 ? [...s.entries, [none ? null : (key as V), value] as const] : s.entries.map((e, i) => (i === at ? ([e[0], value] as const) : e));
-            const made = new Struct(entries);
+            const { items, length } = viewOf(s);
+            const at = none ? -1 : placeOfKey(items, length, key);
+            let made: Struct;
+            if (at < 0 && items.length === length && owned.has(items)) {
+              // The entry goes at the end of a list nothing else has added to: the new
+              // structure shares it, and nothing is copied.
+              (items as Entry[]).push([none ? null : (key as V), value]);
+              made = Struct.sharing(items as Entry[], length + 1);
+            } else {
+              // Otherwise the entries are copied, once: an entry in the middle is put in
+              // place of another, or the list has gone on past this structure's own entries.
+              charge(length);
+              const copy: Entry[] = items.slice(0, length);
+              if (at < 0) copy.push([none ? null : (key as V), value]);
+              else copy[at] = [copy[at][0], value];
+              owned.add(copy);
+              made = Struct.sharing(copy, copy.length);
+            }
             built.add(made);
             return made;
           }),
@@ -1520,13 +1610,10 @@ export const createMachine: CreateKernel = () => {
       if (!known(args[0]) || !known(args[1])) return waits();
       const [a, b] = [seen(args[0]), seen(args[1])];
       if (!(a instanceof Bits && b instanceof Bits)) return new Refuted("only two bits values can be joined", undefined);
+      // Two values of whole bytes are kept as the two: nothing is copied here. They are
+      // laid out once, when something reads the bytes, and the work is charged then.
+      if (whole(a) && whole(b)) return a.bitLength === 0 ? b : b.bitLength === 0 ? a : Bits.joined(a, b, laidOutFor(account));
       charge(a.bitLength + b.bitLength);
-      if (whole(a) && whole(b)) {
-        const bytes = new Uint8Array(a.bytes.length + b.bytes.length);
-        bytes.set(a.bytes, 0);
-        bytes.set(b.bytes, a.bytes.length);
-        return new Bits(bytes, bytes.length * 8);
-      }
       return packed([...bitList(a), ...bitList(b)]);
     }
     if (fn.name === "length") {
@@ -1540,10 +1627,9 @@ export const createMachine: CreateKernel = () => {
       if (!(a instanceof Bits)) return new Refuted("only a bits value can be taken apart", args[0]);
       if (from === undefined || n === undefined) return new Refuted("a place and a count are whole numbers, as bits", undefined);
       if (from + n > a.bitLength) return new Refuted(`${n} bit(s) from place ${from} is outside a value of ${a.bitLength} bit(s)`, undefined);
-      if (whole(a) && from % 8 === 0 && n % 8 === 0) {
-        charge(n);
-        return new Bits(a.bytes.slice(from / 8, (from + n) / 8), n);
-      }
+      // A part of whole bytes is a view of the value it is taken from: nothing is copied,
+      // whatever the size of the part.
+      if (whole(a) && from % 8 === 0 && n % 8 === 0) return new Bits(a.bytes.subarray(from / 8, (from + n) / 8), n);
       charge(a.bitLength);
       return packed(bitList(a).slice(from, from + n));
     }
@@ -1564,9 +1650,9 @@ export const createMachine: CreateKernel = () => {
       if (!known(args[1])) return waits();
       const place = countOf(args[1]);
       if (place === undefined) return new Refuted("a place is a whole number, as bits", args[1]);
-      const open = s.entries.filter(([k]) => !hidden(k));
-      if (place >= open.length) return new Refuted(`place ${place} is outside a structure of ${open.length} entr${open.length === 1 ? "y" : "ies"}`, undefined);
-      const k = open[place][0];
+      const open = openEntries(s);
+      if (place >= open.count) return new Refuted(`place ${place} is outside a structure of ${open.count} entr${open.count === 1 ? "y" : "ies"}`, undefined);
+      const k = open.at(place)[0];
       return k === null ? list([]) : new Quoted(seen(k) as Sym);
     }
     if (fn.name === "kind") {
@@ -1589,7 +1675,7 @@ export const createMachine: CreateKernel = () => {
     if (fn.name === "count") {
       const s = seen(args[0]);
       // An entry keyed by a key has no place and is not counted.
-      if (s instanceof Struct) return count64(s.entries.filter(([k]) => !hidden(k)).length);
+      if (s instanceof Struct) return count64(openEntries(s).count);
       return known(args[0]) ? new Refuted("only a structure has a number of entries", args[0]) : waits();
     }
     if (fn.name === "get") {
@@ -1597,19 +1683,20 @@ export const createMachine: CreateKernel = () => {
       if (!(s instanceof Struct)) return known(args[0]) ? new Refuted("only a structure has entries to read", args[0]) : waits();
       if (!known(args[1])) return waits();
       const key = seen(args[1]);
+      const view = viewOf(s);
       if (key instanceof Sym) {
-        const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
-        return entry !== undefined ? evaluate(entry[1], scope) : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
+        const at = placeOfKey(view.items, view.length, key);
+        return at >= 0 ? evaluate(view.items[at][1], scope) : new Refuted(`the structure has no entry keyed ${key.fqn}`, undefined);
       }
       if (key instanceof Key) {
         // A private entry: only this key reads it, and without it nothing tells that it is there.
-        const entry = s.entries.find(([k]) => k !== null && seen(k) === key);
-        return entry !== undefined ? evaluate(entry[1], scope) : new Refuted("the structure has no entry under that key", undefined);
+        const at = placeOfKey(view.items, view.length, key);
+        return at >= 0 ? evaluate(view.items[at][1], scope) : new Refuted("the structure has no entry under that key", undefined);
       }
       const place = key instanceof Bits ? countOf(key) : undefined;
       if (place === undefined) return new Refuted("an entry is read by a symbol, by a place or by a key", args[1]);
-      const open = s.entries.filter(([k]) => !hidden(k));
-      return place < open.length ? evaluate(open[place][1], scope) : new Refuted(`place ${place} is outside a structure of ${open.length} entr${open.length === 1 ? "y" : "ies"}`, undefined);
+      const open = openEntries(s);
+      return place < open.count ? evaluate(open.at(place)[1], scope) : new Refuted(`place ${place} is outside a structure of ${open.count} entr${open.count === 1 ? "y" : "ies"}`, undefined);
     }
     throw new KernelFault(`the kernel primitive "${fn.name}" has no evaluation`);
   };
@@ -1681,11 +1768,15 @@ export const createMachine: CreateKernel = () => {
   const within = <T>(limits: Limits | undefined, body: () => T): { value: T | undefined; ended: "complete" | "limit"; steps: number } => {
     spent = 0;
     budget = limits?.steps ?? Infinity;
+    const was = evaluating;
+    evaluating = true;
     try {
       return { value: body(), ended: "complete", steps: spent };
     } catch (e) {
       if (e instanceof LimitReached || e instanceof RangeError) return { value: undefined, ended: "limit", steps: spent };
       throw e;
+    } finally {
+      evaluating = was;
     }
   };
 
@@ -1707,7 +1798,6 @@ export const createMachine: CreateKernel = () => {
     variant: VARIANT,
     ...shared,
 
-    scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
     fill: (cell, value, how): Advance => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
@@ -1717,8 +1807,8 @@ export const createMachine: CreateKernel = () => {
       // What waits for this cell is taken up by the next `advance`, in the order it came to
       // wait, after what waits for cells filled before it.
       for (const r of waitersOf.get(c) ?? []) if (live(r)) enqueue(r.task, false);
-      // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
-      return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
+      // Held, the value is only recorded.
+      return how?.hold === true ? { ended: "complete", steps: 0, refuted: [], claims: [] } : kernel.advance(how);
     },
     waiting: () => {
       return waitedNow().map((c) => out(c) as Cell);
@@ -1734,10 +1824,9 @@ export const createMachine: CreateKernel = () => {
       return found.map((c) => out(c) as Cell);
     },
 
-    evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {
+    evaluate: (expression, limits): Result => {
       const e = into(expression, "the expression");
-      // The scope is a token of the deprecated form: it holds nothing.
-      const [s, limits] = a instanceof ScopeV ? [a, b] : [new ScopeV(undefined), a as Limits | undefined];
+      const s = new ScopeV(undefined);
       tallies.clear();
       cut = false;
       collectors = [];
