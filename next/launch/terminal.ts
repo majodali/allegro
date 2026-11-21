@@ -1,11 +1,12 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
 // acceptance side), chunk Q7 (the minimal launcher), parts 1 to 5; chunk
 // Q13 (check and run as configurations, and what a result holds), part 2,
-// for the configuration's sources). The only file of next/launch/ that
-// touches process and fs, with next/launch/allegretto.ts.
+// for the configuration's sources, and part 3, for `--phases`). The only
+// file of next/launch/ that touches process and fs, with
+// next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
 //
 // Each `--import` names the saved program of a module the program
 // imports, directly or through another, in the order they are loaded: a
@@ -36,9 +37,12 @@
 // the sources and hands them in (`resolveOnTerminal`). `npm run launch`
 // takes a saved program and no project, so it has three sources, highest
 // first:
-//   - the command line: `--steps <n>` sets the step budget, and
-//     `--ceiling a,b` the ceiling, which may only narrow the terminal's;
-//     a name the terminal does not supply is a finding;
+//   - the command line: `--steps <n>` sets the step budget,
+//     `--ceiling a,b` the ceiling, which may only narrow the terminal's,
+//     and `--phases` the phases: `run` or `check` (the setting `phases`
+//     of next/tools/configuration.ts). A name the terminal does not
+//     supply, and a list of phases that is not built, `check,run` among
+//     them, are findings;
 //   - the environment: `ALLEGRO_STEPS`, a whole number, sets the step
 //     budget;
 //   - what is built into the launcher: the ceiling that grants every
@@ -48,7 +52,11 @@
 // beside its text. A finding of the sources is written to stderr, one
 // line each, and the entry exits 1; nothing is launched. The run's result
 // names the source of each value (`restsOn.configuration` of
-// next/launch/launcher.ts), and nothing printed for a run changes.
+// next/launch/launcher.ts), and nothing printed for a run changes. Under
+// `--phases check` nothing is printed, since check supplies no
+// capability, and the entry exits as the end says, as for any run: a run
+// left waiting on a capability no phase supplies exits 1. What check
+// shows, and how its command exits, is chunk Q14 (the commands).
 // `--restore <builder>` and `--kernel <name>` are reserved to the command
 // line by the decision and are not built. The environment variable
 // `ALLEGRO_KERNEL` is read by next/kernel/create.ts, not here.
@@ -91,13 +99,15 @@ async function kernelFactory(): Promise<CreateKernel> {
 }
 
 /**
- * Reads the arguments every terminal entry takes: one file, `--steps <n>`
- * and `--ceiling a,b`. Gives the file and what the command line sets.
+ * Reads the arguments every terminal entry takes: one file, `--steps <n>`,
+ * `--ceiling a,b` and `--phases a,b`. Gives the file and what the command
+ * line sets.
  */
-export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[] } } {
+export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[]; phases?: readonly string[] } } {
   let file: string | undefined;
   let steps: number | undefined;
   let ceiling: string[] | undefined;
+  let phases: string[] | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--steps") {
       steps = Number(argv[++i]);
@@ -106,11 +116,15 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
       const names = argv[++i];
       if (names === undefined) fail(`--ceiling takes the names of capabilities, separated by commas\n${usage}`);
       ceiling = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
+    } else if (argv[i] === "--phases") {
+      const names = argv[++i];
+      if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run or check\n${usage}`);
+      phases = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
     } else if (file === undefined) file = argv[i];
     else fail(`unexpected argument ${argv[i]}`);
   }
   if (file === undefined) fail(usage);
-  return { file, commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }) } };
+  return { file, commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }), ...(phases === undefined ? {} : { phases }) } };
 }
 
 /** Writes each finding to stderr, one line each, and exits 1. */
@@ -171,7 +185,7 @@ function readRecord(file: string): unknown {
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>]";
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]";
   const rest: string[] = [];
   const imported: string[] = [];
   for (let i = 0; i < argv.length; i++) {

@@ -1,7 +1,8 @@
 // Tests of a configuration from its sources (B-196 (the rebuild's
 // acceptance side), chunk Q13 (check and run as configurations, and what a
-// result holds), part 2): `resolve`, `readProjectFile` and
-// `readEnvironment` of next/tools/configuration.ts, and the result's list
+// result holds), part 2, and part 3 for the setting `phases`): `resolve`,
+// `shapeOf`, `readProjectFile` and `readEnvironment` of
+// next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
 // next/kernel/create.ts gives: the reference, or the variant that keeps its
@@ -19,7 +20,7 @@ import { readLiteral } from "../bootstrap/literal.js";
 import { launch, type Inputs, type Plain, type SourceName } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shipped } from "../prims/index.js";
-import { MAY_SET, PROJECT_FILE, SETTINGS, SOURCES, readEnvironment, readProjectFile, resolve, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
+import { MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const text = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
@@ -40,6 +41,9 @@ function valueOf(setting: Setting, source: SourceName): Settings[Setting] {
       return `builder-${i}`;
     case "kernel":
       return `variant-${i}`;
+    case "phases":
+      // Two values are built, so the four sources share them.
+      return [["check"], ["run"], ["check"], ["run"]][i];
   }
 }
 const one = (setting: Setting, source: SourceName): Sources => ({ [source]: { [setting]: valueOf(setting, source) } });
@@ -63,15 +67,17 @@ function valueIn(r: Extract<Resolved, { ok: true }>, setting: Setting): unknown 
       return r.configuration.restoreAs;
     case "kernel":
       return r.kernel;
+    case "phases":
+      return r.configuration.phases?.map((p) => p.name) ?? ["run"];
   }
 }
 const sourceOf = (r: Extract<Resolved, { ok: true }>, setting: string) => r.sources.find((s) => s.setting === setting)?.source;
 const nameOf = (setting: Setting) => (setting === "inputs" ? "inputs.n" : setting);
 
-test("the table: steps, inputs and later from any source; ceiling, restore and kernel from the command line and the launcher only", () => {
-  assert.deepEqual([...SETTINGS], ["steps", "inputs", "later", "ceiling", "restore", "kernel"]);
+test("the table: steps, inputs, later and phases from any source; ceiling, restore and kernel from the command line and the launcher only", () => {
+  assert.deepEqual([...SETTINGS], ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases"]);
   assert.deepEqual([...SOURCES], ["command line", "file", "environment", "launcher"]);
-  for (const s of ["steps", "inputs", "later"] as const) assert.deepEqual([...MAY_SET[s]], [...SOURCES]);
+  for (const s of ["steps", "inputs", "later", "phases"] as const) assert.deepEqual([...MAY_SET[s]], [...SOURCES]);
   for (const s of ["ceiling", "restore", "kernel"] as const) assert.deepEqual([...MAY_SET[s]], ["command line", "launcher"]);
 });
 
@@ -96,7 +102,7 @@ test("a higher source replaces a lower one, for every pair of sources that may b
         pairs++;
       }
   }
-  assert.equal(pairs, 3 * 6 + 3 * 1);
+  assert.equal(pairs, 4 * 6 + 3 * 1);
 });
 
 test("a value missing from one source is taken from the next below it", () => {
@@ -198,7 +204,7 @@ test("the project file's findings: JSON that does not parse, not an object, an u
   };
   assert.match(findings("{ steps: 1 ")[0], /^dir\/allegro\.json: the file is not JSON: /);
   assert.deepEqual(findings("[1]"), ["dir/allegro.json: the file is not a JSON object whose keys are setting names"]);
-  assert.deepEqual(findings('{"budget": 3}'), ['dir/allegro.json: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel']);
+  assert.deepEqual(findings('{"budget": 3}'), ['dir/allegro.json: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases']);
   assert.deepEqual(findings('{"steps": "3"}'), ["dir/allegro.json: steps is not a whole number"]);
   assert.deepEqual(findings('{"steps": -1}'), ["dir/allegro.json: steps is not a whole number"]);
   assert.deepEqual(findings('{"inputs": ["1"]}'), ["dir/allegro.json: inputs is not an object from an input's name to a literal written as a JSON string"]);
@@ -248,6 +254,48 @@ test("a run's result names the source of each value of its configuration: values
   const result = outcome.result;
   assert.ok(result !== undefined);
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the list is plain data");
+});
+
+// ── The setting phases (chunk Q13, part 3) ────────────────────────────
+
+const CEILING3: Settings = { ceiling: ["output", "timer"] };
+
+test("the setting phases: run alone is today's shape, and check alone is one phase that supplies nothing", () => {
+  assert.deepEqual(PHASE_VALUES.map((v) => [...v]), [["run"], ["check"]]);
+  const inputs = { n: text("n") };
+  const run = resolved(resolve({ "command line": { phases: ["run"], inputs, later: [{ m: text("m") }] }, launcher: CEILING3 }));
+  assert.equal(run.configuration.phases, undefined);
+  assert.deepEqual(run.configuration.inputs, inputs);
+  assert.deepEqual(run.configuration.later, [{ m: text("m") }]);
+  const none = resolved(resolve({ "command line": { inputs }, launcher: CEILING3 }));
+  assert.deepEqual(none.configuration, { ceiling: ["output", "timer"], inputs }, "with no source setting phases, run alone");
+  const check = resolved(resolve({ file: { phases: ["check"] }, launcher: CEILING3 }));
+  assert.deepEqual(check.configuration.phases, [{ name: "check", capabilities: [] }]);
+  assert.equal(sourceOf(check, "phases"), "file");
+});
+
+test("check then run is a finding of its own: a later phase cannot supply a capability", () => {
+  for (const source of SOURCES) {
+    const r = resolve({ launcher: CEILING3, [source]: { ...(source === "launcher" ? CEILING3 : {}), phases: ["check", "run"] } });
+    assert.deepEqual(r.ok ? [] : r.findings, ['the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'], source);
+  }
+});
+
+test("a value of phases that is not built is a finding that says what is built, and later with check alone is a finding", () => {
+  for (const value of [["run", "check"], ["export"], [], ["check", "check"]]) {
+    const r = resolve({ "command line": { phases: value }, launcher: CEILING3 });
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check"`], JSON.stringify(value));
+  }
+  const later = resolve({ "command line": { phases: ["check"] }, file: { later: [{ m: text("m") }] }, launcher: CEILING3 });
+  assert.deepEqual(later.ok ? [] : later.findings, ['the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input']);
+  assert.deepEqual(shapeOf(["check"], undefined, []), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } }, "an empty list of later phases is none");
+});
+
+test("the project's file reads phases as a list of names", () => {
+  const r = readProjectFile("dir/allegro.json", JSON.stringify({ phases: ["check"] }));
+  assert.deepEqual(r, { ok: true, settings: { phases: ["check"] } });
+  const bad = readProjectFile("dir/allegro.json", JSON.stringify({ phases: "check" }));
+  assert.deepEqual(bad.ok ? [] : bad.findings, ["dir/allegro.json: phases is not a list of phase names"]);
 });
 
 test("the resolver reaches no host API", () => {
