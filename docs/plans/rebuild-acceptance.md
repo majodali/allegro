@@ -3183,3 +3183,103 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      set aside.
   Open with the maintainer: who chooses whether a held claim is refuted
   or logged.
+- **2026-11-21 — Q16, part 3: the check-output capability, first version.**
+  The terminal ships a fourth capability, `report`
+  (`next/launch/report.ts`), the maintainer's check output, and the
+  corpus runner grants it. Its name,
+  parts and shapes are this stream's proposal, for the maintainer to
+  ratify. The launcher is unchanged. The nine points, as built:
+  1. **The capability.** `report`, with the parts `message` and
+     `status`. The file reaches no host API, and a test holds that.
+  2. **Neither part gives a program anything.** Each answers at once
+     with the empty structure, whatever it is given, a failure among
+     them. Neither refuses a value, answers a failure or answers late.
+     A test runs the same program with and without calls on `report`
+     and gets the same lines, the same end and the same summary.
+  3. **`report.message(m)`.** A structure with `level`, `text` and
+     optionally `file`, `line` and `column`, in any order. A text alone
+     is a note. Any other value is a note: "report.message was handed no
+     message: a value of kind <kind>". No function reachable from
+     `next/launch/` shows a value as the `// yields:` lines do, so the
+     note names the kind alone, by the kernel interface's names
+     (`composed-function` for a function). An entry under another key, a
+     level outside the three, a `line` that is negative or not 64 bits,
+     and a `file` that is no text each make the value no message. A
+     message does not set the status.
+  4. **`report.status(n)`.** A whole number of 64 bits from 0 to 255.
+     The highest handed over stands, in either order. A value that is no
+     status counts as 255, with the note "report.status was handed no
+     status from 0 to 255: a value of kind <kind>, which counts as 255".
+  5. **The sink.** The capability is made with a sink of two functions
+     (`ReportSink`). `collector` keeps the messages in order and the
+     highest status; the terminal, the corpus runner and the tests use
+     it. The terminal's sink (`terminalReport`) writes each message to
+     stderr as one line as it is handed over (`messageLine`):
+     `file:line:column: level: text` with the parts it has, `level:
+     text` where there is no file. This stream's reading of "the parts
+     it has": a line is written only after a file, and a column only
+     after a line.
+  6. **The exit code** of both commands is the higher of 0 for a
+     completed run or 1 otherwise, and the highest status (`exitCode`
+     of `next/launch/terminal.ts`). Tested end to end on both commands:
+     completed with status 3 exits 3, refuted with 0 exits 1, refuted
+     with 7 exits 7. Nothing else they print changes.
+  7. **The ceiling and the phases.** `TERMINAL_CEILING` gains `report`.
+     `CHECK_CAPABILITIES` of `next/tools/configuration.ts` holds
+     `report` alone, and `shapeOf` takes the ceiling: check supplies the
+     check capabilities it grants and no other. Under `--phases check` a
+     call on `report` acts and a call on `output` waits. A ceiling
+     narrowed to leave `report` out refuses a module that declares it.
+     A run under check that calls `output` still ends waiting and exits
+     1 at least; what check's command shows is chunk Q14.
+  8. **The corpus lines.** `// reports: <level>: <text>` and `// status:
+     <n>`, documented in the README's section "Messages and status". A
+     `// reports:` line is compared with the terminal's line for the
+     message, so a message with a file is stated with its place first.
+     This stream reads the point so; a line that held the level and the
+     text alone could not show a file.
+  9. **The launcher needs no new rule.** No line of `launcher.ts`
+     changed.
+  - **The programs.** Eleven, under `next/corpus/allegretto/m3/`, none
+    with a `// realises:` line: no case of `next/corpus/cases.json`
+    shows a check output. `report-levels` (one of each level),
+    `report-place` (a file, a line and a column, and fewer),
+    `report-text` (a text alone), `report-not-message` (values that are
+    no message), `report-status-rising` and `report-status-falling`
+    (the higher stands, written second or first), `report-status-invalid`
+    (255 and a note), `report-error-no-status` (completed, status 0),
+    `report-check` (under check: messages handed over, nothing printed,
+    the write waits), `report-answer` (the answers bound, `count` of
+    each 0) and `report-import/main.alg` (report handed on to an
+    imported module, which reports).
+  - **What the reader did that the forms do not say.** The reader
+    refuses a reserved word as a symbol literal: `` x = `error `` is
+    "not Allegretto", as is `` x = `else ``. forms.md §2 says `` `name ``
+    is the symbol `name` and names no exception. The symbol literal is
+    `` ` `` and an identifier, and an identifier excludes the reserved
+    words (`next/bootstrap/allegretto-grammar.ts`). The programs write
+    the level `symbol("error")`. A level named by another word would
+    avoid it; that is the maintainer's.
+  - **What follows from the forms and may surprise.** A text is bits of
+    whole bytes, so a number written out is a text where its bytes are
+    UTF-8: `report.message(42)` is a note whose text is seven NUL bytes
+    and `*`. The programs use `true`, one bit, as a value that is no
+    text. A key handed to a primitive function has the kind `structure`
+    through the kernel's interface, where `kind(x)` in Allegretto gives
+    `` `key ``, so the note names a key's kind as `structure`. The two
+    kernel variants did the same in every program and test.
+  - **Two ruled decisions now differ from what is built.** "The
+    platform ships three phases: check, run and export" has check
+    evaluate "with no capability but the loader's", and check now
+    supplies the check capabilities. "The terminal and the browser ship
+    output, timers and HTTP" names three, and the terminal now ships
+    `report` too. Their wording is the kernel stream's file.
+  - **What stands from the entries above.** `specialize` performs no
+    effect, so when check is `specialize` alone a call on `report` will
+    not act under it. The maintainer's answer above, that this changes
+    how `specialize` serves check, stands open with the kernel stream.
+  - **Measured.** `npm run test:next` passes 861 tests on the reference
+    and 862 with `ALLEGRO_KERNEL=machine`, with one marked to do on
+    each. 40 tests are new on each: 29 written here and one for each of
+    the eleven programs. `npm run harness:next` runs 110 programs, and
+    all pass on both variants.
