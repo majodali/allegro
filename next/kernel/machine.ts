@@ -57,7 +57,7 @@
 // Not here yet, and in the plan's last chunk: specialization.
 
 import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Value } from "./interface.js";
-import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
+import { INTERFACE_VERSION, InterfaceError, KernelFault, LimitFailure, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
 import type { Account, Mark, V } from "./values.js";
@@ -316,8 +316,31 @@ export const createMachine: CreateKernel = () => {
   };
   /** True while a call into the kernel is running: only then is laying out a joined value charged. */
   let evaluating = false;
-  const laidOut = (bits: number): void => {
-    if (evaluating) charge(bits);
+  /**
+   * The charge for laying out a value joined in an evaluation. The evaluation running
+   * when the bytes are read pays. With none running, a host is reading a result: the
+   * evaluation that made the value pays, and where its budget does not cover the work the
+   * read fails and that evaluation is over.
+   */
+  const layingOut = new WeakMap<Account, (bits: number) => void>();
+  const laidOutFor = (maker: Account): ((bits: number) => void) => {
+    let f = layingOut.get(maker);
+    if (f === undefined)
+      layingOut.set(
+        maker,
+        (f = (bits) => {
+          if (evaluating) return charge(bits);
+          const steps = Math.floor(bits / 64);
+          if (steps > maker.left) {
+            const left = maker.left;
+            maker.left = 0;
+            maker.dead = true;
+            throw new LimitFailure(bits, left);
+          }
+          maker.left -= steps;
+        }),
+      );
+    return f;
   };
 
   const context: PrimitiveContext = {
@@ -1589,7 +1612,7 @@ export const createMachine: CreateKernel = () => {
       if (!(a instanceof Bits && b instanceof Bits)) return new Refuted("only two bits values can be joined", undefined);
       // Two values of whole bytes are kept as the two: nothing is copied here. They are
       // laid out once, when something reads the bytes, and the work is charged then.
-      if (whole(a) && whole(b)) return a.bitLength === 0 ? b : b.bitLength === 0 ? a : Bits.joined(a, b, laidOut);
+      if (whole(a) && whole(b)) return a.bitLength === 0 ? b : b.bitLength === 0 ? a : Bits.joined(a, b, laidOutFor(account));
       charge(a.bitLength + b.bitLength);
       return packed([...bitList(a), ...bitList(b)]);
     }

@@ -580,8 +580,11 @@ name.
   search; a part of a bits value is a view of it; two bits values
   joined are laid out once, when something reads the bytes, and charged
   then. Building a list of n entries, and a text of n pieces, costs
-  about n. Also fixed: a deep evaluation paid for its depth at every
-  record of what it rests on.
+  about n. A host that reads the bytes of a result is counted against
+  the evaluation that made it, and where that budget does not cover the
+  read it fails with `LimitFailure`; the length is read without laying
+  anything out. Also fixed: a deep evaluation paid for its depth at
+  every record of what it rests on.
 - **2026-11-20 — The kernel's interface, version 2.** The older forms
   are removed: `Kernel2` and `CreateKernel2`, `scope()` and the scope
   argument of `evaluate`, and `steps` given to `advance`. `fill` now

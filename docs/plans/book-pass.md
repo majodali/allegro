@@ -1705,6 +1705,11 @@ its approval.
   structure made by `put` at the end of another shares its entries, a
   part of a bits value is a view, and two joined are laid out when
   read, which is when the work is charged. The reference still copies.
+  Ruled the next day: the evaluation that does the work of laying a
+  value out pays for it. Inside an evaluation that is the one running.
+  For a host that reads a result, it is the evaluation that made the
+  value, and a read its budget does not cover fails with
+  `LimitFailure`.
 
 ## 8. Sessions
 

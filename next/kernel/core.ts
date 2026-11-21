@@ -188,7 +188,14 @@ export const createCore = () => {
   };
   const bitsOf = (v: V) => {
     const s = seen(v);
-    return s instanceof Bits ? { bytes: s.bytes, bitLength: s.bitLength } : wrong("bitsOf", v);
+    if (!(s instanceof Bits)) return wrong("bitsOf", v);
+    // The length is known at once. The bytes of a value made by joining are laid out when they are read.
+    return {
+      get bytes(): Uint8Array {
+        return s.bytes;
+      },
+      bitLength: s.bitLength,
+    };
   };
   const symbolName = (v: V): string => {
     const s = seen(v);

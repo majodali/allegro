@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { chosenVariant, createKernel } from "./create.js";
-import { InterfaceError } from "./interface.js";
+import { InterfaceError, LimitFailure } from "./interface.js";
 import { Refusal } from "./interface.js";
 import { load, type SavedProgram } from "./saved-program.js";
 import { launch } from "../launch/launcher.js";
@@ -3009,4 +3009,49 @@ test("a claim rests on what its value came through: a name, an argument, and a c
   // Through both, and a second name: x = probe(); y = x; (a => claim(isZero(a)))(y).
   const y = k.symbol("t.y");
   assert.deepEqual(onCapability(k.evaluate(within(k, [[x, call(probe)], [y, x]], call(k.composedFunction([a], call(kp("claim"), call(isZero, a))), y)))), [true]);
+});
+
+test("a host that reads a result pays from the budget of the evaluation that made it, and is refused where that does not cover it", () => {
+  if (!MACHINE) return; // The reference lays a value out where it is joined, and charges there.
+  const { k, call, kp } = setup();
+  const kib = k.bits(new Uint8Array(1024).fill(0x61));
+  const twice = k.param("x");
+  const double = k.composedFunction([twice], call(kp("join"), twice, twice));
+  const doubled = (times: number) => {
+    let grown: Value = kib;
+    for (let i = 0; i < times; i++) grown = call(double, grown);
+    return grown;
+  };
+  // A thousand million bytes, made in a few hundred steps under a budget of a thousand.
+  const huge = k.evaluate(doubled(20), { steps: 1_000 });
+  assert.equal(huge.ended, "complete");
+  assert.equal(k.bitsOf(huge.value).bitLength, 8192 * 2 ** 20, "the length is read, and nothing is laid out");
+  // Another evaluation, with no budget, runs in between: the read is still the first one's to pay.
+  k.evaluate(call(kp("join"), kib, kib));
+  assert.throws(() => k.bitsOf(huge.value).bytes, (e: unknown) => e instanceof LimitFailure && e.bits === 8192 * 2 ** 20, "the bytes are not laid out");
+  assert.throws(() => k.bitsOf(huge.value).bytes, LimitFailure, "nor at a second try: the evaluation is over");
+  // With no budget, a host reads what it likes, and a second read lays nothing out.
+  const free = k.evaluate(doubled(4)).value;
+  assert.equal(k.bitsOf(free).bytes.length, 16 * 1024);
+  assert.equal(k.bitsOf(free).bytes, k.bitsOf(free).bytes);
+});
+
+test("a host's read is counted against the evaluation: work left for it then has less to go on", () => {
+  if (!MACHINE) return; // The reference charges at the join.
+  const run = (read: boolean) => {
+    const { k, call, kp, noted, program, n32 } = noting();
+    const kib = k.bits(new Uint8Array(1024).fill(0x61));
+    const c = k.cell();
+    // also(then(c, go(10)), join(kib, kib)): the joined value is given at once, and ten turns are left for when c comes.
+    const r = k.evaluate(call(kp("also"), call(kp("then"), c, program(10)), call(kp("join"), kib, kib)), { steps: 300 });
+    assert.equal(r.ended, "complete");
+    // Laying out 2048 bytes is 256 steps.
+    if (read) assert.equal(k.bitsOf(r.value).bytes.length, 2048);
+    const a = k.fill(c, n32(0));
+    return { limited: a.limited?.length ?? 0, turns: noted.length };
+  };
+  assert.deepEqual(run(false), { limited: 0, turns: 10 }, "unread, the budget covers the ten turns");
+  const after = run(true);
+  assert.equal(after.limited, 1, "read, what is left does not");
+  assert.ok(after.turns < 10);
 });
