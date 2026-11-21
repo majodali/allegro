@@ -25,7 +25,8 @@
 // next/launch/scripted-transport.ts), and the programs `m3/http-*.alg`.
 // Chunk Q13 (check and run as configurations, and what a result holds),
 // part 1, added the launcher's result to a run (`ProgramRun.result`), the
-// `// summary:` line, and the program `m3/result-assumed.alg`.
+// `// summary:` line, and the program `m3/result-assumed.alg`. Chunk Q13,
+// part 3, added the `// phases:` line and the programs `m3/phase-*.alg`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -47,7 +48,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPins, readServes, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPhases, readPins, readServes, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -404,5 +405,51 @@ test("the programs that state a summary: a claim that holds, one refuted, one as
     const run = await runProgram(text(file), file);
     assert.deepEqual(run.problems, [], file);
     assert.equal(run.result?.summary, summary, file);
+  }
+});
+
+
+// ── The phases line (chunk Q13, part 3) ───────────────────────────────
+
+test("the phases line is read as the convention states: names separated by commas, at most one line", () => {
+  assert.deepEqual(readPhases("capability output\n// phases: check\n"), { phases: ["check"], problems: [] });
+  assert.deepEqual(readPhases("//phases:check ,  run \n"), { phases: ["check", "run"], problems: [] });
+  assert.deepEqual(readPhases("capability output\n"), { phases: undefined, problems: [] });
+  assert.deepEqual(readPhases("// phases: check run\n").problems, ['the line "// phases: check run" is not of the form phases: <name>, <name>']);
+  assert.deepEqual(readPhases("// phases: check\n// phases: run\n").problems, ["the program has two `// phases:` lines"]);
+});
+
+test("a program with a phases line runs those phases, and its lines hold for the whole launch", async () => {
+  const program = 'capability output\nclaim(1 == 1)\noutput.write("hello")\n// end: waiting: the program waits on the capability(ies) output, which no phase supplies\n// summary: undecided\n';
+  const checked = await runProgram(program + "// phases: check\n");
+  assert.deepEqual(checked.problems, []);
+  assert.deepEqual(checked.lines, []);
+  const unstated = await runProgram(program);
+  assert.deepEqual(unstated.lines, ["hello"], "a program with no phases line runs as run alone");
+  assert.ok(unstated.problems.includes('ended "completed", expected "waiting: the program waits on the capability(ies) output, which no phase supplies"'), JSON.stringify(unstated.problems));
+});
+
+test("a malformed phases line, a list that is not built, two lines, and later lines with check alone each fail the program, which is not launched", async () => {
+  const body = 'capability output\ninput a\noutput.write("launched")\n// end: completed\n';
+  for (const [lines, problem] of [
+    ["// phases: check run", 'the line "// phases: check run" is not of the form phases: <name>, <name>'],
+    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check"'],
+    ["// phases: check, run", 'the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'],
+    ["// phases: check\n// phases: run", "the program has two `// phases:` lines"],
+    ['// phases: check\n// later: a = "x"', 'the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input'],
+  ] as const) {
+    const run = await runProgram(body + lines + "\n");
+    assert.ok(run.problems.includes(problem), `${lines}: ${JSON.stringify(run.problems)}`);
+    assert.deepEqual(run.lines, [], lines);
+  }
+  const notLaunched = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// phases: check\n");
+  assert.deepEqual(notLaunched.problems, ["nothing was launched, and the program states a `// phases:` line"]);
+});
+
+test("the programs that run under check are there, in milestone 3's directory, and each states its phases", () => {
+  for (const name of ["prints", "refuted", "bound"]) {
+    const file = `${PROGRAMS_DIR}/m3/phase-check-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, ["check"], file);
   }
 });

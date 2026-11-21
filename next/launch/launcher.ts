@@ -4,7 +4,9 @@
 // capability as a structure of its parts). Part 4 loads the records of
 // imported modules. Chunk Q13 (check and run as configurations, and what a
 // result holds), part 1, adds the result: what the run found; part 2 adds
-// to it the source of each value of the configuration.
+// to it the source of each value of the configuration; part 3 makes a
+// launch apply a sequence of phases, each supplying capabilities and
+// inputs.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -15,7 +17,13 @@
 //    launcher fills a cell with plain data
 //   "Phases are configuration", "When information arrives, what waited on
 //    it is evaluated again": a later phase of the configuration supplies
-//    an input, and what waited on it is evaluated again in the same launch
+//    an input, and what waited on it is evaluated again in the same
+//    launch
+//   "A phase hands its residual to the next", as far as one execution: the
+//    phases are applied in order on one kernel, and the next phase takes
+//    up what the one before left waiting on an input. A later phase
+//    supplies no capability, and what a phase must leave decided is not
+//    built
 //   "A result names everything it rests on", as far as this part goes,
 //   "A tool reads a phase's result and adds no analysis of its own" and
 //   "A module's summary is the weakest strength among its claims": the
@@ -46,7 +54,8 @@
 //   4  creates the capabilities of the ceiling, each part an effectful
 //      primitive function, and hands the module function exactly those
 //      its `declares` names with role `capability`, in the function's
-//      order. The ceiling's capabilities go to the main module alone: an
+//      order. A declared capability the first phase does not supply is
+//      handed as a fresh cell in its place. The ceiling's capabilities go to the main module alone: an
 //      imported module gets a capability only as the module that imports
 //      it hands it on. A capability is handed as a structure of its parts, keyed by
 //      the symbols of the part names, so a program reads a part as an
@@ -67,21 +76,37 @@
 //      maintainer's ruling of 2026-11-20);
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`. When it waits and no capability's
-//      answer is due, it applies the next later phase of the configuration
-//      (`later`): it fills the cells of the inputs that phase supplies and
-//      calls `advance`. Phases are applied in order, one at a time; when
-//      nothing waits, the phases left are not applied. A phase is no formal
-//      element of the system (the maintainer, 2026-11-17): the word is used
-//      in its general sense, and a value that arrives later is the same
-//      event. So a later phase here is a set of inputs that arrive later in
-//      one launch, and no more: the same kernel, the same capabilities, one
-//      step budget;
+//      answer is due, it applies the next phase: it fills the cells of the
+//      inputs that phase supplies and calls `advance`. Phases are applied
+//      in order, one at a time; when nothing waits, the phases left are not
+//      applied, and a refutation ends the launch in whatever phase it is
+//      found. A phase is what it supplies (`Phase`): the configuration
+//      gives the list (`phases`), or else today's shape, a first phase
+//      named `run` that supplies every capability of the ceiling and
+//      `inputs`, and one named `later` for each entry of `later`, which
+//      supplies inputs only. A configuration that gives `phases` and also
+//      `inputs` or `later`, an empty list of phases, a phase that supplies
+//      a capability the ceiling does not grant, and a phase after the
+//      first that supplies a capability are refused before anything is
+//      evaluated. A phase is no formal element of the
+//      system (the maintainer, 2026-11-17 and 2026-11-18): a phase is one
+//      call of the module function with some capabilities and inputs
+//      given, and the step to the next is the same event as a value that
+//      arrives later. So every phase runs on the same kernel, under one
+//      step budget. A capability is supplied by the first phase or by
+//      none: the kernel fills a cell with plain data only, and a
+//      capability is a structure of primitive functions, so no later
+//      phase can put one into the cell a declared capability is handed
+//      as;
 //   7  returns how the run ended, and the lines the output capability
 //      wrote, with the number of lines printed before each later phase was
 //      applied. A refuted run carries the reason the kernel gives for each
 //      refutation it reported (`reasonOf`). A run left waiting names the
-//      inputs no phase supplied, apart from the cells no capability will
-//      answer. A record whose module uses a name nothing binds is refused
+//      inputs no phase supplied, and, where the configuration gives
+//      `phases`, the capabilities, apart from the cells no capability will
+//      answer. Every end but a refusal also gives one entry for each phase
+//      applied (`phases`): its name, the lines printed before it, and the
+//      result as it stood when it was over. A record whose module uses a name nothing binds is refused
 //      at loading, with the kernel's message: "A free name never gets a
 //      value".
 //      With every end but a refusal it also returns the result
@@ -102,7 +127,9 @@
 //        each value of the configuration, as the caller gives it
 //        (`Launch.sources`).
 //      The launcher adds no analysis: it sums what the kernel reports and
-//      names what it was given. It decides no claim and drops none.
+//      names what it was given. It decides no claim and drops none. Under
+//      a phase that supplies no capability it does the same: what is
+//      decided there is what the kernel decided.
 // Step 1 is the caller's: it passes the configuration and the records.
 // The launcher does not resolve a configuration from its sources: the
 // terminal's entries do, with `resolve` of next/tools/configuration.ts,
@@ -191,6 +218,36 @@ export interface Configuration {
    * capabilities and the step budget of the launch.
    */
   readonly later?: readonly Inputs[];
+  /**
+   * The phases, in order, each by what it supplies. The first is applied
+   * at the start, and each later one when the kernel waits and no
+   * capability's answer is due. Only the first may supply capabilities:
+   * the kernel fills a cell with plain data only. None: one phase that
+   * supplies every capability of the ceiling and `inputs`, and then one
+   * for each entry of `later`, each named `later`. A configuration that
+   * gives `phases` gives neither `inputs` nor `later`.
+   */
+  readonly phases?: readonly Phase[];
+}
+
+/**
+ * One phase of a launch: what it supplies. A phase is one call of the
+ * module function with some capabilities and inputs given (the note of
+ * 2026-11-18 on "A phase hands its residual to the next"): the launcher
+ * applies the phases in one execution, on one kernel, under one step
+ * budget, and a phase is no element of the system beyond that.
+ */
+export interface Phase {
+  /** A word for reports, such as `check` or `run`. */
+  readonly name: string;
+  /**
+   * The capabilities this phase supplies, each of the ceiling. Only the
+   * first phase may name any: a later one cannot put a capability into a
+   * cell, since the kernel fills a cell with plain data only.
+   */
+  readonly capabilities: readonly string[];
+  /** The inputs this phase supplies, as `Configuration.inputs` holds them. */
+  readonly inputs?: Inputs;
 }
 
 /**
@@ -243,9 +300,12 @@ export type LaunchEnd =
   /**
    * The kernel waits on what nothing will supply: `unanswered` counts the
    * cells no capability will answer, and `inputs` names the declared
-   * inputs that no phase of the configuration supplied. A name nothing
-   * binds is not waited on: "A free name never gets a value", so the
-   * kernel refuses a module that has one.
+   * inputs that no phase of the configuration supplied. Where the
+   * configuration gives `phases`, `capabilities` names the declared
+   * capabilities that no phase supplied and that the program waits on;
+   * without `phases` every capability is supplied at the start, and it is
+   * left out. A name nothing binds is not waited on: "A free name never
+   * gets a value", so the kernel refuses a module that has one.
    */
   | {
       readonly kind: "waiting";
@@ -253,6 +313,7 @@ export type LaunchEnd =
       readonly reason: string;
       readonly unanswered: number;
       readonly inputs: readonly string[];
+      readonly capabilities?: readonly string[];
     }
   /** Refused before anything was evaluated. */
   | { readonly kind: "refused"; readonly reason: string; readonly findings: readonly string[] }
@@ -356,6 +417,20 @@ export interface LaunchResult {
   readonly restsOn: RunRestsOn;
 }
 
+/** One phase applied, and the result as it stood when the phase was over. */
+export interface PhaseOutcome {
+  /** The phase's name (`Phase.name`). */
+  readonly name: string;
+  /** The number of lines printed before the phase was applied. */
+  readonly linesBefore: number;
+  /**
+   * The result as it stood when the phase was over: just before the next
+   * phase was applied, or at the end. The last phase's is the outcome's
+   * `result`.
+   */
+  readonly result: LaunchResult;
+}
+
 export interface LaunchOutcome {
   /** The lines printed, in order. */
   readonly lines: string[];
@@ -367,6 +442,12 @@ export interface LaunchOutcome {
   readonly end: LaunchEnd;
   /** What the run found. Present for every end but `refused`, where nothing was evaluated. */
   readonly result?: LaunchResult;
+  /**
+   * One entry for each phase applied, in order. Present for every end but
+   * `refused`; empty where the launch ended before the first phase was
+   * applied.
+   */
+  readonly phases?: readonly PhaseOutcome[];
 }
 
 function refused(lines: string[], reason: string, findings: readonly string[] = []): LaunchOutcome {
@@ -540,11 +621,26 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     if (!supplied.has(name)) problems.push(`the ceiling grants ${name}, which this target does not supply`);
   for (const d of program.declares)
     if (d.role === "capability" && !configuration.ceiling.includes(d.name)) problems.push(`the module declares the capability ${d.name}, which the ceiling does not grant`);
+  // The phases: those the configuration gives, or else today's shape.
+  if (configuration.phases !== undefined && (configuration.inputs !== undefined || configuration.later !== undefined))
+    problems.push("the configuration gives phases and also inputs or later: with phases, each phase supplies its own inputs");
+  if (configuration.phases !== undefined && configuration.phases.length === 0) problems.push("the configuration gives no phase");
+  const phases: readonly Phase[] = configuration.phases ?? [
+    { name: "run", capabilities: configuration.ceiling, ...(configuration.inputs === undefined ? {} : { inputs: configuration.inputs }) },
+    ...(configuration.later ?? []).map((inputs) => ({ name: "later", capabilities: [], inputs })),
+  ];
+  // Each capability a phase supplies is of the ceiling, and only the first phase supplies any.
+  phases.forEach((phase, i) => {
+    for (const name of phase.capabilities) {
+      if (!configuration.ceiling.includes(name)) problems.push(`the phase ${phase.name} supplies the capability ${name}, which the ceiling does not grant`);
+      if (i > 0)
+        problems.push(`the phase ${phase.name} supplies the capability ${name} after the first phase: the kernel fills a cell with plain data only, so a capability is supplied by the first phase or by none`);
+    }
+  });
   // The inputs, by declared name: each declared, and each supplied once.
   const declaredInputs = new Set(program.declares.filter((d) => d.role === "input").map((d) => d.name));
-  const phases = configuration.later ?? [];
   const suppliedIn = new Map<string, number>();
-  [configuration.inputs, ...phases].forEach((inputs, phase) => {
+  phases.map((p) => p.inputs).forEach((inputs, phase) => {
     for (const name of namesOf(inputs)) {
       const where = phase === 0 ? "at the start" : `in later phase ${phase}`;
       if (!declaredInputs.has(name)) problems.push(`the configuration supplies the input ${name} ${where}, which the module does not declare`);
@@ -584,7 +680,13 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       },
     };
   };
-  const ended = (end: LaunchEnd): LaunchOutcome => ({ lines, linesBeforePhase, end, result: result() });
+  // Each phase applied, with the lines printed before it, and the result as it stood when it was over.
+  const applied: Array<{ readonly name: string; readonly linesBefore: number }> = [];
+  const over: LaunchResult[] = [];
+  const ended = (end: LaunchEnd): LaunchOutcome => {
+    const last = result();
+    return { lines, linesBeforePhase, end, result: last, phases: applied.map((p, i) => ({ ...p, result: i < over.length ? over[i] : last })) };
+  };
 
   try {
     // Step 3, loading: the pure primitives every record needs, then each imported record, in order, then the saved program.
@@ -639,12 +741,19 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       const names = implementation.definition.parts;
       granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
     }
-    // Each input: the plain data supplied at the start, or else a fresh cell that a later phase may fill.
+    // Each capability: the one the first phase supplies, or else a fresh cell that nothing fills.
+    // Each input: the plain data the first phase supplies, or else a fresh cell that a later phase may fill.
+    const capabilityCells = new Map<string, Cell>();
     const inputCells = new Map<string, Cell>();
-    const atStart = configuration.inputs ?? {};
+    const atStart = phases[0].inputs ?? {};
     // One argument for each capability and input, in order; none for an import, which the kernel supplies.
     const args = program.declares.filter((d) => d.role !== "module").map((d) => {
-      if (d.role !== "input") return granted.get(d.name)!;
+      if (d.role !== "input") {
+        if (phases[0].capabilities.includes(d.name)) return granted.get(d.name)!;
+        const cell = kernel.cell();
+        capabilityCells.set(d.name, cell);
+        return cell;
+      }
       if (Object.hasOwn(atStart, d.name)) return plainValue(kernel, atStart[d.name]);
       const cell = kernel.cell();
       inputCells.set(d.name, cell);
@@ -654,6 +763,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // Step 5: instantiate the module, under the budget. The budget is the
     // evaluation's: the kernel counts the work every later call does for it.
     const budget = configuration.steps;
+    applied.push({ name: phases[0].name, linesBefore: 0 });
     const evaluated = kernel.evaluate(kernel.expression(moduleFn, args), budget === undefined ? {} : { steps: budget });
     tallies.add(evaluated.claims);
     let steps = evaluated.steps;
@@ -673,7 +783,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     };
 
     // Step 6: deliver the values that arrive later, and apply the later phases.
-    let nextPhase = 0;
+    let nextPhase = 1;
     const advanceOnce = (): LaunchOutcome | undefined => {
       const advanced = kernel.advance();
       tallies.add(advanced.claims);
@@ -697,8 +807,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         answers.delete(cell);
       }
       if (filled > 0) {
-        const ended = advanceOnce();
-        if (ended !== undefined) return ended;
+        const stop = advanceOnce();
+        if (stop !== undefined) return stop;
         continue;
       }
       const due = waiting.filter((c) => answers.has(c)).map((c) => answers.get(c)!);
@@ -708,26 +818,38 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       }
       // The kernel waits and no capability's answer is due: the next later phase, if there is one.
       if (nextPhase < phases.length) {
+        over.push(result());
         linesBeforePhase.push(lines.length);
-        const inputs = phases[nextPhase++];
+        const phase = phases[nextPhase++];
+        applied.push({ name: phase.name, linesBefore: lines.length });
+        const inputs = phase.inputs ?? {};
         for (const name of namesOf(inputs)) {
           const cell = inputCells.get(name)!;
           fill(cell, plainValue(kernel, inputs[name]));
           inputCells.delete(name);
         }
-        const ended = advanceOnce();
-        if (ended !== undefined) return ended;
+        const stop = advanceOnce();
+        if (stop !== undefined) return stop;
         continue;
       }
-      // The cells of inputs no phase supplied are named by the input's declared name.
-      const inputOf = new Map([...inputCells].map(([name, cell]) => [cell as Value, name] as const));
+      // The cells of inputs and of capabilities no phase supplied are named by the declared name.
+      const supplier = new Set<Value>([...inputCells.values(), ...capabilityCells.values()]);
       const inputs = [...inputCells.keys()].filter((name) => waiting.includes(inputCells.get(name)!));
-      const unanswered = waiting.filter((c) => !inputOf.has(c)).length;
+      const capabilities = [...capabilityCells.keys()].filter((name) => waiting.includes(capabilityCells.get(name)!));
+      const unanswered = waiting.filter((c) => !supplier.has(c)).length;
       const parts = [
         ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
         ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
+        ...(capabilities.length > 0 ? [`the capability(ies) ${capabilities.join(", ")}, which no phase supplies`] : []),
       ];
-      return ended({ kind: "waiting", steps, reason: `the program waits on ${parts.join(" and on ")}`, unanswered, inputs });
+      return ended({
+        kind: "waiting",
+        steps,
+        reason: `the program waits on ${parts.join(" and on ")}`,
+        unanswered,
+        inputs,
+        ...(configuration.phases === undefined ? {} : { capabilities }),
+      });
     }
 
     // Step 7.
