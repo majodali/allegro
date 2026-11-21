@@ -2933,3 +2933,113 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   launcher already stated `hold: true`. On the merged tree this branch
   passes 800 tests on the reference and 801 with
   `ALLEGRO_KERNEL=machine`, and 99 programs on both.
+- **2026-11-21 — PR #293 merged: what stands of Q13, part 3, and what is open.**
+  The maintainer merged PR #293 on 2026-11-21. A merged pull request is
+  the approval, so the names and the launcher's form stand as built:
+  the setting `phases`, its values `run` and `check`, `--phases`, the
+  project file's `"phases"`, the corpus line `// phases: check`, a
+  phase as what it supplies, the capabilities named in a waiting end,
+  and a result for each phase. Four of its asks were questions, and a
+  merge does not answer a question. They stay open:
+  1. how a later phase supplies a capability, of the three ways the
+     entry of part 3 names;
+  2. what check should decide after a dropped statement that calls a
+     capability;
+  3. whether inputs given with `check` alone are a finding;
+  4. what check prints and how its command exits, which is chunk Q14
+     (the commands).
+  Chunk Q14 waits on the last two.
+- **2026-11-21 — Q8: the speed tests measured after sharing.**
+  PR #292 of the kernel stream, chunk K14 (sharing), merged on
+  2026-11-21. The bench is run on both variants when a chunk of that
+  plan lands (the entry of 2026-11-20 above).
+  - **How it was measured.** `npm run bench:next`, one run on each
+    variant, the machine first, on main at `2f615b4`, on an Intel Xeon
+    at 2.10 GHz with 4 cores and 16 GiB, Linux 6.18, node 22.23.5: the
+    host of the run of 2026-11-20. The run on the machine took about 7
+    minutes and the run on the reference about 5. The bench is
+    unchanged.
+  - **Test 1, the parser.**
+
+    | Terms | Steps on the machine | Reference ms | µs per step | Machine ms | µs per step |
+    |---|---|---|---|---|---|
+    | 1 | 9,783 | 128 | 13.0 | 58.3 | 6.0 |
+    | 4 | 38,817 | 408 | 10.5 | 172 | 4.4 |
+    | 16 | 154,953 | 2,202 | 14.2 | 697 | 4.5 |
+    | 32 | 309,801 | 5,846 | 18.9 | 1,129 | 3.6 |
+    | 64 | 619,497 | 16,663, one run | 26.9 | 2,548 | 4.1 |
+    | 128 | 1,238,890 | not run | | 4,706 | 3.8 |
+    | 256 | 2,477,674 | not run | | 10,232, one run | 4.1 |
+
+    The reference counts three more steps at each size. On the machine
+    the parser takes as long as its twin in the present tree's base
+    language, between 0.6 and 1.1 times, and it completes 256 terms,
+    where the twin ends at the host's stack.
+  - **Test 2a, the typed loop and fold.**
+
+    | n | Reference steps | Reference ms | µs per step | Machine steps | Machine ms | µs per step |
+    |---|---|---|---|---|---|---|
+    | 64 | 4,633 | 130 | 28.1 | 4,409 | 49.7 | 11.3 |
+    | 128 | 9,645 | 301 | 31.2 | 8,685 | 60.2 | 6.9 |
+    | 256 | 21,201 | 975 | 46.0 | 17,233 | 106 | 6.1 |
+    | 512 | kernel limit | | | 34,333 | 158 | 4.6 |
+    | 1,024 | | | | 68,529 | 296 | 4.3 |
+
+    On the machine the steps now grow with n: 68,529 at 1,024, where
+    the run of 2026-11-20 counted 133,553. Joining a text no longer
+    charges by its size.
+  - **Test 2b, the typed sum split in halves.**
+
+    | n | Steps | Reference ms | µs per step | Machine ms | µs per step |
+    |---|---|---|---|---|---|
+    | 256 | 12,186 | 91.6 | 7.5 | 71.1 | 5.8 |
+    | 4,096 | 192,666 | 1,272 | 6.6 | 682 | 3.5 |
+    | 16,384 | 770,202 | 5,874 | 7.6 | 2,793 | 3.6 |
+    | 65,536 | 3,080,346 | 26,193, one run | 8.5 | 12,310, one run | 4.0 |
+
+  - **The largest size that completes.**
+
+    | Program | Reference | Machine | Present tree |
+    |---|---|---|---|
+    | plain `sum(n)`, a fresh process each run | 239 | 65,536 and beyond | 226 |
+    | plain `sum(n)`, in one process | 922 | 65,536 and beyond | 634 |
+    | parser, parentheses nested n deep | 25 | 2,048 and beyond | 31 |
+    | typed squares, a loop of n | 268 | 65,536 and beyond | 656 |
+    | typed letters, a fold of n | 268 | 65,536 and beyond | 657 |
+
+    On the machine four reached the search's cap, and the parser ended
+    at a run past 10 seconds. No run on the machine ended at a limit.
+    The run of 2026-11-20 had the two typed programs at 2,048 and the
+    parser at 128.
+  - **How time grows.** On the parser the steps grow linearly on both
+    variants (fitted exponent 1.00). The time's fitted exponent is
+    0.95 on the machine, where it was 1.21, and 1.19 on the reference.
+    On the machine a step of the parser costs between 3.6 and 4.5
+    microseconds from 4 terms to 256, with no trend. On the two typed
+    tests the machine's time per step falls as the size grows and then
+    stays level, at about 4 microseconds. A step of `sum(n)` written
+    `pass(n, sum(n - 1))` costs 8.2 microseconds at n 50 and 5.0 at
+    n 350 on the machine, and 14.9 and 78.0 on the reference. One `++`
+    of a text with itself counts 18 steps on the machine at every size,
+    and 25,018 on the reference at 100,000 characters.
+  - **The two open findings, now.**
+
+    | Finding | Reference | Machine |
+    |---|---|---|
+    | a step slows as arguments nest | still there | closed: the time of a step does not grow with the size of the run |
+    | a recursion ends at the host's stack | still there | closed: no run ended at a limit |
+
+  - **What this means for milestone 3.** The maintainer's ruling of
+    2026-11-17 signs the milestone on a run where time grows in step
+    with the work on both tests. This run shows that on the machine,
+    on both tests, and does not show it on the reference. The
+    reference is still the kernel a run gets by default. The kernel
+    stream's last chunk, K15 (specialization, and the switch), makes
+    the machine the default. So the speed condition is met on the
+    variant that is to be the default, and the milestone is brought
+    for signing when K15 lands and the bench is run once more on the
+    default. Whether to sign before the switch is the maintainer's.
+  - **All else on both variants.** On main at `3529655`, with PR #293
+    merged, the 99 programs of `npm run harness:next` pass on both, and
+    `npm run test:next` passes 796 tests on the reference and 797 with
+    `ALLEGRO_KERNEL=machine`.

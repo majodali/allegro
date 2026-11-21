@@ -1511,6 +1511,16 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The speed tests measured after sharing (B-196, chunk Q8 (the speed tests of milestone 3))
+
+B-196 (the rebuild's acceptance side). The bench run on main on both
+kernel variants, after the kernel stream's sharing chunk merged. On the
+machine the time of a step no longer grows with the size of the run: a
+step of the parser costs about 4 microseconds from 4 terms to 256, and
+no run ends at a limit. On the reference both findings stand. Milestone
+3 is brought for signing when the machine is the default. The plan's
+record also holds what stands and what is open of PR #293.
+
 ### 2026-11 — Check and run as phases (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 3)
 
 B-196 (the rebuild's acceptance side). The launcher applies a sequence
