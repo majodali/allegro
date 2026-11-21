@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-21 — The machine is the kernel.** `next/kernel/create.ts`
+  now gives the kernel variant that keeps its own stack. The reference
+  kernel stays in the tree as the one to compare against, and
+  `ALLEGRO_KERNEL=reference` gives it. The kernel's tests run on both.
+  This closes the rebuild of the kernel that `docs/plans/book-pass.md`
+  §9 planned.
 - **2026-11-21 — Specialization and sampling.** Two kernel primitives,
   on both variants. `specialize(f, steps)` evaluates a function's body
   with its parameters unknown, both branches of an unknown conditional
@@ -1531,6 +1537,13 @@ each message to stderr as the line build tools read, and both commands
 exit with the higher of the end's code and the highest status. The
 corpus gains the lines `// reports:` and `// status:` and eleven
 programs `m3/report-*`. The launcher is unchanged.
+### 2026-11 — A result counts sampled claims (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 4)
+
+B-196 (the rebuild's acceptance side). The kernel now records a claim
+it evaluated on some cases as sampled. A run's result carries that
+count for each claim, keeps the number of cases among what the claim
+rests on, and gives the summary `sampled` where that is the weakest
+strength among the claims.
 
 ### 2026-11 — The speed tests measured after sharing (B-196, chunk Q8 (the speed tests of milestone 3))
 

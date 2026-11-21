@@ -112,8 +112,10 @@ the summary: one word, the weakest strength among the claims, by the
 decision "A module's summary is the weakest strength among its claims".
 A claim with a refuted evaluation is `refuted`. Else one with an
 undecided evaluation, or one that still waits when the run ends, is
-`undecided`. Else one with an assumed evaluation is `assumed`. Else it is
-`decided`. A run with no claim is `decided`. No run gives `sampled` yet.
+`undecided`. Else one with an assumed evaluation is `assumed`. Else one
+with a sampled evaluation is `sampled`. Else it is `decided`. A run with
+no claim is `decided`. No program here gives `sampled` yet: the notation
+does not write the kernel's `sample`.
 
 `// summary: <word>` states the summary. A program that states one
 passes only if the run's summary is that word. A program that states
