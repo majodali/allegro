@@ -4021,6 +4021,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Use case: a fast kernel runs in production; a nightly job decides a sample of its results again on the reference.
 - Notes: new, by ruling.
 - Notes (2026-11-18, the second adversarial review, cluster 7): agreement with the reference is not asked of a result that rests on a limit.
+- Notes (2026-11-21, the switch): the kernel a launcher is given is now a second variant, which keeps its own stack; the reference kernel stays in the tree to compare against and is chosen by an environment variable. The kernel's tests run on both. Where a ruled decision makes the two answer differently a test says so and names the decision: counts of steps, the order in which late answers are acted on, what is kept of an argument that lost in `first`, slices, and what is charged for a join.
 - Chapter: Trust
 
 #### A primitive's purity is assumed and named unless something stronger is shown
