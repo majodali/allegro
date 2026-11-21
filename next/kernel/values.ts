@@ -8,9 +8,56 @@ import type { Declaration, PrimitiveDeclaration, Rest } from "./interface.js";
 
 // ---- The representation --------------------------------------------------
 
+/**
+ * A bits value. It never changes, so two may share their bytes: a part
+ * taken from one is a view of it, and two joined are kept as the two
+ * until something reads the bytes, when they are laid out once.
+ */
 export class Bits {
-  constructor(readonly bytes: Uint8Array, readonly bitLength: number) {}
+  private flat: Uint8Array | undefined;
+  /** For two values joined and not yet laid out: the two. Both are whole bytes. */
+  private parts: readonly [Bits, Bits] | undefined = undefined;
+  /** Called before a joined value is laid out, with its length: the work is charged where it is done. */
+  private charge: ((bits: number) => void) | undefined = undefined;
+  constructor(bytes: Uint8Array, readonly bitLength: number) {
+    this.flat = bytes;
+  }
+  /** Two values of whole bytes, joined. Nothing is copied until the bytes are read. */
+  static joined(a: Bits, b: Bits, charge: (bits: number) => void): Bits {
+    const r = new Bits(NO_BYTES, a.bitLength + b.bitLength);
+    r.flat = undefined;
+    r.parts = [a, b];
+    r.charge = charge;
+    return r;
+  }
+  /** True where the value is whole bytes, so it can be handled a byte at a time. */
+  get whole(): boolean {
+    return this.flat === undefined || this.bitLength === this.flat.length * 8;
+  }
+  get bytes(): Uint8Array {
+    if (this.flat !== undefined) return this.flat;
+    this.charge?.(this.bitLength);
+    const out = new Uint8Array(this.bitLength / 8);
+    // Left to right, with a list of what is still to lay out: a long chain of joins is no deep recursion.
+    const todo: Bits[] = [this];
+    let at = 0;
+    while (todo.length > 0) {
+      const b = todo.pop() as Bits;
+      if (b.flat !== undefined) {
+        out.set(b.flat, at);
+        at += b.flat.length;
+      } else {
+        const [left, right] = b.parts as readonly [Bits, Bits];
+        todo.push(right, left);
+      }
+    }
+    this.flat = out;
+    this.parts = undefined;
+    this.charge = undefined;
+    return out;
+  }
 }
+const NO_BYTES = new Uint8Array(0);
 export class Sym {
   constructor(readonly fqn: string) {}
 }
@@ -22,11 +69,33 @@ export interface Mark {
   readonly module: string;
   readonly fn: Fn | undefined;
 }
+/**
+ * A structure. It never changes, so two may share their entries: one
+ * made by putting an entry at the end of another holds the same list,
+ * and says how many of its entries are its own.
+ */
 export class Struct {
   /** Written by the kernel when a module is made or a function is built, and kept by every copy. */
   owner: Mark | undefined = undefined;
-  constructor(readonly entries: ReadonlyArray<readonly [V | null, V]>) {}
+  private own: ReadonlyArray<readonly [V | null, V]> | undefined;
+  /** For a structure that shares its entries: the list, which may go on past its own, and how many are its own. */
+  shared: { readonly items: (readonly [V | null, V])[]; readonly length: number } | undefined = undefined;
+  constructor(entries: ReadonlyArray<readonly [V | null, V]>) {
+    this.own = entries;
+  }
+  /** The first `length` entries of a list that other structures may share. */
+  static sharing(items: (readonly [V | null, V])[], length: number): Struct {
+    const s = new Struct(NO_ENTRIES);
+    s.own = undefined;
+    s.shared = { items, length };
+    return s;
+  }
+  /** The entries, as a list of their own. For a structure that shares, this copies them, once. */
+  get entries(): ReadonlyArray<readonly [V | null, V]> {
+    return (this.own ??= (this.shared as NonNullable<Struct["shared"]>).items.slice(0, (this.shared as NonNullable<Struct["shared"]>).length));
+  }
 }
+const NO_ENTRIES: ReadonlyArray<readonly [V | null, V]> = [];
 export class Expr {
   owner: Mark | undefined = undefined;
   /** For what is left of a claim: the claim as it was written. */

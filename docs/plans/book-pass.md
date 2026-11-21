@@ -597,7 +597,7 @@ are:
 | K11 (budgets and slices) | rebuild | a budget for an evaluation and a slice for a call; a call's result says paused; a spent budget drops what is in flight | done 2026-11-20 on the machine: eight new tests. The contract gains `Limits.slice`, the end "paused" and `Advance.limited`; the reference ignores a slice |
 | K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | first half done 2026-11-20: one interface `Kernel` on both variants, with `evaluate` that needs no scope, `fill` that takes up what waited where `hold` is false, and a budget that is the evaluation's on the reference too. Second half done 2026-11-20, after the acceptance stream moved its launcher: the four older forms are removed, `fill` takes up what waited unless it is told to hold, `advance` takes a slice and no budget, and the interface is version 2 |
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | done 2026-11-20: a 23rd kernel primitive on both variants, eight tests. The machine cancels what lost and keeps the answer of a named value in a list of its own, `kept`; the reference keeps nothing of what lost, and the tests say so |
-| K14 (sharing) | rebuild | structures and bits that share what an operation does not change | cost tests: building a list by `put` costs about its size |
+| K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | the acceptance stream's speed tests: time per step does not grow with the size of the run |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
@@ -1701,6 +1701,15 @@ its approval.
   session): the acceptance stream moved its launcher, so the older
   forms are removed and the interface is version 2. One test of the
   kernel is removed with them: it gave `advance` a budget.
+- **2026-11-20 — sharing** (the review session): on the machine a
+  structure made by `put` at the end of another shares its entries, a
+  part of a bits value is a view, and two joined are laid out when
+  read, which is when the work is charged. The reference still copies.
+  Ruled the next day: the evaluation that does the work of laying a
+  value out pays for it. Inside an evaluation that is the one running.
+  For a host that reads a result, it is the evaluation that made the
+  value, and a read its budget does not cover fails with
+  `LimitFailure`.
 
 ## 8. Sessions
 
