@@ -112,7 +112,7 @@
 //      With every end but a refusal it also returns the result
 //      (`LaunchResult`), plain data with no handle of the kernel in it:
 //      - `claims`, one entry for each claim as written, in the order the
-//        run first reported it. Its four counts are the sums of what the
+//        run first reported it. Its five counts are the sums of what the
 //        evaluation and every later call reported for that claim, its
 //        level of waiting is the last one reported, and its reasons and
 //        what it rests on are each listed once. Records of one claim are
@@ -328,7 +328,8 @@ export type LaunchEnd =
  * outside it.
  */
 export type RestData =
-  | { readonly kind: "kernel"; readonly variant: string }
+  /** `sampled` is present where the kernel evaluated the claim on that many cases and not in full. */
+  | { readonly kind: "kernel"; readonly variant: string; readonly sampled?: number }
   | { readonly kind: "primitive"; readonly hash: string; readonly name: string }
   | { readonly kind: "capability"; readonly capability: string; readonly part: string }
   | { readonly kind: "builder"; readonly builder: string }
@@ -354,6 +355,8 @@ export interface ClaimResult {
   readonly module?: string;
   /** Evaluations that came out decided, over the whole run. */
   readonly decided: number;
+  /** Evaluations that came out sampled: true of each case tried, or resting on such a sample. */
+  readonly sampled: number;
   /** Evaluations that came out resting on an assumption. */
   readonly assumed: number;
   /** Evaluations where what decides the claim answered that it cannot tell. */
@@ -458,15 +461,17 @@ function refused(lines: string[], reason: string, findings: readonly string[] = 
  * The weakest strength among the claims. A claim with any refuted
  * evaluation is refuted. Else one with any undecided evaluation, or one
  * that still waits, is undecided. Else one with any assumed evaluation is
- * assumed. Else it is decided. The kernel's records have no count for
- * sampled today, so no run gives `sampled` yet.
+ * assumed. Else one with any sampled evaluation is sampled. Else it is
+ * decided. The count of sampled evaluations is the kernel's
+ * (`ClaimRecord.sampled`, since chunk K15 (specialization, and the
+ * switch) of the kernel stream).
  *
  * A run with no claim at all is `decided`: nothing in it is weaker. That
  * is a choice the maintainer may change.
  */
 export function summaryOf(claims: readonly ClaimResult[]): Strength {
   const strengthOf = (c: ClaimResult): Strength =>
-    c.refuted > 0 ? "refuted" : c.undecided > 0 || c.waiting > 0 ? "undecided" : c.assumed > 0 ? "assumed" : "decided";
+    c.refuted > 0 ? "refuted" : c.undecided > 0 || c.waiting > 0 ? "undecided" : c.assumed > 0 ? "assumed" : c.sampled > 0 ? "sampled" : "decided";
   let weakest = STRENGTHS.length - 1;
   for (const c of claims) weakest = Math.min(weakest, STRENGTHS.indexOf(strengthOf(c)));
   return STRENGTHS[weakest];
@@ -476,7 +481,7 @@ export function summaryOf(claims: readonly ClaimResult[]): Strength {
 function restData(rest: Rest): RestData {
   switch (rest.kind) {
     case "kernel":
-      return { kind: "kernel", variant: rest.variant };
+      return rest.sampled === undefined ? { kind: "kernel", variant: rest.variant } : { kind: "kernel", variant: rest.variant, sampled: rest.sampled };
     case "primitive":
       return { kind: "primitive", hash: rest.hash, name: rest.name };
     case "capability":
@@ -495,6 +500,7 @@ interface Tally {
   at?: string;
   module?: string;
   decided: number;
+  sampled: number;
   assumed: number;
   undecided: number;
   refuted: number;
@@ -523,11 +529,12 @@ class ClaimTallies {
         t = {
           ...(at === undefined ? {} : { at }),
           ...(r.module === undefined ? {} : { module: r.module }),
-          decided: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], seen: new Set(),
+          decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], seen: new Set(),
         };
         this.byClaim.set(r.claim, t);
       }
       t.decided += r.decided;
+      t.sampled += r.sampled;
       t.assumed += r.assumed;
       t.undecided += r.undecided;
       t.refuted += r.refuted;

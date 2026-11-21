@@ -999,7 +999,7 @@ test("the summary is the weakest strength among the claims: each word the kernel
 });
 
 test("the summary's rule, on entries written by hand: refuted, then undecided or waiting, then assumed, then decided; with no claim, decided", () => {
-  const entry = (over: Partial<ClaimResult>): ClaimResult => ({ decided: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], ...over });
+  const entry = (over: Partial<ClaimResult>): ClaimResult => ({ decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], ...over });
   const decided = entry({ decided: 3 });
   assert.equal(summaryOf([]), "decided", "a run with no claim: nothing in it is weaker");
   assert.equal(summaryOf([decided]), "decided");
@@ -1007,6 +1007,31 @@ test("the summary's rule, on entries written by hand: refuted, then undecided or
   assert.equal(summaryOf([decided, entry({ decided: 1, waiting: 1 })]), "undecided", "a claim that still waits is undecided");
   assert.equal(summaryOf([entry({ assumed: 2 }), entry({ undecided: 1 })]), "undecided");
   assert.equal(summaryOf([entry({ undecided: 1 }), entry({ decided: 5, refuted: 1 })]), "refuted");
+});
+
+test("a sampled claim is weaker than a decided one and stronger than an assumed one", () => {
+  const entry = (over: Partial<ClaimResult>): ClaimResult => ({ decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], ...over });
+  assert.equal(summaryOf([entry({ decided: 3 }), entry({ sampled: 1 })]), "sampled");
+  assert.equal(summaryOf([entry({ decided: 2, sampled: 1 })]), "sampled");
+  assert.equal(summaryOf([entry({ sampled: 1 }), entry({ assumed: 1 })]), "assumed");
+  assert.equal(summaryOf([entry({ sampled: 1, assumed: 1 })]), "assumed");
+  assert.equal(summaryOf([entry({ sampled: 4 }), entry({ undecided: 1 })]), "undecided");
+  assert.equal(summaryOf([entry({ sampled: 4, waiting: 1 })]), "undecided");
+  assert.equal(summaryOf([entry({ sampled: 4 }), entry({ refuted: 1 })]), "refuted");
+});
+
+test("a claim the kernel samples is counted sampled, rests on the number of cases, and gives the summary sampled", async () => {
+  // The notation does not write the kernel's `sample` yet. The text writes `first`, a kernel primitive of two arguments
+  // too, and the record is changed to name `sample` in its place: `sample(claim, cases)` of next/kernel/interface.ts.
+  const written = emitted("capability output\nholds(x) => x == x\nclaim(first(holds, [1, 2, 3]))\n");
+  const program = JSON.parse(JSON.stringify(written).replaceAll('{"k":"kernel","name":"first"}', '{"k":"kernel","name":"sample"}')) as unknown;
+  assert.notDeepEqual(program, written, "the record named `first`");
+  const result = resultOf(await launch({ createKernel, program, configuration: { ceiling: ["output"] }, target: SHIPPED_TARGET }));
+  const sampled = result.claims.filter((c) => c.sampled > 0);
+  assert.ok(sampled.length > 0, JSON.stringify(result.claims));
+  assert.ok(sampled.some((c) => c.restsOn.some((rest) => rest.kind === "kernel" && rest.sampled === 3)), JSON.stringify(sampled.map((c) => c.restsOn)));
+  assert.equal(result.summary, "sampled");
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
 });
 
 test("a run with no claim has the summary decided", async () => {

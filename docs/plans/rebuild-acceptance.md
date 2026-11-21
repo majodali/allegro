@@ -3141,3 +3141,32 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   first answer stands as built depends on who may call a check
   capability. "Check capabilities" and "check output" are the
   maintainer's words and are not yet defined in a decision.
+- **2026-11-21 — Q13, part 4: a result counts sampled claims.**
+  PR #295 of the kernel stream, the first part of chunk K15
+  (specialization, and the switch), merged on 2026-11-21. It gives the
+  kernel the primitive `sample`, a count `sampled` in each claim record,
+  and the number of cases on the record of kind `kernel` among what a
+  claim rests on. Its part for this stream said that the launcher's
+  summary did not read the count, so a run whose only claims were
+  sampled would have been summed up as decided. Built, in
+  `next/launch/launcher.ts`:
+  1. Each claim of a result has a fifth count, `sampled`, summed as the
+     other four are.
+  2. The summary reads it. Its rule is now: refuted; else undecided or
+     waiting; else assumed; else sampled; else decided. This is the
+     order of "A module's summary is the weakest strength among its
+     claims".
+  3. What a claim rests on keeps the number of cases: the entry of kind
+     `kernel` has `sampled` where the kernel's record has it.
+  The notation does not write `sample` or `specialize`: the forms
+  (`next/ext/allegretto/forms.md`) do not state them, and the forms are
+  the kernel stream's. The emitter's own test names both as kernel
+  primitives it does not write, as a test marked to do. So no program
+  of the corpus gives the summary `sampled` yet. The launcher's test
+  takes a record the emitter wrote for a call of `first`, which also
+  takes two arguments, and names `sample` in its place.
+  One existing test's helper gained the new field, and no assertion
+  changed. Measured on main at `d65d049` with this change:
+  `npm run test:next` passes 823 tests on the reference and 824 with
+  `ALLEGRO_KERNEL=machine`, with the one test to do on each; 99
+  programs pass on both.
