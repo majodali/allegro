@@ -3105,3 +3105,8 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   inputs. `check, run` is built on it when PR #295 of the kernel stream
   is merged. The other three questions of PR #293 are being gone
   through with the maintainer.
+- **2026-11-21 — PR #294 merged: the asks of Q16, part 2 confirmed.**
+  The maintainer merged PR #294 on 2026-11-21 and wrote on it: "Both
+  asks confirmed." So a file that is there and outside the directories
+  the loader may read is a finding at the import, of kind `refused`,
+  and the project's directory is the directory of the text being run.
