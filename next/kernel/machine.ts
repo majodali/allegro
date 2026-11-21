@@ -51,7 +51,7 @@
 //
 // Not here yet, and in later chunks of the plan: sharing, specialization.
 
-import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Scope, Value } from "./interface.js";
+import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
@@ -246,10 +246,6 @@ export const createMachine: CreateKernel = () => {
   const PENDING = new Expr(new Param("pending"), []);
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(localKey(r), r);
-  };
-  const scopeIn = (x: Scope | undefined, what: string): ScopeV => {
-    if (!(x instanceof ScopeV)) throw new InterfaceError(`${what} is not a scope of this kernel`);
-    return x;
   };
 
   const step = (): void => {
@@ -1707,7 +1703,6 @@ export const createMachine: CreateKernel = () => {
     variant: VARIANT,
     ...shared,
 
-    scope: (parent) => new ScopeV(parent === undefined ? undefined : scopeIn(parent, "the parent")) as unknown as Scope,
     fill: (cell, value, how): Advance => {
       const c = into(cell, "the cell");
       if (!(c instanceof CellV)) throw new InterfaceError("fill: not a cell");
@@ -1717,8 +1712,8 @@ export const createMachine: CreateKernel = () => {
       // What waits for this cell is taken up by the next `advance`, in the order it came to
       // wait, after what waits for cells filled before it.
       for (const r of waitersOf.get(c) ?? []) if (live(r)) enqueue(r.task, false);
-      // Held, the value is only recorded. Leaving `hold` out holds, until the deprecated form goes.
-      return how?.hold === false ? kernel.advance(how) : { ended: "complete", steps: 0, refuted: [], claims: [] };
+      // Held, the value is only recorded.
+      return how?.hold === true ? { ended: "complete", steps: 0, refuted: [], claims: [] } : kernel.advance(how);
     },
     waiting: () => {
       return waitedNow().map((c) => out(c) as Cell);
@@ -1734,10 +1729,9 @@ export const createMachine: CreateKernel = () => {
       return found.map((c) => out(c) as Cell);
     },
 
-    evaluate: (expression: Value, a?: Scope | Limits, b?: Limits): Result => {
+    evaluate: (expression, limits): Result => {
       const e = into(expression, "the expression");
-      // The scope is a token of the deprecated form: it holds nothing.
-      const [s, limits] = a instanceof ScopeV ? [a, b] : [new ScopeV(undefined), a as Limits | undefined];
+      const s = new ScopeV(undefined);
       tallies.clear();
       cut = false;
       collectors = [];
