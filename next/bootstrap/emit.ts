@@ -910,7 +910,9 @@ async function main(argv: readonly string[]): Promise<number> {
   const file = files[0];
   // The driver imports this file, so the command takes it only when it runs, once this file is evaluated.
   const { drive, describeDriveFinding } = await import("./driver.js");
-  const r = drive(fs.readFileSync(file, "utf-8"), file, (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : undefined));
+  // The imported texts are read in the project's directory and nowhere else (next/launch/files.ts).
+  const { projectReader } = await import("../launch/node-files.js");
+  const r = drive(fs.readFileSync(file, "utf-8"), file, projectReader(file));
   if (!r.ok) {
     for (const f of r.findings) console.error(describeDriveFinding(f));
     return 1;
