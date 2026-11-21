@@ -3170,3 +3170,81 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `npm run test:next` passes 823 tests on the reference and 824 with
   `ALLEGRO_KERNEL=machine`, with the one test to do on each; 99
   programs pass on both.
+- **2026-11-21 — Milestone 3, brought for signing.**
+  PR #297 of the kernel stream, the last part of chunk K15
+  (specialization, and the switch), merged on 2026-11-21:
+  `next/kernel/create.ts` gives the variant that keeps its own stack,
+  and the reference with `ALLEGRO_KERNEL=reference`. The maintainer
+  agreed on 2026-11-21 that milestone 3 is brought when the switch
+  makes that variant the default, on one more run of the bench. This
+  is that run.
+  - **The milestone.** `docs/plans/rebuild.md` §5: "Programs in the
+    first notation run: functions, recursion, claims. One speed test of
+    a typed extension and one of a toy parser engine written in
+    Allegro". Its commands are `npm run harness:next` and
+    `npm run bench:next`.
+  - **Programs in the first notation run.** On main at `ea64f65`,
+    `npm run harness:next` runs 99 programs and all pass, on the default
+    kernel and on the reference. Its line for the milestone:
+    `milestone 3: programs 82 (passing 82, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+    `npm run test:next` passes 823 tests by default and 822 on the
+    reference, with one test marked to do on each: the emitter's, which
+    names the kernel primitives `sample` and `specialize` as ones the
+    notation does not write.
+  - **The speed tests, measured.** `npm run bench:next`, one run on the
+    default kernel and one on the reference, on main at `f525b4c`, on
+    the host of the runs of 2026-11-20 and 2026-11-21. The run on the
+    default took 8 minutes and the run on the reference 6. While the
+    default ran, this session merged a branch and ran a typecheck on
+    the same host, so the rows for 16 and 32 terms are a little high.
+
+    | Test | Size | Default: ms | µs per step | Reference: ms | µs per step |
+    |---|---|---|---|---|---|
+    | parser | 4 terms | 163 | 4.2 | 432 | 11.1 |
+    | parser | 16 | 818 | 5.3 | 2,274 | 14.7 |
+    | parser | 64 | 2,578 | 4.2 | 16,071, one run | 25.9 |
+    | parser | 256 | 11,285 | 4.6 | not run | |
+    | typed loop | 64 | 45.5 | 10.3 | 78.5 | 17.0 |
+    | typed loop | 256 | 81.0 | 4.7 | 675 | 31.8 |
+    | typed loop | 1,024 | 223 | 3.2 | kernel limit at 512 | |
+    | halving sum | 4,096 | 644 | 3.3 | 1,282 | 6.7 |
+    | halving sum | 65,536 | 10,346, one run | 3.4 | 26,244, one run | 8.5 |
+
+    The time's fitted exponent against size, on the default: 0.89 for
+    the parser, with steps at 1.00; 0.66 for the typed loop; 0.88 for
+    the halving sum. On the reference: 1.10, 1.55 and 1.01. On the
+    default a step of the parser costs between 4.2 and 5.3 microseconds
+    from 4 terms to 256, with no trend. The parser's series ends at
+    256 terms because that run passed 10 seconds, which is the bench's
+    own rule. A step of `sum(n)` written
+    `pass(n, sum(n - 1))` costs 9.7 microseconds at n 50 and 4.9 at
+    n 350. No run on the default ended at a limit: a plain `sum(n)`
+    and the two typed programs reach the search's cap of 65,536, and
+    the parser 2,048 nested parentheses, where the present tree ends
+    at 226, 649, 650 and 30.
+  - **The condition.** The maintainer's ruling of 2026-11-17 signs
+    the milestone on a run where time grows in step with the work on
+    both tests. On the default kernel it does, on both tests.
+  - **The 14 cases due at milestone 3 that no program realises.** Each
+    waits on something the milestone's state does not name. By what
+    its decisions say it needs:
+    - a session at a prompt, which is chunk Q14 (the commands): four,
+      "REPL persistence (C2.3b)" and the three "persistent context"
+      cases of the base tests;
+    - extensions that layer and shadow, with metadata fields: two,
+      "extension: source can shadow extension binding" and "extension:
+      multiple extensions layer correctly";
+    - the loader's own keeping of modules: two, the "module: P2" cases;
+    - a value's origin: one, "D47 chunk 2: explain";
+    - a tool that reads a result: two, "Phase A: summarizeValue
+      collects unresolved symbols" and "compile: report lists
+      unresolved imports";
+    - the typed language: two, "UntypedFunction" and "partial eval:
+      eval_if with unresolved condition";
+    - one this stream has not placed: "hybrid parser: dot access with
+      function call".
+    Milestone 1 was signed with 6 of its 25 cases realised by a
+    program. This stream proposes the same here: the 14 stay due at
+    milestone 3 and stay counted as not yet named, and each is realised
+    when what it waits on lands. Moving a case to a later milestone is
+    the maintainer's.
