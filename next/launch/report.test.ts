@@ -7,7 +7,9 @@
 //
 // Every test here passes on both kernel variants and asserts what must be
 // present. No test pins a step count or a wall-clock duration. The two
-// commands end to end are tested in next/launch/launcher.test.ts.
+// commands end to end are tested in next/launch/launcher.test.ts, and the
+// check capabilities of the setting `phases` in
+// next/tools/configuration.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -19,9 +21,11 @@ import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
 import { shipped } from "../prims/index.js";
+import { CHECK_CAPABILITIES, shapeOf } from "../tools/configuration.js";
 import { describe, launch, type CapabilityHost, type Configuration, type LaunchOutcome } from "./launcher.js";
 import { output } from "./output.js";
 import { collector, messageLine, REPORT, report, type ReportMessage } from "./report.js";
+import { exitCode, TERMINAL_CEILING, terminalReport } from "./terminal.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 
@@ -48,8 +52,10 @@ const lines = (messages: readonly ReportMessage[]) => messages.map(messageLine);
 /** `error` is a reserved word of the reader, so its symbol is written with `symbol`. */
 const ERROR = 'symbol("error")';
 
-test("the check-output capability is report, with two parts, message and status", () => {
+test("the check-output capability is report, with two parts, message and status, and it is a check capability", () => {
   assert.deepEqual(REPORT, { name: "report", parts: ["message", "status"] });
+  assert.deepEqual([...CHECK_CAPABILITIES], ["report"]);
+  assert.ok(TERMINAL_CEILING.includes("report"));
 });
 
 /** Values of every kind a program can hand a part, a failure among them, each as Allegretto writes it. */
@@ -216,6 +222,17 @@ test("leaving the calls on report out changes nothing the program computes: the 
   assert.deepEqual(without.outcome.lines, ["one", "8"]);
 });
 
+test("under check alone the phase supplies report: its calls act, while a call on output waits and nothing is printed", async () => {
+  const shape = shapeOf(["check"], undefined, undefined, ["output", "report"]);
+  assert.ok(shape.ok);
+  assert.deepEqual(shape.shape.phases, [{ name: "check", capabilities: ["report"] }]);
+  const r = await run(['report.message({level: `warning, text: "checked"})', "report.status(2)", 'output.write("never")', 'report.message("held")'], { ceiling: ["output", "report"], ...shape.shape });
+  assert.deepEqual(r.outcome.lines, []);
+  assert.deepEqual(lines(r.messages), ["warning: checked"]);
+  assert.equal(r.status, 2);
+  assert.equal(describe(r.outcome.end), "waiting: the program waits on the capability(ies) output, which no phase supplies");
+});
+
 test("a module that hands report on to an imported module: the imported module reports through it", async () => {
   const d = drive("capability report\nimport lint\nlint.warn(\"from lint\")\n", "dir/main.alg", () => 'capability report\nexport warn(t) => report.message({level: `warning, text: t})\n');
   assert.ok(d.ok);
@@ -241,13 +258,30 @@ test("a program that does not declare report is unaffected by a ceiling that gra
   assert.equal(c.status(), 0);
 });
 
-test("the line for each shape of message: file:line:column: level: text with the parts it has, level: text where there is no file", () => {
+test("the terminal's line for each shape of message: file:line:column: level: text with the parts it has, level: text where there is no file", () => {
   assert.equal(messageLine({ level: "error", text: "e" }), "error: e");
   assert.equal(messageLine({ level: "warning", text: "w", file: "a.alg" }), "a.alg: warning: w");
   assert.equal(messageLine({ level: "note", text: "n", file: "a.alg", line: 3n }), "a.alg:3: note: n");
   assert.equal(messageLine({ level: "error", text: "e", file: "a.alg", line: 3n, column: 7n }), "a.alg:3:7: error: e");
   assert.equal(messageLine({ level: "note", text: "n", line: 3n, column: 7n }), "note: n");
   assert.equal(messageLine({ level: "note", text: "n", file: "a.alg", column: 7n }), "a.alg: note: n");
+  const written: string[] = [];
+  const t = terminalReport((line) => written.push(line));
+  t.sink.message({ level: "warning", text: "w", file: "a.alg", line: 1n, column: 2n });
+  t.sink.status(4);
+  t.sink.message({ level: "note", text: "n" });
+  t.sink.status(1);
+  assert.deepEqual(written, ["a.alg:1:2: warning: w", "note: n"], "one line for each message, as it is handed over, and nothing for a status");
+  assert.equal(t.status(), 4, "the terminal's sink keeps the highest status");
+});
+
+test("the exit code is the higher of the end's code, 0 for a completed run and 1 otherwise, and the highest status", () => {
+  assert.equal(exitCode({ kind: "completed", steps: 1 }, 0), 0);
+  assert.equal(exitCode({ kind: "completed", steps: 1 }, 3), 3);
+  assert.equal(exitCode({ kind: "refuted", steps: 1, reason: "r", reasons: ["r"] }, 0), 1);
+  assert.equal(exitCode({ kind: "refuted", steps: 1, reason: "r", reasons: ["r"] }, 7), 7);
+  assert.equal(exitCode({ kind: "waiting", steps: 1, reason: "w", unanswered: 0, inputs: [] }, 1), 1);
+  assert.equal(exitCode({ kind: "refused", reason: "r", findings: [] }, 0), 1);
 });
 
 test("the check-output capability reaches no host API", () => {
