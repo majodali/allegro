@@ -3043,3 +3043,13 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     merged, the 99 programs of `npm run harness:next` pass on both, and
     `npm run test:next` passes 796 tests on the reference and 797 with
     `ALLEGRO_KERNEL=machine`.
+- **2026-11-21 — Two asks of PR #296 agreed by the maintainer in session.**
+  "I agree on asks 1 & 2." So: milestone 3 is brought for signing when
+  chunk K15 (specialization, and the switch) of the kernel stream makes
+  the machine the default, on one more run of the bench then. And a
+  later phase supplies a capability by `specialize`: check is the
+  module function specialized with its parameters unknown, and run is a
+  call of the function that gives, with the capabilities and the
+  inputs. `check, run` is built on it when PR #295 of the kernel stream
+  is merged. The other three questions of PR #293 are being gone
+  through with the maintainer.
