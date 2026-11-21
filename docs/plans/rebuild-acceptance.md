@@ -2641,3 +2641,124 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   decided, now that PR #285 fixed the waiting count of a held claim on
   the machine. The emitter's test of what waits has nothing left to do:
   every kernel primitive is one the emitter writes.
+- **2026-11-20 — Q13, part 2: a configuration from its sources.**
+  Built. The new tree reads a run's configuration from four sources in
+  the ruled order, and a run's result says which source supplied each
+  value. This is part 2 of chunk Q13 (check and run as configurations,
+  and what a result holds), for B-196 (the rebuild's acceptance side).
+  It closes B-059 (the project root file) as far as this part goes:
+  the file sets a run's budget and inputs, and nothing of structure,
+  phases or dependencies. Check as a configuration, and pipelines, are
+  later parts, and neither is built. Nothing printed for a run changes:
+  showing a result is chunk Q14's (the commands).
+  The configuration is in host form. "A full configuration is a model,
+  evaluated in a first phase" is a design to prove, and by the
+  maintainer's ruling of 2026-11-20 not owed to a milestone, so no
+  configuration language is built.
+  The proposal, as built, for the maintainer to ratify at the PR:
+  1. **The settings** (`SETTINGS` of `next/tools/configuration.ts`):
+     `steps`, a whole number; `inputs`, a record from an input's name to
+     its value; `later`, a list of such records, one for each later
+     phase; `ceiling`, the names of the capabilities granted; `restore`,
+     the builder whose stored outcomes are accepted; `kernel`, the
+     kernel variant's name. No source sets `steps` by default, and where
+     none does there is no budget. Building showed one point. The
+     launcher's `Configuration` has no place for the kernel: the
+     launcher is handed a kernel factory, not a name. So the resolver
+     gives `kernel` beside the configuration, where a source sets it,
+     and nothing reads it. No source on the terminal sets it today. A
+     ceiling no source sets grants nothing.
+  2. **The four sources, highest first** (`SOURCES`): the command line,
+     the project's file, the environment, the launcher. A setting is
+     taken whole from the highest source that sets it. `inputs` is
+     merged by input name, so `--input b=…` replaces the file's `b` and
+     keeps its `a`. Building showed one point. `later` is taken whole,
+     so one `--later` replaces every later phase of the file. And an
+     input the file supplies at the start with a `--later` of the same
+     name is supplied twice: the launcher refuses the run, naming the
+     input, as it refused before. Neither is silent.
+  3. **Which source may set what** is one table, `MAY_SET`: `steps`,
+     `inputs` and `later` from any source; `ceiling`, `restore` and
+     `kernel` from the command line and the launcher only. A setting
+     found in a source that may not set it is a finding that names both,
+     for example "the setting ceiling is set by the project's file
+     allegro.json, which may not set it: only the command line and the
+     launcher may", and the run is refused before anything is emitted or
+     evaluated. Building showed one point against the decision's words:
+     the decision says "the launcher holds those rules", and the table
+     is in `next/tools/configuration.ts`, which the terminal's entries
+     call, not in `next/launch/launcher.ts`. The launcher does not
+     resolve, as point 9 asks.
+  4. **The project's file** is `allegro.json` (`PROJECT_FILE`), in the
+     directory of the text being run, and optional. It is a JSON object
+     whose keys are setting names. `inputs` and `later` hold each value
+     as an Allegretto literal written as a JSON string, read by
+     `readLiteral` (`readProjectFile`). JSON that does not parse, a file
+     that is not an object, an unknown key, a value of the wrong shape
+     and a literal that does not read are each a finding that starts
+     with the file's name. A file may hold `ceiling`, `restore` or
+     `kernel` in the right shape: it is read, and the resolver refuses
+     it. Building showed no reason against it.
+  5. **The environment** gives one setting: `ALLEGRO_STEPS`, a whole
+     number (`readEnvironment`). A value that is not one is a finding.
+     An empty variable is unset, as `next/kernel/create.ts` treats an
+     empty `ALLEGRO_KERNEL`. The variable `ALLEGRO_KERNEL` is read by
+     the kernel stream's `next/kernel/create.ts` and not here. As it
+     stands it is at odds with the decision: the environment chooses the
+     kernel, which the decision reserves to the launcher and the command
+     line. It is the kernel stream's to change, and this part does not
+     work around it or read it as a setting. A run's result names the
+     variant in `restsOn.kernel`, and no `kernel` entry in its list of
+     sources.
+  6. **The launcher's own values**: the terminal's ceiling,
+     `TERMINAL_CEILING` of `next/launch/terminal.ts`, every capability it
+     supplies. Nothing else. Building showed no reason against it.
+  7. **The command line** gains `--ceiling a,b` on both commands. A
+     ceiling from a source other than the launcher may only narrow the
+     launcher's: a name the terminal does not supply is a finding. It
+     keeps `--steps`, and `npm run allegretto` keeps `--input` and
+     `--later`. `--restore <builder>` and `--kernel <name>` are reserved
+     to the command line by the decision and are not built.
+  8. **The resolver is one host-neutral function**, `resolve` of
+     `next/tools/configuration.ts`. It takes the four sources as data and
+     gives the launcher's `Configuration` with the source of each value,
+     or the findings. It reads no file, no environment and no argument
+     list. A test reads the file and finds no `process`, `fs`, `path`,
+     `Buffer` or `globalThis` in its code. Building showed no reason
+     against it.
+  9. **The result says where each value came from.** `Launch` takes
+     `sources`, the caller's list, beside the configuration, and
+     `LaunchResult.restsOn` gives it as `configuration`: a list of
+     `{setting, source}` in the order of point 1, with one entry
+     `inputs.<name>` for each input. Within `inputs` the order is that of
+     the sources, highest first. Where the caller gives none, the result
+     has none. The corpus runner (`runProgram` of
+     `next/corpus/allegretto.ts`) gives none: a program of the corpus
+     states its inputs in its own comment lines and reads no project
+     file, and the runner is unchanged.
+  10. **The two commands.** `npm run allegretto` reads `allegro.json`
+     beside its text where there is one, the environment and its flags,
+     resolves (`resolveOnTerminal` of `next/launch/terminal.ts`) and
+     launches. `npm run launch` takes a saved program and no project, and
+     resolves from its flags, the environment and the launcher's own
+     values. A finding is written to stderr, one line each, and the
+     command exits 1. Nothing either command prints for a run changes.
+     Building showed no reason against it.
+  What the decision names that is not built yet: the accepted keys, the
+  inspection right, keeping origins, turning off a default policy, the
+  parser's and the loader's choice by a project's file, `--restore`, and
+  `--kernel`.
+  No existing test's assertion changed. No test branches on the
+  variant.
+  Measured: `npm run test:next` passes 734 tests on the reference and
+  735 with `ALLEGRO_KERNEL=machine`; 93 programs pass on both;
+  `milestone 3: programs 76 (passing 76, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
+  No row of the decision map moves in this part. The orchestrating
+  session decides which rows it earns.
+- **2026-11-20 — The asks of PR #287 and PR #288 confirmed.**
+  The maintainer, in session on 2026-11-20: the confirmation recorded
+  under Q16, part 1 was for PR #287, and "I also confirm all asks on
+  #288". So the result's form, the key by which a claim is told from
+  another, the two choices about the summary, one entry for the
+  assumptions of one module, and the corpus line `// summary:` stand as
+  built. Both pull requests are merged.
