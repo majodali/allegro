@@ -313,8 +313,10 @@ export function allegrettoGrammar(): Grammar {
   }
 
   // The five added.
-  // 1. The symbol literal, tried before a name.
-  addProduction(g, "symbol_lit", seq([lit("`"), nonterm("ident")], { name: "symbol_lit" }));
+  // 1. The symbol literal, tried before a name. Its name is any word, a reserved one among them: a
+  //    symbol's name is data and is never read as a name or a keyword (forms.md §2 lists no exception).
+  addProduction(g, "symbol_name", regex(/[a-zA-Z_][a-zA-Z_0-9]*/));
+  addProduction(g, "symbol_lit", seq([lit("`"), nonterm("symbol_name")], { name: "symbol_lit" }));
   insertAlternative(g, "expr_atom", undefined, nonterm("symbol_lit"), "ident");
   // 2. `++`, a level of its own between the comparisons and `+`.
   addProduction(g, "expr_join", alt([seq([nonterm("expr_join"), ws, lit("++"), ws, nonterm("expr_add")], { name: "join" }), nonterm("expr_add")]));

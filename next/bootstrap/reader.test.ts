@@ -85,6 +85,11 @@ test("the other literals: truth values, the symbol literal, structures and lists
   assert.deepEqual([exprOf("true").k, (exprOf("true") as { value: boolean }).value, (exprOf("false") as { value: boolean }).value], ["truth", true, false]);
   const s = exprOf("`name");
   assert.deepEqual([s.k, (s as { name: string }).name], ["symbol", "name"]);
+  // A symbol's name is data: a word the grammar reserves is a symbol's name like any other.
+  for (const word of ["error", "else", "if", "none", "when", "then", "true"]) {
+    const reserved = exprOf("`" + word);
+    assert.deepEqual([reserved.k, (reserved as { name: string }).name], ["symbol", word], word);
+  }
   const r = exprOf("{a: 1, b: x}");
   assert.equal(r.k, "record");
   assert.deepEqual((r as Extract<Expr, { k: "record" }>).fields.map((f) => [f.k === "named" ? f.name.name : "", shape(f.value)]), [["a", "1"], ["b", "x"]]);
