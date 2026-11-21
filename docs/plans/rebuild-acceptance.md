@@ -2974,3 +2974,14 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   that leads out of it, where the command is run end to end. Measured:
   `npm run test:next` passes 790 tests on the reference and 791 with
   `ALLEGRO_KERNEL=machine`; 99 programs pass on both.
+- **2026-11-21 — PR #290 merged: the asks of Q13, part 2 stand as built.**
+  The maintainer merged PR #290 on 2026-11-21, after merging the
+  kernel's interface, version 2 (PR #289 of the kernel stream). A merged
+  pull request is the approval. So these stand as built: the settings
+  and their names; the project's file `allegro.json`; which source may
+  set what; how sources combine; `--ceiling`; `ALLEGRO_STEPS`; and the
+  table of rules in `next/tools/configuration.ts`. Nothing of this
+  stream changed for version 2 of the interface: every `fill` of the
+  launcher already stated `hold: true`. On the merged tree this branch
+  passes 800 tests on the reference and 801 with
+  `ALLEGRO_KERNEL=machine`, and 99 programs on both.
