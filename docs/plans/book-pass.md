@@ -598,7 +598,7 @@ are:
 | K12 (the interface made one) | rebuild | one version of the interface: `fill` takes up the waiters, `scope()` is gone | first half done 2026-11-20: one interface `Kernel` on both variants, with `evaluate` that needs no scope, `fill` that takes up what waited where `hold` is false, and a budget that is the evaluation's on the reference too. Second half done 2026-11-20, after the acceptance stream moved its launcher: the four older forms are removed, `fill` takes up what waited unless it is told to hold, `advance` takes a slice and no budget, and the interface is version 2 |
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | done 2026-11-20: a 23rd kernel primitive on both variants, eight tests. The machine cancels what lost and keeps the answer of a named value in a list of its own, `kept`; the reference keeps nothing of what lost, and the tests say so |
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
-| K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is proposed to be dropped: specialization did not need it, and nothing else reads one. The switch is the last pull request. Condition: the acceptance stream's speed tests, time per step does not grow with the size of the run |
+| K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1716,7 +1716,14 @@ its approval.
   function's body by writing each value evaluated when needed where it
   is used, or binding it in a block where it is used more than once.
   Fixed with it: on the machine a slice could pause work done ahead of
-  what is done, and leave the kernel performing no effect.
+  what is done, and leave the kernel performing no effect. Ruled on
+  its pull request: reading a waiting task back as an expression is
+  dropped; a claim in a branch evaluated under an unknown condition is
+  recorded as it comes out.
+- **2026-11-21 — the switch** (the review session):
+  `next/kernel/create.ts` gives the machine. The reference kernel
+  stays, chosen by `ALLEGRO_KERNEL=reference`, and the kernel's tests
+  run on both as before. This closes the nine chunks of §9.
 
 ## 8. Sessions
 
@@ -1917,6 +1924,10 @@ split.
    planned with it, in the last chunk. Until then the machine refuses that one call
    on a waiting result. One test reads what is left of a computation
    with an unknown parameter; that case is unaffected.
+   *Dropped by ruling on 2026-11-21.* Specialization did not need it:
+   a function is specialized ahead of what is done, where nothing
+   waits. Nothing else reads a waiting task, since phases are rerun and
+   no residual is saved. It is taken up again when something needs it.
 3. **Evaluation ahead.** In the reference it falls out of evaluating
    what is left again. In the machine it is a mechanism of its own. If
    it proves costly or unfaithful, the question goes to the maintainer:

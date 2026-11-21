@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-21 — The machine is the kernel.** `next/kernel/create.ts`
+  now gives the kernel variant that keeps its own stack. The reference
+  kernel stays in the tree as the one to compare against, and
+  `ALLEGRO_KERNEL=reference` gives it. The kernel's tests run on both.
+  This closes the rebuild of the kernel that `docs/plans/book-pass.md`
+  §9 planned.
 - **2026-11-21 — Specialization and sampling.** Two kernel primitives,
   on both variants. `specialize(f, steps)` evaluates a function's body
   with its parameters unknown, both branches of an unknown conditional
