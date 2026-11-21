@@ -256,6 +256,7 @@ export const createMachine: CreateKernel = () => {
    */
   const rest = (r: Rest): void => {
     if (collectors.length > 0) collectors[collectors.length - 1].set(localKey(r), r);
+    for (const c of collectors) c.set(localKey(r), r);
   };
 
   const step = (): void => {
