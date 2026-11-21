@@ -2,8 +2,8 @@
 // chunk Q7 (the minimal launcher), parts 1 to 3, and chunk Q5 (the first
 // notation and the bootstrap), part 3): next/launch/launcher.ts
 // and the output capability next/launch/output.ts, on the kernel
-// `createKernel` of next/kernel/create.ts gives: the reference kernel, or
-// the variant that keeps its own stack with `ALLEGRO_KERNEL=machine`. Run
+// `createKernel` of next/kernel/create.ts gives: the variant that keeps
+// its own stack, or the reference kernel with `ALLEGRO_KERNEL=reference`. Run
 // by `npm run test:next`. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of
 // the configuration's sources, part 2; of phases, part 3. The tests of the
@@ -199,7 +199,7 @@ function laterCapability(): { capability: CapabilityImplementation; answer: (tex
   return { capability, answer: (t) => resolve({ bits: new TextEncoder().encode(t) }), asked: () => asked };
 }
 
-/** The reference kernel wrapped so every function called on it is recorded by name. */
+/** The kernel `createKernel` gives, wrapped so every function called on it is recorded by name. */
 function recording(): { createKernel: () => Kernel; created: () => number; calls: string[]; made: PrimitiveDeclaration[] } {
   const calls: string[] = [];
   const made: PrimitiveDeclaration[] = [];
@@ -460,7 +460,7 @@ test("a claim refuted once its answer arrives ends the run as refuted, and the o
   const one = await run;
   assert.deepEqual(one.end.kind === "refuted" && one.end.reasons, ["a claim that is not true"]);
 
-  // The reference kernel reports one refuted value per run of one module.
+  // The kernel reports one refuted value per run of one module.
   // This wrapper adds a second refuted value, made by the same kernel, to
   // what `advance` reports, so the test holds that the outcome keeps all.
   const twice = () => {

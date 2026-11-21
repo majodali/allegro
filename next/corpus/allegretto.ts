@@ -78,7 +78,7 @@
 //                             on it.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
-// next/launch/launcher.ts on the reference kernel, the imported ones
+// next/launch/launcher.ts on the kernel next/kernel/create.ts gives, the imported ones
 // loaded first, with the output capability, the timer capability, the
 // HTTP capability, the check-output capability, the shipped primitives and
 // its inputs. It passes when its lines, its end, the lines printed before

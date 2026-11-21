@@ -7,8 +7,8 @@
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
-// next/kernel/create.ts gives: the reference, or the variant that keeps its
-// own stack with `ALLEGRO_KERNEL=machine`. The two commands end to end are
+// next/kernel/create.ts gives: the variant that keeps its own stack, or the
+// reference with `ALLEGRO_KERNEL=reference`. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 
 import { test } from "node:test";

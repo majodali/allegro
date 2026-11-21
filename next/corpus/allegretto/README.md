@@ -73,7 +73,7 @@ launcher's count of the lines printed before each phase
 `runProgram` of `next/corpus/allegretto.ts` reads these lines. It emits
 the text and the texts it imports with the driver of
 `next/bootstrap/driver.ts` and runs the records with the launcher of
-`next/launch/launcher.ts` on the reference kernel, the imported ones
+`next/launch/launcher.ts` on the kernel `next/kernel/create.ts` gives, the imported ones
 loaded first, with the output capability, the timer capability, the
 HTTP capability, the check-output capability, the shipped primitives,
 its inputs and a budget of 1,000,000 steps. A program passes when its
