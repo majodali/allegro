@@ -188,7 +188,14 @@ export const createCore = () => {
   };
   const bitsOf = (v: V) => {
     const s = seen(v);
-    return s instanceof Bits ? { bytes: s.bytes, bitLength: s.bitLength } : wrong("bitsOf", v);
+    if (!(s instanceof Bits)) return wrong("bitsOf", v);
+    // The length is known at once. The bytes of a value made by joining are laid out when they are read.
+    return {
+      get bytes(): Uint8Array {
+        return s.bytes;
+      },
+      bitLength: s.bitLength,
+    };
   };
   const symbolName = (v: V): string => {
     const s = seen(v);
@@ -353,7 +360,7 @@ export const createCore = () => {
   };
   /** A bits value from its bits, held in as few bytes as hold them. */
   /** True where a bits value is whole bytes, so it can be handled a byte at a time. */
-  const whole = (b: Bits): boolean => b.bitLength === b.bytes.length * 8;
+  const whole = (b: Bits): boolean => b.whole;
   const packed = (bits: readonly number[]): V => {
     const bytes = new Uint8Array(Math.ceil(bits.length / 8));
     const pad = bytes.length * 8 - bits.length;
@@ -851,7 +858,7 @@ export const createCore = () => {
    * as it is. What is left to a variant is evaluation: `scope`, `fill`, `waiting`,
    * `evaluate`, `advance` and `current`.
    */
-  const shared: Omit<Kernel, "interfaceVersion" | "variant" | "scope" | "fill" | "waiting" | "kept" | "evaluate" | "advance" | "current"> = {
+  const shared: Omit<Kernel, "interfaceVersion" | "variant" | "fill" | "waiting" | "kept" | "evaluate" | "advance" | "current"> = {
 
     bits: (bytes, bitLength) => {
       const n = bitLength ?? bytes.length * 8;
