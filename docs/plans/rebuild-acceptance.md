@@ -2922,3 +2922,14 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `milestone 3: programs 82 (passing 82, failing 0) · cases due 131 · realised 117, named only by a failing program 0, not yet named 14 · up to 3: 132 of 165 realised`.
   No row of the decision map moves in this part: check alone is built,
   and the rows of the Phases chapter wait for a pipeline.
+- **2026-11-21 — PR #290 merged: the asks of Q13, part 2 stand as built.**
+  The maintainer merged PR #290 on 2026-11-21, after merging the
+  kernel's interface, version 2 (PR #289 of the kernel stream). A merged
+  pull request is the approval. So these stand as built: the settings
+  and their names; the project's file `allegro.json`; which source may
+  set what; how sources combine; `--ceiling`; `ALLEGRO_STEPS`; and the
+  table of rules in `next/tools/configuration.ts`. Nothing of this
+  stream changed for version 2 of the interface: every `fill` of the
+  launcher already stated `hold: true`. On the merged tree this branch
+  passes 800 tests on the reference and 801 with
+  `ALLEGRO_KERNEL=machine`, and 99 programs on both.
