@@ -3141,3 +3141,45 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   first answer stands as built depends on who may call a check
   capability. "Check capabilities" and "check output" are the
   maintainer's words and are not yet defined in a decision.
+- **2026-11-21 — The maintainer on check capabilities, in session.**
+  This stream answered the question of how check capabilities change
+  things and put four asks. The answers, in the maintainer's words:
+  - Who may call check output, only the code that presents a result or
+    also the module being checked: "I agree with (b), but you're right,
+    this changes how we think about `specialize` and if it works for
+    `check`. Check capabilities need to have no side effects and not
+    provide any input values, so that skipping those methods have no
+    effect on checking or running a program."
+  - Whether check decides for every input and a run for the inputs
+    given: "It's not feasible to check every value of every input, much
+    less every combination of possible values across all inputs.
+    However, holding claims that depend on inputs makes `check`
+    potentially useless. For Allegro code this is resolved by using
+    types, which are declared in the code and inputs can remain unknown.
+    For Allegretto code we assume that any required correctness checks
+    are built in to the code by explicitly. To support that practice,
+    held claims should be flagged - either refuted or logged. So there
+    is a formal difference between `run` and `claim, run.` Invoking
+    `run` alone is aimed at scripting and iterative development." This
+    stream reads `claim, run` as `check, run`.
+  - The check-output capability: "Go ahead and draft a v1 check output
+    capability. We'll likely add to it with test output and utility
+    methods."
+  - The points for the kernel session: the maintainer carries a message
+    this stream drafts.
+  What this changes of what this stream had concluded:
+  1. `check, run` is a configuration of its own, with a formal
+     difference from `run`, and is to be built. This stream had said it
+     was no longer needed for the shipped commands.
+  2. A plain run stays `run` alone.
+  3. Under check a claim that is held is flagged. So the ratified rule
+     stands for check too: a claim that still waits counts as
+     undecided. This stream had proposed to leave such claims out of
+     the word under check, and withdraws that.
+  4. A phase is the capabilities it supplies and what it must leave
+     decided, in the words of "Phases are configuration". Check must
+     leave no claim held, or log each one.
+  5. Check leaves an input unknown. Taking a given value as known is
+     set aside.
+  Open with the maintainer: who chooses whether a held claim is refuted
+  or logged.
