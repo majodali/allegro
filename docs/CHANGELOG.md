@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-21 — Specialization and sampling.** Two kernel primitives,
+  on both variants. `specialize(f, steps)` evaluates a function's body
+  with its parameters unknown, both branches of an unknown conditional
+  included, performs no effect, and gives a function of the same module
+  whose body is what is left. `sample(claim, cases)` evaluates a claim
+  on each case: true of all, it is recorded as sampled, and what rests
+  on it is no stronger; a case it fails refutes it. A claim's record
+  gains the count `sampled`. Fixed on the machine: a slice could pause
+  work done ahead and leave the kernel performing no effect.
 - **2026-11-20 — Sharing.** On the machine, values share what an
   operation does not change. Putting an entry at the end of a structure
   copies nothing; an entry is found by its key or its place without a

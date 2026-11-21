@@ -54,7 +54,10 @@
 // of a bits value is a view of it. Two bits values joined are kept as the
 // two, and laid out once when something reads the bytes.
 //
-// Not here yet, and in the plan's last chunk: specialization.
+// `specialize` evaluates a function's body with its parameters unknown,
+// ahead of what is done and with both branches of an unknown conditional,
+// and gives a function whose body is what is left. `sample` evaluates a
+// claim on the cases it is given, and records it as sampled.
 
 import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, LimitFailure, Refusal } from "./interface.js";
@@ -191,12 +194,12 @@ export const createMachine: CreateKernel = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody,
     shared,
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k14";
+  const VARIANT = "machine-k15";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -242,6 +245,8 @@ export const createMachine: CreateKernel = () => {
   let ahead = false;
   /** True where this call met a refutation and ran out of steps while looking for more. */
   let cut = false;
+  /** True while a function is specialized: both branches of a conditional whose condition is unknown are evaluated. */
+  let speculative = false;
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
@@ -652,7 +657,8 @@ export const createMachine: CreateKernel = () => {
         const call: Call = item;
         // A slice that is spent pauses here, before the next thing is run. An evaluation
         // made from inside another is not paused: it is over soon.
-        if (spent >= pauseAt && !S.nested && call.wait === undefined) {
+        // Nor is anything paused while it is evaluated ahead of what is done: that is short too.
+        if (spent >= pauseAt && !S.nested && !ahead && call.wait === undefined) {
           pause(S, call, marks);
           return SUSPENDED;
         }
@@ -1158,6 +1164,9 @@ export const createMachine: CreateKernel = () => {
           if (truth === true) return evaluate(v.args[1], scope);
           if (truth === false) return evaluate(v.args[2], scope);
           if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
+          // Specializing, both branches are evaluated though the condition is unknown. A
+          // refutation inside a branch stays in that branch.
+          if (speculative) return after(evaluate(v.args[1], scope), (yes) => after(evaluate(v.args[2], scope), (no) => new Expr(fn, [condition, yes, no])));
           return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
         });
       }
@@ -1229,6 +1238,25 @@ export const createMachine: CreateKernel = () => {
           if (!known(steps)) return new Expr(fn, [later(v.args[0], scope), steps]);
           if (!(budgetBits instanceof Bits)) return new Refuted("an attempt's budget is a number of steps, as bits", steps);
           return new Call(attemptGen(v, fn, steps, numberOf(budgetBits), scope), undefined);
+        });
+      }
+      if (fn.name === "specialize") {
+        return each(v.args, scope, evaluate, (args) => {
+          if (!known(args[0]) || !known(args[1])) return new Expr(fn, args);
+          const [f, budgetBits] = [seen(args[0]), seen(args[1])];
+          if (!(budgetBits instanceof Bits)) return new Refuted("a specialization's budget is a number of steps, as bits", args[1]);
+          // A primitive has no body to evaluate: it is its own specialization.
+          if (f instanceof Prim || f instanceof KernelPrim) return f;
+          if (!(f instanceof Fn)) return new Refuted("only a function can be specialized", args[0]);
+          return specialized(f, numberOf(budgetBits), scope);
+        });
+      }
+      if (fn.name === "sample") {
+        return each(v.args, scope, evaluate, (args) => {
+          if (!known(args[0]) || !known(args[1])) return new Expr(fn, args);
+          const cases = seen(args[1]);
+          if (!(cases instanceof Struct)) return new Refuted("the cases of a sample are a structure", args[1]);
+          return new Call(sampleGen(v, fn, args, cases, scope), undefined);
         });
       }
       if (fn.name === "build") {
@@ -1379,8 +1407,10 @@ export const createMachine: CreateKernel = () => {
     if (told instanceof Decided && told.outcome === "undecided") return tallied(v, new Decided(told.inner, [{ kind: "kernel", variant: VARIANT }, ...rests], "undecided", told.reason), rests);
     if (truthOf(claimed) === true) {
       // A claim that rests on an assumption is no stronger than assumed.
+      // And one that rests on a sample is no stronger than sampled.
       const assumed = rests.some((r) => r.kind === "assumption");
-      return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : "decided"), rests);
+      const sampled = rests.some((r) => r.kind === "kernel" && r.sampled !== undefined);
+      return tallied(v, new Decided(seen(claimed), [{ kind: "kernel", variant: VARIANT }, ...rests], assumed ? "assumed" : sampled ? "sampled" : "decided"), rests);
     }
     if (known(claimed)) return tallied(v, new Refuted("a claim that is not true", claimed), rests);
     return tallied(v, new Expr(fn, [claimed]), rests);
@@ -1502,6 +1532,74 @@ export const createMachine: CreateKernel = () => {
     if (second instanceof Refuted) return second;
     if (!held && !ahead && known(second)) return second;
     return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+  };
+  /**
+   * A function's body evaluated with its parameters unknown, under a budget. Nothing is
+   * performed: an effect stays in what is left. A call to the function itself, met while
+   * its body is evaluated, is not opened again. The answer is a function of the same
+   * parameters whose body is what is left, of the module that made the original.
+   */
+  const specialized = (f: Fn, allowed: number, scope: ScopeV): Step => {
+    const [outer, wasAhead, wasSpeculative] = [budget, ahead, speculative];
+    budget = Math.min(outer, spent + allowed);
+    ahead = true;
+    speculative = true;
+    // The body is evaluated with parameters of its own. What is left may hold the original
+    // function, as a call to itself that was not opened, and the two must not share theirs.
+    const params = f.params.map((p) => new Param(p.name));
+    const body = substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map());
+    opening.push(f);
+    let left: V;
+    try {
+      left = run(evaluate(body, scope));
+    } catch (e) {
+      // The budget of the specialization ran out: the answer is "limit", as an attempt's is.
+      if ((e instanceof LimitReached && spent < outer) || e instanceof RangeError) {
+        rest({ kind: "limit" });
+        return failure("limit");
+      }
+      throw e;
+    } finally {
+      budget = outer;
+      ahead = wasAhead;
+      speculative = wasSpeculative;
+      opening.pop();
+    }
+    // A body refuted whatever its parameters is a refutation of the whole.
+    if (left instanceof Refuted) return left;
+    const made = new Fn(params, asBody(left));
+    made.owner = f.owner;
+    return close(made, scope);
+  };
+  /**
+   * A claim evaluated on the cases it is given. True of each, it is sampled: the kernel
+   * evaluated it, and not in full. A case it is not true of refutes it, and is the
+   * counterexample.
+   */
+  const sampleGen = function* (v: Expr, fn: KernelPrim, args: V[], cases: Struct, scope: ScopeV): Gen {
+    const mine = new Map<string, Rest>();
+    const open = cases.entries.filter(([k]) => !hidden(k));
+    const each = function* (): Gen {
+      for (const [, one] of open) {
+        const s = needStep(evaluate(new Expr(args[0], [one]), scope), scope);
+        const r: V = s instanceof Call ? yield s : s;
+        if (r instanceof Refuted) return r;
+        if (truthOf(r) === true) continue;
+        if (known(r)) return new Refuted("a claim that is not true of a case it was sampled on", one);
+        // It rests on something no answer will come for: the sample is left as an expression.
+        return new Expr(fn, args);
+      }
+      return TRUE;
+    };
+    const c = framed(each(), undefined);
+    c.collector = mine;
+    const verdict: V = yield c;
+    const rests = [...mine.values()];
+    rests.forEach(rest);
+    if (verdict !== TRUE) return tallied(v, verdict, rests);
+    const sample: Rest = { kind: "kernel", variant: VARIANT, sampled: open.length };
+    rest(sample);
+    return tallied(v, new Decided(TRUE, [sample, ...rests], "sampled"), rests);
   };
   const firstGen = function* (v: Expr, fn: KernelPrim, scope: ScopeV, ctl: Ctl): Gen {
     // Both are started, and the value is that of whichever is known first; where both are
