@@ -105,8 +105,8 @@ As ruled in DR5 (2026-11-12), with the chapter titles the maintainer confirmed o
 
 As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and the ways the platform is used, which is not a list of decisions.
 
-30. **The kernel's interface** (5 decisions). A passive kernel, what its interface offers and never exposes, and limits.
-   - Decisions: The kernel is passive; What the kernel's interface offers; No interface call writes a bare claim outcome; Limits are step budgets; One task runs at a time, and a slice never changes what happens.
+30. **The kernel's interface** (6 decisions). A passive kernel, what its interface offers and never exposes, limits, and the hook for diagnostics.
+   - Decisions: The kernel is passive; What the kernel's interface offers; No interface call writes a bare claim outcome; Limits are step budgets; One task runs at a time, and a slice never changes what happens; Diagnostics are a hook the kernel offers its host.
 31. **Configuration** (3 decisions). What configuration is, where it is read from, and configuration as a model.
    - Decisions: Configuration is all the information that determines an execution; Configuration sources have a priority, and a result says which supplied each value; A full configuration is a model, evaluated in a first phase.
 32. **Launching** (4 decisions). The launcher's criterion, the ceiling, startup step by step, and many invocations.
@@ -119,8 +119,8 @@ As ruled in DR6 (2026-11-13). The part opens with an introduction, the roles and
    - Decisions: A saved program is a recorded sequence of interface calls; A saved program names what it needs by content hash; A stored outcome is restored with its builder's name; A target platform is a model, and export is a transformation into it; Saving is export to a target whose model is the kernel's interface; An exported program needs a kernel only if it handles expressions at run time; An exported program behaves as the program does in a kernel; A law licenses a rewrite, and the rewritten program carries the law's strength; How extensions are distributed.
 36. **Trust** (6 decisions). What is trusted, what a result names, policies, builders, the reference kernel, purity.
    - Decisions: Three things are trusted: the kernel, the launcher and primitive functions; A result names everything it rests on; A policy is a claim over what a result rests on; A builder is identified by hash, then manifest, then signature; One reference kernel is the root of trust; A primitive's purity is assumed and named unless something stronger is shown.
-37. **Tools** (10 decisions). Tools that read results, what check reaches, a capability a phase leaves out, the hook for diagnostics, commands, summaries, the tools for proposing, tracing.
-   - Decisions: A tool reads a phase's result and adds no analysis of its own; Check reaches every claim; A phase leaves a capability out as not yet given or as not needed; Diagnostics are a hook the kernel offers its host; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
+37. **Tools** (9 decisions). Tools that read results, what check reaches, a capability a phase leaves out, commands, summaries, the tools for proposing, tracing.
+   - Decisions: A tool reads a phase's result and adds no analysis of its own; Check reaches every claim; A phase leaves a capability out as not yet given or as not needed; A command is a configuration; A module's summary is the weakest strength among its claims; Open obligations are listed for any proposer; One primer for every proposer; A proposer answers with only the missing value; A trace is read from origins.
 38. **The launchers we ship** (5 decisions). The default configuration, the shipped capabilities, values that arrive later, the browser.
    - Decisions: The platform's default configuration is the standard language; The terminal and the browser ship output, timers and HTTP; A late answer or its failure fills a cell as plain data; The browser launcher is one bundle; The core runs in a browser.
 
@@ -3572,6 +3572,20 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-20, built): built on the kernel variant that keeps its own stack. Ruled on its pull requests: after a refutation `advance` leaves the tasks in line where they are, and reports a further refutation in the call that takes the task up; what a `then` or a waiting claim holds back is evaluated ahead once, when its holder comes to wait. A task whose value nothing will read is an orphan and is not taken up; the term is ratified.
 - Chapter: The kernel's interface
 
+#### Diagnostics are a hook the kernel offers its host
+- Decides: which branches a run took, a trace of an evaluation, and stopping at a place are built on one hook that the kernel offers its host and never Allegro code. The hook reports what the kernel does (a branch taken, a call opened, a claim decided) with the place of the part. The holder of the kernel is trusted as the launcher is and already reads every body, so the hook gives no new authority. A capability for diagnostics, where there is one, is the launcher's, made on the hook.
+- Status: open (not built; a part has a place since 2026-11-22, which the hook needs); ruled 2026-11-22
+- Type: capability
+- Rationale kind: technical
+- Depends on: What the kernel's interface offers; A description is plain data in a fixed set of forms
+- Significance: 3 — coverage, tracing and breakpoints with the program unchanged
+- Label: swappable — what the hook reports
+- Options recorded: instrumenting a program with calls to a diagnostic capability (rejected: a module's identity is its content, so the instrumented module is another module and its stored outcomes no longer match; counts of steps shift; a function built again is its builder's; and it cannot see what is not in the text, such as what waits and what was evaluated ahead); building each diagnostic into the kernel (rejected: it grows what is trusted)
+- Sources: the maintainer's rulings of 2026-11-22 (the discussion of inputs and capabilities a phase does not have)
+- Use case: a coverage report lists the branches no test took, each by file and line, for a program that ran exactly as it does without the report.
+- Notes: new, by ruling. Read with "A trace is read from origins", which stays open: an origin is the chain from a value back to what it came from, and a place is where one part was written.
+- Chapter: The kernel's interface
+
 ### Configuration
 
 #### Configuration is all the information that determines an execution
@@ -4083,20 +4097,6 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-22 (the discussion of inputs and capabilities a phase does not have)
 - Use case: a module writes a note through a capability check gives it. At run the launcher leaves that capability out as not needed, and the statement after the note is not held.
 - Notes: new, by ruling. Without the second way a statement whose value is dropped would wait for ever on a capability nothing gives, and hold what is written after it. A version of a run's capability for check, which checks the arguments of each call against the domain its definition states, is to be generated from the definition and not written by hand; the maintainer set it at low priority.
-- Chapter: Tools
-
-#### Diagnostics are a hook the kernel offers its host
-- Decides: which branches a run took, a trace of an evaluation, and stopping at a place are built on one hook that the kernel offers its host and never Allegro code. The hook reports what the kernel does (a branch taken, a call opened, a claim decided) with the place of the part. The holder of the kernel is trusted as the launcher is and already reads every body, so the hook gives no new authority. A capability for diagnostics, where there is one, is the launcher's, made on the hook.
-- Status: open (not built; a part has a place since 2026-11-22, which the hook needs); ruled 2026-11-22
-- Type: capability
-- Rationale kind: technical
-- Depends on: What the kernel's interface offers; A description is plain data in a fixed set of forms
-- Significance: 3 — coverage, tracing and breakpoints with the program unchanged
-- Label: swappable — what the hook reports
-- Options recorded: instrumenting a program with calls to a diagnostic capability (rejected: a module's identity is its content, so the instrumented module is another module and its stored outcomes no longer match; counts of steps shift; a function built again is its builder's; and it cannot see what is not in the text, such as what waits and what was evaluated ahead); building each diagnostic into the kernel (rejected: it grows what is trusted)
-- Sources: the maintainer's rulings of 2026-11-22 (the discussion of inputs and capabilities a phase does not have)
-- Use case: a coverage report lists the branches no test took, each by file and line, for a program that ran exactly as it does without the report.
-- Notes: new, by ruling. Read with "A trace is read from origins", which stays open: an origin is the chain from a value back to what it came from, and a place is where one part was written.
 - Chapter: Tools
 
 #### A command is a configuration
