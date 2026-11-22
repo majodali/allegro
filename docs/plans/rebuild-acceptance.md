@@ -3392,3 +3392,19 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     each. 40 tests are new on each: 29 written here and one for each of
     the eleven programs. `npm run harness:next` runs 110 programs, and
     all pass on both variants.
+- **2026-11-22 — Milestone 3 signed.**
+  The maintainer, on PR #300, on 2026-11-22: "Milestone 3 is signed.
+  The 14 cases not yet realized should be held over until they can be
+  answered." Milestone 3 of `docs/plans/rebuild.md` §5 is the state
+  "Programs in the first notation run: functions, recursion, claims.
+  One speed test of a typed extension and one of a toy parser engine
+  written in Allegro". Its commands are `npm run harness:next` and
+  `npm run bench:next`, and the entry "Milestone 3, brought for
+  signing" above holds what each showed. The 14 cases stay due at
+  milestone 3 and counted as not yet named, and each is realised when
+  what it waits on lands: that entry lists them by what they wait on.
+  Milestones 1, 2 and 3 are signed. Milestone 4 is next: the typed
+  part of the corpus passes. From this stream it needs chunk Q11 (the
+  standard language's notation in the bootstrap), which waits on the
+  forms the kernel stream rules, and chunk Q12 (the cases of each
+  milestone, realised) for milestone 4.
