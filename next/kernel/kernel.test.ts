@@ -589,7 +589,8 @@ test("a description made by code is read in full when it is built", () => {
   const f = k.composedFunction([x], call(add, x, byte(k, 1)));
   const d = k.evaluate(call(kp("describe"), k.inspectionRight(), f)).value;
   // The same description, put together entry by entry: each entry is an expression until it is read.
-  const pieces = k.structure(k.entriesOf(d).map((_, i) => [null, call(kp("get"), d, byte(k, i))] as const));
+  // Since 2026-11-22 a description's entries are keyed, so each piece keeps its key.
+  const pieces = k.structure(k.entriesOf(d).map(([key], i) => [key, call(kp("get"), d, byte(k, i))] as const));
   const built = k.evaluate(call(kp("build"), pieces, k.structure([])));
   assert.equal(built.refuted, false);
   assert.equal(num(k, k.evaluate(call(built.value, byte(k, 6))).value), 7);
@@ -3211,4 +3212,77 @@ test("a slice does not pause what is evaluated ahead: the next evaluation perfor
   assert.ok(r.steps > 100, "though it took many times the slice");
   k.evaluate(call(say, byte(k, 1)));
   assert.deepEqual(said, [1], "the kernel is not left looking ahead");
+});
+
+// ---- Places in the text, and descriptions keyed by name (2026-11-22) ---------------------
+
+const place = (source: string, line: number, column: number, length: number) => ({ source, start: { index: column - 1, line, column }, end: { index: column - 1 + length, line, column: column + length } });
+
+test("a description is keyed by name, and build passes over an entry it does not know", () => {
+  const { k, add, call, kp } = setup();
+  const x = k.param("x");
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([x], call(add, x, byte(k, 1))))).value;
+  const keys = (v: Value) => k.entriesOf(v).map(([key]) => (key === null ? null : k.symbolName(key)));
+  const entry = (v: Value, name: string) => k.current(k.evaluate(k.entriesOf(v).find(([key]) => key !== null && k.symbolName(key) === name)![1]).value);
+  assert.deepEqual(keys(d), ["form", "parameters", "body"]);
+  assert.equal(k.symbolName(entry(d, "form")), "function");
+  const body = entry(d, "body");
+  assert.deepEqual(keys(body), ["form", "function", "arguments"]);
+  assert.deepEqual(keys(entry(body, "function")), ["form", "hash"]);
+  // An entry build does not know is passed over, wherever it stands.
+  const extra = k.structure([[k.symbol("note"), byte(k, 9)], ...k.entriesOf(d), [k.symbol("mine"), k.structure([])]]);
+  const built = k.evaluate(call(kp("build"), extra, k.structure([])));
+  assert.equal(built.refuted, false);
+  assert.equal(num(k, k.evaluate(call(built.value, byte(k, 6))).value), 7);
+  // The entries are found by key, not by where they stand.
+  const turned = k.structure([...k.entriesOf(d)].reverse());
+  assert.equal(num(k, k.evaluate(call(k.evaluate(call(kp("build"), turned, k.structure([]))).value, byte(k, 1))).value), 2);
+  // Without its form it is no description.
+  assert.equal(k.evaluate(call(kp("build"), k.structure(k.entriesOf(d).slice(1)), k.structure([]))).refuted, true);
+});
+
+test("a part keeps the place it was written at: through a copy, in what an evaluation leaves, and in its description", () => {
+  const { k, add, call, kp } = setup();
+  const [x, p] = [k.param("x"), k.param("p")];
+  const [atAdd, atFn, atCall] = [place("m.alg", 3, 8, 9), place("m.alg", 3, 1, 16), place("m.alg", 7, 1, 4)];
+  const f = k.composedFunction([x], k.expression(add, [x, p], atAdd), atFn);
+  assert.deepEqual(k.placeOf(f), atFn);
+  assert.equal(k.placeOf(byte(k, 1)), undefined, "bits have no place");
+  // Called with p unknown, what is left of the addition is the addition, where it was written.
+  const left = k.evaluate(k.expression(f, [byte(k, 1)], atCall));
+  assert.equal(k.kind(left.value), "expression");
+  assert.deepEqual(k.placeOf(left.value), atAdd);
+  // A description carries the place, and what is built from it has the place. (f itself cannot
+  // be built again: it mentions a parameter no function around it owns.)
+  const y = k.param("y");
+  const g = k.composedFunction([x, y], k.expression(add, [x, y], atAdd), atFn);
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), g)).value;
+  const entryNames = k.entriesOf(d).map(([key]) => k.symbolName(key as Value));
+  assert.deepEqual(entryNames, ["form", "parameters", "body", "at"]);
+  const built = k.evaluate(call(kp("build"), d, k.structure([]))).value;
+  assert.deepEqual(k.placeOf(built), atFn);
+  assert.deepEqual(k.placeOf(k.evaluate(k.expression(built, [byte(k, 1), p])).value), atAdd, "and so has its body");
+  // A place that is not one is refused, by the host's builder and by build.
+  assert.throws(() => k.expression(add, [x, x], { source: "m", start: { index: -1, line: 1, column: 1 }, end: { index: 0, line: 1, column: 1 } }), /place/);
+  const bad = k.structure([...k.entriesOf(d).slice(0, 3), [k.symbol("at"), byte(k, 1)]]);
+  assert.equal(k.evaluate(call(kp("build"), bad, k.structure([]))).refuted, true);
+});
+
+test("a claim's record says where the claim was written, and a place is no part of a module's identity", () => {
+  const { k, isZero, call, kp } = setup();
+  const at = place("checks.alg", 12, 3, 20);
+  const claim = k.expression(kp("claim"), [call(isZero, byte(k, 0))], at);
+  const r = k.evaluate(claim);
+  assert.deepEqual(r.claims[0].at, at);
+  assert.equal(k.evaluate(call(kp("claim"), call(isZero, byte(k, 0)))).claims[0].at, undefined, "a claim nobody placed has none");
+  // A claim that waits, and is decided later: the record of the later call says the same place.
+  const c = k.cell();
+  k.evaluate(k.expression(kp("claim"), [call(isZero, c)], at));
+  assert.deepEqual(k.fill(c, byte(k, 0)).claims[0].at, at);
+  // Two modules that differ only in where they were written are one module.
+  const module = (line: number) => {
+    const key = k.param("key");
+    return k.moduleOf(k.module(k.composedFunction([key], k.expression(kp("claim"), [call(isZero, byte(k, 0))], place("m.alg", line, 1, 5)), place("m.alg", line, 1, 30)), 1));
+  };
+  assert.equal(module(1), module(40));
 });

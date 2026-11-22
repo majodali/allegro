@@ -270,6 +270,8 @@ export interface ClaimRecord {
   readonly claim: Value;
   /** The identity of the module whose code wrote the claim, where a module did. */
   readonly module?: string;
+  /** Where the claim was written, where the kernel was told. */
+  readonly at?: Place;
   /** Evaluations that came out decided, a restored outcome among them. */
   readonly decided: number;
   /** Evaluations that came out sampled: true of each case tried, or resting on such a sample. */
@@ -380,6 +382,30 @@ export interface Declaration {
   readonly identity?: string;
 }
 
+/** One point in a text. */
+export interface Location {
+  /** How many characters come before it in the text, from 0. */
+  readonly index: number;
+  /** Its line, from 1. */
+  readonly line: number;
+  /** Its column in that line, from 1. */
+  readonly column: number;
+}
+
+/**
+ * Where a part was written: the text, and where the part starts and ends
+ * in it. The source is what whoever read the text calls it, a file's path
+ * or a module's name; the kernel gives it no meaning. A place is no part
+ * of a module's identity or of a claim's key: the same text laid out
+ * otherwise is the same module.
+ */
+export interface Place {
+  readonly source: string;
+  readonly start: Location;
+  /** The point after the part's last character. */
+  readonly end: Location;
+}
+
 /** What `Kernel.keyOf` reads of a key. */
 export interface KeyDescription {
   /** The identity of the module the key was made with. */
@@ -428,11 +454,11 @@ export interface Kernel {
    * A structure. Complete in shape; an entry's value may be a cell. An
    * entry's key is null, a symbol made with `symbol`, or a key.
    */
-  structure(entries: readonly Entry[]): Value;
+  structure(entries: readonly Entry[], at?: Place): Value;
   /** An unevaluated application of a function value to arguments. */
-  expression(fn: Value, args: readonly Value[]): Value;
+  expression(fn: Value, args: readonly Value[], at?: Place): Value;
   /** A composed function: parameters and a body. */
-  composedFunction(params: readonly Value[], body: Value): Value;
+  composedFunction(params: readonly Value[], body: Value, at?: Place): Value;
   /**
    * A primitive function. An effectful one is authority: whoever is
    * handed the value can use it. A pure one is available to all code: a
@@ -568,6 +594,12 @@ export interface Kernel {
   field(value: Value, field: Value): Value | undefined;
   /** The kernel's record of a claim's outcome on this value, where there is one. */
   outcomeOf(value: Value): Outcome | undefined;
+  /**
+   * Where a part was written, where whoever made it said: an application,
+   * a function or a structure written in a text. A copy keeps it, and so
+   * does what an evaluation leaves of the part.
+   */
+  placeOf(value: Value): Place | undefined;
   /** The expression this value came from, where the kernel kept one. */
   originOf(value: Value): Value | undefined;
   /**
