@@ -1537,6 +1537,16 @@ each message to stderr as the line build tools read, and both commands
 exit with the higher of the end's code and the highest status. The
 corpus gains the lines `// reports:` and `// status:` and eleven
 programs `m3/report-*`. The launcher is unchanged.
+### 2026-11 — Milestone 3, brought for signing (B-196, chunk Q8 (the speed tests of milestone 3))
+
+B-196 (the rebuild's acceptance side). The kernel stream's switch made
+the variant that keeps its own stack the default kernel. The bench, run
+once more on main, shows time growing in step with the work on both
+speed tests on the default, and no run ending at a limit. The 99
+programs pass on both kernels. Of the 131 cases due at the milestone,
+117 are realised by a program, and the record names what each of the
+other 14 waits on.
+
 ### 2026-11 — A result counts sampled claims (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 4)
 
 B-196 (the rebuild's acceptance side). The kernel now records a claim
