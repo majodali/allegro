@@ -10,3 +10,6 @@ output.write("after the assumption")
 // expect: after the assumption
 // end: completed
 // summary: assumed
+// The assumed claim is the one the dropped statement on line 8 stands for.
+// claim at: 7:1 decided
+// claim at: 8:1 assumed

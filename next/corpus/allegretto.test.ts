@@ -487,6 +487,22 @@ test("a claim that still waits when the run ends is stated waiting; a claim at l
 });
 
 
+test("the programs that state claims by their place: claims that hold, one refuted, one assumed, one undecided, and one that waits when the run ends", async () => {
+  for (const [name, stated] of [
+    ["claim-holds", ["4:1 decided", "7:1 decided"]],
+    ["claim-refuted", ["5:1 decided", "7:1 refuted"]],
+    ["result-assumed", ["7:1 decided", "8:1 assumed"]],
+    ["assume-undecided", ["7:1 assumed", "10:1 undecided"]],
+    ["input-not-supplied", ["8:1 decided", "10:1 waiting"]],
+  ] as const) {
+    const file = `${PROGRAMS_DIR}/m3/${name}.alg`;
+    assert.deepEqual(readClaimLines(text(file)).claims.map((c) => `${c.line}:${c.column} ${c.word}`), stated, file);
+    const run = await runProgram(text(file), file);
+    assert.deepEqual(run.problems, [], file);
+  }
+});
+
+
 // ── The phases line (chunk Q13, part 3) ───────────────────────────────
 
 test("the phases line is read as the convention states: names separated by commas, at most one line", () => {

@@ -14,3 +14,6 @@ output.write("after the undecided claim")
 // The undecided claim is the weakest of the two, so the summary is
 // undecided.
 // summary: undecided
+// The undecided claim is the one on line 10; the assumption is on line 7.
+// claim at: 7:1 assumed
+// claim at: 10:1 undecided
