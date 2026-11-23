@@ -18,16 +18,19 @@
 // byte is of the byte that matters.
 //
 // Signs written between operands are read as one row: an operand, and
-// then a sign and an operand any number of times. Which sign binds
-// tighter is not the grammar's to say here: forms.md gives the order,
-// loosest first, as `|>`; `||`; `&&`; `==` `!=`; `<` `>` `<=` `>=`;
-// `++`; `+` `-`; `*` `/` `%`, and the row is grouped by it when a tree
-// is turned into a description. A rule for each level would read the
-// same texts with ten times the work for each operand. A conditional
-// and a function are read where a whole expression may stand, and
-// inside brackets anywhere else.
+// then a sign and an operand any number of times. What the row gives is
+// grouped by the levels of the signs (levels.alg), in the order forms.md
+// gives, loosest first: `|>`; `||`; `&&`; `==` `!=`; `<` `>` `<=` `>=`;
+// `++`; `+` `-`; `*` `/` `%`. A rule for each level would read the same
+// texts with ten times the work for each operand. A conditional and a
+// function are read where a whole expression may stand, and inside
+// brackets anywhere else.
+//
+// The forms give no descriptions yet, but for the row: that is a later
+// chunk's, with the rest of Allegretto's grammar.
 import class
 import grammar
+import levels
 
 byte = grammar.byte
 ref = grammar.ref
@@ -128,9 +131,22 @@ marked = spaced(grammar.term("a symbol", (text, at) => if byte(text, at) == 96 &
 
 // ---- The rules ----
 
-// A sign written between two operands. Where one sign begins another, as
-// `<` begins `<=`, both are tried, and one of them goes on.
-between = alt([sign("|>"), sign("||"), sign("&&"), sign("=="), sign("!="), sign("<="), sign(">="), sign("<"), sign(">"), sign("++"), sign("+"), sign("-"), sign("*"), sign("/"), sign("%")])
+// The levels of the signs written between operands, loosest first, as
+// forms.md has them: each binds tighter than the one before it, and all
+// group from the left. Where one sign begins another, as `<` begins
+// `<=`, both are tried, and one of them goes on.
+binds(name, signs, looser) => levels.after(levels.level(name, signs, `left), [looser])
+between = [
+  levels.level(`piped, ["|>"], `left),
+  binds(`either, ["||"], `piped),
+  binds(`both, ["&&"], `either),
+  binds(`equal, ["==", "!="], `both),
+  binds(`ordered, ["<=", ">=", "<", ">"], `equal),
+  binds(`joined, ["++"], `ordered),
+  binds(`sum, ["+", "-"], `joined),
+  binds(`product, ["*", "/", "%"], `sum)]
+// What a sign with its two operands gives: for now the three, and the place.
+signed = (sign, left, right, at) => {sign: sign, left: left, right: right, at: at}
 
 // Items with commas between, or none.
 listed(item) => opt(seq([item, star(seq([sign(","), item]))]))
@@ -145,7 +161,7 @@ rules = {
   expression: alt([ref(`condition), ref(`function), ref(`operation)]),
   condition: seq([word("if"), ref(`expression), word("then"), ref(`expression), word("else"), ref(`expression)]),
   function: seq([alt([name, seq([sign("("), ref(`names), sign(")")])]), sign("=>"), ref(`expression)]),
-  operation: seq([ref(`prefixed), star(seq([between, ref(`prefixed)]))]),
+  operation: levels.row(ref(`prefixed), between, sign, signed),
   prefixed: alt([seq([alt([sign("-"), sign("!")]), ref(`prefixed)]), ref(`applied)]),
   applied: seq([ref(`primary), star(alt([seq([sign("("), ref(`arguments), sign(")")]), seq([sign("."), name]), seq([sign("["), ref(`expression), sign("]")])]))]),
   primary: alt([number, quoted, marked, word("true"), word("false"), name, seq([sign("("), ref(`expression), sign(")")]), seq([sign("["), ref(`arguments), sign("]")]), seq([sign_of(123), ref(`fields), sign_of(125)])]),

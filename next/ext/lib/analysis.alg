@@ -17,7 +17,9 @@
 // `star` and an `opt` have `set` and `open` too, for their one item. A
 // `ref` has two more entries: `kept`, true where the results of its
 // rule at a position are remembered, and `grows`, true where its rule
-// can begin with itself. A terminal has `words`: the words it does not
+// can begin with itself, and `settles`, true where the grammar marks
+// its rule settled. Every form has `acts`, true where it has a function
+// for what it gives. A terminal has `words`: the words it does not
 // read, as a list for each length in bytes, or [] where it reads all.
 // `top` is a `ref` to the start rule. `kept` at the top is the rules
 // remembered, each {name, grows}, a structure with no keys.
@@ -44,7 +46,7 @@ made(g, x) => {start: g.start, top: ready(grammar.ref(g.start), x), rules: readi
 facts(g) => known(g, numbered(g.rules, 0, []), settled(g.rules, cleared(g.rules, 0, []), 0, (r, table) => can_be_empty(r, table)))
 known(g, numbers, empties) => knot(g, numbers, empties, settled(g.rules, cleared(g.rules, 0, []), 0, (r, table) => touches(r, table, g.space_reads)))
 knot(g, numbers, empties, touched) =>
-  x = {rules: g.rules, numbers: numbers, empties: empties, touched: touched, reserved: g.reserved, grows: growing(x, 0, []), kept: remembered(x)}
+  x = {rules: g.rules, numbers: numbers, empties: empties, touched: touched, reserved: g.reserved, settled: g.settled, grows: growing(x, 0, []), kept: remembered(x)}
   x
 numbered(rules, i, out) => if i == count(rules) then out else numbered(rules, i + 1, put(out, key(rules, i), i))
 
@@ -156,13 +158,14 @@ readied(rules, x, i, out) =>
   if i == count(rules) then out
   else readied(rules, x, i + 1, put(out, key(rules, i), ready(get(rules, i), x)))
 ready(g, x) =>
-  if g.op == `term then {op: `term, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, words: by_length(g.unless, x.reserved), known: g.known, ranges: g.ranges, empty: g.empty}
-  else if g.op == `ref then {op: `ref, name: g.name, kept: is_kept(x, g.name), grows: get(x.grows, g.name)}
-  else if g.op == `seq then {op: `seq, items: ready_items(g.items, 0, x, [])}
-  else if g.op == `alt then {op: `alt, items: ready_choices(g.items, 0, x, [])}
-  else if g.op == `guard then {op: `guard, item: ready(g.item, x), holds: g.holds}
-  else gated(g.op, g.item, begins(nothing_yet, g.item, x), x)
-gated(op, item, b, x) => {op: op, item: ready(item, x), set: class.made(b.ranges), open: b.any || can_be_empty(item, x.empties)}
+  if g.op == `term then {op: `term, acts: kind(g.gives) == `function, gives: g.gives, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, words: by_length(g.unless, x.reserved), known: g.known, ranges: g.ranges, empty: g.empty}
+  else if g.op == `ref then {op: `ref, acts: kind(g.gives) == `function, gives: g.gives, name: g.name, kept: is_kept(x, g.name), grows: get(x.grows, g.name), settles: is_among(x.settled, g.name, 0)}
+  else if g.op == `seq then {op: `seq, acts: kind(g.gives) == `function, gives: g.gives, items: ready_items(g.items, 0, x, [])}
+  else if g.op == `alt then {op: `alt, acts: kind(g.gives) == `function, gives: g.gives, items: ready_choices(g.items, 0, x, [])}
+  else if g.op == `guard then {op: `guard, acts: kind(g.gives) == `function, gives: g.gives, item: ready(g.item, x), holds: g.holds}
+  else gated(g, begins(nothing_yet, g.item, x), x)
+gated(g, b, x) => {op: g.op, acts: kind(g.gives) == `function, gives: g.gives, item: ready(g.item, x), set: class.made(b.ranges), open: b.any || can_be_empty(g.item, x.empties)}
+is_among(names, name, i) => i < count(names) && (names[i] == name || is_among(names, name, i + 1))
 ready_items(items, i, x, out) =>
   if i == count(items) then out
   else ready_items(items, i + 1, x, put(out, [], ready(items[i], x)))

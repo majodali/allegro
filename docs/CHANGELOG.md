@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-26 — What a parse gives.** In `next/ext/lib/engine.alg` a
+  reading gives a value and no longer a tree: a terminal the text it
+  read, a sequence and a repetition what their items give, and a form
+  made with `grammar.giving` what its function makes of that, with the
+  place it read: `{source, start, end}`, each end an index, a line and
+  a column. `engine.parse` gives the one reading and claims there is
+  one; a text that reads two ways refutes the claim. A rule a grammar
+  marks settled is claimed to have one result at most wherever it is
+  read. `next/ext/lib/levels.alg`, new: levels of binding by name, each
+  placed by the levels it names, and a row of signs grouped by them.
+  `flat.alg` groups its rows by Allegretto's eight levels. "A parser
+  records where each expression came from in its text" is reworded to
+  the ruling of 2026-11-22.
 - **2026-11-26 — A rule that begins with itself costs in line with its
   text.** A turn reads on only from the results the turn before added:
   a row of 80 operands through `sum = sum "+" one | one` takes 62,129

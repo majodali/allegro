@@ -6,7 +6,7 @@ import flat
 
 p = engine.prepared(flat.allegretto)
 readings(text) => size(engine.parses(p, text))
-size(a) => if is_failure(a) then 0 else length(a.trees)
+size(a) => if is_failure(a) then 0 else length(a.readings)
 length(l) => if count(l) == 0 then 0 else 1 + length(l.t)
 failed_at(text) => engine.parses(p, text).at
 
@@ -60,6 +60,21 @@ claim(failed_at("x = (1 + \ny = 2\n") == 9)
 claim(failed_at("x = 1\ny = [1, 2\n") == 15)
 claim(failed_at("x = 1 +* 2\n") == 7)
 claim(failed_at("x = \"open\n") == 4)
+
+// A row of signs is grouped by their levels. The value of `x = e` is
+// [[] "x" ["=" e]], and of a module [[] [[line end] ...] []].
+bound(text) => engine.parse(p, text)[1][0][0][2][1]
+times = bound("x = a + b * c - d\n")
+claim(times.sign == "-" && times.left.sign == "+" && times.left.right.sign == "*" && times.left.right.left[0] == "b")
+claim(times.at.start.index == 4 && times.at.end.index == 17 && times.left.right.at.start.column == 9)
+mixed = bound("x = a |> f || b && c == d < e ++ g + h * i\n")
+claim(mixed.sign == "|>" && mixed.right.sign == "||" && mixed.right.right.sign == "&&" && mixed.right.right.right.sign == "==")
+claim(mixed.right.right.right.right.sign == "<" && mixed.right.right.right.right.right.sign == "++" && mixed.right.right.right.right.right.right.sign == "+")
+claim(mixed.right.right.right.right.right.right.right.sign == "*")
+// The same levels the other way round, and signs of one level from the left.
+claim(bound("x = a * b + c ++ d < e\n").sign == "<" && bound("x = a * b + c ++ d < e\n").left.left.left.sign == "*")
+claim(bound("x = a - b + c - d\n").left.left.sign == "-" && bound("x = a - b + c - d\n").left.left.left[0] == "a")
+claim(bound("x = a <= b == c >= d\n").sign == "==" && bound("x = a <= b == c >= d\n").left.sign == "<=")
 
 output.write("flat: ok")
 // expect: flat: ok

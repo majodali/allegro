@@ -603,7 +603,7 @@ are:
 | E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | done 2026-11-24: the runner `next/ext/ext.test.ts`, `next/ext/lib/map.alg` and `set.alg` with their test modules, and the primitives `text.byte`, `text.span`, `text.starts`, `text.until`; a map of 10,000 entries is built and read in 4,652,564 steps, 4.75 times the steps of one of 2,500 |
 | E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | done 2026-11-25: `class.alg`, `grammar.alg`, `analysis.alg`, `engine.alg` and `flat.alg` under `next/ext/lib/`, each with a test module; **the speed target is met: a module of 207 lines is read in 2,280,434 steps and about 7 seconds**; the engine specialized over a grammar is measured and gains little (§7) |
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
-| E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
+| E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
 | E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
@@ -1962,6 +1962,66 @@ its approval.
     one is caught by the new test of growth in `next/ext/ext.test.ts`,
     and two showed missing tests: a rule that begins with itself
     inside an option, and inside a repetition. Both have tests now.
+- **2026-11-26 — chunk E5, the engine: what a parse gives** (the
+  review session). The maintainer confirmed the rewording of "Offside
+  rule through stateful indent terminals" on PR #310.
+  - *A reading gives a value.* The trees of E3, each with an entry
+    `kind`, are gone, as E3's record said they would be. A terminal
+    gives the text it read; a rule and an `alt` what their form gives;
+    a `seq` and a `star` a structure with no keys of what their items
+    give; an `opt` `[]` or one thing in a structure; a `guard` `[]`.
+    The answer of `parses` is `{readings}`.
+  - *A form is given a function.* `grammar.giving(form, f)`: the form
+    gives `f(value, at)`. Any of the seven forms may have one, and the
+    count of forms stays seven: it is an entry of a form, `gives`. A
+    function is called when what it gives is read, so a reading that
+    is dropped calls none. The names in a function mean what they
+    meant where it was written, since it is a function; "Every
+    notation stands for an expression" asks for that.
+  - *Places.* `at` is `{source, start, end}`, each end `{index, line,
+    column}`: the index in bytes from 0, the line and the column from
+    1, the column in bytes. A place ends where what was read ends, the
+    space after it not counted: a result carries `stop` beside `end`
+    for that. A line is counted from the beginning of the text when a
+    place is read, so a place nothing reads costs nothing and one that
+    is read costs its distance from the beginning. The entry "A parser
+    records where each expression came from in its text" is reworded
+    to the ruling of 2026-11-22, as confirmed on PR #305.
+  - *Ambiguity is a claim.* `engine.parse(p, text)` gives the one
+    reading, or the failure `no_parse`. It claims the text reads one
+    way; two readings refute it. `engine.parses` gives every reading
+    and claims nothing.
+  - *The mark `unambiguous`.* `grammar.with_settled(g, names)` marks
+    rules. A marked rule is claimed to have one result at most
+    wherever it is read. The entry says a marked production's reading
+    must be "the only reading of the text so far"; that holds here
+    where the rules around a marked rule are read one after another,
+    as the lines of a module are. A marked rule must end at a definite
+    place: one that ends with a repetition has a result for every
+    count, and refutes its own mark. The maintainer is asked to
+    confirm this reading of the mark; E8 is what uses it.
+  - *Levels.* `levels.alg`: a level is `{name, signs, side, after,
+    before}`, `after` naming levels it binds tighter than and `before`
+    levels it binds looser than, as the present book has them.
+    `row(operand, levels, sign, make)` is an ordinary form, a sequence
+    with a function; the engine knows nothing of levels. Two levels
+    with no order between them may both be in a grammar, and a text
+    that writes their signs side by side is refused; so is a text
+    where two levels each bind tighter than the other. A level whose
+    signs do not group at all is not built: no ruled notation has one.
+  - *Measured.* `grammar.alg`, `class.alg` and `map.alg`, now 250
+    lines and 13,832 bytes: 2,389,175 steps, 7.6 seconds; 173 steps a
+    byte, where E4 had 175. The measurement counts the readings and
+    reads no value; E7 measures with descriptions read.
+  - *Tests changed by this chunk.* The 18 claims that compared a tree
+    as a text compare what the reading gives; `.trees` is `.readings`.
+  - *A claim refuted inside an attempt is on the run's record.* So a
+    test module that tests one has the summary `refuted`. Those tests
+    are in `refuted_claims.test.alg`, which says so; the runner holds
+    every other module to `decided`, and lets no module say `refuted`
+    that is not named for it. The runner's condition changed: it was
+    "every claim is decided" for every module.
+  - *Deliberate faults*: 26 made in the five modules, 26 caught.
 
 ## 8. Sessions
 

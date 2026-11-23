@@ -80,6 +80,25 @@ claim(grammar.spaced(marked).unless == `words && grammar.unless(marked, `others)
 counting = grammar.stepper("a count", (text, at, n) => {read: 1, state: n + 1}, false, word.ranges, false)
 claim(counting.stateful && counting.op == `term && counting.step(t, 0, 4).state == 5 && counting.step(t, 0, 4).read == 1)
 
+// A form given a function is the same form otherwise, whichever of the seven it is.
+twice = (v, at) => v ++ v
+claim(kind(word.gives) == `structure && kind(grammar.giving(word, twice).gives) == `function)
+given_word = grammar.giving(marked, twice)
+claim(given_word.spaced && given_word.unless == `words && given_word.match(t, 0) == 3 && given_word.gives("ab", 0) == "abab")
+claim(grammar.spaced(given_word).gives("a", 0) == "aa" && grammar.unless(given_word, `others).gives("a", 0) == "aa")
+claim(grammar.giving(grammar.ref(`w), twice).name == `w && grammar.giving(grammar.ref(`w), twice).op == `ref)
+claim(count(grammar.giving(grammar.seq([word, digit]), twice).items) == 2 && grammar.giving(grammar.alt([word]), twice).op == `alt)
+claim(grammar.giving(grammar.star(word), twice).item.name == "a word" && grammar.giving(grammar.opt(word), twice).op == `opt)
+claim(!grammar.giving(grammar.guard(word, false), twice).holds && grammar.giving(grammar.guard(word, true), twice).holds)
+// Given twice, the second is handed what the first made.
+claim(grammar.giving(grammar.giving(word, twice), (v, at) => v ++ "!").gives("a", 0) == "aa!")
+
+// Rules are marked settled by name, beside those marked already.
+claim(count(g.settled) == 0)
+marks = grammar.with_settled(grammar.with_settled(other, [`s]), [`w, `x])
+claim(count(marks.settled) == 3 && marks.settled[0] == `s && marks.settled[2] == `x && count(marks.reserved) == 2 && marks.state == 7)
+claim(count(grammar.with_state(marks, 1).settled) == 3 && count(grammar.with_reserved(marks, `words, ["a"]).settled) == 3 && count(grammar.with_space(marks, marks.space, false).settled) == 3)
+
 output.write("grammar: ok")
 // expect: grammar: ok
 // end: completed

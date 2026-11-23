@@ -142,6 +142,17 @@ claim(count(worded.rules.s.words) == 5 && count(worded.rules.s.words[2]) == 2 &&
 claim(worded.rules.s.words[2][1] == "of" && worded.rules.s.words[4][0] == "else")
 claim(count(worded.rules.t.words) == 0)
 
+// A form with a function for what it gives is marked, and keeps it.
+acting = analysis.prepared(grammar.with_settled(grammar.grammar(`s, {
+  s: seq([grammar.giving(ref(`t), (v, at) => 1), ref(`t), grammar.giving(grammar.star(lit("a")), (v, at) => 2), grammar.opt(grammar.giving(lit("b"), (v, at) => 3))]),
+  t: grammar.giving(alt([lit("x"), grammar.giving(grammar.guard(lit("y"), true), (v, at) => 4)]), (v, at) => 5)
+}), [`t]))
+claim(acting.rules.s.items[0].acts && acting.rules.s.items[0].gives(0, 0) == 1 && !acting.rules.s.items[1].acts && !acting.rules.s.acts)
+claim(acting.rules.s.items[2].acts && acting.rules.s.items[2].gives(0, 0) == 2 && !acting.rules.s.items[3].acts && acting.rules.s.items[3].item.acts)
+claim(acting.rules.t.acts && acting.rules.t.gives(0, 0) == 5 && !acting.rules.t.items[0].g.acts && acting.rules.t.items[1].g.acts && acting.rules.t.items[1].g.gives(0, 0) == 4)
+// A rule the grammar marks settled is marked wherever it is named.
+claim(acting.rules.s.items[0].settles && acting.rules.s.items[1].settles && !acting.top.settles)
+
 output.write("analysis: ok")
 // expect: analysis: ok
 // end: completed

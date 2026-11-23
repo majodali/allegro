@@ -4,19 +4,20 @@
 // "Scannerless parsing", "A terminal is a function, so a grammar can
 // define its own" (docs/plans/book-pass.md section 10).
 //
-// A grammar is {start, rules, state, reserved, space, space_reads}.
+// A grammar is {start, rules, state, reserved, space, space_reads,
+// settled}.
 // `rules` is a structure of rules keyed by the symbols of their names,
 // and `start` is the name of the rule a text is read as. The other four
 // are below. A rule is one of seven forms, each a structure with the
 // entry `op`:
 //
-//   {op: `term, name, ...}          a terminal
-//   {op: `ref, name}                the rule of that name
-//   {op: `seq, items}               each item in order
-//   {op: `alt, items}               any one of the items
-//   {op: `star, item}               the item, zero times or more
-//   {op: `opt, item}                the item, or nothing
-//   {op: `guard, item, holds}       nothing, where the item can be read
+//   {op: `term, gives, name, ...}   a terminal
+//   {op: `ref, gives, name}         the rule of that name
+//   {op: `seq, gives, items}        each item in order
+//   {op: `alt, gives, items}        any one of the items
+//   {op: `star, gives, item}        the item, zero times or more
+//   {op: `opt, gives, item}         the item, or nothing
+//   {op: `guard, gives, item, holds} nothing, where the item can be read
 //                                   here (`holds` true) or cannot (false)
 //
 // The order of the items of an `alt` has no meaning. `items` is a
@@ -48,17 +49,28 @@
 // words to a set, so a grammar that adds a word of its own keeps it out
 // of every name.
 //
+// What a reading gives is made by the forms (engine.alg). A form made
+// with `giving` has a function that makes something of what the form
+// gives without one: so a form gives the description of an expression,
+// and the names the function uses mean what they meant where it was
+// written.
+//
+// `settled` is the names of the rules marked settled: a rule that is
+// claimed to have one result at most wherever it is read.
+//
 // This module makes the forms, and the terminals most grammars need.
 // The terminals read a text with the kernel's primitives on bits. The
 // shipped primitives text.span, text.starts and text.until do the same
 // in one step each, and take their place when a text can name them.
 import class
 
-export grammar(start, rules) => {start: start, rules: rules, state: "", reserved: [], space: no_space, space_reads: false}
+export grammar(start, rules) => {start: start, rules: rules, state: "", reserved: [], space: no_space, space_reads: false, settled: []}
 no_space = (text, at, state) => 0
-export with_state(g, state) => {start: g.start, rules: g.rules, state: state, reserved: g.reserved, space: g.space, space_reads: g.space_reads}
-export with_space(g, space, reads) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: space, space_reads: reads}
-export with_reserved(g, name, words) => {start: g.start, rules: g.rules, state: g.state, reserved: put(g.reserved, name, added(words, 0, words_of(g.reserved, name, 0))), space: g.space, space_reads: g.space_reads}
+export with_state(g, state) => {start: g.start, rules: g.rules, state: state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: g.settled}
+export with_space(g, space, reads) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: space, space_reads: reads, settled: g.settled}
+export with_reserved(g, name, words) => {start: g.start, rules: g.rules, state: g.state, reserved: put(g.reserved, name, added(words, 0, words_of(g.reserved, name, 0))), space: g.space, space_reads: g.space_reads, settled: g.settled}
+// The grammar with the rules of these names marked settled, beside those marked already.
+export with_settled(g, names) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: added(names, 0, g.settled)}
 // The words of the set of that name, or none where there is no such set.
 export words_of(reserved, name, i) =>
   if i == count(reserved) then []
@@ -66,19 +78,31 @@ export words_of(reserved, name, i) =>
   else words_of(reserved, name, i + 1)
 added(words, i, out) => if i == count(words) then out else added(words, i + 1, put(out, [], words[i]))
 
-export term(name, match, known, ranges, empty) => {op: `term, name: name, match: match, step: [], stateful: false, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
+export term(name, match, known, ranges, empty) => {op: `term, gives: [], name: name, match: match, step: [], stateful: false, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
 // A terminal that reads the state, and may change it.
-export stepper(name, step, known, ranges, empty) => {op: `term, name: name, match: [], step: step, stateful: true, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
+export stepper(name, step, known, ranges, empty) => {op: `term, gives: [], name: name, match: [], step: step, stateful: true, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
 // The terminal t, reading the space after what it reads.
-export spaced(t) => {op: `term, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: true, unless: t.unless, known: t.known, ranges: t.ranges, empty: t.empty}
+export spaced(t) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: true, unless: t.unless, known: t.known, ranges: t.ranges, empty: t.empty}
 // The terminal t, reading no word of the reserved set of that name.
-export unless(t, set) => {op: `term, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: t.spaced, unless: set, known: t.known, ranges: t.ranges, empty: t.empty}
-export ref(name) => {op: `ref, name: name}
-export seq(items) => {op: `seq, items: items}
-export alt(items) => {op: `alt, items: items}
-export star(item) => {op: `star, item: item}
-export opt(item) => {op: `opt, item: item}
-export guard(item, holds) => {op: `guard, item: item, holds: holds}
+export unless(t, set) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: t.spaced, unless: set, known: t.known, ranges: t.ranges, empty: t.empty}
+export ref(name) => {op: `ref, gives: [], name: name}
+export seq(items) => {op: `seq, gives: [], items: items}
+export alt(items) => {op: `alt, gives: [], items: items}
+export star(item) => {op: `star, gives: [], item: item}
+export opt(item) => {op: `opt, gives: [], item: item}
+export guard(item, holds) => {op: `guard, gives: [], item: item, holds: holds}
+
+// The form g, giving what the function f makes of what it gave before:
+// f(value, at), with `at` the place the form read. A form given a
+// function twice gives what the second makes of what the first made.
+export giving(g, f) => given(g, if kind(g.gives) == `function then after(g.gives, f) else f)
+after(first, second) => (value, at) => second(first(value, at), at)
+given(g, f) =>
+  if g.op == `term then {op: `term, gives: f, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, unless: g.unless, known: g.known, ranges: g.ranges, empty: g.empty}
+  else if g.op == `ref then {op: `ref, gives: f, name: g.name}
+  else if g.op == `seq || g.op == `alt then {op: g.op, gives: f, items: g.items}
+  else if g.op == `guard then {op: `guard, gives: f, item: g.item, holds: g.holds}
+  else {op: g.op, gives: f, item: g.item}
 
 // The byte of a text at a byte position, or -1 at its end.
 export byte(text, at) => if at * 8 >= bits.length(text) then -1 else bits.int(bits.slice(text, at * 8, 8))

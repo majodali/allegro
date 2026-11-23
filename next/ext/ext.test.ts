@@ -8,7 +8,8 @@
 // tests. Each of its claims is an assertion. It states what it prints
 // and how it ends in the lines the acceptance stream's corpus uses:
 // `// expect:`, `// end:` and `// summary:`. It passes where it prints
-// that, ends so, and every claim is decided.
+// that, ends so, and its claims come out as it states: all decided, but
+// for a module that tests a claim being refuted, which says so.
 //
 // Reading a test's text and running it is the acceptance stream's code
 // (next/corpus/allegretto.ts, next/launch/), called here and not changed.
@@ -58,12 +59,17 @@ test("there are tests to run", () => {
 });
 
 for (const file of files)
-  test(`${file}: prints what it states, ends as it states, and every claim is decided`, DEPTH, async () => {
-    const run = await runProgram(fs.readFileSync(file, "utf8"), file);
+  test(`${file}: prints what it states, ends as it states, and its claims come out as it states`, DEPTH, async () => {
+    const text = fs.readFileSync(file, "utf8");
+    const run = await runProgram(text, file);
     assert.deepEqual(run.findings, [], "the text is read");
     assert.deepEqual(run.problems, []);
     assert.equal(run.end, "completed");
-    assert.equal(run.result?.summary, "decided", "every claim is decided");
+    // Every claim is decided, but in a module that tests a claim being refuted inside an attempt:
+    // such a module is named for it, and states `// summary: refuted`. No other module may.
+    const refutes = path.basename(file).startsWith("refuted_");
+    assert.match(text, refutes ? /^\/\/ summary: refuted$/m : /^\/\/ summary: decided$/m);
+    assert.equal(run.result?.summary, refutes ? "refuted" : "decided");
     assert.ok((run.result?.claims.length ?? 0) > 0, "it claims something");
   });
 
@@ -114,7 +120,7 @@ const READER = [
   "input source",
   "import engine",
   "import flat",
-  "size(a) => if is_failure(a) then 0 - a.at else length(a.trees)",
+  "size(a) => if is_failure(a) then 0 - a.at else length(a.readings)",
   "length(l) => if count(l) == 0 then 0 else 1 + length(l.t)",
   "output.write(int.text(size(engine.parses(engine.prepared(flat.allegretto), source))))",
   "",
@@ -149,7 +155,7 @@ test("a rule that begins with itself costs in line with its text: twice the oper
     "import engine",
     "import grammar",
     'g = grammar.grammar(`sum, {sum: grammar.alt([grammar.seq([grammar.ref(`sum), grammar.lit("+"), grammar.ref(`one)]), grammar.ref(`one)]), one: grammar.run("a number", "09")})',
-    "size(a) => if is_failure(a) then 0 - a.at else length(a.trees)",
+    "size(a) => if is_failure(a) then 0 - a.at else length(a.readings)",
     "length(l) => if count(l) == 0 then 0 else 1 + length(l.t)",
     "output.write(int.text(size(engine.parses(engine.prepared(g), source))))",
     "",
@@ -165,9 +171,9 @@ test("a rule that begins with itself costs in line with its text: twice the oper
 
 /** A module that yields `reader`, the engine with a grammar already given: a function of a text. */
 const readerOf = (rules: string): string =>
-  ["capability output", "import engine", "import grammar", `p = engine.prepared(grammar.grammar(\`s, ${rules}))`, "export reader = text => engine.parses(p, text)", "export ways(a) => if count(a.trees) == 0 then 0 else 1 + ways({trees: a.trees.t})", ""].join("\n");
+  ["capability output", "import engine", "import grammar", `p = engine.prepared(grammar.grammar(\`s, ${rules}))`, "export reader = text => engine.parses(p, text)", "export ways(a) => if count(a.readings) == 0 then 0 else 1 + ways({readings: a.readings.t})", ""].join("\n");
 
-/** The `reader` a module yields and its `ways`, which counts the trees of an answer, in a kernel of their own. */
+/** The `reader` a module yields and its `ways`, which counts the readings of an answer, in a kernel of their own. */
 function yielded(text: string): { k: Kernel; reader: Value; ways: Value } {
   const e = emitted(text, "next/ext/lib/specialized.alg");
   if ("findings" in e) throw new Error(`the text is refused: ${e.findings.join("; ")}`);
@@ -184,7 +190,7 @@ function yielded(text: string): { k: Kernel; reader: Value; ways: Value } {
   return { k, reader: entry("reader"), ways: entry("ways") };
 }
 
-/** How many trees a reader gives for a text, and the steps the reading took. */
+/** How many readings a reader gives for a text, and the steps the reading took. */
 function reading(k: Kernel, reader: Value, ways: Value, text: string): { trees: number; steps: number } {
   const r = k.evaluate(k.expression(reader, [k.bits(new TextEncoder().encode(text))]), { steps: 1_000_000 });
   assert.equal(r.ended, "complete");

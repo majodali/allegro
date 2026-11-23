@@ -34,15 +34,15 @@ blocks = grammar.with_state(grammar.with_space(grammar.grammar(`module, {
 p = engine.prepared(blocks)
 
 readings(text) => size(engine.parses(p, text))
-size(a) => if is_failure(a) then 0 else length(a.trees)
+size(a) => if is_failure(a) then 0 else length(a.readings)
 length(l) => if count(l) == 0 then 0 else 1 + length(l.t)
 failed_at(text) => engine.parses(p, text).at
-tree(text) => engine.shown(engine.parses(p, text).trees.h, text)
+tree(text) => engine.shown(engine.parses(p, text).readings.h)
 
 // Statements in the first column.
 claim(readings("a = 1\nb = 2\n") == 1)
 claim(readings("a = 1") == 1)
-claim(tree("a = 1\nb = 2") == "module([statements([statement(#0 [a name \"a\" = \"=\" a value \"1\"]) <[a new line \"\n\" statement(#0 [a name \"b\" = \"=\" a value \"2\"])]>]) the end of the text \"\"])")
+claim(tree("a = 1\nb = 2") == "[[[a = 1] [[\n [b = 2]]]] ]")
 
 // A block is deeper than its line, and ends where a line is less deep.
 claim(readings("a:\n  b = 1\n  c = 2\nd = 3\n") == 1)

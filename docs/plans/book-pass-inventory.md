@@ -1741,8 +1741,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### A parser records where each expression came from in its text
-- Decides: the position of an expression in its source text is a metadata field the parser's extension registers and writes. The kernel does not know about it. The parse tree stays internal to the parser.
-- Status: open; ruled 2026-11-12 (DR3)
+- Decides: the place of an expression in its source text is an entry of its description, `at`, which the parser writes: the text's name, and where the part starts and ends, each a location of index, line and column. The kernel keeps a place on what is built from a description and gives it no meaning. The parse tree stays internal to the parser.
+- Status: open (the present tree has none; the rebuild's engine writes places, `next/ext/lib/engine.alg`); ruled 2026-11-12 (DR3); reworded 2026-11-26 to the maintainer's ruling of 2026-11-22
 - Type: capability
 - Rationale kind: technical
 - Depends on: Parsing is evaluation; An extension registers its own fields; A value's origin is a description
@@ -1750,7 +1750,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Label: swappable — a parser may record more or less
 - Options recorded: the kernel recording source positions in its own origin field (rejected: "Source attachment is not a promise the kernel needs to know about")
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
-- Notes: new, by ruling. Two fields: the kernel's origin field holds the expression an expression came from; the parser's field holds a parsed expression's source information. Following the origin chain to its end reaches an expression that carries the parser's field.
+- Notes: new, by ruling. Was "a metadata field the parser's extension registers and writes", with the kernel knowing nothing of it. The ruling of 2026-11-22 made a place an entry of a part's description, kept by the kernel on what it builds and told to a host with a claim's record; the maintainer confirmed on PR #305 that this entry follows the later ruling. The origin field is unchanged: it holds the expression an expression came from.
 - Chapter: Parsing
 
 #### Scannerless parsing
