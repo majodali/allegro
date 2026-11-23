@@ -1732,6 +1732,13 @@ its approval.
   an input or a capability: "Check reaches every claim", "A phase
   leaves a capability out as not yet given or as not needed" and
   "Diagnostics are a hook the kernel offers its host". 256 decisions.
+- **2026-11-23 — the wording confirmed, and two notes** (the review
+  session): the maintainer confirmed the three decisions and the entry
+  names of a description. Two notes record a second discussion: a
+  check has three phases (specialization, the host's analysis of what
+  it leaves, and tests run by ordinary evaluation), and both ways of
+  leaving a capability out are kept, pending real cases. The hook is
+  next.
 
 ## 8. Sessions
 
