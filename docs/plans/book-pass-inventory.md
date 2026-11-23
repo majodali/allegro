@@ -3574,7 +3574,7 @@ They came together over years of exploration into most of what Allegro is today.
 
 #### Diagnostics are a hook the kernel offers its host
 - Decides: which branches a run took, a trace of an evaluation, and stopping at a place are built on one hook that the kernel offers its host and never Allegro code. The hook reports what the kernel does (a branch taken, a call opened, a claim decided) with the place of the part. The holder of the kernel is trusted as the launcher is and already reads every body, so the hook gives no new authority. A capability for diagnostics, where there is one, is the launcher's, made on the hook.
-- Status: open (not built; a part has a place since 2026-11-22, which the hook needs); ruled 2026-11-22
+- Status: partly built (the hook exists on both kernel variants; no launcher uses it, and stopping at a place is not built); ruled 2026-11-22
 - Type: capability
 - Rationale kind: technical
 - Depends on: What the kernel's interface offers; A description is plain data in a fixed set of forms
@@ -3584,6 +3584,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-22 (the discussion of inputs and capabilities a phase does not have)
 - Use case: a coverage report lists the branches no test took, each by file and line, for a program that ran exactly as it does without the report.
 - Notes: new, by ruling. Read with "A trace is read from origins", which stays open: an origin is the chain from a value back to what it came from, and a place is where one part was written.
+- Notes (2026-11-23, built): `observe` on the kernel's interface. The kernel tells four things: a branch, with which of its two was then evaluated, both where a function is specialized under an unknown condition and neither in ordinary evaluation under one; a composed function's body opened; a claim's evaluation come out, or made to wait; a part of a capability performed. Each comes with the part, its place, and whether it was evaluated ahead of what is done. A branch that specialization never reaches is known by nothing being told of it. Stopping at a place needs the kernel to pause on the host's word, which only the variant that keeps its own stack can do, and is not built.
 - Chapter: The kernel's interface
 
 ### Configuration

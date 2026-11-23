@@ -195,12 +195,12 @@ export const createMachine: CreateKernel = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody, tell, observed, aheadIs,
     shared,
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k16";
+  const VARIANT = "machine-k17";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -260,6 +260,7 @@ export const createMachine: CreateKernel = () => {
    * is written: each collector hands what it holds to the one around it when its
    * evaluation ends, so a deep evaluation does not pay for its depth at every record.
    */
+  aheadIs(() => ahead);
   const rest = (r: Rest): void => {
     if (collectors.length > 0) collectors[collectors.length - 1].set(localKey(r), r);
   };
@@ -1163,6 +1164,7 @@ export const createMachine: CreateKernel = () => {
         return needed(evaluate(v.args[0], scope), scope, (condition) => {
           if (condition instanceof Refuted) return condition;
           const truth = truthOf(condition);
+          if (observed() && (truth !== undefined || !known(condition))) tell(v, { kind: "branch", taken: truth === true ? "then" : truth === false ? "else" : speculative ? "both" : "neither" });
           if (truth === true) return evaluate(v.args[1], scope);
           if (truth === false) return evaluate(v.args[2], scope);
           if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
@@ -1343,6 +1345,7 @@ export const createMachine: CreateKernel = () => {
         return l;
       });
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      if (observed() && !(ahead && opening.includes(fn))) tell(v, { kind: "call", function: out(fn) });
       // The body is evaluated from `run`, in place of this call: a function that calls itself
       // as the value of its body goes round with no frame kept for each turn.
       if (!ahead) return bounce(() => evaluate(substitute(fn.body, env, new Map()), scope));
@@ -1368,6 +1371,7 @@ export const createMachine: CreateKernel = () => {
       if (ahead && d.purity === "effectful") return new Expr(fn, args);
       const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
       rest(what);
+      if (d.purity === "effectful" && observed()) tell(v, { kind: "effect", capability: d.capability, operation: d.part });
       const before = running;
       running = d.purity === "effectful" ? what : undefined;
       let r: V;
@@ -1390,6 +1394,7 @@ export const createMachine: CreateKernel = () => {
     ctl.onSuspend = () => {
       if (!waits) {
         waits = true;
+        tell(site, { kind: "claim", outcome: "waiting" });
         tallyOf(site);
         waitingAt.set(site, (waitingAt.get(site) ?? 0) + 1);
       }

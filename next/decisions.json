@@ -212,7 +212,7 @@
     {"title":"No interface call writes a bare claim outcome","part":"VI","chapter":"The kernel's interface","type":"capability","present":"open","owner":"R","state":"written","unit":"next/kernel/kernel.ts"},
     {"title":"Limits are step budgets","part":"VI","chapter":"The kernel's interface","type":"capability","present":"open","owner":"R","state":"none","unit":null},
     {"title":"One task runs at a time, and a slice never changes what happens","part":"VI","chapter":"The kernel's interface","type":"capability","present":"open","owner":"R","state":"none","unit":null},
-    {"title":"Diagnostics are a hook the kernel offers its host","part":"VI","chapter":"The kernel's interface","type":"capability","present":"open","owner":"R","state":"none","unit":null},
+    {"title":"Diagnostics are a hook the kernel offers its host","part":"VI","chapter":"The kernel's interface","type":"capability","present":"partly built","owner":"R","state":"none","unit":null},
     {"title":"Configuration is all the information that determines an execution","part":"VI","chapter":"Configuration","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"Configuration sources have a priority, and a result says which supplied each value","part":"VI","chapter":"Configuration","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"A full configuration is a model, evaluated in a first phase","part":"VI","chapter":"Configuration","type":"capability","present":"open","owner":"Q","state":"none","unit":null},

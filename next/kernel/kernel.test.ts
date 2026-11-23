@@ -3286,3 +3286,69 @@ test("a claim's record says where the claim was written, and a place is no part 
   };
   assert.equal(module(1), module(40));
 });
+
+// ---- The hook for diagnostics (2026-11-23) ------------------------------------------------
+//
+// "Diagnostics are a hook the kernel offers its host".
+
+/** A kernel whose host listens, and what it was told, each as one line. */
+function listening() {
+  const base = sayer();
+  const { k } = base;
+  const told: string[] = [];
+  k.observe((seen) => {
+    const where = seen.at === undefined ? "?" : `${seen.at.start.line}`;
+    const what = seen.kind === "branch" ? seen.taken : seen.kind === "claim" ? seen.outcome : seen.kind === "effect" ? `${seen.capability}.${seen.operation}` : "";
+    told.push(`${seen.kind}@${where}${what === "" ? "" : " " + what}${seen.ahead ? " ahead" : ""}`);
+  });
+  return { ...base, told };
+}
+
+test("a host that listens is told each branch taken, call opened, claim decided and effect performed, with its place", () => {
+  const { k, isZero, kp, call, told, say } = listening();
+  const x = k.param("x");
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  // f(x) = if isZero(x) then say(1) else claim(isZero(x))      -- lines 2 to 4; the call at line 9
+  const f = k.composedFunction([x], k.expression(kp("if"), [call(isZero, x), k.expression(say, [byte(k, 1)], line(3)), k.expression(kp("claim"), [call(isZero, x)], line(4))], line(2)), line(1));
+  k.evaluate(k.expression(f, [byte(k, 0)], line(9)));
+  assert.deepEqual(told, ["call@9", "branch@2 then", "effect@3 output.write"]);
+  told.length = 0;
+  k.evaluate(k.expression(f, [byte(k, 5)], line(9)));
+  assert.deepEqual(told, ["call@9", "branch@2 else", "claim@4 refuted"]);
+  // With no host listening nothing is told, and the program runs the same.
+  told.length = 0;
+  k.observe(undefined);
+  assert.equal(k.evaluate(k.expression(f, [byte(k, 5)], line(9))).refuted, true);
+  assert.deepEqual(told, []);
+  assert.throws(() => k.observe(1 as never), /observer/);
+});
+
+test("the host is told which branches a specialization reached: both under an unknown condition, one under a known one", () => {
+  const { k, isZero, kp, call, told, say } = listening();
+  const x = k.param("x");
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  // g(x) = if isZero(x) then say(1) else (if isZero(0) then 2 else say(3))
+  const inner = k.expression(kp("if"), [call(isZero, byte(k, 0)), byte(k, 2), k.expression(say, [byte(k, 3)], line(6))], line(5));
+  const g = k.composedFunction([x], k.expression(kp("if"), [call(isZero, x), k.expression(say, [byte(k, 1)], line(3)), inner], line(2)), line(1));
+  k.evaluate(call(kp("specialize"), g, steps(k, 1_000)));
+  // The outer condition is unknown, so both its branches are reached. The inner one is
+  // known, so its else branch, at line 6, is never reached: nothing is told of it.
+  assert.deepEqual(told, ["branch@2 both ahead", "branch@5 then ahead"]);
+  // Ordinary evaluation with the condition unknown reaches neither branch.
+  told.length = 0;
+  k.evaluate(k.expression(g, [k.param("unknown")], line(9)));
+  assert.deepEqual(told, ["call@9", "branch@2 neither"]);
+});
+
+test("the host is told of a claim that waits and of its outcome when the answer comes, and of what is looked at ahead", () => {
+  const { k, isZero, kp, call, told, say } = listening();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const c = k.cell();
+  // then(claim(isZero(c)), say(7)): the claim waits, and the effect it holds back is looked at ahead.
+  k.evaluate(k.expression(kp("then"), [k.expression(kp("claim"), [call(isZero, c)], line(1)), k.expression(say, [byte(k, 7)], line(2))], line(1)));
+  assert.equal(told.filter((t) => t.startsWith("claim@1 waiting")).length >= 1, true, "the claim is told as waiting");
+  assert.ok(!told.some((t) => t.startsWith("effect")), "nothing is performed ahead, so no effect is told");
+  told.length = 0;
+  k.fill(c, byte(k, 0));
+  assert.deepEqual(told, ["claim@1 decided", "effect@2 output.write"]);
+});
