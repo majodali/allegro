@@ -53,6 +53,7 @@ import { createKernel } from "../kernel/create.js";
 import type { Value } from "../kernel/interface.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
+import { testLines, testMessages } from "../launch/test-output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
@@ -797,4 +798,56 @@ test("under a test phase the input lines go to the load, the serves lines still 
   const checked = await runProgram(program.replace("// phases: test", "// phases: check, test").replace("// summary: decided\n// claim at: 4:1 decided\n", ""));
   assert.deepEqual(checked.problems, []);
   assert.ok(checked.result?.claims.some((c) => c.at?.start.line === 4 && c.decided > 0), JSON.stringify(checked.result?.claims));
+});
+
+test("the programs of the test phase are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["pass-fail", ["test"]], ["exports", ["test"]], ["open", ["test"]], ["none", ["test"]], ["load-refuted", ["test"]],
+    ["prints", ["test"]], ["timer", ["test"]], ["http", ["test"]], ["report", ["test"]], ["check", ["check", "test"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/test-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+  const imports = `${PROGRAMS_DIR}/m3/test-import/main.alg`;
+  assert.ok(FILES.includes(imports));
+  assert.ok(isImportedText(`${PROGRAMS_DIR}/m3/test-import/arith.alg`));
+  assert.deepEqual(readPhases(text(imports)).phases, ["test"]);
+  assert.deepEqual(readPins(text(imports)).realises, []);
+});
+
+test("program m3/test-pass-fail.alg: all four tests are called, and the refuted one names its claim's place, which the message for it carries", async () => {
+  const file = `${PROGRAMS_DIR}/m3/test-pass-fail.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.ok(run.tests !== undefined);
+  const wrong = run.tests.tests.find((t) => t.name === "wrong");
+  const refuted = wrong?.result.claims.find((c) => c.refuted > 0);
+  assert.deepEqual([refuted?.at?.source, refuted?.at?.start.line, refuted?.at?.start.column], [file, 13, 3]);
+  assert.deepEqual(testMessages(run.tests), [{ level: "error", text: "test wrong: a claim that is not true", file, line: 13n, column: 3n }]);
+});
+
+test("program m3/test-prints.alg: the commands show nothing of the passing test and each line of the failing one", async () => {
+  const file = `${PROGRAMS_DIR}/m3/test-prints.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.ok(run.tests !== undefined);
+  assert.deepEqual(run.tests.load.lines, ["loading"]);
+  assert.deepEqual(testLines(run.tests), ["test quiet: passed", "test loud: refuted: a claim that is not true", "  from a failing test", "  its second line", "tests: 1 passed, 1 failed"]);
+});
+
+test("program m3/test-load-refuted.alg calls no test, and m3/test-check.alg's test passes under the test phase alone", async () => {
+  const refuted = `${PROGRAMS_DIR}/m3/test-load-refuted.alg`;
+  const loaded = await runProgram(text(refuted), refuted);
+  assert.deepEqual(loaded.problems, []);
+  assert.deepEqual(loaded.tests?.tests, []);
+  const checked = `${PROGRAMS_DIR}/m3/test-check.alg`;
+  const both = await runProgram(text(checked), checked);
+  assert.deepEqual(both.problems, []);
+  assert.equal(both.tests, undefined, "the check ends the launch before the load");
+  const alone = await runProgram(text(checked).replace("// phases: check, test\n", "// phases: test\n").replace(/\/\/ (end|claim at):.*\n/g, ""), checked);
+  assert.deepEqual(alone.tests?.tests.map((t) => [t.name, t.end.kind]), [["greets", "completed"]]);
+  assert.deepEqual(alone.lines, ["the test was called"]);
 });
