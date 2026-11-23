@@ -10,9 +10,10 @@
 // of next/ext/allegretto/forms.md section 2, but for the block, `sync`,
 // `<-`, `import` with `with` or `without`, and `use`.
 //
-// There is no scanner. A terminal that reads a word or a sign also reads
-// the space after it: spaces, tabs, comments, and the end of a line
-// where the next line with anything on it begins with a space. So what a
+// There is no scanner. A terminal that reads a word or a sign is made
+// `spaced`, so it also reads the space after it: spaces, tabs, comments,
+// and the end of a line where the next line with anything on it begins
+// with a space. So what a
 // rule can begin with is never a space, and the engine's test of one
 // byte is of the byte that matters.
 //
@@ -87,11 +88,7 @@ opening = grammar.term("the beginning of a module", (text, at) => first_column(t
 
 // ---- Words and signs ----
 
-// A terminal that reads the space after what it reads.
-spaced(t) => grammar.term(t.name, spaced_match(t.match), t.known, t.ranges, t.empty)
-spaced_match(match) => (text, at) => with_space(text, at, match(text, at))
-with_space(text, at, n) => if n < 0 then -1 else n + space(text, at + n)
-
+spaced = grammar.spaced
 sign(t) => spaced(grammar.lit(t))
 // The sign of one byte b: a brace cannot be written in a text.
 sign_of(b) => sign(bits.slice(b, 56, 8))
@@ -107,11 +104,8 @@ whole_word(match) => (text, at) => not_longer(text, at, match(text, at))
 not_longer(text, at, n) => if n < 0 || class.has(word_bytes, byte(text, at + n)) then -1 else n
 
 // A name: letters, digits and underscores, the first no digit, and not
-// one of the five words that are forms.
-name = spaced(grammar.term("a name", (text, at) => a_name(text, at), true, class.pairs("azAZ__"), false))
-a_name(text, at) => if class.has(letters, byte(text, at)) then unless_form(text, at, span(text, word_bytes, at, 1)) else -1
-unless_form(text, at, n) => if is_form(bits.slice(text, at * 8, n * 8), n) then -1 else n
-is_form(w, n) => (n == 2 && w == "if") || (n == 4 && (w == "else" || w == "true")) || (n == 5 && w == "false")
+// one of the words that are forms: the reserved set `forms`.
+name = spaced(grammar.unless(grammar.term("a name", (text, at) => if class.has(letters, byte(text, at)) then span(text, word_bytes, at, 1) else -1, true, class.pairs("azAZ__"), false), `forms))
 
 // A number: digits and letters after a digit, and a point with digits after it.
 number = spaced(grammar.term("a number", (text, at) => a_number(text, at), true, class.pairs("09"), false))
@@ -141,7 +135,8 @@ between = alt([sign("|>"), sign("||"), sign("&&"), sign("=="), sign("!="), sign(
 // Items with commas between, or none.
 listed(item) => opt(seq([item, star(seq([sign(","), item]))]))
 
-export allegretto = grammar.grammar(`module, {
+export allegretto = grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `forms, ["if", "else", "true", "false"]), (text, at, state) => space(text, at), false)
+rules = {
   module: seq([opening, star(seq([ref(`line), ending])), grammar.end]),
   line: alt([ref(`declaration), ref(`binding), ref(`expression)]),
   declaration: seq([alt([word("capability"), word("input"), word("key"), word("import")]), name]),
@@ -156,5 +151,4 @@ export allegretto = grammar.grammar(`module, {
   primary: alt([number, quoted, marked, word("true"), word("false"), name, seq([sign("("), ref(`expression), sign(")")]), seq([sign("["), ref(`arguments), sign("]")]), seq([sign_of(123), ref(`fields), sign_of(125)])]),
   arguments: listed(ref(`expression)),
   fields: listed(ref(`field)),
-  field: seq([alt([name, seq([sign("["), ref(`expression), sign("]")])]), sign(":"), ref(`expression)])
-})
+  field: seq([alt([name, seq([sign("["), ref(`expression), sign("]")])]), sign(":"), ref(`expression)])}

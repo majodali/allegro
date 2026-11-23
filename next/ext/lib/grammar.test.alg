@@ -56,6 +56,30 @@ claim(g.start == `s && g.rules.s.op == `seq && count(g.rules.s.items) == 2)
 claim(g.rules.s.items[0].name == `w && g.rules.s.items[1].item.op == `alt)
 claim(!g.rules.s.items[1].item.items[1].holds)
 
+// A grammar begins with no state to speak of, no space and no reserved word.
+claim(g.state == "" && count(g.reserved) == 0 && !g.space_reads && g.space(t, 3, "") == 0)
+// Each of the three is given by a function that leaves the rest as it was.
+stated = grammar.with_state(g, 7)
+claim(stated.state == 7 && stated.start == `s && count(stated.rules) == 2)
+spaced_g = grammar.with_space(stated, (text, at, state) => 1, true)
+claim(spaced_g.space(t, 0, 0) == 1 && spaced_g.space_reads && spaced_g.state == 7)
+// Words are added to a set: the second call keeps the words of the first.
+kept = grammar.with_reserved(grammar.with_reserved(spaced_g, `words, ["if", "else"]), `words, ["when"])
+claim(count(kept.reserved) == 1 && count(kept.reserved.words) == 3 && kept.reserved.words[0] == "if" && kept.reserved.words[2] == "when")
+claim(kept.state == 7 && kept.space_reads)
+other = grammar.with_reserved(kept, `signs, ["+"])
+claim(count(other.reserved) == 2 && count(other.reserved.words) == 3 && count(other.reserved.signs) == 1)
+claim(count(grammar.words_of(other.reserved, `signs, 0)) == 1 && count(grammar.words_of(other.reserved, `none_such, 0)) == 0)
+
+// A terminal made spaced, or kept from a set of words, is the same terminal otherwise.
+claim(!word.spaced && !word.stateful && count(word.unless) == 0)
+marked = grammar.unless(grammar.spaced(word), `words)
+claim(marked.spaced && marked.unless == `words && marked.name == "a word" && marked.match(t, 0) == 3 && marked.known && !marked.empty)
+claim(grammar.spaced(marked).unless == `words && grammar.unless(marked, `others).spaced)
+// A terminal that reads the state.
+counting = grammar.stepper("a count", (text, at, n) => {read: 1, state: n + 1}, false, word.ranges, false)
+claim(counting.stateful && counting.op == `term && counting.step(t, 0, 4).state == 5 && counting.step(t, 0, 4).read == 1)
+
 output.write("grammar: ok")
 // expect: grammar: ok
 // end: completed

@@ -82,7 +82,7 @@ claim(analysis.prepared(grammar.grammar(`s, {s: grammar.star(grammar.opt(lit("a"
 
 // A rule two items of one alt both begin with is remembered: name, with
 // which both call and name begin. No other is.
-claim(count(p.kept) == 1 && p.kept[0] == `name)
+claim(count(p.kept) == 1 && p.kept[0].name == `name && !p.kept[0].grows)
 claim(p.rules.call.items[0].kept)
 claim(!p.rules.list.items[1].kept && !p.rules.more.items[1].kept)
 // Through other rules too: a and b both begin with c, which begins with d.
@@ -94,7 +94,7 @@ deep = analysis.prepared(grammar.grammar(`s, {
   d: lit("d"),
   e: seq([ref(`s), ref(`s)])
 }))
-claim(count(deep.kept) == 2 && deep.kept[0] == `c && deep.kept[1] == `d)
+claim(count(deep.kept) == 2 && deep.kept[0].name == `c && deep.kept[1].name == `d)
 // One item that reaches a rule twice does not make it remembered.
 twice = analysis.prepared(grammar.grammar(`s, {s: alt([seq([grammar.opt(ref(`a)), ref(`a)]), lit("z")]), a: lit("a")}))
 claim(count(twice.kept) == 0)
@@ -105,6 +105,42 @@ claim(count(plain.kept) == 0)
 // A rule that names itself is no trouble to the analysis.
 loop = analysis.prepared(grammar.grammar(`s, {s: alt([seq([lit("("), ref(`s), lit(")")]), lit("x")])}))
 claim(class.has(loop.rules.s.items[0].set, 40) && class.size(loop.rules.s.items[0].set) == 1)
+
+// A rule that can begin with itself, straight or through others or after
+// what can read no byte; and one that only holds itself further on.
+turns = analysis.prepared(grammar.grammar(`a, {
+  a: alt([seq([ref(`a), lit("+")]), lit("x")]),
+  b: seq([ref(`c), lit("1")]),
+  c: alt([ref(`b), lit("y")]),
+  d: seq([grammar.opt(lit("-")), ref(`d)]),
+  e: seq([lit("("), ref(`e), lit(")")]),
+  f: seq([ref(`a), ref(`e)])
+}))
+claim(turns.rules.f.items[0].grows && turns.rules.b.items[0].grows && turns.rules.c.items[0].g.grows && turns.rules.d.items[1].grows)
+claim(!turns.rules.e.items[1].grows && !turns.rules.f.items[1].grows)
+claim(turns.top.op == `ref && turns.top.name == `a && turns.top.grows)
+// What a rule that begins with itself can begin with is what its other items begin with.
+claim(class.has(turns.rules.a.items[0].set, 120) && class.size(turns.rules.a.items[0].set) == 1)
+
+// A rule that reads the state or changes it, itself or through another,
+// is not remembered; nor one with a spaced terminal where space reads the state.
+step = grammar.stepper("a step", (text, at, n) => {read: 0, state: n}, false, class.no_ranges, true)
+twice_begun(rules) => grammar.grammar(`s, put(rules, `s, alt([seq([ref(`a), lit("1")]), seq([ref(`a), lit("2")])])))
+claim(count(analysis.prepared(twice_begun({a: lit("a")})).kept) == 1)
+claim(count(analysis.prepared(twice_begun({a: seq([lit("a"), step])})).kept) == 0)
+claim(count(analysis.prepared(twice_begun({a: seq([lit("a"), ref(`b)]), b: grammar.opt(step)})).kept) == 0)
+spaced_rule = twice_begun({a: grammar.spaced(lit("a"))})
+claim(count(analysis.prepared(spaced_rule).kept) == 1)
+claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, true)).kept) == 0)
+claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, false)).kept) == 1)
+// The state and the space of the grammar are handed on.
+claim(analysis.prepared(grammar.with_state(spaced_rule, 5)).state == 5)
+
+// The words a terminal does not read, by their length in bytes.
+worded = analysis.prepared(grammar.with_reserved(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words), t: grammar.run("a name", "az")}), `words, ["if", "else", "of", "when"]))
+claim(count(worded.rules.s.words) == 5 && count(worded.rules.s.words[2]) == 2 && count(worded.rules.s.words[4]) == 2 && count(worded.rules.s.words[3]) == 0)
+claim(worded.rules.s.words[2][1] == "of" && worded.rules.s.words[4][0] == "else")
+claim(count(worded.rules.t.words) == 0)
 
 output.write("analysis: ok")
 // expect: analysis: ok

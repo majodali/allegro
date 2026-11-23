@@ -120,8 +120,8 @@ const READER = [
   "",
 ].join("\n");
 
-/** Two modules of this directory that are written flat, as one text: a little over 200 lines. */
-const MODULE = ["analysis.alg", "class.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
+/** Three modules of this directory that are written flat, as one text: a little over 200 lines. */
+const MODULE = ["grammar.alg", "class.alg", "map.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
 
 test("the speed target: a module of 200 lines of Allegretto is read, one way, in under 10 seconds", DEPTH, async () => {
   assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);

@@ -602,7 +602,7 @@ are:
 | E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
 | E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | done 2026-11-24: the runner `next/ext/ext.test.ts`, `next/ext/lib/map.alg` and `set.alg` with their test modules, and the primitives `text.byte`, `text.span`, `text.starts`, `text.until`; a map of 10,000 entries is built and read in 4,652,564 steps, 4.75 times the steps of one of 2,500 |
 | E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | done 2026-11-25: `class.alg`, `grammar.alg`, `analysis.alg`, `engine.alg` and `flat.alg` under `next/ext/lib/`, each with a test module; **the speed target is met: a module of 207 lines is read in 2,280,434 steps and about 7 seconds**; the engine specialized over a grammar is measured and gains little (§7) |
-| E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | its tests |
+| E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
@@ -1865,6 +1865,72 @@ its approval.
     `true`, such as `trues`, and a brace inside a text; the six names
     of E2's hand-off are still not listed, so terminals read bytes with
     `bits.slice` and `bits.int`, about 39,000 calls for the 207 lines.
+- **2026-11-25 — chunk E4, the engine: left recursion and state** (the
+  review session). The maintainer confirmed E3's asks: operators as one
+  row, a terminal that says what it can start with, and space read
+  after a terminal.
+  - *A rule that begins with itself.* The analysis marks it: its own
+    number is among the rules its body can begin with. The engine reads
+    such a rule in turns at a position. The first turn gives the rule
+    nothing where it meets itself there; each turn after gives it what
+    the turn before gave; a turn that adds no result ends it. This
+    holds for two rules that begin with each other and for a rule that
+    begins with itself after an item that can read no byte. A rule that
+    reads itself and no byte between has no end of readings and is
+    refused, when more turns have added results than bytes are left.
+    While a rule is read in turns at a position the table is not read
+    there, since what a rule gives there is not settled. Each turn
+    reads the body again for every result so far, so a row of n
+    operands read this way costs about n times n: 55,275 steps for 20
+    operands, 191,125 for 40, 711,225 for 80. `flat.alg` reads its
+    operators with a repetition and is not affected. Reading on from
+    the new results of a turn alone would make it grow with n; it is
+    not built.
+  - *A state.* A result is `{end, state, tree}`. A state is a bits
+    value, so that two can be compared: the ruling "a rule entered
+    again at the same position with a changed state is refused" needs
+    it. A terminal made with `stepper` gives `{read, state}`. The
+    maintainer is asked to confirm that a state is bits.
+  - *What is remembered, with a state.* The table has a row for a
+    position, not for a position and a state. So a rule is remembered
+    only where it neither reads nor changes the state, itself or
+    through another rule; what the table holds is then right for every
+    state, and whoever reads an entry puts its own state on the
+    results. In a grammar with blocks by indentation the space after
+    every word reads the state, so nothing is remembered there. Whether
+    that costs is to be measured on Allegretto's whole grammar, in E7.
+  - *Space and reserved words are the grammar's.* `with_space` gives a
+    grammar its function for space; a terminal made `spaced` reads it
+    after what it reads, and a tree keeps where the terminal itself
+    ended. `with_reserved` adds words to a set by name; a terminal made
+    with `unless` and a set's name reads none of them. `flat.alg` uses
+    both and holds no code of its own for either.
+  - *Blocks by indentation.* `offside.alg`: the state is the columns
+    of the blocks being read. `newline` holds where the next line is at
+    the block's column. The entry "Offside rule through stateful indent
+    terminals" says at or below; here a line below the block's column
+    is `dedent`'s alone, since with every reading kept a `newline` that
+    held there too would read the outer block's statement as the inner
+    one's. `indent` reads nothing and holds at the first thing on a
+    line deeper than the block, because the space after the word
+    before it has already carried on to that line. `sameline`, which
+    the present tree never built, is here. A tab counts as one column;
+    the entry leaves tabs open. The maintainer is asked to confirm.
+  - *Measured.* `grammar.alg`, `class.alg` and `map.alg` as one text,
+    226 lines and 12,069 bytes: 2,113,919 steps, 6.7 seconds.
+    `analysis.alg` now holds an indented block, so it is no longer a
+    text `flat.alg` reads.
+  - *Tests changed by this chunk.* `analysis.test.alg`: an entry of
+    `kept` is `{name, grows}` and no longer a name, so two claims read
+    `.name`. The speed test reads three other modules, for the reason
+    above.
+  - *Deliberate faults*: 30 made in the four modules, 27 caught at
+    first. The 3 missed showed missing tests: a remembered rule inside
+    a rule read in turns, the state compared where a rule is met
+    again, and the state after a guard. Each has a test now and is
+    caught.
+  - *For the research goal.* Nothing new: the three small grammars of
+    E3's finding take 389 to 313, 925 to 862 and 511 to 404 steps.
 
 ## 8. Sessions
 

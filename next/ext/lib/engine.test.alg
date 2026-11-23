@@ -1,5 +1,6 @@
 // Tests of next/ext/lib/engine.alg.
 capability output
+import class
 import engine
 import grammar
 
@@ -121,6 +122,89 @@ claim(readings(sums, "1") == 1)
 claim(tree(sums, "1+2") == "start([sum([product([factor([space \"\" #0 a number \"1\"]) <>]) <[space \"\" #0 + \"+\" product([factor([space \"\" #0 a number \"2\"]) <>])]>]) space \"\" the end of the text \"\"])")
 claim(failed_at(sums, "1 + * 2") == 4)
 claim(failed_at(sums, "(1 + 2") == 6)
+
+// ---- A rule that begins with itself ----
+number = grammar.run("a number", "09")
+left = engine.prepared(grammar.grammar(`sum, {sum: alt([seq([ref(`sum), lit("+"), ref(`one)]), ref(`one)]), one: number}))
+claim(tree(left, "7") == "sum(#1 one(a number \"7\"))")
+// Each sign takes all that is before it: (1+2)+3.
+claim(tree(left, "1+2+3") == "sum(#0 [sum(#0 [sum(#1 one(a number \"1\")) + \"+\" one(a number \"2\")]) + \"+\" one(a number \"3\")])")
+claim(readings(left, "1+2+3+4+5+6") == 1)
+claim(failed_at(left, "1+") == 2 && failed_at(left, "+1") == 0 && failed_at(left, "1+2+x") == 4)
+// The same with the items of the alt written the other way round.
+left_turned = engine.prepared(grammar.grammar(`sum, {sum: alt([ref(`one), seq([ref(`sum), lit("+"), ref(`one)])]), one: number}))
+claim(tree(left_turned, "1+2") == "sum(#1 [sum(#0 one(a number \"1\")) + \"+\" one(a number \"2\")])")
+// A rule that begins and ends with itself reads a row every way: two for three, five for four.
+both_ends = engine.prepared(grammar.grammar(`e, {e: alt([seq([ref(`e), lit("+"), ref(`e)]), number])}))
+claim(readings(both_ends, "1+2") == 1 && readings(both_ends, "1+2+3") == 2 && readings(both_ends, "1+2+3+4") == 5)
+// Two rules that begin with each other.
+pair = engine.prepared(grammar.grammar(`a, {a: alt([seq([ref(`b), lit("x")]), lit("y")]), b: alt([seq([ref(`a), lit("z")]), lit("w")])}))
+claim(readings(pair, "y") == 1 && readings(pair, "wx") == 1 && readings(pair, "yzx") == 1 && readings(pair, "wxzxzx") == 1)
+claim(readings(pair, "yz") == 0 && failed_at(pair, "yzy") == 2)
+// A rule that begins with itself after an item that can read nothing.
+hidden = engine.prepared(grammar.grammar(`a, {a: alt([seq([opt(lit("-")), ref(`a), lit("!")]), lit("x")])}))
+claim(readings(hidden, "x!!") == 1 && readings(hidden, "-x!") == 1 && readings(hidden, "--x!!") == 1 && readings(hidden, "-x") == 0)
+// "-x!!" reads two ways: the sign with x! and then !, or with x and then both.
+claim(readings(hidden, "-x!!") == 2)
+// A rule that begins with itself and is remembered: both items of s begin with it.
+shared = engine.prepared(grammar.grammar(`s, {s: alt([seq([ref(`sum), lit(";")]), seq([ref(`sum), lit(".")])]), sum: alt([seq([ref(`sum), lit("+"), ref(`one)]), ref(`one)]), one: number}))
+claim(count(shared.kept) == 2 && shared.kept[0].name == `sum && shared.kept[0].grows && !shared.kept[1].grows)
+claim(readings(shared, "1+2+3.") == 1 && readings(shared, "1;") == 1 && failed_at(shared, "1+2,") == 3)
+// Two rules that begin with each other, both remembered: two items of
+// r begin with x, and so with r. What x gives where r is read in turns is not
+// taken from the table, since it changes from turn to turn.
+mutual = engine.prepared(grammar.grammar(`r, {r: alt([seq([ref(`x), lit("!")]), seq([ref(`x), lit("?")]), lit("a")]), x: seq([ref(`r), lit("+")])}))
+claim(count(mutual.kept) == 2 && mutual.kept[0].name == `r && mutual.kept[1].name == `x)
+claim(attempt(readings(mutual, "a+!+?"), 200000) == 1 && attempt(readings(mutual, "a"), 200000) == 1 && attempt(readings(mutual, "a+"), 200000) == 0)
+// A rule that reads itself and no byte between has no end of readings, and is refused.
+idle_rule = engine.prepared(grammar.grammar(`a, {a: alt([ref(`a), lit("x")])}))
+claim(attempt(readings(idle_rule, "x"), 100000).reason == "a rule reads itself and no byte between")
+
+// ---- A state beside the position ----
+// The state counts the brackets open: one that closes is read where one
+// is open, and the text ends where none is.
+opened = grammar.stepper("(", (text, at, depth) => if grammar.byte(text, at) == 40 then {read: 1, state: depth + 1} else [], true, class.pairs("(("), false)
+closed = grammar.stepper(")", (text, at, depth) => if grammar.byte(text, at) == 41 && depth > 0 then {read: 1, state: depth - 1} else [], true, class.pairs("))"), false)
+level = grammar.stepper("no bracket open", (text, at, depth) => if depth == 0 then {read: 0, state: depth} else [], false, class.no_ranges, true)
+brackets = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), 0))
+claim(readings(brackets, "(x(x))x") == 1 && readings(brackets, "") == 1)
+claim(readings(brackets, "(x") == 0 && failed_at(brackets, "(x") == 2)
+claim(readings(brackets, "x)") == 0 && failed_at(brackets, "x)") == 1)
+// A state the grammar begins with.
+begun = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), 2))
+claim(readings(begun, "x))") == 1 && readings(begun, "x)") == 0)
+// A rule remembered touches no state, and what it gives is read with the
+// state of whoever asks: `more` changes the state before n is read twice.
+more = grammar.stepper("more", (text, at, n) => {read: 0, state: n + 1}, false, class.no_ranges, true)
+is_one = grammar.stepper("the state 1", (text, at, n) => if n == 1 then {read: 0, state: n} else [], false, class.no_ranges, true)
+asked = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([more, alt([seq([ref(`n), is_one]), seq([ref(`n), lit("!")])])]), n: number}), 0))
+claim(count(asked.kept) == 1 && readings(asked, "12") == 1 && readings(asked, "12!") == 1)
+// A rule that touches the state is not remembered, though two items begin with it.
+touching = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: alt([seq([ref(`n), lit("?")]), seq([ref(`n), lit("!")])]), n: seq([more, number])}), 0))
+claim(count(touching.kept) == 0 && readings(touching, "12!") == 1)
+// A rule met again at one position with another state is refused.
+restless = engine.prepared(grammar.with_state(grammar.grammar(`a, {a: alt([seq([more, ref(`a), lit("!")]), lit("x")])}), 0))
+claim(attempt(readings(restless, "x!"), 100000).reason == "a rule is met again at one position with another state")
+// A guard leaves the state as it was, whatever its item would have made of it.
+looking = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([grammar.guard(opened, true), level, opened, closed])}), 0))
+claim(readings(looking, "()") == 1)
+
+// ---- Space after a terminal, and reserved words ----
+spaces = (text, at, state) => blanks(text, at, 0)
+blanks(text, at, n) => if grammar.byte(text, at + n) == 32 then blanks(text, at, n + 1) else n
+word_of = grammar.spaced(grammar.unless(grammar.run("a name", "az"), `words))
+when_word = grammar.spaced(lit("when"))
+plain_words = grammar.with_reserved(grammar.with_space(grammar.grammar(`s, {s: alt([seq([when_word, word_of]), seq([word_of, lit("="), word_of])])}), spaces, false), `words, ["if", "else"])
+spaced_words = engine.prepared(plain_words)
+// The tree keeps where the word ended, and the reading goes on after the space.
+claim(tree(spaced_words, "a   =b  ") == "s(#1 [a name \"a\" = \"=\" a name \"b\"])")
+// A terminal not made spaced reads no space after it.
+claim(readings(spaced_words, "a = b") == 0 && failed_at(spaced_words, "a = b") == 3)
+claim(readings(spaced_words, "if =b") == 0 && readings(spaced_words, "iffy =b") == 1 && readings(spaced_words, "a =else") == 0)
+// Words added to a set are kept out as the first are: "when x" read one way, not two.
+claim(readings(spaced_words, "when =b") == 1 && readings(spaced_words, "when x") == 1)
+with_when = engine.prepared(grammar.with_reserved(plain_words, `words, ["when"]))
+claim(readings(with_when, "when =b") == 0 && readings(with_when, "when x") == 1 && readings(with_when, "if =b") == 0 && readings(with_when, "whence =b") == 1)
 
 output.write("engine: ok")
 // expect: engine: ok

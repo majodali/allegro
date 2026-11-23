@@ -574,6 +574,18 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-25 — The engine reads rules that begin with themselves, and
+  carries a state.** In `next/ext/lib/engine.alg` a rule that can begin
+  with itself is read in turns at a position until a turn adds no
+  result, so `sum = sum "+" one | one` reads "1+2+3" as (1+2)+3. A
+  result carries a state, a bits value; a terminal made with `stepper`
+  reads it and may change it. A grammar has a function for space, read
+  after a terminal made `spaced`, and sets of reserved words by name,
+  to which a grammar adds. `next/ext/lib/offside.alg` gives blocks by
+  indentation as terminals over a state of columns: `newline`,
+  `indent`, `dedent`, `sameline`. A rule that touches the state is not
+  remembered. A module of 226 lines is read in 2,113,919 steps and
+  about 7 seconds.
 - **2026-11-25 — A parser engine written in Allegretto, and the speed
   target met.** Five modules under `next/ext/lib/`, each with a test
   module. `class.alg`: a class of bytes as 256 bits. `grammar.alg`: a

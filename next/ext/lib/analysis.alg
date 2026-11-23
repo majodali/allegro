@@ -7,48 +7,75 @@
 // `prepared(g)` reads a grammar (grammar.alg) and gives the same grammar
 // with what the engine needs written on it:
 //
-//   {start, rules, kept}
+//   {start, top, rules, kept, state, space}
 //
-// `rules` is the grammar's rules in the same forms, with two changes.
+// `rules` is the grammar's rules in the same forms, with these changes.
 // An item of an `alt` is {g, set, open}: `g` is the item; `set` is the
 // class of the bytes the item can start with; `open` is true where the
 // item is tried whatever the next byte is, because it can read no byte
 // at all or begins with a terminal that does not say how it starts. A
 // `star` and an `opt` have `set` and `open` too, for their one item. A
-// `ref` has the entry `kept`: true where the results of its rule at a
-// position are remembered. `kept` at the top is the names of the rules
-// remembered, a structure with no keys.
+// `ref` has two more entries: `kept`, true where the results of its
+// rule at a position are remembered, and `grows`, true where its rule
+// can begin with itself. A terminal has `words`: the words it does not
+// read, as a list for each length in bytes, or [] where it reads all.
+// `top` is a `ref` to the start rule. `kept` at the top is the rules
+// remembered, each {name, grows}, a structure with no keys.
 //
 // A rule is remembered where two items of one `alt` can both begin with
 // it: then the rule is read twice at one position, and so is all that
 // follows from it. A rule that only one path reaches is read once, and
-// remembering it would cost and save nothing.
+// remembering it would cost and save nothing. A rule that reads the
+// state or changes it is not remembered: what it gives at a position
+// is not the same for every state.
 //
 // Nothing here parses a text. Each part is worked out when it is first
 // read, and once.
 import class
+import grammar
 import set
 
-export prepared(g) => made(g, facts(g.rules))
-made(g, x) => {start: g.start, rules: readied(g.rules, x, 0, []), kept: kept_names(g.rules, x.kept, 0, [])}
+export prepared(g) => made(g, facts(g))
+made(g, x) => {start: g.start, top: ready(grammar.ref(g.start), x), rules: readied(g.rules, x, 0, []), kept: kept_names(g.rules, x, 0, []), state: g.state, space: g.space}
 
 // What the analysis knows of a grammar: its rules, the number of each
-// rule by name, which rules can read no byte, and the rules remembered.
-facts(rules) => known(rules, numbered(rules, 0, []), settled(rules, cleared(rules, 0, []), 0))
-known(rules, numbers, empties) => {rules: rules, numbers: numbers, empties: empties, kept: remembered({rules: rules, numbers: numbers, empties: empties})}
+// rule by name, which rules can read no byte, which read or change the
+// state, which can begin with themselves, and the rules remembered.
+facts(g) => known(g, numbered(g.rules, 0, []), settled(g.rules, cleared(g.rules, 0, []), 0, (r, table) => can_be_empty(r, table)))
+known(g, numbers, empties) => knot(g, numbers, empties, settled(g.rules, cleared(g.rules, 0, []), 0, (r, table) => touches(r, table, g.space_reads)))
+knot(g, numbers, empties, touched) =>
+  x = {rules: g.rules, numbers: numbers, empties: empties, touched: touched, reserved: g.reserved, grows: growing(x, 0, []), kept: remembered(x)}
+  x
 numbered(rules, i, out) => if i == count(rules) then out else numbered(rules, i + 1, put(out, key(rules, i), i))
 
-// ---- Which rules can read no byte ----
+// ---- A table of true or false for each rule ----
 
-// A table from a rule's name to true or false, begun with false for
-// each and worked over until a turn changes nothing.
+// Begun with false for each rule and worked over until a turn changes
+// nothing. `holds(rule, table)` says what is true of a rule, by the table.
 cleared(rules, i, out) => if i == count(rules) then out else cleared(rules, i + 1, put(out, key(rules, i), false))
-settled(rules, table, n) => settled_next(rules, turn(rules, table, 0, []), n)
-settled_next(rules, next, n) => if how_many(next, 0, 0) == n then next else settled(rules, next, how_many(next, 0, 0))
-turn(rules, table, i, out) =>
+settled(rules, table, n, holds) => settled_next(rules, turn(rules, table, 0, [], holds), n, holds)
+settled_next(rules, next, n, holds) => if how_many(next, 0, 0) == n then next else settled(rules, next, how_many(next, 0, 0), holds)
+turn(rules, table, i, out, holds) =>
   if i == count(rules) then out
-  else turn(rules, table, i + 1, put(out, key(rules, i), can_be_empty(get(rules, key(rules, i)), table)))
+  else turn(rules, table, i + 1, put(out, key(rules, i), holds(get(rules, key(rules, i)), table)), holds)
 how_many(table, i, n) => if i == count(table) then n else how_many(table, i + 1, if get(table, i) then n + 1 else n)
+
+// ---- Which rules read the state or change it ----
+
+touches(g, table, space_reads) =>
+  if g.op == `term then g.stateful || (g.spaced && space_reads)
+  else if g.op == `ref then get(table, g.name)
+  else if g.op == `seq || g.op == `alt then any_touches(g.items, 0, table, space_reads)
+  else touches(g.item, table, space_reads)
+any_touches(items, i, table, space_reads) => i < count(items) && (touches(items[i], table, space_reads) || any_touches(items, i + 1, table, space_reads))
+
+// ---- Which rules can begin with themselves ----
+
+growing(x, i, out) =>
+  if i == count(x.rules) then out
+  else growing(x, i + 1, put(out, key(x.rules, i), set.has(begins(nothing_yet, get(x.rules, i), x).seen, i)))
+
+// ---- Which rules can read no byte ----
 
 // True where the form g can read no byte, by a table of the rules.
 export can_be_empty(g, table) =>
@@ -116,10 +143,12 @@ noted(met, once, kept) =>
   else if set.has(once, met.h) then noted(met.t, once, set.with_member(kept, met.h))
   else noted(met.t, set.with_member(once, met.h), kept)
 
-kept_names(rules, kept, i, out) =>
+// A rule is remembered where it is shared and does not touch the state.
+is_kept(x, name) => set.has(x.kept, get(x.numbers, name)) && !get(x.touched, name)
+kept_names(rules, x, i, out) =>
   if i == count(rules) then out
-  else if set.has(kept, i) then kept_names(rules, kept, i + 1, put(out, [], key(rules, i)))
-  else kept_names(rules, kept, i + 1, out)
+  else if is_kept(x, key(rules, i)) then kept_names(rules, x, i + 1, put(out, [], {name: key(rules, i), grows: get(x.grows, key(rules, i))}))
+  else kept_names(rules, x, i + 1, out)
 
 // ---- The grammar with the analysis written on it ----
 
@@ -127,8 +156,8 @@ readied(rules, x, i, out) =>
   if i == count(rules) then out
   else readied(rules, x, i + 1, put(out, key(rules, i), ready(get(rules, i), x)))
 ready(g, x) =>
-  if g.op == `term then g
-  else if g.op == `ref then {op: `ref, name: g.name, kept: set.has(x.kept, get(x.numbers, g.name))}
+  if g.op == `term then {op: `term, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, words: by_length(g.unless, x.reserved), known: g.known, ranges: g.ranges, empty: g.empty}
+  else if g.op == `ref then {op: `ref, name: g.name, kept: is_kept(x, g.name), grows: get(x.grows, g.name)}
   else if g.op == `seq then {op: `seq, items: ready_items(g.items, 0, x, [])}
   else if g.op == `alt then {op: `alt, items: ready_choices(g.items, 0, x, [])}
   else if g.op == `guard then {op: `guard, item: ready(g.item, x), holds: g.holds}
@@ -141,3 +170,15 @@ ready_choices(items, i, x, out) =>
   if i == count(items) then out
   else ready_choices(items, i + 1, x, put(out, [], choice(items[i], begins(nothing_yet, items[i], x), x)))
 choice(g, b, x) => {g: ready(g, x), set: class.made(b.ranges), open: b.any || can_be_empty(g, x.empties)}
+
+// ---- The words a terminal does not read ----
+
+// The words of a reserved set as a list for each length in bytes: the
+// words of n bytes are at place n. [] where the terminal names no set.
+by_length(unless, reserved) => if kind(unless) == `symbol then sized(grammar.words_of(reserved, unless, 0), 0, longest(grammar.words_of(reserved, unless, 0), 0, 0), []) else []
+longest(words, i, n) => if i == count(words) then n else longest(words, i + 1, if bits.length(words[i]) / 8 > n then bits.length(words[i]) / 8 else n)
+sized(words, n, last, out) => if n > last then out else sized(words, n + 1, last, put(out, [], of_size(words, n, 0, [])))
+of_size(words, n, i, out) =>
+  if i == count(words) then out
+  else if bits.length(words[i]) == n * 8 then of_size(words, n, i + 1, put(out, [], words[i]))
+  else of_size(words, n, i + 1, out)
