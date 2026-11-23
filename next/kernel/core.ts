@@ -601,7 +601,7 @@ export const createCore = () => {
   /** True while a host listens: what is told is only put together then. */
   const observed = (): boolean => observer !== undefined;
   /** Tells the host that listens one thing the kernel did, with the part it is about and the part's place. */
-  const tell = (part: V, what: { kind: "branch"; taken: "then" | "else" | "both" | "neither" } | { kind: "call"; function: Value } | { kind: "claim"; outcome: Outcome | "waiting" } | { kind: "effect"; capability: string; operation: string } | { kind: "refuted"; reason: string }): void => {
+  const tell = (part: V, what: { kind: "branch"; taken: "then" | "else" | "both" | "neither" } | { kind: "call"; function: Value } | { kind: "claim"; outcome: Outcome | "waiting" } | { kind: "effect"; capability: string; operation: string } | { kind: "refutation"; reason: string }): void => {
     if (observer === undefined) return;
     const at = part instanceof Expr || part instanceof Fn || part instanceof Struct ? part.at : undefined;
     observer({ part: out(part), ...(at === undefined ? {} : { at }), ahead: aheadNow(), ...what } as Observed);

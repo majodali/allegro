@@ -261,7 +261,7 @@ export const createMachine: CreateKernel = () => {
     reaching.noted.add(r);
     const at = part instanceof Expr || part instanceof Fn || part instanceof Struct ? part.at : undefined;
     reaching.found.push({ reason: r.reason, ...(at === undefined ? {} : { at }) });
-    tell(part, { kind: "refuted", reason: r.reason });
+    tell(part, { kind: "refutation", reason: r.reason });
   };
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];

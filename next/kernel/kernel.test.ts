@@ -3298,7 +3298,7 @@ function listening() {
   const told: string[] = [];
   k.observe((seen) => {
     const where = seen.at === undefined ? "?" : `${seen.at.start.line}`;
-    const what = seen.kind === "branch" ? seen.taken : seen.kind === "claim" ? seen.outcome : seen.kind === "effect" ? `${seen.capability}.${seen.operation}` : "";
+    const what = seen.kind === "branch" ? seen.taken : seen.kind === "claim" ? seen.outcome : seen.kind === "effect" ? `${seen.capability}.${seen.operation}` : seen.kind === "refutation" ? seen.reason : "";
     told.push(`${seen.kind}@${where}${what === "" ? "" : " " + what}${seen.ahead ? " ahead" : ""}`);
   });
   return { ...base, told };
@@ -3416,7 +3416,7 @@ test("check finds a refutation that is no claim, says where, and tells a host th
   assert.equal(checked.refutations?.length, 1);
   assert.match(checked.refutations?.[0].reason ?? "", /t\.nowhere is bound by no block/);
   assert.equal(checked.refutations?.[0].at?.start.line, 2);
-  assert.ok(told.some((t) => t.startsWith("refuted@2")), "the host is told of it");
+  assert.ok(told.some((t) => /^refutation@2 .*t\.nowhere is bound by no block/.test(t)), "the host is told of it, with the reason");
   // An evaluation gives no such list.
   assert.equal(k.evaluate(program).refutations, undefined);
 });

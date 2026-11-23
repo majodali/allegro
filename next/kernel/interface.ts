@@ -428,16 +428,18 @@ export interface Place {
  *   "claim"   an evaluation of a claim came out. `part` is the claim as
  *             written. "waiting" says it is not decided yet.
  *   "effect"  a part of a capability was performed.
- *   "refuted" a check found a part refuted that the program as a whole
- *             is not refuted by: a branch under an unknown condition, a
- *             function nothing called, a value nothing read.
+ *   "refutation" a check found a part refuted that the program as a
+ *             whole is not refuted by: a branch under an unknown
+ *             condition, a function nothing called, a value nothing
+ *             read. It is one entry of the result's `refutations`, told
+ *             when it is found.
  */
 export type Observed =
   | { readonly kind: "branch"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly taken: "then" | "else" | "both" | "neither" }
   | { readonly kind: "call"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly function: Value }
   | { readonly kind: "claim"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly outcome: Outcome | "waiting" }
   | { readonly kind: "effect"; readonly part: Value; readonly at?: Place; readonly ahead: false; readonly capability: string; readonly operation: string }
-  | { readonly kind: "refuted"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly reason: string };
+  | { readonly kind: "refutation"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly reason: string };
 
 /** What `Kernel.keyOf` reads of a key. */
 export interface KeyDescription {
