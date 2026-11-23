@@ -222,7 +222,7 @@ export const createKernel: CreateKernel = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody, tell, observed, aheadIs,
     shared,
   } = core;
   const roots: Root[] = [];
@@ -256,6 +256,7 @@ export const createKernel: CreateKernel = () => {
   const groups: Group[] = [];
   /** Set by `waitsOn` when it passes a `then` that waits for work its first part started. */
   let sawGroup = false;
+  aheadIs(() => ahead);
   const rest = (r: Rest): void => {
     for (const c of collectors) c.set(localKey(r), r);
   };
@@ -399,6 +400,7 @@ export const createKernel: CreateKernel = () => {
         const condition = evaluate(v.args[0], scope);
         if (condition instanceof Refuted) return condition;
         const truth = truthOf(condition);
+        if (observed() && (truth !== undefined || !known(condition))) tell(v, { kind: "branch", taken: truth === true ? "then" : truth === false ? "else" : speculative ? "both" : "neither" });
         if (truth === true) return evaluate(v.args[1], scope);
         if (truth === false) return evaluate(v.args[2], scope);
         if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
@@ -807,6 +809,7 @@ export const createKernel: CreateKernel = () => {
         return l;
       });
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      if (observed() && !(ahead && opening.includes(fn))) tell(v, { kind: "call", function: out(fn) });
       if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
       // Ahead of what is done, a function already being opened ahead is not opened again,
       // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
@@ -841,6 +844,7 @@ export const createKernel: CreateKernel = () => {
       if (ahead && d.purity === "effectful") return new Expr(fn, args);
       const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
       rest(what);
+      if (d.purity === "effectful" && observed()) tell(v, { kind: "effect", capability: d.capability, operation: d.part });
       const before = running;
       running = d.purity === "effectful" ? what : undefined;
       let r: V;

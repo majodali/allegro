@@ -326,3 +326,27 @@ test("a record holds a private member as an entry keyed by a key slot", () => {
   assert.equal(k.bitsOf(count).bytes[7], 0, "the private entry is not counted");
   assert.equal(k.bitsOf(k.evaluate(k.expression(read, [obj])).value).bytes[0], 9);
 });
+
+test("a node may say where it was written: the check holds its shape, and the loaded part has the place", () => {
+  const at = { source: "m.alg", start: { index: 4, line: 2, column: 1 }, end: { index: 13, line: 2, column: 10 } };
+  const placed = edit((doc) => {
+    doc.nodes[4].at = at;
+    doc.nodes[6].at = { ...at, start: { index: 0, line: 1, column: 1 } };
+  }) as SavedProgram;
+  assert.deepEqual(check(placed), []);
+  assert.deepEqual(JSON.parse(encode(placed)), placed, "a place survives encoding");
+  // Each way a place can be wrong is named.
+  assert.match(check(edit((doc) => (doc.nodes[4].at = { source: "m.alg", start: at.start })))[0], /nodes\[4\]\.at is not a place/);
+  assert.match(check(edit((doc) => (doc.nodes[4].at = { ...at, end: { index: 1.5, line: 1, column: 1 } })))[0], /nodes\[4\]\.at is not a place/);
+  assert.match(check(edit((doc) => (doc.nodes[4].at = { ...at, more: 1 })))[0], /nodes\[4\]\.at is not a place/);
+  assert.match(check(edit((doc) => (doc.nodes[3].at = at)))[0], /unknown key "at"/, "bits have no place");
+  // Loaded, the application and the function have their places, and the module's identity is the same as without them.
+  const k = createKernel();
+  const add = k.primitiveFunction({ purity: "pure", hash: ADD, name: "int.add", arity: 2, run: (a) => a[0] });
+  const primitives = new Map([[ADD, add]]);
+  const withPlaces = load(k, placed, primitives);
+  const without = load(k, good, primitives);
+  assert.deepEqual(k.placeOf(withPlaces), { ...at, start: { index: 0, line: 1, column: 1 } });
+  assert.equal(k.placeOf(without), undefined);
+  assert.equal(k.moduleOf(withPlaces), k.moduleOf(without), "a place is no part of a module's identity");
+});

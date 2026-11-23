@@ -59,7 +59,7 @@
 // and gives a function whose body is what is left. `sample` evaluates a
 // claim on the cases it is given, and records it as sampled.
 
-import type { Advance, Cell, CreateKernel, Kernel, Limits, PrimitiveContext, Rest, Result, Value } from "./interface.js";
+import type { Advance, Cell, CreateKernel, Kernel, Limits, Place, PrimitiveContext, Rest, Result, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, LimitFailure, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
@@ -74,6 +74,7 @@ interface Marks {
   readonly owner: Mark | undefined;
   readonly site: Expr | undefined;
   readonly group: MGroup | undefined;
+  readonly at: Place | undefined;
 }
 /** A call still to be run: a frame, or a function `run` calls in its place. */
 /** Something a computation waits for: a late answer, a value another task is working out, or the work a sequence's first part started. */
@@ -181,7 +182,7 @@ interface Stack {
 const SUSPENDED = Symbol("suspended");
 /** The marks of an inner evaluation come first; an outer one fills what is still missing. */
 const merge = (inner: Marks | undefined, outer: Marks | undefined): Marks | undefined =>
-  inner === undefined ? outer : outer === undefined ? inner : { owner: inner.owner ?? outer.owner, site: inner.site ?? outer.site, group: inner.group ?? outer.group };
+  inner === undefined ? outer : outer === undefined ? inner : { owner: inner.owner ?? outer.owner, site: inner.site ?? outer.site, group: inner.group ?? outer.group, at: inner.at ?? outer.at };
 
 /** Creates a machine. It does nothing until it is called. */
 export const createMachine: CreateKernel = () => {
@@ -194,12 +195,12 @@ export const createMachine: CreateKernel = () => {
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
-    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody,
+    truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody, tell, observed, aheadIs,
     shared,
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k15";
+  const VARIANT = "machine-k17";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -259,6 +260,7 @@ export const createMachine: CreateKernel = () => {
    * is written: each collector hands what it holds to the one around it when its
    * evaluation ends, so a deep evaluation does not pay for its depth at every record.
    */
+  aheadIs(() => ahead);
   const rest = (r: Rest): void => {
     if (collectors.length > 0) collectors[collectors.length - 1].set(localKey(r), r);
   };
@@ -372,15 +374,16 @@ export const createMachine: CreateKernel = () => {
     if (v instanceof Expr) {
       const site = v.site ?? (v.fn === CLAIM || v.fn === ASSUME ? v : undefined);
       const group = groupOf.get(v);
-      return v.owner === undefined && site === undefined && group === undefined ? undefined : { owner: v.owner, site, group };
+      return v.owner === undefined && site === undefined && group === undefined && v.at === undefined ? undefined : { owner: v.owner, site, group, at: v.at };
     }
-    if (v instanceof Struct || v instanceof Fn) return v.owner === undefined ? undefined : { owner: v.owner, site: undefined, group: undefined };
+    if (v instanceof Struct || v instanceof Fn) return v.owner === undefined && v.at === undefined ? undefined : { owner: v.owner, site: undefined, group: undefined, at: v.at };
     return undefined;
   };
   /** Gives a value the marks kept for it, where it has none of its own. */
   const marked = (m: Marks | undefined, r: V): V => {
     if (m === undefined) return r;
     if ((r instanceof Expr || r instanceof Struct || r instanceof Fn) && r.owner === undefined) r.owner = m.owner;
+    if ((r instanceof Expr || r instanceof Struct || r instanceof Fn) && r.at === undefined) r.at = m.at;
     if (r instanceof Expr) {
       if (r.site === undefined && m.site !== undefined && m.site !== r) r.site = m.site;
       if (m.group !== undefined && !groupOf.has(r)) groupOf.set(r, m.group);
@@ -1161,6 +1164,7 @@ export const createMachine: CreateKernel = () => {
         return needed(evaluate(v.args[0], scope), scope, (condition) => {
           if (condition instanceof Refuted) return condition;
           const truth = truthOf(condition);
+          if (observed() && (truth !== undefined || !known(condition))) tell(v, { kind: "branch", taken: truth === true ? "then" : truth === false ? "else" : speculative ? "both" : "neither" });
           if (truth === true) return evaluate(v.args[1], scope);
           if (truth === false) return evaluate(v.args[2], scope);
           if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
@@ -1341,6 +1345,7 @@ export const createMachine: CreateKernel = () => {
         return l;
       });
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
+      if (observed() && !(ahead && opening.includes(fn))) tell(v, { kind: "call", function: out(fn) });
       // The body is evaluated from `run`, in place of this call: a function that calls itself
       // as the value of its body goes round with no frame kept for each turn.
       if (!ahead) return bounce(() => evaluate(substitute(fn.body, env, new Map()), scope));
@@ -1366,6 +1371,7 @@ export const createMachine: CreateKernel = () => {
       if (ahead && d.purity === "effectful") return new Expr(fn, args);
       const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
       rest(what);
+      if (d.purity === "effectful" && observed()) tell(v, { kind: "effect", capability: d.capability, operation: d.part });
       const before = running;
       running = d.purity === "effectful" ? what : undefined;
       let r: V;
@@ -1388,6 +1394,7 @@ export const createMachine: CreateKernel = () => {
     ctl.onSuspend = () => {
       if (!waits) {
         waits = true;
+        tell(site, { kind: "claim", outcome: "waiting" });
         tallyOf(site);
         waitingAt.set(site, (waitingAt.get(site) ?? 0) + 1);
       }

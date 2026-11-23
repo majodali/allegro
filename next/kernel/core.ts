@@ -8,7 +8,7 @@
 // 2026-11-20 with no change (docs/plans/book-pass.md section 9). The
 // reference kernel's evaluator is next/kernel/kernel.ts.
 
-import type { Cell, ClaimRecord, Declaration, Entry, Kernel, KeyDescription, Kind, Outcome, Rest, Value } from "./interface.js";
+import type { Cell, ClaimRecord, Declaration, Entry, Kernel, KeyDescription, Kind, Location, Observed, Outcome, Place, Rest, Value } from "./interface.js";
 import { InterfaceError } from "./interface.js";
 import { sha256Text } from "./hash.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KERNEL_PRIMITIVES, KernelPrim, Key, Lazy, NameRef, Param, Prim, Quoted, Refuted, Struct, Sym } from "./values.js";
@@ -378,10 +378,62 @@ export const createCore = () => {
   };
   const textOf = (b: Bits): string => new TextDecoder().decode(b.bytes);
   /** A structure of plain data whose first entry is a symbol naming its form. */
-  const data = (form: string, ...parts: V[]): V => {
-    const s = new Struct([[null, new Quoted(intern(`description.${form}`))], ...parts.map((p) => [null, p] as const)]);
+  /**
+   * The entries of each form of description, in the order they are written. Every
+   * description is a structure keyed by symbols: `form` first, then these, then `at`
+   * where the part has a place.
+   */
+  const FORMS: Record<string, readonly string[]> = {
+    bits: ["value"], symbol: ["value"], name: ["name"], param: ["function", "index"], apply: ["function", "arguments"],
+    function: ["parameters", "body"], structure: ["entries"], kernel: ["name"], primitive: ["hash"],
+    capability: ["capability", "part"], key: ["module", "slot"], opaque: ["mentions"], unknown: [],
+  };
+  const keyed = (entries: ReadonlyArray<readonly [string, V]>): Struct => {
+    const s = new Struct(entries.map(([k, e]) => [intern(k), e] as const));
     settled.add(s);
     return s;
+  };
+  const data = (form: string, ...parts: V[]): V => keyed([["form", new Quoted(intern(form))], ...parts.map((p, i) => [FORMS[form][i], p] as const)]);
+  /** A description with the place of the part it describes, where the part has one. */
+  const placed = (d: V, from: V): V => {
+    const at = from instanceof Expr || from instanceof Fn || from instanceof Struct ? from.at : undefined;
+    return at === undefined ? d : keyed([...(d as Struct).entries.map(([k, e]) => [(k as Sym).fqn, e] as const), ["at", placeData(at)]]);
+  };
+  const locationData = (l: Location): V => keyed([["index", number(l.index)], ["line", number(l.line)], ["column", number(l.column)]]);
+  /** A place as plain data: its source, and the two locations. */
+  const placeData = (p: Place): V => keyed([["source", text(p.source)], ["start", locationData(p.start)], ["end", locationData(p.end)]]);
+  /** The entry of a structure under a name, evaluated where it was evaluated when read. */
+  const entryOf = (s: Struct, name: string): V | undefined => {
+    const key = intern(name);
+    const found = s.entries.find(([k]) => k !== null && seen(k) === key);
+    return found === undefined ? undefined : through(found[1]);
+  };
+  /** A place read from plain data, or undefined where the data is not one. */
+  const placeOfData = (v: V | undefined): Place | undefined => {
+    const s = v === undefined ? undefined : seen(v);
+    if (!(s instanceof Struct)) return undefined;
+    const source = entryOf(s, "source");
+    const sourceBits = source === undefined ? undefined : seen(source);
+    const location = (name: string): Location | undefined => {
+      const l = entryOf(s, name);
+      const ls = l === undefined ? undefined : seen(l);
+      if (!(ls instanceof Struct)) return undefined;
+      const [index, line, column] = ["index", "line", "column"].map((n) => {
+        const b = entryOf(ls, n);
+        return b !== undefined && seen(b) instanceof Bits ? numberOf(seen(b) as Bits) : undefined;
+      });
+      return index === undefined || line === undefined || column === undefined ? undefined : { index, line, column };
+    };
+    const [start, end] = [location("start"), location("end")];
+    return !(sourceBits instanceof Bits) || start === undefined || end === undefined ? undefined : { source: textOf(sourceBits), start, end };
+  };
+  /** A place a host gives, checked. */
+  const placeIn = (at: Place | undefined, what: string): Place | undefined => {
+    if (at === undefined) return undefined;
+    const whole = (n: unknown): boolean => typeof n === "number" && Number.isInteger(n) && n >= 0;
+    const ok = (l: Location | undefined): boolean => l !== undefined && whole(l.index) && whole(l.line) && whole(l.column);
+    if (typeof at.source !== "string" || !ok(at.start) || !ok(at.end)) throw new InterfaceError(`${what}: the place is not {source, start, end} with a location at each end`);
+    return { source: at.source, start: { ...at.start }, end: { ...at.end } };
   };
   /**
    * A failure a program can handle, in the one shape every failure has: a structure whose
@@ -405,38 +457,47 @@ export const createCore = () => {
   const build = (d: V, binders: readonly Fn[]): V => {
     const malformed = (): V => new Refuted("not a description", d);
     const s = seen(d);
-    if (!(s instanceof Struct) || s.entries.length === 0) return malformed();
-    // An entry may be one that was evaluated when read: what it came to is what is read.
-    const head = through(s.entries[0][1]);
+    if (!(s instanceof Struct)) return malformed();
+    // The entries are read by their keys, and one that is not known is passed over. An entry
+    // may be one that was evaluated when read: what it came to is what is read.
+    const head = entryOf(s, "form");
     const form = head instanceof Quoted && head.inner instanceof Sym ? head.inner.fqn : "";
-    const parts = s.entries.slice(1).map(([, e]) => through(e));
+    const parts = (FORMS[form] ?? []).map((name) => entryOf(s, name));
+    // A part with a place is built with it. A place that is not one is no description.
+    const atData = entryOf(s, "at");
+    const at = placeOfData(atData);
+    if (atData !== undefined && at === undefined) return malformed();
+    const sited = <T extends Expr | Fn | Struct>(made: T): T => {
+      made.at = at;
+      return made;
+    };
     const bitsAt = (i: number): Bits | undefined => {
       const p = parts[i] === undefined ? undefined : seen(parts[i]);
       return p instanceof Bits ? p : undefined;
     };
     switch (form) {
-      case "description.bits":
+      case "bits":
         return bitsAt(0) ?? malformed();
-      case "description.symbol":
+      case "symbol":
         return parts[0] instanceof Quoted ? parts[0] : malformed();
-      case "description.name":
+      case "name":
         return parts[0] instanceof Quoted && parts[0].inner instanceof Sym ? parts[0].inner : malformed();
-      case "description.kernel": {
+      case "kernel": {
         const p = bitsAt(0) === undefined ? undefined : kernelPrims.get(textOf(bitsAt(0) as Bits));
         return p ?? malformed();
       }
-      case "description.primitive": {
+      case "primitive": {
         const b = bitsAt(0);
         if (b === undefined) return malformed();
         return pureByHash.get(textOf(b)) ?? new Refuted(`a description names the primitive ${textOf(b)}, which this kernel lacks`, undefined);
       }
-      case "description.param": {
+      case "param": {
         const [depth, index] = [bitsAt(0), bitsAt(1)];
         if (depth === undefined || index === undefined) return malformed();
         const owner = binders[binders.length - 1 - numberOf(depth)];
         return owner?.params[numberOf(index)] ?? malformed();
       }
-      case "description.apply": {
+      case "apply": {
         const args = parts[1] === undefined ? undefined : seen(parts[1]);
         if (parts[0] === undefined || !(args instanceof Struct)) return malformed();
         const fn = build(parts[0], binders);
@@ -447,9 +508,9 @@ export const createCore = () => {
           if (r instanceof Refuted) return r;
           built.push(r);
         }
-        return new Expr(fn, built);
+        return sited(new Expr(fn, built));
       }
-      case "description.structure": {
+      case "structure": {
         const entries = parts[0] === undefined ? undefined : seen(parts[0]);
         if (!(entries instanceof Struct)) return malformed();
         const built: (readonly [V | null, V])[] = [];
@@ -458,19 +519,19 @@ export const createCore = () => {
           if (r instanceof Refuted) return r;
           built.push([k, r]);
         }
-        return new Struct(built);
+        return sited(new Struct(built));
       }
-      case "description.function": {
+      case "function": {
         const count = bitsAt(0);
         if (count === undefined || parts[1] === undefined || numberOf(count) > 255) return malformed();
         const params = Array.from({ length: numberOf(count) }, (_x, i) => new Param(`p${i}`));
         // A stand-in with the same parameters is the innermost binder while the body is built.
         const body = build(parts[1], [...binders, new Fn(params, new Struct([]))]);
-        return body instanceof Refuted ? body : new Fn(params, body);
+        return body instanceof Refuted ? body : sited(new Fn(params, body));
       }
-      case "description.capability":
-      case "description.key":
-      case "description.opaque":
+      case "capability":
+      case "key":
+      case "opaque":
         return new Refuted("a description that holds the identity of an unforgeable value cannot be built: nothing makes authority from data", undefined);
       default:
         return malformed();
@@ -498,6 +559,9 @@ export const createCore = () => {
   const keep = (from: V, to: V): V => {
     if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
       to.owner = from.owner;
+    // And the place it was written at: what a copy or an evaluation leaves of a part is still that part.
+    if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.at === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
+      to.at = from.at;
     // What a copy or an evaluation leaves of a claim is still that claim, as written.
     if (to !== from && to instanceof Expr && from instanceof Expr && to.site === undefined && (from.site !== undefined || from.fn === kernelPrims.get("claim") || from.fn === kernelPrims.get("assume")))
       to.site = from.site ?? from;
@@ -526,9 +590,27 @@ export const createCore = () => {
     if (t === undefined) tallies.set(site, (t = { decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
     return t;
   };
+  // ---- What a host is told ---------------------------------------------------
+
+  let observer: ((seen: Observed) => void) | undefined;
+  /** Whether the evaluator is ahead of what is done. The evaluator says how to tell. */
+  let aheadNow: () => boolean = () => false;
+  const aheadIs = (reader: () => boolean): void => {
+    aheadNow = reader;
+  };
+  /** True while a host listens: what is told is only put together then. */
+  const observed = (): boolean => observer !== undefined;
+  /** Tells the host that listens one thing the kernel did, with the part it is about and the part's place. */
+  const tell = (part: V, what: { kind: "branch"; taken: "then" | "else" | "both" | "neither" } | { kind: "call"; function: Value } | { kind: "claim"; outcome: Outcome | "waiting" } | { kind: "effect"; capability: string; operation: string }): void => {
+    if (observer === undefined) return;
+    const at = part instanceof Expr || part instanceof Fn || part instanceof Struct ? part.at : undefined;
+    observer({ part: out(part), ...(at === undefined ? {} : { at }), ahead: aheadNow(), ...what } as Observed);
+  };
+
   /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
   const tallied = (from: Expr, result: V, rests: readonly Rest[]): V => {
     const site = from.site ?? from;
+    if (observer !== undefined) tell(site, { kind: "claim", outcome: result instanceof Refuted ? "refuted" : result instanceof Decided ? result.outcome : "waiting" });
     if (waitingClaims.has(from)) {
       waitingClaims.delete(from);
       waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
@@ -556,6 +638,7 @@ export const createCore = () => {
     [...tallies].map(([site, t]) => ({
       claim: out(site),
       ...(site.owner === undefined ? {} : { module: site.owner.module }),
+      ...(site.at === undefined ? {} : { at: site.at }),
       decided: t.decided,
       sampled: t.sampled,
       assumed: t.assumed,
@@ -806,13 +889,13 @@ export const createCore = () => {
       walk(v, new Set());
       return data("opaque", list(mentioned.map((m) => describe(m, binders, own))));
     }
-    if (v instanceof Expr) return data("apply", describe(v.fn, binders, own), list(v.args.map((a) => describe(a, binders, own))));
+    if (v instanceof Expr) return placed(data("apply", describe(v.fn, binders, own), list(v.args.map((a) => describe(a, binders, own)))), v);
     if (v instanceof Struct) {
       const entries = new Struct(v.entries.map(([k, e]) => [k === null ? null : seen(k) instanceof Key ? describe(seen(k), binders, own) : asData(k, "a structure's key"), describe(e, binders, own)] as const));
       settled.add(entries);
-      return data("structure", entries);
+      return placed(data("structure", entries), v);
     }
-    if (v instanceof Fn) return data("function", number(v.params.length), describe(v.body, [...binders, v], own));
+    if (v instanceof Fn) return placed(data("function", number(v.params.length), describe(v.body, [...binders, v], own)), v);
     return data("unknown"); // a refutation
   };
 
@@ -931,16 +1014,34 @@ export const createCore = () => {
     symbol: (fqn) => out(intern(fqn)),
     symbolData: (fqn) => out(new Quoted(intern(fqn))),
     param: (name) => out(new Param(name)),
-    structure: (entries) => out(new Struct(entries.map(([k, e]) => [k === null ? null : into(k, "a key"), into(e, "an entry")] as const))),
-    expression: (fn, args) => out(new Expr(into(fn, "the function"), args.map((a) => into(a, "an argument")))),
-    composedFunction: (params, body) => {
+    structure: (entries, at) => {
+      const made = new Struct(entries.map(([k, e]) => [k === null ? null : into(k, "a key"), into(e, "an entry")] as const));
+      made.at = placeIn(at, "structure");
+      return out(made);
+    },
+    expression: (fn, args, at) => {
+      const made = new Expr(into(fn, "the function"), args.map((a) => into(a, "an argument")));
+      made.at = placeIn(at, "expression");
+      return out(made);
+    },
+    observe: (o) => {
+      if (o !== undefined && typeof o !== "function") throw new InterfaceError("observe: the observer is not a function");
+      observer = o;
+    },
+    placeOf: (value) => {
+      const v = through(into(value, "the value"));
+      return v instanceof Expr || v instanceof Fn || v instanceof Struct ? v.at : undefined;
+    },
+    composedFunction: (params, body, at) => {
       const ps = params.map((p) => {
         const v = into(p, "a parameter");
         if (!(v instanceof Param)) throw new InterfaceError("composedFunction: a parameter is not of kind param");
         return v;
       });
       if (new Set(ps).size !== ps.length) throw new InterfaceError("composedFunction: a parameter is listed twice");
-      return out(new Fn(ps, into(body, "the body")));
+      const made = new Fn(ps, into(body, "the body"));
+      made.at = placeIn(at, "composedFunction");
+      return out(made);
     },
     primitiveFunction: (declaration) => {
       const p = new Prim(declaration);
@@ -1094,7 +1195,7 @@ export const createCore = () => {
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, asBody, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    restored, thenGroups, localKey, keep, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,

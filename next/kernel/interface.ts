@@ -270,6 +270,8 @@ export interface ClaimRecord {
   readonly claim: Value;
   /** The identity of the module whose code wrote the claim, where a module did. */
   readonly module?: string;
+  /** Where the claim was written, where the kernel was told. */
+  readonly at?: Place;
   /** Evaluations that came out decided, a restored outcome among them. */
   readonly decided: number;
   /** Evaluations that came out sampled: true of each case tried, or resting on such a sample. */
@@ -380,6 +382,53 @@ export interface Declaration {
   readonly identity?: string;
 }
 
+/** One point in a text. */
+export interface Location {
+  /** How many characters come before it in the text, from 0. */
+  readonly index: number;
+  /** Its line, from 1. */
+  readonly line: number;
+  /** Its column in that line, from 1. */
+  readonly column: number;
+}
+
+/**
+ * Where a part was written: the text, and where the part starts and ends
+ * in it. The source is what whoever read the text calls it, a file's path
+ * or a module's name; the kernel gives it no meaning. A place is no part
+ * of a module's identity or of a claim's key: the same text laid out
+ * otherwise is the same module.
+ */
+export interface Place {
+  readonly source: string;
+  readonly start: Location;
+  /** The point after the part's last character. */
+  readonly end: Location;
+}
+
+/**
+ * One thing the kernel did, as it tells a host that listens
+ * (`Kernel.observe`). Each names the part of the program it is about, and
+ * the part's place where it has one. `ahead` is true where the part was
+ * evaluated ahead of what is done: while a function is specialized, for
+ * what a `then` or a waiting claim holds back, and after a refutation.
+ * Nothing is performed there.
+ *   "branch"  a conditional's condition was evaluated. `taken` says which
+ *             branch was then evaluated: "then", "else", "both" where the
+ *             condition is unknown and a function is being specialized,
+ *             or "neither" where it is unknown and nothing is.
+ *   "call"    a composed function's body was opened. `function` is the
+ *             function.
+ *   "claim"   an evaluation of a claim came out. `part` is the claim as
+ *             written. "waiting" says it is not decided yet.
+ *   "effect"  a part of a capability was performed.
+ */
+export type Observed =
+  | { readonly kind: "branch"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly taken: "then" | "else" | "both" | "neither" }
+  | { readonly kind: "call"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly function: Value }
+  | { readonly kind: "claim"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly outcome: Outcome | "waiting" }
+  | { readonly kind: "effect"; readonly part: Value; readonly at?: Place; readonly ahead: false; readonly capability: string; readonly operation: string };
+
 /** What `Kernel.keyOf` reads of a key. */
 export interface KeyDescription {
   /** The identity of the module the key was made with. */
@@ -428,11 +477,11 @@ export interface Kernel {
    * A structure. Complete in shape; an entry's value may be a cell. An
    * entry's key is null, a symbol made with `symbol`, or a key.
    */
-  structure(entries: readonly Entry[]): Value;
+  structure(entries: readonly Entry[], at?: Place): Value;
   /** An unevaluated application of a function value to arguments. */
-  expression(fn: Value, args: readonly Value[]): Value;
+  expression(fn: Value, args: readonly Value[], at?: Place): Value;
   /** A composed function: parameters and a body. */
-  composedFunction(params: readonly Value[], body: Value): Value;
+  composedFunction(params: readonly Value[], body: Value, at?: Place): Value;
   /**
    * A primitive function. An effectful one is authority: whoever is
    * handed the value can use it. A pure one is available to all code: a
@@ -568,6 +617,23 @@ export interface Kernel {
   field(value: Value, field: Value): Value | undefined;
   /** The kernel's record of a claim's outcome on this value, where there is one. */
   outcomeOf(value: Value): Outcome | undefined;
+  /**
+   * Has the kernel tell a host what it does: one call of `observer` for
+   * each thing, as it happens. One observer at a time; `undefined` stops
+   * it. It is for diagnostics that leave the program as it is: which
+   * branches a run took, a trace, what a check reached. The observer is
+   * host code and is trusted as the holder of this object is. It may
+   * read values with the calls of this interface that only read. It may
+   * not evaluate, advance or fill from inside the call. Allegro code
+   * never sees this.
+   */
+  observe(observer: ((seen: Observed) => void) | undefined): void;
+  /**
+   * Where a part was written, where whoever made it said: an application,
+   * a function or a structure written in a text. A copy keeps it, and so
+   * does what an evaluation leaves of the part.
+   */
+  placeOf(value: Value): Place | undefined;
   /** The expression this value came from, where the kernel kept one. */
   originOf(value: Value): Value | undefined;
   /**

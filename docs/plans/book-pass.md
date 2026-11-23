@@ -1724,6 +1724,26 @@ its approval.
   `next/kernel/create.ts` gives the machine. The reference kernel
   stays, chosen by `ALLEGRO_KERNEL=reference`, and the kernel's tests
   run on both as before. This closes the nine chunks of §9.
+- **2026-11-22 — places in the text, and descriptions keyed by name**
+  (the review session): a part may say where it was written, a copy
+  keeps it, and a claim's record gives it. A description's entries are
+  found by name, and `build` passes over one it does not know. Three
+  decisions are new, from the discussion of what a phase does without
+  an input or a capability: "Check reaches every claim", "A phase
+  leaves a capability out as not yet given or as not needed" and
+  "Diagnostics are a hook the kernel offers its host". 256 decisions.
+- **2026-11-23 — the wording confirmed, and two notes** (the review
+  session): the maintainer confirmed the three decisions and the entry
+  names of a description. Two notes record a second discussion: a
+  check has three phases (specialization, the host's analysis of what
+  it leaves, and tests run by ordinary evaluation), and both ways of
+  leaving a capability out are kept, pending real cases. The hook is
+  next.
+- **2026-11-23 — the hook for diagnostics** (the review session):
+  `Kernel.observe` has the kernel tell its host each branch taken, call
+  opened, claim decided and effect performed, with the place of the
+  part and whether it was evaluated ahead. Both variants tell the same
+  things in the same order for the cases tested.
 
 ## 8. Sessions
 
