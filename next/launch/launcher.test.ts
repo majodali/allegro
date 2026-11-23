@@ -6,7 +6,8 @@
 // its own stack, or the reference kernel with `ALLEGRO_KERNEL=reference`. Run
 // by `npm run test:next`. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of
-// the configuration's sources, part 2; of phases, part 3. The tests of the
+// the configuration's sources, part 2; of phases, part 3; of a check, and
+// check then run, part 5. The tests of the
 // two commands' exit code with check output are chunk Q16 (the
 // capabilities the launchers ship), part 3.
 
@@ -21,7 +22,7 @@ import { createKernel } from "../kernel/create.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Plain, type Target } from "./launcher.js";
+import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Phase, type Plain, type Target } from "./launcher.js";
 import { timer } from "./timer.js";
 import { virtualClock } from "./clock.js";
 import { OUTPUT, output } from "./output.js";
@@ -1232,7 +1233,10 @@ test("npm run launch resolves from its flags, the environment and the launcher: 
 //
 // A phase is what it supplies (`Configuration.phases`). A declared
 // capability no phase has supplied yet is a fresh cell. Every test here
-// passes on both kernel variants, and asserts what must be present.
+// passes on both kernel variants, and asserts what must be present. The
+// phase `CHECK` below is named check and is no check (`Phase.check` is
+// unset): it holds the path a first phase that is no check takes, which
+// nothing shipped uses since part 5.
 
 const CHECK = { name: "check", capabilities: [] } as const;
 const checkOnly = (ceiling: readonly string[] = ["output"]): Configuration => ({ ceiling, phases: [CHECK] });
@@ -1468,4 +1472,189 @@ test("both commands under --phases check: report acts, nothing is printed, a cal
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+
+// ── A check, and check then run (chunk Q13, part 5) ───────────────────
+//
+// A first phase that is a check (`Phase.check`) is handed to the kernel's
+// `check` once. Every test here passes on both kernel variants. It asserts
+// what must be present: a word, an end, a count above zero. It holds no
+// count of evaluations under check, since the kernel may count one twice.
+
+/** A capability of one part of one argument, whose implementation records each call of the part. */
+function recordingCapability(name: string, part: string): { capability: CapabilityImplementation; calls: string[] } {
+  const calls: string[] = [];
+  const capability: CapabilityImplementation = {
+    definition: { name, parts: [part] },
+    create: (host) => [{
+      purity: "effectful", capability: name, part, arity: 1,
+      run: (args, context) => {
+        calls.push(`${name}.${part}`);
+        host.line(`${name}: ${new TextDecoder().decode(context.bitsOf(args[0]).bytes)}`);
+        return context.structure([]);
+      },
+    }],
+  };
+  return { capability, calls };
+}
+const CHECKING = { name: "check", check: true, capabilities: [] } as const;
+const checkThen = (...more: Phase[]): Configuration => ({ ceiling: ["output"], phases: [CHECKING, ...more] });
+const RUN_AFTER = { name: "run", capabilities: ["output"] } as const;
+/** An end as words, without the count of steps a completed run gives. */
+const endWords = (end: LaunchOutcome["end"]): string => (end.kind === "completed" ? "completed" : describe(end));
+/** The word of the claim written at this line and column of `<text>`; undefined where none is. */
+const wordAt = (result: LaunchResult, line: number, column: number) => {
+  const c = result.claims.find((x) => x.place?.start.line === line && x.place.start.column === column);
+  return c === undefined ? undefined : claimWord(c);
+};
+
+test("under a check no part of any capability's implementation is called: one the check names, and one it does not", async () => {
+  const say = recordingCapability("say", "line");
+  const note = recordingCapability("note", "message");
+  const r = recording();
+  const program = emitted('capability say\ncapability note\nnote.message("n")\nsay.line("s")\nclaim(2 + 2 == 4)\n');
+  const outcome = await launch({ createKernel: r.createKernel, program, configuration: { ceiling: ["say", "note"], phases: [{ name: "check", check: true, capabilities: ["note"] }] }, target: { capabilities: [say.capability, note.capability], primitives: shipped } });
+  assert.deepEqual(say.calls, []);
+  assert.deepEqual(note.calls, []);
+  assert.deepEqual(outcome.lines, []);
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(r.calls.filter((c) => ["check", "evaluate", "advance", "fill"].includes(c)), ["check"], "the kernel is handed one expression, by check, and nothing is filled or advanced");
+  assert.equal(wordAt(resultOf(outcome), 5, 1), "decided");
+});
+
+test("under a check a capability it names is not needed: a call answers the empty structure, and a claim on the answer is decided", async () => {
+  const note = recordingCapability("note", "message");
+  const program = (claimed: string) => emitted(`capability note\nx <- note.message("n")\nclaim(${claimed})\n`);
+  const target: Target = { capabilities: [note.capability], primitives: shipped };
+  const named: Configuration = { ceiling: ["note"], phases: [{ name: "check", check: true, capabilities: ["note"] }] };
+  // count(x) is 0 only of the empty structure: the claim is decided where the stand-in answers it.
+  const empty = await launch({ createKernel, program: program("count(x) == 0"), configuration: named, target });
+  const claim = resultOf(empty).claims.find((c) => c.place?.start.line === 3);
+  assert.ok(claim !== undefined && claim.decided > 0, JSON.stringify(resultOf(empty).claims.map(counts)));
+  // A claim that the answer has an entry is refuted by the empty structure.
+  const one = await launch({ createKernel, program: program("count(x) == 1"), configuration: named, target });
+  assert.equal(describe(one.end), "refuted: a claim that is not true");
+  // Not named, the capability is not yet given: the call waits, and nothing refutes the claim.
+  const notGiven = await launch({ createKernel, program: program("count(x) == 1"), configuration: { ceiling: ["note"], phases: [CHECKING] }, target });
+  assert.equal(notGiven.end.kind, "completed");
+  assert.equal(wordAt(resultOf(notGiven), 3, 1), "waiting");
+  assert.deepEqual(note.calls, []);
+});
+
+test("under a check every input is unknown: a claim over it waits, a claim over nothing unknown is decided, and the launch completes", async () => {
+  const outcome = await launch({ createKernel, program: emitted("capability output\ninput n\nclaim(n == 1)\nclaim(2 + 2 == 4)\n"), configuration: checkThen(), target: SHIPPED_TARGET });
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  assert.equal(wordAt(result, 3, 1), "waiting");
+  assert.equal(wordAt(result, 4, 1), "decided");
+  assert.equal(result.summary, "undecided");
+  assert.deepEqual(outcome.phases?.map((p) => p.name), ["check"]);
+});
+
+test("a check reaches a false claim in a function nothing calls and one under a condition on an unknown input, and ends the launch refuted", async () => {
+  const uncalled = await launch({ createKernel, program: emitted('capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n'), configuration: checkThen(), target: SHIPPED_TARGET });
+  assert.equal(describe(uncalled.end), "refuted: a claim that is not true");
+  assert.equal(wordAt(resultOf(uncalled), 2, 14), "refuted");
+  assert.deepEqual(uncalled.lines, []);
+  const branch = await launch({ createKernel, program: emitted('capability output\ninput mode\nx = if mode == 1 then claim(1 == 2) else 0\noutput.write("ok")\n'), configuration: checkThen(), target: SHIPPED_TARGET });
+  assert.equal(describe(branch.end), "refuted: a claim that is not true");
+  assert.equal(wordAt(resultOf(branch), 3, 23), "refuted");
+  // Run alone does not reach the claim in the function nothing calls, and completes.
+  const ran = await launch({ createKernel, program: emitted('capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n'), configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+  assert.equal(ran.end.kind, "completed");
+  assert.deepEqual(ran.lines, ["hello"]);
+});
+
+test("a check ends at its limit where its budget runs out and nothing is refuted", async () => {
+  const outcome = await launch({ createKernel, program: emitted("capability output\nclaim(2 + 2 == 4)\nclaim(3 + 3 == 6)\n"), configuration: { ceiling: ["output"], steps: 1, phases: [CHECKING] }, target: SHIPPED_TARGET });
+  assert.equal(describe(outcome.end), "limit: the step budget of 1 ran out");
+  assert.ok(outcome.result !== undefined, "a check at its limit has a result");
+});
+
+/**
+ * A record of the first version, which makes no module, so a name nothing
+ * binds is not refused at loading: module(output) => block({f: x =>
+ * then(x, nowhere)}, {}). f is never called. Written at line 2 of free.alg.
+ */
+const FREE_IN_UNCALLED: unknown = (() => {
+  const at = { source: "free.alg", start: { index: 0, line: 2, column: 1 }, end: { index: 9, line: 2, column: 10 } };
+  return {
+    format: "allegro-saved-program", version: 1, needs: [], module: 11, declares: [{ param: 0, role: "capability", name: "output" }],
+    nodes: [
+      { k: "param", name: "output" }, { k: "param", name: "x" }, { k: "symbol", fqn: "nowhere" }, { k: "kernel", name: "then" },
+      { k: "expression", fn: 3, args: [1, 2], at }, { k: "function", params: [1], body: 4, at }, { k: "symbol", fqn: "f" },
+      { k: "structure", entries: [[6, 5]] }, { k: "kernel", name: "block" }, { k: "structure", entries: [] },
+      { k: "expression", fn: 8, args: [7, 9] }, { k: "function", params: [0], body: 10 },
+    ],
+  };
+})();
+
+test("a check's result gives the refutations found in parts that do not refute the whole, each with its place, and the launch ends refuted with their reason", async () => {
+  assert.deepEqual(check2(FREE_IN_UNCALLED), []);
+  const outcome = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: checkThen(), target: TERMINAL });
+  assert.equal(outcome.end.kind, "refuted");
+  const result = resultOf(outcome);
+  const found = result.refutations.find((r) => /nowhere is bound by no block/.test(r.reason));
+  assert.ok(found !== undefined, JSON.stringify(result.refutations));
+  assert.deepEqual([found.place?.source, found.place?.start.line], ["free.alg", 2]);
+  assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
+  // A run gives none: the function is never called.
+  const ran = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(ran.end.kind, "completed");
+  assert.deepEqual(resultOf(ran).refutations, []);
+});
+
+test("a check is the first phase or none, and names no input: each is refused before anything is evaluated", async () => {
+  const cases: Array<[Configuration, string]> = [
+    [{ ceiling: ["output"], phases: [RUN_AFTER, { name: "again", check: true, capabilities: [] }] }, "the phase again is a check after the first phase: only the first phase may be a check"],
+    [{ ceiling: ["output"], phases: [{ name: "check", check: true, capabilities: [], inputs: { n: textData("x") } }] }, "the phase check is a check and supplies the input(s) n: a check supplies no input, and leaves every input unknown"],
+  ];
+  for (const [configuration, reason] of cases) {
+    const r = recording();
+    const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration, target: TERMINAL });
+    assert.equal(outcome.end.kind === "refused" && outcome.end.reason, reason);
+    assert.ok(!r.calls.includes("evaluate") && !r.calls.includes("check"));
+    assert.deepEqual(outcome.lines, []);
+  }
+  // After a check, the first phase of the run supplies capabilities, and a phase after it may not.
+  const late = await launch({ createKernel, program: PRINTS_N, configuration: checkThen(RUN_AFTER, { name: "later", capabilities: ["output"] }), target: TERMINAL });
+  assert.match(describe(late.end), /^refused: the phase later supplies the capability output after the first phase/);
+});
+
+test("check then run, on one kernel: two phases, the run a fresh evaluation, its result free of the check's counts, and the outcome's result the run's", async () => {
+  const r = recording();
+  const program = emitted('capability output\ninput n\nunused(m) => claim(m == m)\nclaim(2 + 2 == 4)\noutput.write(n)\n');
+  const outcome = await launch({ createKernel: r.createKernel, program, configuration: checkThen({ ...RUN_AFTER, inputs: { n: textData("given") } }), target: SHIPPED_TARGET });
+  assert.equal(r.created(), 1);
+  assert.deepEqual(r.calls.filter((c) => c === "check" || c === "evaluate"), ["check", "evaluate"]);
+  assert.deepEqual(outcome.lines, ["given"], "the run is given the input the check left unknown");
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(outcome.phases?.map((p) => [p.name, p.linesBefore]), [["check", 0], ["run", 0]]);
+  const [checked, ran] = outcome.phases ?? [];
+  assert.equal(ran.result, outcome.result);
+  // The claim in the function nothing calls is the check's: the run never reaches it, and its result holds none of the check's.
+  assert.ok(wordAt(checked.result, 3, 14) !== undefined, JSON.stringify(checked.result.claims.map((c) => c.place?.start)));
+  assert.equal(wordAt(ran.result, 3, 14), undefined);
+  assert.equal(wordAt(checked.result, 4, 1), "decided");
+  const runClaim = ran.result.claims.find((c) => c.place?.start.line === 4);
+  assert.ok(runClaim !== undefined && runClaim.decided > 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(outcome.phases)), outcome.phases, "each result is plain data");
+});
+
+test("check then run prints what run alone prints and ends as it ends; where the check ends the launch nothing is printed", async () => {
+  for (const text of ['capability output\noutput.write("first")\noutput.write("second")\n', "capability output\ninput n\noutput.write(\"before\")\noutput.write(n)\n"]) {
+    const alone = await launch({ createKernel, program: emitted(text), configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+    const both = await launch({ createKernel, program: emitted(text), configuration: checkThen(RUN_AFTER), target: SHIPPED_TARGET });
+    assert.deepEqual(both.lines, alone.lines, text);
+    assert.equal(endWords(both.end), endWords(alone.end), text);
+  }
+  const text = 'capability output\noutput.write("hello")\nclaim(2 + 2 == 5)\n';
+  const alone = await launch({ createKernel, program: emitted(text), configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
+  assert.deepEqual(alone.lines, ["hello"], "run alone prints the line before the false claim is reached");
+  const both = await launch({ createKernel, program: emitted(text), configuration: checkThen(RUN_AFTER), target: SHIPPED_TARGET });
+  assert.deepEqual(both.lines, []);
+  assert.equal(describe(both.end), "refuted: a claim that is not true");
+  assert.deepEqual(both.phases?.map((p) => p.name), ["check"], "the run is not applied");
 });
