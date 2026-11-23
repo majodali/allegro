@@ -1744,6 +1744,11 @@ its approval.
   opened, claim decided and effect performed, with the place of the
   part and whether it was evaluated ahead. Both variants tell the same
   things in the same order for the cases tested.
+- **2026-11-23 — the kernel's part of a speculative check** (the
+  review session): `Kernel.check` evaluates ahead and with both
+  branches, then goes over what the evaluation left untouched and the
+  body of every function it met. The launcher's check does not call it
+  yet.
 
 ## 8. Sessions
 

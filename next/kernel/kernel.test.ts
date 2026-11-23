@@ -3352,3 +3352,95 @@ test("the host is told of a claim that waits and of its outcome when the answer 
   k.fill(c, byte(k, 0));
   assert.deepEqual(told, ["claim@1 decided", "effect@2 output.write"]);
 });
+
+// ---- Check reaches every claim (2026-11-23) ------------------------------------------------
+//
+// "Check reaches every claim": `check` evaluates ahead, takes both branches of an unknown
+// conditional, and then goes over everything the evaluation left untouched.
+
+/** The records of a check or an evaluation, each as "line: decided refuted waiting". */
+const recordsOf = (r: { claims: readonly { at?: { start: { line: number } }; decided: number; refuted: number; waiting: number }[] }) =>
+  r.claims.map((c) => `${c.at?.start.line ?? "?"}: ${c.decided} ${c.refuted} ${c.waiting}`).sort();
+
+test("check reaches a claim in a function nothing calls, in both branches of an unknown conditional, and in a binding nothing reads", () => {
+  const { k, isZero, call, kp, said, say } = sayer();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const claimAt = (n: number, of: Value) => k.expression(kp("claim"), [of], line(n));
+  const [f, g, unread, x, y, n] = [k.symbol("t.f"), k.symbol("t.g"), k.symbol("t.unread"), k.param("x"), k.param("y"), k.param("n")];
+  // f(x) = if isZero(x) then claim(isZero(1)) else claim(isZero(x))       lines 2 and 3, never called
+  // g(y) = claim(isZero(0))                                               line 5, never called
+  // unread = claim(isZero(0))                                             line 6, never read
+  // then(say(9), if isZero(n) then claim(isZero(0)) else claim(isZero(n)))  lines 8 and 9, n unknown
+  const program = within(k, [
+    [f, k.composedFunction([x], k.expression(kp("if"), [call(isZero, x), claimAt(2, call(isZero, byte(k, 1))), claimAt(3, call(isZero, x))]))],
+    [g, k.composedFunction([y], claimAt(5, call(isZero, byte(k, 0))))],
+    [unread, claimAt(6, call(isZero, byte(k, 0)))],
+  ], call(kp("then"), call(say, byte(k, 9)), k.expression(kp("if"), [call(isZero, n), claimAt(8, call(isZero, byte(k, 0))), claimAt(9, call(isZero, n))])));
+  const checked = k.check(program, { steps: 10_000 });
+  assert.equal(checked.ended, "complete");
+  assert.equal(checked.refuted, false, "one branch of a function nothing calls is refuted, and the program is not");
+  assert.deepEqual(said, [], "nothing is performed");
+  assert.equal(k.kind(checked.value), "expression", "what is left is given");
+  assert.deepEqual(recordsOf(checked), ["2: 0 1 0", "3: 0 0 1", "5: 1 0 0", "6: 1 0 0", "8: 1 0 0", "9: 0 0 1"]);
+  assert.deepEqual(checked.refutations, [], "a refuted claim is in the claims' records, and not listed a second time");
+  // Ordinary evaluation of the same program reaches none of them: its condition is unknown and nothing calls f or g.
+  assert.deepEqual(recordsOf(k.evaluate(program)), []);
+});
+
+test("check takes one branch where the condition is known, and reaches an argument nothing needs and an entry nothing reads", () => {
+  const { k, isZero, call, kp } = setup();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const claimAt = (n: number, of: Value) => k.expression(kp("claim"), [of], line(n));
+  const a = k.param("a");
+  const ignores = k.composedFunction([a], byte(k, 0));
+  // [ if isZero(0) then claim(isZero(0)) else claim(isZero(1)),  ignores(claim(isZero(0))),  claim(isZero(0)) ]
+  const program = k.structure([
+    [null, k.expression(kp("if"), [call(isZero, byte(k, 0)), claimAt(1, call(isZero, byte(k, 0))), claimAt(2, call(isZero, byte(k, 1)))])],
+    [null, call(ignores, claimAt(3, call(isZero, byte(k, 0))))],
+    [null, claimAt(4, call(isZero, byte(k, 0)))],
+  ]);
+  const checked = k.check(program, { steps: 10_000 });
+  // Line 2 is in the branch a known condition does not take: it cannot be reached, and has no record.
+  assert.deepEqual(recordsOf(checked), ["1: 1 0 0", "3: 1 0 0", "4: 1 0 0"]);
+});
+
+test("check finds a refutation that is no claim, says where, and tells a host that listens", () => {
+  const { k, add, call, told } = listening();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const [f, x] = [k.symbol("t.f"), k.param("x")];
+  // f(x) = x + nowhere      -- the name nowhere is bound by nothing; f is never called
+  const program = within(k, [[f, k.composedFunction([x], k.expression(add, [x, k.symbol("t.nowhere")], line(2)), line(2))]], byte(k, 1));
+  const checked = k.check(program, { steps: 10_000 });
+  assert.equal(checked.refuted, false);
+  assert.equal(num(k, checked.value), 1);
+  assert.equal(checked.refutations?.length, 1);
+  assert.match(checked.refutations?.[0].reason ?? "", /t\.nowhere is bound by no block/);
+  assert.equal(checked.refutations?.[0].at?.start.line, 2);
+  assert.ok(told.some((t) => t.startsWith("refuted@2")), "the host is told of it");
+  // An evaluation gives no such list.
+  assert.equal(k.evaluate(program).refutations, undefined);
+});
+
+test("check of a function that calls itself ends, and a function a call opened with known values is specialized as well", () => {
+  const { k, add, dec, isZero, call, kp } = setup();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const [count, n] = [k.symbol("t.count"), k.param("n")];
+  // count(n) = then(claim(isZero(isZero-of-nothing...)), ...) is too much: count(n) = if isZero(n) then 0 else 1 + count(n - 1), with a claim on n at line 2
+  const body = call(kp("then"), k.expression(kp("claim"), [call(isZero, call(dec, call(add, n, byte(k, 1))))], line(2)), call(kp("if"), call(isZero, n), byte(k, 0), call(add, byte(k, 1), call(count, call(dec, n)))));
+  const program = within(k, [[count, k.composedFunction([n], body)]], call(count, byte(k, 0)));
+  const checked = k.check(program, { steps: 10_000 });
+  assert.equal(checked.ended, "complete");
+  assert.equal(num(k, checked.value), 0);
+  // The call count(0) decides the claim for 0; the function is then evaluated with n unknown, where the claim waits.
+  assert.deepEqual(recordsOf(checked), ["2: 1 0 1"]);
+  // A budget too small ends the check at its limit, with the records so far.
+  const short = k.check(program, { steps: 6 });
+  assert.equal(short.ended, "limit");
+});
+
+test("a host that listens to a check is told that a conditional under an unknown condition had both branches evaluated", () => {
+  const { k, isZero, call, kp, told } = listening();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  k.check(k.expression(kp("if"), [call(isZero, k.param("n")), byte(k, 1), byte(k, 2)], line(4)), { steps: 1_000 });
+  assert.deepEqual(told, ["branch@4 both ahead"]);
+});
