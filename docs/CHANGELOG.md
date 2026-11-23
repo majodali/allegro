@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-26 — A rule that begins with itself costs in line with its
+  text.** A turn reads on only from the results the turn before added:
+  a row of 80 operands through `sum = sum "+" one | one` takes 62,129
+  steps, where it took 711,225. Rulings recorded: a state is a bits
+  value; `newline` holds only at the block's column, and "Offside rule
+  through stateful indent terminals" is reworded; a tab counts as one
+  column.
 - **2026-11-25 — The engine reads rules that begin with themselves, and
   carries a state.** In `next/ext/lib/engine.alg` a rule that can begin
   with itself is read in turns at a position until a turn adds no

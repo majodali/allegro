@@ -142,6 +142,25 @@ test("a text of twice the length takes about twice the steps", DEPTH, async () =
   assert.ok(growth > 1.7 && growth < 2.3, `twice the text took ${growth.toFixed(2)} times the steps (${once.steps} and ${twice.steps})`);
 });
 
+test("a rule that begins with itself costs in line with its text: twice the operands, about twice the steps", DEPTH, async () => {
+  const program = [
+    "capability output",
+    "input source",
+    "import engine",
+    "import grammar",
+    'g = grammar.grammar(`sum, {sum: grammar.alt([grammar.seq([grammar.ref(`sum), grammar.lit("+"), grammar.ref(`one)]), grammar.ref(`one)]), one: grammar.run("a number", "09")})',
+    "size(a) => if is_failure(a) then 0 - a.at else length(a.trees)",
+    "length(l) => if count(l) == 0 then 0 else 1 + length(l.t)",
+    "output.write(int.text(size(engine.parses(engine.prepared(g), source))))",
+    "",
+  ].join("\n");
+  const row = (n: number): string => Array.from({ length: n }, (_, i) => String(i)).join("+");
+  const [forty, eighty] = [await timed(program, "next/ext/lib/row.alg", 5_000_000, row(40)), await timed(program, "next/ext/lib/row.alg", 5_000_000, row(80))];
+  assert.deepEqual([forty.lines, eighty.lines], [["1"], ["1"]]);
+  const growth = eighty.steps / forty.steps;
+  assert.ok(growth > 1.7 && growth < 2.3, `twice the operands took ${growth.toFixed(2)} times the steps (${forty.steps} and ${eighty.steps})`);
+});
+
 // ---- The engine, specialized over a grammar -------------------------------------
 
 /** A module that yields `reader`, the engine with a grammar already given: a function of a text. */

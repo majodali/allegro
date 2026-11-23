@@ -1931,6 +1931,37 @@ its approval.
     caught.
   - *For the research goal.* Nothing new: the three small grammars of
     E3's finding take 389 to 313, 925 to 862 and 511 to 404 steps.
+- **2026-11-25 — rulings on PR #309, and turns that read on from new
+  results only** (the review session). The maintainer confirmed E4's
+  asks. A state is a bits value. `newline` holds only at the block's
+  column, and the entry "Offside rule through stateful indent
+  terminals" is reworded so. A tab counts as one column. A rule is
+  remembered only where it neither reads nor changes the state, to be
+  measured on Allegretto's whole grammar in E7. And on the cost of a
+  rule that begins with itself: "go ahead and fix the cost of that
+  scenario."
+  - *Built.* In `next/ext/lib/engine.alg` a result carries a mark,
+    `via`: true where it was read through a result marked new. A turn
+    is given the results the turn before added, marked new, and keeps
+    of what it reads only what came through them. The older results
+    that read no byte are given too, unmarked, since a new result may
+    follow one of them at the same position. A rule met while another
+    is read in turns at the same position is read as before, each turn
+    given every result so far, and the marks pass through it.
+  - *Measured.* A row of n operands through `sum = sum "+" one | one`:
+    17,206 steps for 20 operands, 32,169 for 40, 62,129 for 80, where
+    it took 55,275, 191,125 and 711,225. The 226 lines of the speed
+    test are unchanged in kind: the mark is an entry nothing reads
+    outside a turn.
+  - *A fault found by the earlier method.* The first version gave a
+    turn the new results that read no byte twice, marked and unmarked,
+    and counted three readings where there is one. A new test holds a
+    grammar where the rule is met twice at one position; the same
+    claims were run with every rule read the earlier way, and agree.
+  - *Deliberate faults*: 12 made, 9 caught at first. Of the 3 missed,
+    one is caught by the new test of growth in `next/ext/ext.test.ts`,
+    and two showed missing tests: a rule that begins with itself
+    inside an option, and inside a repetition. Both have tests now.
 
 ## 8. Sessions
 

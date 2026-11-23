@@ -156,6 +156,21 @@ claim(readings(shared, "1+2+3.") == 1 && readings(shared, "1;") == 1 && failed_a
 mutual = engine.prepared(grammar.grammar(`r, {r: alt([seq([ref(`x), lit("!")]), seq([ref(`x), lit("?")]), lit("a")]), x: seq([ref(`r), lit("+")])}))
 claim(count(mutual.kept) == 2 && mutual.kept[0].name == `r && mutual.kept[1].name == `x)
 claim(attempt(readings(mutual, "a+!+?"), 200000) == 1 && attempt(readings(mutual, "a"), 200000) == 1 && attempt(readings(mutual, "a+"), 200000) == 0)
+// A rule that can read no byte, met twice at one position: after a
+// result that read nothing, the rule is met again where it began. "xx"
+// reads two ways, one of which follows the empty result with a new one.
+again = engine.prepared(grammar.grammar(`a, {a: alt([seq([ref(`a), ref(`c)]), opt(lit("q"))]), c: seq([ref(`a), lit("x")])}))
+claim(readings(again, "") == 1 && readings(again, "x") == 1 && readings(again, "xx") == 2 && readings(again, "qx") == 2)
+// A rule with two items that begin with itself.
+signs = engine.prepared(grammar.grammar(`e, {e: alt([seq([ref(`e), lit("+"), number]), seq([ref(`e), lit("-"), number]), seq([ref(`e), lit("!")]), number])}))
+claim(tree(signs, "1-2!+3") == "e(#0 [e(#2 [e(#1 [e(#3 a number \"1\") - \"-\" a number \"2\"]) ! \"!\"]) + \"+\" a number \"3\"])")
+claim(readings(signs, "1+2-3+4-5!!") == 1 && failed_at(signs, "1+2-+") == 4)
+// A rule that begins with itself inside an option, and inside a repetition.
+in_opt = engine.prepared(grammar.grammar(`e, {e: seq([opt(seq([ref(`e), lit("+")])), number])}))
+claim(readings(in_opt, "1") == 1 && readings(in_opt, "1+2+3") == 1 && readings(in_opt, "1+") == 0)
+// "x,x,x" reads two ways: the repetition twice, or once around "x,x".
+in_star = engine.prepared(grammar.grammar(`e, {e: seq([star(seq([ref(`e), lit(",")])), lit("x")])}))
+claim(readings(in_star, "x") == 1 && readings(in_star, "x,x") == 1 && readings(in_star, "x,x,x") == 2)
 // A rule that reads itself and no byte between has no end of readings, and is refused.
 idle_rule = engine.prepared(grammar.grammar(`a, {a: alt([ref(`a), lit("x")])}))
 claim(attempt(readings(idle_rule, "x"), 100000).reason == "a rule reads itself and no byte between")

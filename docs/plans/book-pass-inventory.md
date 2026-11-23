@@ -1782,8 +1782,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### Offside rule through stateful indent terminals
-- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of offset and indent stack. `NEWLINE` matches only when the next content is at or below the block's indent, so a continuation line needs no construct of its own.
-- Status: partly built
+- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of the columns of the blocks being read. `NEWLINE` matches only when the next content is at the block's column; a line less deep is `DEDENT`'s alone, and a line deeper carries on the line before it, so a continuation line needs no construct of its own. A tab counts as one column, like a space.
+- Status: partly built; reworded 2026-11-25 by the maintainer's ruling on PR #309
 - Type: capability — grammar authors name the indent terminals in their rules
 - Rationale kind: technical
 - Depends on: A terminal is a function, so a grammar can define its own; Scannerless parsing
@@ -1792,7 +1792,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Units: grammar-formalism
 - Options recorded: a dedicated continuation construct (rejected); tab handling proposals (tabs forbidden by default, `tab_width` opt-in)
 - Sources: docs/book/grammar-formalism.md §5.1–§5.5; docs/book/extension/grammar.md §3
-- Notes: `SAMELINE` is not implemented (`src/grammar2/engine.ts:712`); the tab and empty-stack questions of docs/book/grammar-formalism.md §5.4 are "Proposed", not recorded as decided.
+- Notes: `SAMELINE` is not implemented in the present tree (`src/grammar2/engine.ts:712`); the rebuild's `next/ext/lib/offside.alg` has all four. Was "at or below the block's indent": with every reading of a text kept, a `NEWLINE` that held below the block's column too would read the outer block's next statement as the inner block's as well. The tab question of docs/book/grammar-formalism.md §5.4 is ruled as above; the empty-stack question does not arise, since the outermost block has no `DEDENT`.
 - Chapter: Parsing
 
 #### Guards and reserved words separate keywords from identifiers

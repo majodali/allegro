@@ -13,8 +13,9 @@
 //                                  reading could not go on
 //
 // What a form gives at a position and a state is every result it has
-// there, and not the first: a result is {end, state, tree}, the position
-// after what was read, the state after it, and what was read. So every item of an `alt` is tried and every result
+// there, and not the first: a result is {end, state, via, tree}: the
+// position after what was read, the state after it, a mark for rules
+// read in turns, and what was read. So every item of an `alt` is tried and every result
 // kept, the order of the items has no meaning, and a text that can be
 // read two ways has two trees.
 //
@@ -39,8 +40,8 @@
 //
 // A rule may begin with itself. Such a rule is read in turns at a
 // position: the first turn gives the rule nothing where it meets itself
-// there, and each turn after gives it the results of the turn before,
-// until a turn adds none. So `sum = sum "+" one | one` reads "1+2+3" as
+// there, and each turn after gives it the results the turn before
+// added, until a turn adds none. So `sum = sum "+" one | one` reads "1+2+3" as
 // (1+2)+3. A rule met again at one position with another state is
 // refused, and so is a rule that reads itself and no byte between.
 //
@@ -103,12 +104,12 @@ parse(c, g, at, st) =>
   else if g.op == `term then (if g.stateful then stepped(g, at, g.step(c.text, at, st)) else terminal(c, g, at, st, g.match(c.text, at)))
   else if g.op == `seq then in_order(c, g.items, at, st)
   else if g.op == `alt then branches(c, g.items, 0, at, st, grammar.byte(c.text, at))
-  else if g.op == `star then grow(c, g, {h: {end: at, state: st, tree: []}, t: []}, [], -1)
+  else if g.op == `star then grow(c, g, {h: {end: at, state: st, via: false, tree: []}, t: []}, [], -1)
   else if g.op == `opt then maybe(at, st, gate(c, g, at, st))
   else guarded(g.holds, at, st, parse(c, g.item, at, st))
 
 none_at(at) => {rs: [], far: at}
-one_at(end, st, tree) => {rs: {h: {end: end, state: st, tree: tree}, t: []}, far: -1}
+one_at(end, st, tree) => {rs: {h: {end: end, state: st, via: false, tree: tree}, t: []}, far: -1}
 
 // A terminal: what it read is no reserved word, and where it is spaced
 // the space after it is read too.
@@ -133,18 +134,54 @@ growing(c, g, at, st, seed) =>
   if count(seed) == 0 then settled(c, g, at, st)
   else if seed.h.state == st then named(g.name, at, false, st, {rs: seed.h.rs, far: -1})
   else refuse("a rule is met again at one position with another state")
-body_of(c, name, grows, at, st) => if grows then in_turns(c, name, get(c.rules, name), at, st, [], 0, 0) else parse(c, get(c.rules, name), at, st)
+body_of(c, name, grows, at, st) =>
+  if !grows then parse(c, get(c.rules, name), at, st)
+  else if c.seed_at == at then in_turns(c, name, get(c.rules, name), at, st, [], 0, 0)
+  else from_new(c, name, get(c.rules, name), at, st)
 
 // `restate` is true where the results are from the table: each takes the state st.
 named(name, at, restate, st, p) => {rs: named_each(name, at, restate, st, p.rs), far: p.far}
 named_each(name, at, restate, st, rs) =>
   if count(rs) == 0 then []
-  else {h: {end: rs.h.end, state: if restate then st else rs.h.state, tree: {kind: `rule, name: name, start: at, end: rs.h.end, tree: rs.h.tree}}, t: named_each(name, at, restate, st, rs.t)}
+  else {h: {end: rs.h.end, state: if restate then st else rs.h.state, via: !restate && rs.h.via, tree: {kind: `rule, name: name, start: at, end: rs.h.end, tree: rs.h.tree}}, t: named_each(name, at, restate, st, rs.t)}
 
-// A rule that can begin with itself, read in turns. `seed` is what the
-// turn before gave, n how many results that is, and k the turns so far.
-// A turn that adds a result when every byte left has been a turn reads
+// A rule that can begin with itself, read in turns. A turn reads the
+// rule's body once, with the rule giving, where it meets itself at this
+// position, the results of the turn before. A result carries `via`: true
+// where it was read through a result marked new. So a turn is given only
+// the results the turn before added, marked new, and keeps of what it
+// reads only what came through them: nothing is read on from twice, and
+// a row of n operands takes n turns of one operand each. The older
+// results that read no byte are given at every turn too, unmarked,
+// since a new result may follow one of them at this same position.
+//
+// `all` is every result so far, `fresh` those of the last turn, `zero`
+// those of the turns before it that read no byte, `far` the farthest failure and k the turns. A
+// turn that adds a result when every byte left has been a turn reads
 // itself and nothing between.
+from_new(c, name, body, at, st) => begun(c, name, body, at, st, parse(seeded(c, name, at, st, []), body, at, st))
+begun(c, name, body, at, st, p) => widen(c, name, body, at, st, unmarked(p.rs, false, []), unmarked(p.rs, false, []), [], p.far, 0)
+widen(c, name, body, at, st, all, fresh, zero, far, k) =>
+  if count(fresh) == 0 then {rs: all, far: far}
+  else if k > c.len - at + 1 then refuse("a rule reads itself and no byte between")
+  else widened(c, name, body, at, st, all, unread(fresh, at, zero), far, k, parse(seeded(c, name, at, st, marked(fresh, zero)), body, at, st))
+widened(c, name, body, at, st, all, zero, far, k, p) => added(c, name, body, at, st, all, zero, most(far, p.far), k, unmarked(p.rs, true, []))
+added(c, name, body, at, st, all, zero, far, k, fresh) => widen(c, name, body, at, st, onto(fresh, all), fresh, zero, far, k + 1)
+// The results rs, unmarked, put before `out`: all of them, or with `only_new` those marked new.
+unmarked(rs, only_new, out) =>
+  if count(rs) == 0 then out
+  else if only_new && !rs.h.via then unmarked(rs.t, only_new, out)
+  else unmarked(rs.t, only_new, {h: {end: rs.h.end, state: rs.h.state, via: false, tree: rs.h.tree}, t: out})
+// The results rs marked new, put before `out`.
+marked(rs, out) => if count(rs) == 0 then out else marked(rs.t, {h: {end: rs.h.end, state: rs.h.state, via: true, tree: rs.h.tree}, t: out})
+// Those of rs that read no byte, put before `out`.
+unread(rs, at, out) => if count(rs) == 0 then out else unread(rs.t, at, if rs.h.end == at then {h: rs.h, t: out} else out)
+onto(rs, out) => if count(rs) == 0 then out else onto(rs.t, {h: rs.h, t: out})
+
+// The same for a rule met while another is being read in turns at this
+// position: each turn is given every result so far, and ends when one
+// adds none. Marks pass through it untouched, so they stay the outer
+// rule's.
 in_turns(c, name, body, at, st, seed, n, k) => after_turn(c, name, body, at, st, n, k, parse(seeded(c, name, at, st, seed), body, at, st))
 after_turn(c, name, body, at, st, n, k, p) => next_turn(c, name, body, at, st, n, k, p, length(p.rs, 0))
 next_turn(c, name, body, at, st, n, k, p, m) =>
@@ -161,18 +198,18 @@ seed_in(l, name) => if count(l) == 0 then [] else if l.name == name then {h: l} 
 // that result ends, with the state it left.
 in_order(c, items, at, st) => as_seq(sequence(c, items, 0, at, st))
 as_seq(p) => {rs: as_seq_each(p.rs), far: p.far}
-as_seq_each(rs) => if count(rs) == 0 then [] else {h: {end: rs.h.end, state: rs.h.state, tree: {kind: `seq, items: rs.h.tree}}, t: as_seq_each(rs.t)}
+as_seq_each(rs) => if count(rs) == 0 then [] else {h: {end: rs.h.end, state: rs.h.state, via: rs.h.via, tree: {kind: `seq, items: rs.h.tree}}, t: as_seq_each(rs.t)}
 sequence(c, items, i, at, st) =>
   if i == count(items) then one_at(at, st, [])
   else chain(c, items, i, parse(c, items[i], at, st))
 chain(c, items, i, p) => link(c, items, i, p.rs, p.far)
 link(c, items, i, rs, far) =>
   if count(rs) == 0 then {rs: [], far: far}
-  else joined(rs.h.tree, sequence(c, items, i + 1, rs.h.end, rs.h.state), link(c, items, i, rs.t, far))
-joined(tree, rest, more) => {rs: fronted(tree, rest.rs, more.rs), far: most(rest.far, more.far)}
-fronted(tree, rs, more) =>
+  else joined(rs.h, sequence(c, items, i + 1, rs.h.end, rs.h.state), link(c, items, i, rs.t, far))
+joined(r, rest, more) => {rs: fronted(r, rest.rs, more.rs), far: most(rest.far, more.far)}
+fronted(r, rs, more) =>
   if count(rs) == 0 then more
-  else {h: {end: rs.h.end, state: rs.h.state, tree: {h: tree, t: rs.h.tree}}, t: fronted(tree, rs.t, more)}
+  else {h: {end: rs.h.end, state: rs.h.state, via: r.via || rs.h.via, tree: {h: r.tree, t: rs.h.tree}}, t: fronted(r, rs.t, more)}
 
 // The item of a `star` or an `opt`, where the next byte is one it can
 // begin with or it is open.
@@ -188,7 +225,7 @@ branch(c, items, i, at, st, b, it) =>
 either(i, p, q) => {rs: chosen(i, p.rs, q.rs), far: most(p.far, q.far)}
 chosen(i, rs, more) =>
   if count(rs) == 0 then more
-  else {h: {end: rs.h.end, state: rs.h.state, tree: {kind: `alt, index: i, tree: rs.h.tree}}, t: chosen(i, rs.t, more)}
+  else {h: {end: rs.h.end, state: rs.h.state, via: rs.h.via, tree: {kind: `alt, index: i, tree: rs.h.tree}}, t: chosen(i, rs.t, more)}
 
 // A repetition. `todo` is the results not yet tried further and `done`
 // those that were; each holds its trees last first. A result is tried
@@ -200,17 +237,17 @@ grow(c, g, todo, done, far) =>
 grown(c, g, r, todo, done, far, p) => grow(c, g, longer(p.rs, r, todo), {h: r, t: done}, most(far, p.far))
 longer(rs, r, todo) =>
   if count(rs) == 0 then todo
-  else if rs.h.end > r.end then {h: {end: rs.h.end, state: rs.h.state, tree: {h: rs.h.tree, t: r.tree}}, t: longer(rs.t, r, todo)}
+  else if rs.h.end > r.end then {h: {end: rs.h.end, state: rs.h.state, via: r.via || rs.h.via, tree: {h: rs.h.tree, t: r.tree}}, t: longer(rs.t, r, todo)}
   else longer(rs.t, r, todo)
 turned(done, out) =>
   if count(done) == 0 then out
-  else turned(done.t, {h: {end: done.h.end, state: done.h.state, tree: {kind: `star, items: reversed(done.h.tree, [])}}, t: out})
+  else turned(done.t, {h: {end: done.h.end, state: done.h.state, via: done.h.via, tree: {kind: `star, items: reversed(done.h.tree, [])}}, t: out})
 reversed(l, out) => if count(l) == 0 then out else reversed(l.t, {h: l.h, t: out})
 
-maybe(at, st, p) => {rs: {h: {end: at, state: st, tree: {kind: `opt, items: []}}, t: maybe_each(p.rs)}, far: p.far}
+maybe(at, st, p) => {rs: {h: {end: at, state: st, via: false, tree: {kind: `opt, items: []}}, t: maybe_each(p.rs)}, far: p.far}
 maybe_each(rs) =>
   if count(rs) == 0 then []
-  else {h: {end: rs.h.end, state: rs.h.state, tree: {kind: `opt, items: {h: rs.h.tree, t: []}}}, t: maybe_each(rs.t)}
+  else {h: {end: rs.h.end, state: rs.h.state, via: rs.h.via, tree: {kind: `opt, items: {h: rs.h.tree, t: []}}}, t: maybe_each(rs.t)}
 
 // A guard reads nothing and leaves the state as it was.
 guarded(holds, at, st, p) => if (count(p.rs) > 0) == holds then one_at(at, st, {kind: `guard}) else none_at(at)
