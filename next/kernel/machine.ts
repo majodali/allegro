@@ -192,7 +192,7 @@ export const createMachine: CreateKernel = () => {
     restKey, TRUE, FALSE, out, isV, into, through, seen, bindingOf, known, hidden, knownInFull,
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
-    numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
+    numberOf, bitList, partOf, sameBits, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody, tell, observed, aheadIs,
@@ -1741,8 +1741,7 @@ export const createMachine: CreateKernel = () => {
         if (a.bitLength !== b.bitLength) return FALSE;
         charge(a.bitLength);
         if (whole(a) && whole(b)) return a.bytes.every((x, i) => x === b.bytes[i]) ? TRUE : FALSE;
-        const [x, y] = [bitList(a), bitList(b)];
-        return x.every((bit, i) => bit === y[i]) ? TRUE : FALSE;
+        return sameBits(a, b) ? TRUE : FALSE;
       }
       if (a instanceof Sym && b instanceof Sym) return a === b ? TRUE : FALSE;
       return new Refuted("only two bits values or two symbols can be told apart", undefined);
@@ -1772,7 +1771,7 @@ export const createMachine: CreateKernel = () => {
       // whatever the size of the part.
       if (whole(a) && from % 8 === 0 && n % 8 === 0) return new Bits(a.bytes.subarray(from / 8, (from + n) / 8), n);
       charge(a.bitLength);
-      return packed(bitList(a).slice(from, from + n));
+      return partOf(a, from, n);
     }
     if (fn.name === "undecided") {
       if (!known(args[0])) return waits();

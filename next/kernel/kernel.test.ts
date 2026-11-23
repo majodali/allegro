@@ -2974,6 +2974,17 @@ test("a part of a bits value and two joined give what copying gives", () => {
   const six = k.evaluate(join(three, three)).value;
   assert.deepEqual(k.bitsOf(six), { bytes: Uint8Array.of(0b101101), bitLength: 6 });
   assert.deepEqual(k.bitsOf(k.evaluate(call(kp("slice"), join(abc, three), n(80), n(3))).value), { bytes: Uint8Array.of(0b101), bitLength: 3 });
+  // A part of more than a byte that begins inside one: 12 bits from place 2 of 0001 0110 1110 0101 are 0101 1011 1001.
+  const sixteen = k.bits(Uint8Array.of(0b00010110, 0b11100101));
+  assert.deepEqual(k.bitsOf(k.evaluate(call(kp("slice"), sixteen, n(2), n(12))).value), { bytes: Uint8Array.of(0b0101, 0b10111001), bitLength: 12 });
+  // A part of a value that is itself not whole bytes: 2 bits from place 1 of 101 are 01.
+  assert.deepEqual(k.bitsOf(k.evaluate(call(kp("slice"), three, n(1), n(2))).value), { bytes: Uint8Array.of(0b01), bitLength: 2 });
+  // Two values that are not whole bytes are the same where every bit is, the first among them.
+  const same = (a: Value, b: Value) => num(k, k.evaluate(call(kp("same"), a, b)).value);
+  assert.equal(same(three, k.bits(Uint8Array.of(0b101), 3)), 1);
+  assert.equal(same(three, k.bits(Uint8Array.of(0b001), 3)), 0, "they differ in the first bit");
+  assert.equal(same(three, k.bits(Uint8Array.of(0b100), 3)), 0, "they differ in the last bit");
+  assert.equal(same(three, k.bits(Uint8Array.of(0b111), 3)), 0, "they differ in the middle bit");
   // The value a part was taken from is unchanged.
   assert.equal(new TextDecoder().decode(k.bitsOf(abc).bytes), "abcdefghij");
 });

@@ -379,8 +379,32 @@ export const createCore = () => {
   const countOf = (v: V): number | undefined => {
     const b = seen(v);
     if (!(b instanceof Bits)) return undefined;
+    // Whole bytes are read a byte at a time: a count is read at every part taken and every entry read by its place.
+    if (b.whole) {
+      let n = 0;
+      for (const byte of b.bytes) n = n * 256 + byte;
+      return Number.isSafeInteger(n) ? n : undefined;
+    }
     const n = bitList(b).reduce((acc, bit) => acc * 2 + bit, 0);
     return Number.isSafeInteger(n) ? n : undefined;
+  };
+  /** The bit of a value at a place, from 0: its bits are the last `bitLength` bits of its bytes. */
+  const bitAt = (b: Bits, bytes: Uint8Array, place: number): number => {
+    const i = bytes.length * 8 - b.bitLength + place;
+    return (bytes[i >> 3] >> (7 - (i & 7))) & 1;
+  };
+  /** `n` bits of a value from a place, as a value of its own, with no list of its bits made. */
+  const partOf = (b: Bits, from: number, n: number): V => {
+    const [source, bytes] = [b.bytes, new Uint8Array(Math.ceil(n / 8))];
+    const pad = bytes.length * 8 - n;
+    for (let j = 0; j < n; j++) if (bitAt(b, source, from + j)) bytes[(j + pad) >> 3] |= 128 >> ((j + pad) & 7);
+    return new Bits(bytes, n);
+  };
+  /** True where two values of one length have the same bits. */
+  const sameBits = (a: Bits, b: Bits): boolean => {
+    const [x, y] = [a.bytes, b.bytes];
+    for (let j = 0; j < a.bitLength; j++) if (bitAt(a, x, j) !== bitAt(b, y, j)) return false;
+    return true;
   };
   const textOf = (b: Bits): string => new TextDecoder().decode(b.bytes);
   /** A structure of plain data whose first entry is a symbol naming its form. */
@@ -1206,7 +1230,7 @@ export const createCore = () => {
     restKey, TRUE, FALSE, out, isV, into, through, seen, bindingOf, known, hidden, knownInFull,
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
-    numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
+    numberOf, bitList, partOf, sameBits, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
     restored, thenGroups, localKey, keep, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,

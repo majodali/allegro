@@ -22,7 +22,9 @@ import { emitted, runProgram } from "../corpus/allegretto.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { chosenVariant, createKernel } from "../kernel/create.js";
-import { shipped } from "../prims/index.js";
+import { shipped, shippedByName } from "../prims/index.js";
+import { load } from "../kernel/saved-program.js";
+import type { Kernel, Value } from "../kernel/interface.js";
 
 const ROOT = "next/ext";
 
@@ -39,12 +41,13 @@ function testFiles(dir: string): string[] {
     .sort();
 }
 
-/** Runs a text with a budget of its own, and gives how it ended, what it printed, the steps and the time. */
-async function timed(text: string, file: string, steps: number): Promise<{ end: string; lines: string[]; steps: number; ms: number }> {
+/** Runs a text with a budget of its own, and gives how it ended, what it printed, the steps and the time. `source`, where given, is handed as the input of that name. */
+async function timed(text: string, file: string, steps: number, source?: string): Promise<{ end: string; lines: string[]; steps: number; ms: number }> {
   const e = emitted(text, file);
   if ("findings" in e) throw new Error(`the text is refused: ${e.findings.join("; ")}`);
+  const inputs = source === undefined ? {} : { inputs: { source: { bits: new TextEncoder().encode(source) } } };
   const before = Date.now();
-  const outcome = await launch({ createKernel, program: e.program, imports: e.imports, configuration: { ceiling: ["output"], steps }, target: { capabilities: [output], primitives: shipped } });
+  const outcome = await launch({ createKernel, program: e.program, imports: e.imports, configuration: { ceiling: ["output"], steps, ...inputs }, target: { capabilities: [output], primitives: shipped } });
   return { end: outcome.end.kind, lines: outcome.lines, steps: "steps" in outcome.end ? outcome.end.steps : -1, ms: Date.now() - before };
 }
 
@@ -101,4 +104,95 @@ test("a map of ten thousand entries is built and read, and the work grows with i
   const growth = large.steps / small.steps;
   assert.ok(growth > 3.5 && growth < 5, `four times the entries took ${growth.toFixed(2)} times the steps (${small.steps} and ${large.steps})`);
   console.log(`map: 2,500 entries ${small.steps} steps ${small.ms} ms; 10,000 entries ${large.steps} steps ${large.ms} ms`);
+});
+
+// ---- The engine, measured -------------------------------------------------------
+
+/** A program that reads its input `source` as flat Allegretto and prints how many ways it reads, or minus where it failed. */
+const READER = [
+  "capability output",
+  "input source",
+  "import engine",
+  "import flat",
+  "size(a) => if is_failure(a) then 0 - a.at else length(a.trees)",
+  "length(l) => if count(l) == 0 then 0 else 1 + length(l.t)",
+  "output.write(int.text(size(engine.parses(engine.prepared(flat.allegretto), source))))",
+  "",
+].join("\n");
+
+/** Two modules of this directory that are written flat, as one text: a little over 200 lines. */
+const MODULE = ["analysis.alg", "class.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
+
+test("the speed target: a module of 200 lines of Allegretto is read, one way, in under 10 seconds", DEPTH, async () => {
+  assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);
+  const run = await timed(READER, "next/ext/lib/reader.alg", 50_000_000, MODULE);
+  assert.equal(run.end, "completed");
+  assert.deepEqual(run.lines, ["1"], "the text reads one way");
+  console.log(`engine: ${MODULE.split("\n").length} lines, ${MODULE.length} bytes, read in ${run.steps} steps and ${run.ms} ms`);
+  // The steps do not depend on the machine the test runs on, so they are what is held tight.
+  assert.ok(run.steps < 2_600_000, `${run.steps} steps`);
+  assert.ok(run.ms < 10_000, `${run.ms} ms`);
+});
+
+test("a text of twice the length takes about twice the steps", DEPTH, async () => {
+  const one = fs.readFileSync(path.join(ROOT, "lib", "class.alg"), "utf8");
+  const [once, twice] = [await timed(READER, "next/ext/lib/reader.alg", 50_000_000, one), await timed(READER, "next/ext/lib/reader.alg", 50_000_000, `${one}\n${one.replace(/^import class$/m, "")}`)];
+  assert.deepEqual([once.lines, twice.lines], [["1"], ["1"]]);
+  const growth = twice.steps / once.steps;
+  assert.ok(growth > 1.7 && growth < 2.3, `twice the text took ${growth.toFixed(2)} times the steps (${once.steps} and ${twice.steps})`);
+});
+
+// ---- The engine, specialized over a grammar -------------------------------------
+
+/** A module that yields `reader`, the engine with a grammar already given: a function of a text. */
+const readerOf = (rules: string): string =>
+  ["capability output", "import engine", "import grammar", `p = engine.prepared(grammar.grammar(\`s, ${rules}))`, "export reader = text => engine.parses(p, text)", "export ways(a) => if count(a.trees) == 0 then 0 else 1 + ways({trees: a.trees.t})", ""].join("\n");
+
+/** The `reader` a module yields and its `ways`, which counts the trees of an answer, in a kernel of their own. */
+function yielded(text: string): { k: Kernel; reader: Value; ways: Value } {
+  const e = emitted(text, "next/ext/lib/specialized.alg");
+  if ("findings" in e) throw new Error(`the text is refused: ${e.findings.join("; ")}`);
+  const k = createKernel();
+  const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
+  const primitives = new Map([...e.imports, e.program].flatMap((doc) => doc.needs).map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+  for (const doc of e.imports) load(k, doc, primitives);
+  const module = k.evaluate(k.expression(load(k, e.program, primitives), [k.structure([])]), { steps: 1_000_000 });
+  const entry = (name: string): Value => {
+    const found = k.entriesOf(k.current(module.value)).find(([key]) => key !== null && k.symbolName(key) === name);
+    if (found === undefined) throw new Error(`the module yields no ${name}`);
+    return found[1];
+  };
+  return { k, reader: entry("reader"), ways: entry("ways") };
+}
+
+/** How many trees a reader gives for a text, and the steps the reading took. */
+function reading(k: Kernel, reader: Value, ways: Value, text: string): { trees: number; steps: number } {
+  const r = k.evaluate(k.expression(reader, [k.bits(new TextEncoder().encode(text))]), { steps: 1_000_000 });
+  assert.equal(r.ended, "complete");
+  const counted = k.evaluate(k.expression(ways, [r.value]), { steps: 1_000_000 });
+  const bytes = k.bitsOf(k.current(counted.value)).bytes;
+  return { trees: Number(new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0)), steps: r.steps };
+}
+
+test("the engine specialized over a grammar reads the same, in fewer steps; how few is recorded as a finding", DEPTH, () => {
+  const cases: [string, string, string, number][] = [
+    ["a sequence", '{s: grammar.seq([grammar.lit("a"), grammar.ref(`b), grammar.lit("c")]), b: grammar.run("bees", "bb")}', "abbbbc", 1],
+    ["a rule that names itself", '{s: grammar.alt([grammar.seq([grammar.lit("("), grammar.ref(`s), grammar.lit(")")]), grammar.lit("x")])}', "(((x)))", 1],
+    ["two readings", '{s: grammar.seq([grammar.ref(`a), grammar.ref(`a)]), a: grammar.alt([grammar.lit("x"), grammar.lit("xx")])}', "xxx", 2],
+  ];
+  for (const [name, rules, text, trees] of cases) {
+    const { k, reader, ways } = yielded(readerOf(rules));
+    // The first reading works the analysis of the grammar out, so the second is the one compared.
+    reading(k, reader, ways, text);
+    const plain = reading(k, reader, ways, text);
+    const budget = new Uint8Array(4);
+    new DataView(budget.buffer).setUint32(0, 100_000);
+    const made = k.evaluate(k.expression(k.kernelPrimitive("specialize"), [reader, k.bits(budget)]), { steps: 1_000_000 });
+    assert.equal(k.kind(k.current(made.value)), "composed-function", name);
+    const special = reading(k, k.current(made.value), ways, text);
+    assert.equal(plain.trees, trees, name);
+    assert.equal(special.trees, trees, name);
+    assert.ok(special.steps < plain.steps, `${name}: ${special.steps} steps specialized, ${plain.steps} plain`);
+    console.log(`specialized: ${name}: ${plain.steps} steps plain, ${special.steps} specialized, ${made.steps} to specialize`);
+  }
 });

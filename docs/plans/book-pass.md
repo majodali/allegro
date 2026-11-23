@@ -601,7 +601,7 @@ are:
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
 | E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
 | E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | done 2026-11-24: the runner `next/ext/ext.test.ts`, `next/ext/lib/map.alg` and `set.alg` with their test modules, and the primitives `text.byte`, `text.span`, `text.starts`, `text.until`; a map of 10,000 entries is built and read in 4,652,564 steps, 4.75 times the steps of one of 2,500 |
-| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | its tests; the corpus cases of the parser engine that need no more; **the speed target of §10.6 item 1, measured. Where it is missed the plan stops here for a ruling** |
+| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | done 2026-11-25: `class.alg`, `grammar.alg`, `analysis.alg`, `engine.alg` and `flat.alg` under `next/ext/lib/`, each with a test module; **the speed target is met: a module of 207 lines is read in 2,280,434 steps and about 7 seconds**; the engine specialized over a grammar is measured and gains little (§7) |
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | its tests |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
@@ -1798,6 +1798,73 @@ its approval.
   left out there and say so; the machine runs them all. Open for
   lane Q: the emitter's lists name none of the four primitives, nor
   `specialize` and `sample`, so no Allegretto text can use them yet.
+- **2026-11-25 — chunk E3, the engine: every parse** (the review
+  session). Built, each with a test module beside it:
+  `next/ext/lib/class.alg`, a class of bytes as 256 bits;
+  `grammar.alg`, the seven rule forms and the terminals `lit`, `run`,
+  `many`, `one`, `until` and `end`; `analysis.alg`; `engine.alg`;
+  `flat.alg`, a grammar for Allegretto written with no indented block.
+  - *The engine.* What a form gives at a position is every result it
+    has there. A sequence carries on from each result of an item; an
+    `alt` gives the results of all its items; a `star` gives a result
+    for every count. Its answer is `{trees}` or
+    ``{failure: `no_parse, at}``. A tree has an entry `kind`; this
+    shape lasts until E5 gives descriptions.
+  - *What cannot match is not tried.* The analysis gives each item of
+    an `alt`, and the item of a `star` and of an `opt`, the class of
+    bytes it can begin with. The engine tests one byte. A terminal says
+    what it can start with, since the analysis cannot look inside a
+    function.
+  - *Only what pays is remembered.* A rule is remembered where two
+    items of one `alt` can both begin with it. What is remembered is a
+    table with a row for each position, whose entries are worked out
+    when first read and once: the kernel's own rule for an entry of a
+    structure. So the engine threads no table through its functions,
+    and the map of E2 is used by the analysis only.
+  - *Space.* A terminal that reads a word or a sign reads the space
+    after it, so what a rule begins with is never a space.
+  - *Operators are read as one row*: an operand, then a sign and an
+    operand any number of times. With a rule for each of the eight
+    levels of binding the same module took 3,884,041 steps and 15
+    seconds, and missed the target. The row is to be grouped by the
+    order of binding when a tree becomes a description, in E5, which
+    builds the precedence levels. The maintainer is asked to confirm.
+  - *Measured.* `analysis.alg` and `class.alg` as one text, 207 lines
+    and 10,189 bytes: one reading, 2,280,434 steps, 7.1 seconds alone
+    and 8.2 inside the test file. Twice the text takes about twice the
+    steps. The engine's tests take about 32 seconds in all.
+  - *The kernel, again.* A count was read from a list of its 64 bits;
+    a part of a value not of whole bytes, and a comparison of two,
+    listed every bit of the whole value. Each now reads what it needs.
+    The 207 lines went from 8.8 to 7.1 seconds.
+  - *For the research goal: what specialization left undone.* The
+    kernel's `specialize` was applied to the engine with its grammar
+    given and the text unknown. Three small grammars: 341 steps to 281,
+    823 to 771, 456 to 367 for a reading. The saving is a fixed number
+    of steps for a reading and does not grow with the text. The cause:
+    a function being opened is not opened again inside itself, and the
+    engine is one function, `parse`, entered again for each form of the
+    grammar. So only the first form's choice is removed, and every
+    other is left as a call of the general `parse`. What would remove
+    them: opening a function again where its known arguments differ,
+    and keeping one specialized function for each pair of a function
+    and its known arguments, so that a rule that names itself closes a
+    loop. On the grammar of `flat.alg` the specialization did not
+    finish in 30,000,000 steps and 67 seconds. Why is not established.
+  - *Deliberate faults*: 41 made in the five modules. 31 were caught
+    at first. Of the 10 that were not, 2 change no result, and one of
+    them was an optimization in `flat.alg` that saved no step and is
+    removed. The other 8 showed tests that were missing: an item that
+    can read no byte, the farthest position across items, a remembered
+    rule at the end of a text, a rule met twice by one item, a tab, a
+    first line that begins with a space, and a name that begins as a
+    word does. Each has a test now and is caught. In the kernel's new
+    reading of bits, 5 made: 3 caught at first, and 2 after two tests
+    were added to `next/kernel/kernel.test.ts`.
+  - *Open for lane Q*: the reader refuses a name that begins with
+    `true`, such as `trues`, and a brace inside a text; the six names
+    of E2's hand-off are still not listed, so terminals read bytes with
+    `bits.slice` and `bits.int`, about 39,000 calls for the 207 lines.
 
 ## 8. Sessions
 

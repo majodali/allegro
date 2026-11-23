@@ -574,6 +574,21 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-25 — A parser engine written in Allegretto, and the speed
+  target met.** Five modules under `next/ext/lib/`, each with a test
+  module. `class.alg`: a class of bytes as 256 bits. `grammar.alg`: a
+  grammar as a value in seven rule forms, and terminals as functions
+  of a text and a position. `analysis.alg`: which rules can read no
+  byte, the bytes each item can begin with, and the rules worth
+  remembering. `engine.alg`: every reading of a text, with no meaning
+  given to the order of alternatives, or the farthest position where
+  no reading goes on. `flat.alg`: a grammar for Allegretto written
+  with no indented block. The engine reads a module of 207 lines of
+  Allegretto in 2,280,434 steps and about 7 seconds; the target is 10.
+  The kernel's `specialize` makes the engine over a grammar 6 to 20
+  percent cheaper on small grammars and does not finish on this one.
+  Not yet: a rule that begins with itself, a state beside the
+  position, and trees as descriptions.
 - **2026-11-24 — What the parser engine stands on.** Allegretto modules
   under `next/ext/` now have tests: a module `<name>.test.alg` beside
   what it tests, its claims the assertions, run by
