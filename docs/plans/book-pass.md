@@ -1744,6 +1744,15 @@ its approval.
   opened, claim decided and effect performed, with the place of the
   part and whether it was evaluated ahead. Both variants tell the same
   things in the same order for the cases tested.
+- **2026-11-23 — the kernel's part of a speculative check** (the
+  review session): `Kernel.check` evaluates ahead and with both
+  branches, then goes over what the evaluation left untouched and the
+  body of every function it met. The launcher's check does not call it
+  yet. Ruled on its pull request: a function a call opened is evaluated
+  again with its parameters unknown; a branch a known condition does
+  not take is not evaluated; the second phase's analyses are Allegro
+  code that the launcher hands a check's result to; a refutation is
+  told to a host under the name `refutation`.
 
 ## 8. Sessions
 
