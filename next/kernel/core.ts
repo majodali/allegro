@@ -8,7 +8,7 @@
 // 2026-11-20 with no change (docs/plans/book-pass.md section 9). The
 // reference kernel's evaluator is next/kernel/kernel.ts.
 
-import type { Cell, ClaimRecord, Declaration, Entry, Kernel, KeyDescription, Kind, Location, Outcome, Place, Rest, Value } from "./interface.js";
+import type { Cell, ClaimRecord, Declaration, Entry, Kernel, KeyDescription, Kind, Location, Observed, Outcome, Place, Rest, Value } from "./interface.js";
 import { InterfaceError } from "./interface.js";
 import { sha256Text } from "./hash.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KERNEL_PRIMITIVES, KernelPrim, Key, Lazy, NameRef, Param, Prim, Quoted, Refuted, Struct, Sym } from "./values.js";
@@ -590,9 +590,27 @@ export const createCore = () => {
     if (t === undefined) tallies.set(site, (t = { decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, reasons: new Set(), rests: new Map() }));
     return t;
   };
+  // ---- What a host is told ---------------------------------------------------
+
+  let observer: ((seen: Observed) => void) | undefined;
+  /** Whether the evaluator is ahead of what is done. The evaluator says how to tell. */
+  let aheadNow: () => boolean = () => false;
+  const aheadIs = (reader: () => boolean): void => {
+    aheadNow = reader;
+  };
+  /** True while a host listens: what is told is only put together then. */
+  const observed = (): boolean => observer !== undefined;
+  /** Tells the host that listens one thing the kernel did, with the part it is about and the part's place. */
+  const tell = (part: V, what: { kind: "branch"; taken: "then" | "else" | "both" | "neither" } | { kind: "call"; function: Value } | { kind: "claim"; outcome: Outcome | "waiting" } | { kind: "effect"; capability: string; operation: string }): void => {
+    if (observer === undefined) return;
+    const at = part instanceof Expr || part instanceof Fn || part instanceof Struct ? part.at : undefined;
+    observer({ part: out(part), ...(at === undefined ? {} : { at }), ahead: aheadNow(), ...what } as Observed);
+  };
+
   /** Records how one evaluation of a claim came out. `from` is what was evaluated: the claim, or what an earlier evaluation left of it. */
   const tallied = (from: Expr, result: V, rests: readonly Rest[]): V => {
     const site = from.site ?? from;
+    if (observer !== undefined) tell(site, { kind: "claim", outcome: result instanceof Refuted ? "refuted" : result instanceof Decided ? result.outcome : "waiting" });
     if (waitingClaims.has(from)) {
       waitingClaims.delete(from);
       waitingAt.set(site, (waitingAt.get(site) ?? 1) - 1);
@@ -1006,6 +1024,10 @@ export const createCore = () => {
       made.at = placeIn(at, "expression");
       return out(made);
     },
+    observe: (o) => {
+      if (o !== undefined && typeof o !== "function") throw new InterfaceError("observe: the observer is not a function");
+      observer = o;
+    },
     placeOf: (value) => {
       const v = through(into(value, "the value"));
       return v instanceof Expr || v instanceof Fn || v instanceof Struct ? v.at : undefined;
@@ -1173,7 +1195,7 @@ export const createCore = () => {
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
     numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, asBody, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    restored, thenGroups, localKey, keep, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,

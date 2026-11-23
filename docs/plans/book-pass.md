@@ -1739,6 +1739,11 @@ its approval.
   it leaves, and tests run by ordinary evaluation), and both ways of
   leaving a capability out are kept, pending real cases. The hook is
   next.
+- **2026-11-23 — the hook for diagnostics** (the review session):
+  `Kernel.observe` has the kernel tell its host each branch taken, call
+  opened, claim decided and effect performed, with the place of the
+  part and whether it was evaluated ahead. Both variants tell the same
+  things in the same order for the cases tested.
 
 ## 8. Sessions
 

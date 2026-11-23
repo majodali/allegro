@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-23 — A hook for diagnostics.** `Kernel.observe` gives the
+  kernel's host one call for each branch taken, call opened, claim
+  decided and effect performed, with the place of the part and whether
+  it was evaluated ahead. A host can tell from it which branches a run
+  took and which a specialization reached, with the program unchanged.
+  Allegro code never sees it. Nothing uses it yet.
 - **2026-11-22 — Places in the text; descriptions keyed by name.** An
   application, a function and a structure may say where they were
   written: the name of the text and two locations. A copy keeps the
