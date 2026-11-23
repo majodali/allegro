@@ -118,7 +118,11 @@
 //        what it rests on are each listed once. Records of one claim are
 //        matched by the handle `ClaimRecord.claim`. An entry's `at` is the
 //        key the kernel gives the claim in its module's function, resting
-//        on nothing (`claimKey`), so a reader can tell claims apart;
+//        on nothing (`claimKey`), so a reader can tell claims apart. Its
+//        `place` is where the claim was written, copied from the kernel's
+//        record (`ClaimRecord.at`) where the kernel gives one. The
+//        kernel's record names the two the other way round: its `at` is
+//        the place;
 //      - `summary`, the weakest strength among the claims (`summaryOf`);
 //      - `restsOn`, what the run as a whole rests on: the kernel variant,
 //        the pure primitives the records name, the modules loaded, the
@@ -149,7 +153,7 @@
 // Tested by next/launch/launcher.test.ts, on the kernel that
 // next/kernel/create.ts gives.
 
-import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, PrimitiveDeclaration, Rest, Value } from "../kernel/interface.js";
+import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
 
@@ -351,6 +355,14 @@ export interface ClaimResult {
    * no module for the claim, or does not give a key for it.
    */
   readonly at?: string;
+  /**
+   * Where the claim was written: the text's name, and the index, line and
+   * column of its start and of the point after its end. It is the plain
+   * data of the kernel's `ClaimRecord.at`, copied from the first record of
+   * the claim that gives one, and absent where none does. `at` above is
+   * the claim's key; the kernel's record calls the place `at`.
+   */
+  readonly place?: Place;
   /** The identity of the module whose code wrote the claim, where the kernel gives one. */
   readonly module?: string;
   /** Evaluations that came out decided, over the whole run. */
@@ -458,7 +470,8 @@ function refused(lines: string[], reason: string, findings: readonly string[] = 
 }
 
 /**
- * The weakest strength among the claims. A claim with any refuted
+ * The weakest strength among the claims, each claim's by `claimWord`,
+ * where a claim that waits counts as undecided. A claim with any refuted
  * evaluation is refuted. Else one with any undecided evaluation, or one
  * that still waits, is undecided. Else one with any assumed evaluation is
  * assumed. Else one with any sampled evaluation is sampled. Else it is
@@ -470,11 +483,29 @@ function refused(lines: string[], reason: string, findings: readonly string[] = 
  * is a choice the maintainer may change.
  */
 export function summaryOf(claims: readonly ClaimResult[]): Strength {
-  const strengthOf = (c: ClaimResult): Strength =>
-    c.refuted > 0 ? "refuted" : c.undecided > 0 || c.waiting > 0 ? "undecided" : c.assumed > 0 ? "assumed" : c.sampled > 0 ? "sampled" : "decided";
   let weakest = STRENGTHS.length - 1;
-  for (const c of claims) weakest = Math.min(weakest, STRENGTHS.indexOf(strengthOf(c)));
+  for (const c of claims) {
+    const word = claimWord(c);
+    weakest = Math.min(weakest, STRENGTHS.indexOf(word === "waiting" ? "undecided" : word));
+  }
   return STRENGTHS[weakest];
+}
+
+/** A word for one claim: a strength, or `waiting` for a claim that still waits and is neither refuted nor undecided. */
+export type ClaimWord = Strength | "waiting";
+
+/** The words of `ClaimWord`, weakest first. */
+export const CLAIM_WORDS: readonly ClaimWord[] = ["refuted", "undecided", "waiting", "assumed", "sampled", "decided"];
+
+/**
+ * The rule of `summaryOf` for one claim: refuted, then undecided, then
+ * waiting, then assumed, then sampled, else decided. The summary counts a
+ * claim that waits as undecided; this word keeps it apart, so a reader can
+ * tell a claim that waits from one that cannot be told. The one rule both
+ * use.
+ */
+export function claimWord(c: ClaimResult): ClaimWord {
+  return c.refuted > 0 ? "refuted" : c.undecided > 0 ? "undecided" : c.waiting > 0 ? "waiting" : c.assumed > 0 ? "assumed" : c.sampled > 0 ? "sampled" : "decided";
 }
 
 /** A `Rest` as plain data: the kernel's handle left out. */
@@ -495,9 +526,19 @@ function restData(rest: Rest): RestData {
   }
 }
 
+/** A place as plain data: a copy of the kernel's, field by field. */
+function placeData(at: Place): Place {
+  return {
+    source: at.source,
+    start: { index: at.start.index, line: at.start.line, column: at.start.column },
+    end: { index: at.end.index, line: at.end.line, column: at.end.column },
+  };
+}
+
 /** One claim's records, as they are summed. */
 interface Tally {
   at?: string;
+  place?: Place;
   module?: string;
   decided: number;
   sampled: number;
@@ -528,11 +569,14 @@ class ClaimTallies {
         const at = this.atOf(r);
         t = {
           ...(at === undefined ? {} : { at }),
+          ...(r.at === undefined ? {} : { place: placeData(r.at) }),
           ...(r.module === undefined ? {} : { module: r.module }),
           decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], seen: new Set(),
         };
         this.byClaim.set(r.claim, t);
       }
+      // The place, from the first record that gives one: the launcher copies what the kernel says and keeps it.
+      if (t.place === undefined && r.at !== undefined) t.place = placeData(r.at);
       t.decided += r.decided;
       t.sampled += r.sampled;
       t.assumed += r.assumed;

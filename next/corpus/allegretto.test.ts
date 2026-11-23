@@ -51,7 +51,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -440,6 +440,50 @@ test("the programs that state a summary: a claim that holds, one refuted, one as
     assert.deepEqual(run.problems, [], file);
     assert.equal(run.result?.summary, summary, file);
   }
+});
+
+
+// ── The claim at line (chunks Q5 and Q13, 2026-11-23) ─────────────────
+
+test("the claim at lines are read as the convention states: a line, a column and a word, several in order", () => {
+  assert.deepEqual(readClaimLines("// claim at: 2:1 decided\n//claim at:  10:7   waiting  \n"), {
+    claims: [{ line: 2, column: 1, word: "decided" }, { line: 10, column: 7, word: "waiting" }],
+    problems: [],
+  });
+  assert.deepEqual(readClaimLines("capability output\n"), { claims: [], problems: [] });
+  const form = "is not of the form claim at: <line>:<column> <word>, the word one of refuted, undecided, waiting, assumed, sampled, decided";
+  assert.deepEqual(readClaimLines("// claim at: 2 decided\n// claim at: 0:1 decided\n// claim at: 2:1 proven\n// claim at: 2:1\n").problems, [
+    `the line "// claim at: 2 decided" ${form}`,
+    `the line "// claim at: 0:1 decided" ${form}`,
+    `the line "// claim at: 2:1 proven" ${form}`,
+    `the line "// claim at: 2:1" ${form}`,
+  ]);
+});
+
+test("a program that states a claim at a place passes only with that word; a place where no claim is written fails it", async () => {
+  const program = 'capability output\nclaim(1 == 1)\nassume(2 == 2)\noutput.write("after")\nclaim(1 == 2)\n// expect: after\n// end: refuted: a claim that is not true\n';
+  const plain = await runProgram(program, "dir/claims.alg");
+  assert.deepEqual(plain.problems, []);
+  assert.ok(plain.result?.claims.some((c) => c.place?.source === "dir/claims.alg" && c.place.start.line === 2), "each claim has its place in the program's own file");
+  assert.deepEqual((await runProgram(program + "// claim at: 2:1 decided\n// claim at: 3:1 assumed\n// claim at: 5:1 refuted\n", "dir/claims.alg")).problems, []);
+  assert.deepEqual((await runProgram(program + "// claim at: 2:1 assumed\n", "dir/claims.alg")).problems, ["the claim at 2:1 came out decided, expected assumed"]);
+  assert.deepEqual((await runProgram(program + "// claim at: 2:2 decided\n", "dir/claims.alg")).problems, ["no claim of the result is written at 2:2 of dir/claims.alg"]);
+  assert.deepEqual((await runProgram(program + "// claim at: 9:1 decided\n")).problems, ["no claim of the result is written at 9:1 of <text>"]);
+  const malformed = await runProgram(program + "// claim at: two:one decided\n");
+  assert.equal(malformed.problems.length, 1);
+  assert.match(malformed.problems[0], /is not of the form claim at: <line>:<column> <word>/);
+  assert.deepEqual(malformed.lines, [], "a program whose lines cannot be read is not launched");
+});
+
+test("a claim that still waits when the run ends is stated waiting; a claim at line where nothing is launched fails the program", async () => {
+  const waits = await runProgram(
+    "capability output\ninput n\nclaim(n == 1)\n// end: waiting: the program waits on the input(s) n, which the configuration does not supply\n// claim at: 3:1 waiting\n",
+  );
+  assert.deepEqual(waits.problems, []);
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// claim at: 2:1 decided\n");
+  assert.deepEqual(notEmitted.problems, ["nothing was launched, and the program states a `// claim at:` line"]);
+  const refusedRun = await runProgram("capability output\ninput a\nclaim(a == 1)\n// input: b = 1\n// end: refused: the configuration supplies the input b at the start, which the module does not declare\n// claim at: 3:1 decided\n");
+  assert.deepEqual(refusedRun.problems, ["the launcher refused the run, and the program states a `// claim at:` line"]);
 });
 
 

@@ -21,7 +21,7 @@ import { createKernel } from "../kernel/create.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Plain, type Target } from "./launcher.js";
+import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Plain, type Target } from "./launcher.js";
 import { timer } from "./timer.js";
 import { virtualClock } from "./clock.js";
 import { OUTPUT, output } from "./output.js";
@@ -1072,6 +1072,67 @@ test("the result holds no kernel handle: it survives JSON unchanged", async () =
   for (const outcome of outcomes) {
     const result = resultOf(outcome);
     assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
+  }
+});
+
+// ── Where a claim was written (chunks Q5 and Q13, 2026-11-23) ─────────
+//
+// `place` is the plain data of the kernel's `ClaimRecord.at`, copied as
+// the kernel gives it. `at` stays the claim's key.
+
+/** A claim's place as `source:line:column-line:column`, for a short assertion. */
+const placeText = (c: ClaimResult): string | undefined =>
+  c.place === undefined ? undefined : `${c.place.source}:${c.place.start.line}:${c.place.start.column}-${c.place.end.line}:${c.place.end.column}`;
+
+test("a result gives each claim the place it was written, and keeps its key in at", async () => {
+  const text = "capability output\nclaim(1 == 1)\nassume(2 == 2)\noutput.write(\n  \"done\")\nclaim(3 == 4)\n";
+  const result = resultOf(await run(emitted(text)));
+  const places = result.claims.map(placeText);
+  for (const p of ["<text>:2:1-2:14", "<text>:4:1-5:10", "<text>:6:1-6:14"]) assert.ok(places.includes(p), `${p} among ${JSON.stringify(places)}`);
+  const refuted = result.claims.find((c) => placeText(c) === "<text>:6:1-6:14");
+  assert.ok(refuted !== undefined && refuted.refuted === 1, "the claim at line 6 is the refuted one");
+  assert.match(refuted.at ?? "", /^sha256:[0-9a-f]{64}$/, "at is the claim's key");
+  const first = result.claims.find((c) => placeText(c) === "<text>:2:1-2:14");
+  assert.deepEqual(first?.place, { source: "<text>", start: { index: text.indexOf("claim(1"), line: 2, column: 1 }, end: { index: text.indexOf("claim(1") + 13, line: 2, column: 14 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
+});
+
+test("a claim in an imported module names that module's file", async () => {
+  const records = drivenRecords("capability output\nimport lib\noutput.write(int.text(lib.double(21)))\n", { lib: "export double(n) => sync\n  claim(n >= 0)\n  n * 2\n" });
+  const result = resultOf(await launchDriven(records));
+  const inLib = result.claims.find((c) => c.place?.source === path.join("dir", "lib.alg"));
+  assert.ok(inLib !== undefined, JSON.stringify(result.claims.map(placeText)));
+  assert.deepEqual([inLib.place?.start.line, inLib.place?.start.column], [2, 3]);
+  assert.equal(inLib.module, result.restsOn.modules[0], "the module that wrote it is the imported one");
+  assert.ok(result.claims.some((c) => c.place?.source === "dir/main.alg"), "the write in the main text is a claim of its own file");
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
+});
+
+test("a claim that waits and is decided later keeps its place", async () => {
+  const later = laterCapability();
+  const program = emitted('capability later\nclaim(later.ask() == "yes")\n');
+  const pending = launch({ createKernel, program, configuration: { ceiling: ["later"] }, target: { capabilities: [later.capability], primitives: shipped } });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  later.answer("yes");
+  const outcome = await pending;
+  assert.equal(outcome.end.kind, "completed");
+  const result = resultOf(outcome);
+  const claim = entryWith(result, [1, 0, 0, 0, 0]);
+  assert.equal(placeText(claim), "<text>:2:1-2:28");
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
+});
+
+test("the word for one claim is the summary's rule, with waiting kept apart from undecided", () => {
+  const entry = (over: Partial<ClaimResult>): ClaimResult => ({ decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], ...over });
+  assert.equal(claimWord(entry({ decided: 2 })), "decided");
+  assert.equal(claimWord(entry({ decided: 1, sampled: 1 })), "sampled");
+  assert.equal(claimWord(entry({ sampled: 1, assumed: 1 })), "assumed");
+  assert.equal(claimWord(entry({ assumed: 1, waiting: 1 })), "waiting");
+  assert.equal(claimWord(entry({ undecided: 1, waiting: 1 })), "undecided");
+  assert.equal(claimWord(entry({ undecided: 1, refuted: 1 })), "refuted");
+  for (const c of [entry({ decided: 1 }), entry({ sampled: 1 }), entry({ assumed: 1 }), entry({ waiting: 1 }), entry({ undecided: 1 }), entry({ refuted: 1 })]) {
+    const word = claimWord(c);
+    assert.equal(summaryOf([c]), word === "waiting" ? "undecided" : word, JSON.stringify(c));
   }
 });
 

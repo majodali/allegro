@@ -29,6 +29,7 @@ Each statement is a comment line of its own:
 | `// expect: <line>` | a line the program prints; the lines in order, each compared exactly |
 | `// end: <how>` | how the run ends: `completed`, `refuted: <the reason the kernel gives>`, `waiting: <the reason the launcher gives>`, or `refused: <the reason>`; every program has one |
 | `// summary: <word>` | the run's summary, the weakest strength among its claims: `refuted`, `undecided`, `assumed`, `sampled` or `decided`; at most one line (see "The summary") |
+| `// claim at: <line>:<column> <word>` | the claim written at that line and column of the program's own text came out with this word: `decided`, `sampled`, `assumed`, `undecided`, `refuted` or `waiting`; several lines may be written (see "A claim by its place") |
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
@@ -78,8 +79,9 @@ loaded first, with the output capability, the timer capability, the
 HTTP capability, the check-output capability, the shipped primitives,
 its inputs and a budget of 1,000,000 steps. A program passes when its
 printed lines, its end, the lines printed before each later phase and
-its yielded keys are the ones stated, and its summary, its messages and
-its status where it states them. The yielded keys are read
+its yielded keys are the ones stated, and its summary, the word of each
+claim it states by its place, its messages and its status where it
+states them. The yielded keys are read
 with the program's inputs handed in and its imported records loaded.
 
 ## Phases
@@ -126,6 +128,32 @@ value is dropped stands for a claim, so a line written with
 lines, and a line in a program that is not launched or that the
 launcher refuses each fail the program. `runProgram` gives the result
 of the run (`ProgramRun.result`).
+
+## A claim by its place
+
+Each claim of the result gives the place it was written (`place` of
+`ClaimResult` in `next/launch/launcher.ts`): the file, and the line and
+column of its start and of the point after its end. The emitter writes
+each part's place into the record, and the launcher copies the kernel's.
+`// claim at: <line>:<column> <word>` states that the claim written at
+that line and column of the program's own text came out with that word.
+The line and column are those of the claim's first character, each
+counted from 1. A statement whose value is dropped stands for a claim
+written where the statement starts.
+
+The word is the summary's rule for one claim (`claimWord` of
+`next/launch/launcher.ts`): `refuted`, else `undecided`, else `waiting`
+for a claim that still waits when the run ends, else `assumed`, else
+`sampled`, else `decided`. The summary counts a claim that waits as
+`undecided`; this line keeps the two apart.
+
+A program may state several such lines. Every claim of the result
+written at the place must have the word. A line that names a place where
+no claim of the result is written fails the program. A line that is not
+of the form, and a line in a program that is not launched or that the
+launcher refuses, each fail the program. The line names a place in the
+program's own text only, so a claim in an imported text is not stated
+this way.
 
 ## When a case is realised
 
