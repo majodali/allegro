@@ -3975,7 +3975,7 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     load and the tests), `test-import/main.alg` (imports
     `test-import/arith.alg` and tests its `gcd`), `test-check` (`check,
     test`: a false claim in a function no test calls ends the launch).
-  - **Measured.** `npm run test:next` runs 968 tests on the default
-    kernel and 967 with `ALLEGRO_KERNEL=reference`; all pass but one
+  - **Measured.** `npm run test:next` runs 969 tests on the default
+    kernel and 968 with `ALLEGRO_KERNEL=reference`; all pass but one
     marked to do on each. 43 tests are new on each. `npm run
     harness:next` runs 129 programs, and all pass on both variants.
