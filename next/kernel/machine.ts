@@ -276,6 +276,8 @@ export const createMachine: CreateKernel = () => {
    * evaluation ends, so a deep evaluation does not pay for its depth at every record.
    */
   aheadIs(() => ahead);
+  /** What a call of a primitive rests on, one record for each declaration: a call notes it and makes nothing. */
+  const restOfPrimitive = new WeakMap<object, Rest>();
   const rest = (r: Rest): void => {
     if (collectors.length > 0) collectors[collectors.length - 1].set(localKey(r), r);
   };
@@ -1402,7 +1404,8 @@ export const createMachine: CreateKernel = () => {
       if (!args.every(knownInFull)) return new Expr(fn, args);
       const d = fn.declaration;
       if (ahead && d.purity === "effectful") return new Expr(fn, args);
-      const what: Rest = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part };
+      let what = restOfPrimitive.get(d);
+      if (what === undefined) restOfPrimitive.set(d, (what = d.purity === "pure" ? { kind: "primitive", hash: d.hash, name: d.name } : { kind: "capability", capability: d.capability, part: d.part }));
       rest(what);
       if (d.purity === "effectful" && observed()) tell(v, { kind: "effect", capability: d.capability, operation: d.part });
       const before = running;

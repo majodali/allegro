@@ -574,6 +574,20 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-24 — What the parser engine stands on.** Allegretto modules
+  under `next/ext/` now have tests: a module `<name>.test.alg` beside
+  what it tests, its claims the assertions, run by
+  `next/ext/ext.test.ts`. `next/ext/lib/map.alg` is a map from whole
+  numbers to values, a tree that shares all but the path to a key;
+  `next/ext/lib/set.alg` is a set on it. Four shipped primitives read a
+  text from a byte position: `text.byte`, `text.span`, `text.starts`
+  and `text.until`. An Allegretto text cannot name them until the
+  emitter lists them. The kernel no longer builds a key and a record
+  for every call of a primitive, nor a list of 64 numbers for every
+  count: a map of 10,000 entries is built and read in 4,652,564 steps
+  and about 12 seconds, where it took 18. The tests that run a module
+  are left out on the reference kernel, whose depth the modules
+  outgrow.
 - **2026-11-24 — A plan for the parser engine and the module loader.**
   `docs/plans/book-pass.md` §10 and eleven chunks in its §5: an engine
   and a loader written in Allegretto under `next/ext/`, ending with the

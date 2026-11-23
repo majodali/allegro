@@ -30,6 +30,10 @@ export class Bits {
     r.charge = charge;
     return r;
   }
+  /** True where the bytes are laid out, so reading them does no work. */
+  get laidOut(): boolean {
+    return this.flat !== undefined;
+  }
   /** True where the value is whole bytes, so it can be handled a byte at a time. */
   get whole(): boolean {
     return this.flat === undefined || this.bitLength === this.flat.length * 8;

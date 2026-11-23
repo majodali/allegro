@@ -189,7 +189,9 @@ export const createCore = () => {
   const bitsOf = (v: V) => {
     const s = seen(v);
     if (!(s instanceof Bits)) return wrong("bitsOf", v);
-    // The length is known at once. The bytes of a value made by joining are laid out when they are read.
+    // The length is known at once. Bytes that are laid out are handed over as they are.
+    if (s.laidOut) return { bytes: s.bytes, bitLength: s.bitLength };
+    // The bytes of a value made by joining are laid out when they are read.
     return {
       get bytes(): Uint8Array {
         return s.bytes;
@@ -368,7 +370,11 @@ export const createCore = () => {
     return new Bits(bytes, bits.length);
   };
   /** A count as the kernel answers one: 64 bits, most significant first. */
-  const count64 = (n: number): V => packed(Array.from({ length: 64 }, (_, i) => (i < 11 ? 0 : Math.floor(n / 2 ** (63 - i)) % 2)));
+  const count64 = (n: number): V => {
+    const bytes = new Uint8Array(8);
+    for (let i = 7, rest = n; i >= 0 && rest > 0; i--, rest = Math.floor(rest / 256)) bytes[i] = rest % 256;
+    return new Bits(bytes, 64);
+  };
   /** A whole number read from bits, or undefined where the value is not bits or is too large to count with. */
   const countOf = (v: V): number | undefined => {
     const b = seen(v);
@@ -548,8 +554,14 @@ export const createCore = () => {
   const assumptionNumbers = new WeakMap<object, number>();
   let assumptionCount = 0;
   /** The key within one kernel: it tells two assumptions of one module apart, which the stored key does not. */
+  /** The key of a rest that is not an assumption at a place, kept: the same record is noted at every step that rests on it. */
+  const keyOfRest = new WeakMap<Rest, string>();
   const localKey = (r: Rest): string => {
-    if (r.kind !== "assumption" || r.at === undefined) return restKey(r);
+    if (r.kind !== "assumption" || r.at === undefined) {
+      let key = keyOfRest.get(r);
+      if (key === undefined) keyOfRest.set(r, (key = restKey(r)));
+      return key;
+    }
     let n = assumptionNumbers.get(r.at as object);
     if (n === undefined) assumptionNumbers.set(r.at as object, (n = ++assumptionCount));
     return `${restKey(r)} #${n}`;

@@ -43,7 +43,8 @@ test("the shipped primitives are listed in name order, each with its own content
   assert.deepEqual(names, [
     "bits.int",
     "float.add", "float.div", "float.eq", "float.ge", "float.gt", "float.int", "float.le", "float.lt", "float.mul", "float.neg", "float.sub", "float.text",
-    "int.add", "int.div", "int.float", "int.ge", "int.gt", "int.le", "int.lt", "int.mod", "int.mul", "int.neg", "int.sub", "int.text", "text.int",
+    "int.add", "int.div", "int.float", "int.ge", "int.gt", "int.le", "int.lt", "int.mod", "int.mul", "int.neg", "int.sub", "int.text",
+    "text.byte", "text.int", "text.span", "text.starts", "text.until",
   ]);
 });
 
@@ -104,6 +105,46 @@ test("an integer and its text", () => {
   assert.match(refusal("text.int", text("12a")), /not a whole number/);
   assert.match(refusal("text.int", text("")), /not a whole number/);
   assert.match(refusal("text.int", text("9223372036854775808")), /outside/);
+});
+
+test("a terminal reads a text from a position: a byte, a run of a class, a literal, and the bytes before a literal", () => {
+  const t = text("let x1 = 42 // note\nnext");
+  const [digit, word, space] = [text("09"), text("azAZ09__"), text("  \n\n")];
+  // The byte at a position, and minus one at the end.
+  assert.equal(asInt("text.byte", t, int(0n)), 108n);
+  assert.equal(asInt("text.byte", t, int(24n)), -1n);
+  assert.equal(asInt("text.byte", text(""), int(0n)), -1n);
+  assert.match(refusal("text.byte", t, int(25n)), /outside a text of 24 byte/);
+  assert.match(refusal("text.byte", t, int(-1n)), /outside/);
+  // A run of a class: as many bytes as belong, and none where the first does not.
+  assert.equal(asInt("text.span", t, int(0n), word), 3n);
+  assert.equal(asInt("text.span", t, int(4n), word), 2n, "a class of several ranges");
+  assert.equal(asInt("text.span", t, int(9n), digit), 2n);
+  assert.equal(asInt("text.span", t, int(0n), digit), 0n);
+  assert.equal(asInt("text.span", t, int(3n), space), 1n);
+  assert.equal(asInt("text.span", t, int(20n), word), 4n, "a run ends with the text");
+  assert.equal(asInt("text.span", t, int(24n), word), 0n, "at the end there is nothing");
+  assert.equal(asInt("text.span", t, int(0n), text("")), 0n, "nothing belongs to an empty class");
+  assert.equal(asInt("text.span", k.bits(Uint8Array.of(0xc3, 0xa9, 0x61, 0x20)), int(0n), k.bits(Uint8Array.of(0x61, 0x7a, 0x80, 0xff))), 3n, "bytes of a character beyond ASCII belong by their range");
+  assert.match(refusal("text.span", t, int(0n), text("a")), /pairs of bytes/);
+  assert.match(refusal("text.span", t, int(99n), word), /outside/);
+  assert.match(refusal("text.span", t, int(0n), k.structure([])), /not a value of kind structure/);
+  // A literal at a position.
+  assert.equal(asTruth("text.starts", t, int(0n), text("let")), true);
+  assert.equal(asTruth("text.starts", t, int(1n), text("let")), false);
+  assert.equal(asTruth("text.starts", t, int(20n), text("next")), true);
+  assert.equal(asTruth("text.starts", t, int(21n), text("extra")), false, "a literal longer than what is left");
+  assert.equal(asTruth("text.starts", t, int(24n), text("")), true, "the empty text begins everywhere");
+  assert.match(refusal("text.starts", t, int(25n), text("")), /outside/);
+  // The bytes before a literal, or to the end.
+  assert.equal(asInt("text.until", t, int(12n), text("\n")), 7n);
+  assert.equal(asInt("text.until", t, int(19n), text("\n")), 0n);
+  assert.equal(asInt("text.until", t, int(0n), text("//")), 12n);
+  assert.equal(asInt("text.until", t, int(20n), text("\n")), 4n, "to the end where it begins nowhere");
+  assert.equal(asInt("text.until", t, int(0n), text("/*")), 24n);
+  assert.equal(asInt("text.until", text("a*b*/c"), int(0n), text("*/")), 3n, "a first byte that matches alone does not stop it");
+  assert.match(refusal("text.until", t, int(0n), text("")), /empty/);
+  assert.match(refusal("text.until", t, int(-3n), text("x")), /outside/);
 });
 
 test("float arithmetic and orderings follow IEEE 754", () => {

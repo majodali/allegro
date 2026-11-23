@@ -600,7 +600,7 @@ are:
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
 | E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
-| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | their tests; a map of ten thousand entries is built and read in time that grows with its size |
+| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | done 2026-11-24: the runner `next/ext/ext.test.ts`, `next/ext/lib/map.alg` and `set.alg` with their test modules, and the primitives `text.byte`, `text.span`, `text.starts`, `text.until`; a map of 10,000 entries is built and read in 4,652,564 steps, 4.75 times the steps of one of 2,500 |
 | E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | its tests; the corpus cases of the parser engine that need no more; **the speed target of §10.6 item 1, measured. Where it is missed the plan stops here for a ruling** |
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | its tests |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
@@ -1771,6 +1771,33 @@ its approval.
   parse waits; this stream runs its tests on the acceptance stream's
   reader and launcher; a speed target that E3 must meet or stop at;
   terminals may be shipped primitives.
+- **2026-11-24 — chunk E2, what the engine stands on** (the review
+  session). Built: the runner of Allegretto test modules
+  `next/ext/ext.test.ts`; the map `next/ext/lib/map.alg` and the set
+  `next/ext/lib/set.alg`, each with a test module; the shipped
+  primitives `text.byte`, `text.span`, `text.starts` and `text.until`.
+  Measured: a map of 10,000 entries built and read takes 4,652,564
+  steps, 4.75 times the steps of one of 2,500, so the work grows with
+  the size and with the depth of a key. The first measurement took 18
+  seconds, about 250,000 steps a second. A profile showed three costs
+  that were not evaluation: a key built from a primitive's hash at
+  every call, a list of 64 numbers built for every count, and an
+  object made for every read of bits by a primitive. All three are
+  removed; the same run takes about 12 seconds, about 390,000 steps a
+  second. What is left is spread
+  over substitution into function bodies (about a fifth), the
+  collector of the host (a tenth) and the integer primitives' use of
+  the host's large integers (a tenth). No shared form for a map in the
+  kernel is asked for (§10.7 item 2): the map's cost is the kernel's
+  cost for each step, not copying. Deliberate faults: 7 of 7 in the
+  map, 1 of 1 in the set, 6 of 6 in the primitives, with two more
+  changes there that change no result. For the research goal: nothing
+  is specialized yet, so nothing is reported as left undone. The
+  reference kernel evaluates on the host's stack and ends a map of
+  fifty entries as out of budget, so the tests that run a module are
+  left out there and say so; the machine runs them all. Open for
+  lane Q: the emitter's lists name none of the four primitives, nor
+  `specialize` and `sample`, so no Allegretto text can use them yet.
 
 ## 8. Sessions
 
