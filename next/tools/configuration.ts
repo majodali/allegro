@@ -3,8 +3,8 @@
 // part 2, docs/plans/rebuild-acceptance.md §5; part 3, for the setting
 // `phases`, and part 5, for check as a check phase and for check then run;
 // chunk Q16 (the capabilities the launchers ship), part 3, for the check
-// capabilities). It closes B-059 (the project root file) as far
-// as this part goes.
+// capabilities; chunk Q13, part 6, for the test phase). It closes B-059
+// (the project root file) as far as this part goes.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Configuration is all the information that determines an execution",
@@ -23,7 +23,10 @@
 //    decision's wording is the kernel stream's to amend
 //   "Check reaches every claim": check is a check phase (`Phase.check` of
 //    next/launch/launcher.ts), which the launcher hands to the kernel's
-//    `check`, and which leaves every input unknown
+//    `check`, and which leaves every input unknown. Running tests, the
+//    third of the phases of a check by the note of 2026-11-23, is the test
+//    phase (`Phase.test`): `test` alone, or `check, test`
+//    (`TEST_PHASE_VALUES`)
 // "A full configuration is a model, evaluated in a first phase" is a design
 // to prove and is not built: the configuration here is in host form.
 //
@@ -35,8 +38,9 @@
 //   ceiling  the names of the capabilities granted;
 //   restore  the builder whose stored outcomes are accepted;
 //   kernel   the kernel variant's name;
-//   phases   the shipped phases to apply, in order (`PHASE_VALUES`):
-//            `run` alone, `check` alone, or `check, run`. Check is a check
+//   phases   the shipped phases to apply, in order (`PHASE_VALUES` and
+//            `TEST_PHASE_VALUES`): `run` alone, `check` alone, `check,
+//            run`, `test` alone, or `check, test`. Check is a check
 //            phase that names the check capabilities of the ceiling
 //            (`CHECK_CAPABILITIES`), which it hands as not needed, and no
 //            input: it leaves every input unknown. Run supplies every
@@ -45,7 +49,11 @@
 //            check and then run. Where no source sets it, it is `run`
 //            alone, which is what happens without it. With `check` alone,
 //            `inputs` and `later` are no finding, and the check does not
-//            use them.
+//            use them. `test` is a test phase that supplies every
+//            capability of the ceiling, and the inputs, which go to the
+//            load of the test module. `check, test` is the check and then
+//            the test phase. With a test phase `later` is a finding: no
+//            later phase follows the tests.
 //
 // The sources, highest first (`SOURCES`): the command line, the project's
 // file, the environment, what is built into the launcher. A setting is
@@ -95,10 +103,16 @@ export const MAY_SET: Readonly<Record<Setting, readonly SourceName[]>> = {
 };
 
 /** The shipped phases, by the name the setting `phases` uses. */
-export type ShippedPhase = "check" | "run";
+export type ShippedPhase = "check" | "run" | "test";
 
-/** The values of the setting `phases` that are built, each a list of shipped phases in order. */
+/** The values of the setting `phases` that run the program, each a list of shipped phases in order. */
 export const PHASE_VALUES: ReadonlyArray<readonly ShippedPhase[]> = [["run"], ["check"], ["check", "run"]];
+
+/** The values of the setting `phases` that run the tests of a test module (chunk Q13, part 6). */
+export const TEST_PHASE_VALUES: ReadonlyArray<readonly ShippedPhase[]> = [["test"], ["check", "test"]];
+
+/** Every value of the setting `phases` that is built, in the order a finding names them. */
+const BUILT: ReadonlyArray<readonly ShippedPhase[]> = [...PHASE_VALUES, ...TEST_PHASE_VALUES];
 
 /**
  * The check capabilities: those check names where the ceiling grants
@@ -154,7 +168,11 @@ const PHRASE: Readonly<Record<SourceName, string>> = {
 const phaseList = (names: readonly string[]): string => names.join(", ");
 
 /**
- * What the setting `phases` makes of the configuration. `run` alone is
+ * What the setting `phases` makes of the configuration. `test` is the
+ * launcher's `phases` with one test phase (`Phase.test`) named `test`, that
+ * supplies every capability of `ceiling` and the inputs; `check, test` is
+ * the check phase below and then that test phase. `later` given with
+ * either is a finding, and an empty list of later phases is none. `run` alone is
  * today's shape: the inputs and the later phases. `check` alone is the
  * launcher's `phases` with one check phase (`Phase.check`) that names the
  * check capabilities `ceiling` grants, in the order of
@@ -174,10 +192,17 @@ export function shapeOf(
   ceiling: readonly string[] = [],
 ): { readonly ok: true; readonly shape: Pick<Configuration, "inputs" | "later" | "phases"> } | { readonly ok: false; readonly findings: readonly string[] } {
   const names = phases ?? ["run"];
-  if (!PHASE_VALUES.some((v) => v.length === names.length && v.every((n, i) => n === names[i])))
-    return { ok: false, findings: [`the setting phases is ${JSON.stringify(phaseList(names))}, which is not built: the values built are ${PHASE_VALUES.map((v) => JSON.stringify(phaseList(v))).join(", ")}`] };
-  if (names[0] !== "check") return { ok: true, shape: { ...(inputs === undefined ? {} : { inputs }), ...(later === undefined ? {} : { later }) } };
+  if (!BUILT.some((v) => v.length === names.length && v.every((n, i) => n === names[i])))
+    return { ok: false, findings: [`the setting phases is ${JSON.stringify(phaseList(names))}, which is not built: the values built are ${BUILT.map((v) => JSON.stringify(phaseList(v))).join(", ")}`] };
   const check: Phase = { name: "check", check: true, capabilities: CHECK_CAPABILITIES.filter((c) => ceiling.includes(c)) };
+  if (names.includes("test")) {
+    // No later phase follows the tests: `later` beside a test phase is a finding. An empty list is none.
+    if (later !== undefined && later.length > 0)
+      return { ok: false, findings: [`the setting later is given with the phases ${JSON.stringify(phaseList(names))}: no later phase follows the tests`] };
+    const test: Phase = { name: "test", test: true, capabilities: ceiling, ...(inputs === undefined ? {} : { inputs }) };
+    return { ok: true, shape: { phases: names[0] === "check" ? [check, test] : [test] } };
+  }
+  if (names[0] !== "check") return { ok: true, shape: { ...(inputs === undefined ? {} : { inputs }), ...(later === undefined ? {} : { later }) } };
   if (!names.includes("run")) return { ok: true, shape: { phases: [check] } };
   return {
     ok: true,

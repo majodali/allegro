@@ -531,7 +531,7 @@ test("a malformed phases line, a list that is not built, and two lines each fail
   const body = 'capability output\ninput a\noutput.write("launched")\n// end: completed\n';
   for (const [lines, problem] of [
     ["// phases: check run", 'the line "// phases: check run" is not of the form phases: <name>, <name>'],
-    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"'],
+    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run", "test", "check, test"'],
     ["// phases: check\n// phases: run", "the program has two `// phases:` lines"],
   ] as const) {
     const run = await runProgram(body + lines + "\n");

@@ -7,14 +7,15 @@
 // part 3, for `--phases`, and part 5, for `--phases check` as the kernel's
 // check and for `--phases check,run`;
 // chunk Q16 (the capabilities the launchers ship), part 3, for check
-// output and the exit code): it emits
+// output and the exit code; chunk Q13, part 6, for `--phases test` and
+// `--phases check,test`): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]…
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes. Where the run did not complete
 // it writes the end's reason to stderr. Each message the program hands to
@@ -31,7 +32,9 @@
 //
 // The target is the terminal's: `output`, `timer` on the host's real
 // timer, `http` on the host's `fetch` (part 1 of Q16), `report` on the
-// terminal's sink (part 3 of Q16), and the shipped pure primitives.
+// terminal's sink (part 3 of Q16), and the shipped pure primitives. Under
+// a test phase it is the terminal's target for tests (`testTarget` of
+// next/launch/terminal.ts).
 //
 // The configuration comes from four sources, highest first, resolved by
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
@@ -43,7 +46,9 @@
 //     capabilities of the ceiling, `report` alone today, as not needed.
 //     Run supplies every capability of the ceiling and the inputs.
 //     `check,run` is the check and, where it finds nothing, the run, whose
-//     lines and end are the command's. Each `--input name=<literal>` supplies
+//     lines and end are the command's. `test` runs the tests of the text,
+//     a test module, and `check,test` checks it first: what they print is
+//     said in next/launch/terminal.ts. Each `--input name=<literal>` supplies
 //     the input `name` at the start. Each `--later name=<literal>` is one
 //     later phase that supplies it, in the order written. The value is
 //     one Allegretto literal, read by `readLiteral` of
@@ -72,7 +77,7 @@ import type { Inputs, Plain } from "./launcher.js";
 import { projectReader } from "./node-files.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]... [--later name=<literal>]...";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);

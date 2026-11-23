@@ -1371,7 +1371,7 @@ test("both commands take --phases: run as today, check with nothing printed, che
   assert.equal(check.status, 0);
   const notBuilt = command("terminal.ts", [FIXTURE, "--phases", "run,check"]);
   assert.equal(notBuilt.stdout, "");
-  assert.equal(notBuilt.stderr, 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"\n');
+  assert.equal(notBuilt.stderr, 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run", "test", "check, test"\n');
   assert.equal(notBuilt.status, 1);
   for (const entry of ["terminal.ts", "allegretto.ts"] as const) {
     const both = command(entry, [entry === "terminal.ts" ? FIXTURE : FIXTURE_TEXT, "--phases", "check,run"]);
@@ -1380,7 +1380,7 @@ test("both commands take --phases: run as today, check with nothing printed, che
     assert.equal(both.status, 0, entry);
   }
   const noList = command("allegretto.ts", [FIXTURE_TEXT, "--phases"]);
-  assert.match(noList.stderr, /^--phases takes the names of phases, separated by commas: run, check, or check,run\nusage: npm run allegretto -- /);
+  assert.match(noList.stderr, /^--phases takes the names of phases, separated by commas: run, check, check,run, test, or check,test\nusage: npm run allegretto -- /);
   assert.equal(noList.status, 1);
   const text = command("allegretto.ts", [FIXTURE_TEXT, "--phases", "check"]);
   assert.equal(text.stdout, "");
@@ -1845,4 +1845,80 @@ test("a test phase is the first phase or follows a check, and no phase follows i
 test("a run has no tests", async () => {
   const outcome = await launch({ createKernel, program: HELLO, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.equal(outcome.tests, undefined);
+});
+
+// ── The test phase on both commands (chunk Q13, part 6) ───────────────
+//
+// Both commands end to end: what is printed, what is written to stderr,
+// and the exit code. What the lines and messages hold is tested in
+// next/launch/test-output.test.ts.
+
+/** Writes a text and its record, emitted with the text's path as the source of its places, into `dir`. */
+function writeBoth(dir: string, name: string, text: string): { file: string; record: string } {
+  const file = path.join(dir, `${name}.alg`);
+  fs.writeFileSync(file, text);
+  const r = emit(text, new Map(), file);
+  assert.ok(r.ok, r.ok ? "" : r.findings.map((f) => f.message).join("; "));
+  const record = path.join(dir, `${name}.json`);
+  fs.writeFileSync(record, encode(r.program));
+  return { file, record };
+}
+
+test("both commands under --phases test: a line for each test, a failing test's lines indented, the last line, a message with the place of the refuted claim, and exit 1", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-phase-"));
+  try {
+    const { file, record } = writeBoth(dir, "tests", 'capability output\nexport passes() =>\n  output.write("hidden")\n  claim(1 == 1)\nexport fails() =>\n  output.write("trace")\n  claim(1 == 2)\nexport after() => claim(2 == 2)\n');
+    for (const [entry, arg] of [["allegretto.ts", file], ["terminal.ts", record]] as const) {
+      const r = command(entry, [arg, "--phases", "test"]);
+      assert.equal(r.stdout, "test passes: passed\ntest fails: refuted: a claim that is not true\n  trace\ntest after: passed\ntests: 2 passed, 1 failed\n", entry);
+      assert.equal(r.stderr, `${file}:7:3: error: test fails: a claim that is not true\n`, entry);
+      assert.equal(r.status, 1, entry);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("both commands under --phases test: tests that pass exit 0; a module with no test prints the last line alone; a load that does not complete prints as a run", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-phase-"));
+  try {
+    const programs: Array<[string, string, string, string, number]> = [
+      // name, text, stdout, stderr, exit code
+      ["passing", "capability output\nexport a() => claim(1 == 1)\nexport b() => claim(2 == 2)\n", "test a: passed\ntest b: passed\ntests: 2 passed, 0 failed\n", "", 0],
+      ["none", "capability output\nexport n = 1\nexport f(x) => x\n", "tests: 0 passed, 0 failed\n", "", 0],
+      ["load-refuted", 'capability output\noutput.write("loading")\nclaim(1 == 2)\nexport t() => output.write("never")\n', "loading\n", "refuted: a claim that is not true\n", 1],
+      ["reports", 'capability output\ncapability report\nexport a() =>\n  report.message({level: `warning, text: "from a test"})\n  report.status(5)\nexport b() => claim(1 == 1)\n', "test a: passed\ntest b: passed\ntests: 2 passed, 0 failed\n", "warning: from a test\n", 5],
+      ["versions", 'capability output\ncapability timer\ncapability http\nexport waits() =>\n  t <- timer.wait(9000000000)\n  claim(t == 9000000000)\nexport requests() =>\n  r <- http.request({method: "GET", url: "https://example.com/"})\n  claim(r.failure == `unreachable)\n', "test waits: passed\ntest requests: passed\ntests: 2 passed, 0 failed\n", "", 0],
+    ];
+    for (const [name, text, stdout, stderr, status] of programs) {
+      const { file, record } = writeBoth(dir, name, text);
+      for (const [entry, arg] of [["allegretto.ts", file], ["terminal.ts", record]] as const) {
+        const r = command(entry, [arg, "--phases", "test"]);
+        assert.deepEqual([r.stdout, r.stderr, r.status], [stdout, stderr, status], `${entry} ${name}`);
+      }
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("both commands under --phases check,test: a false claim no test calls is refuted by the check and no test is called; where the check finds nothing, the tests run", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "check-test-"));
+  try {
+    const refuted = writeBoth(dir, "refuted", 'capability output\nunused(n) => claim(1 == 2)\nexport t() => output.write("never")\n');
+    const passing = writeBoth(dir, "passing", "capability output\nexport t() => claim(1 == 1)\n");
+    for (const [entry, which] of [["allegretto.ts", "file"], ["terminal.ts", "record"]] as const) {
+      const r = command(entry, [refuted[which], "--phases", "check,test"]);
+      assert.deepEqual([r.stdout, r.stderr, r.status], ["", "refuted: a claim that is not true\n", 1], entry);
+      const tests = command(entry, [refuted[which], "--phases", "test"]);
+      assert.deepEqual([tests.stdout, tests.status], ["test t: passed\ntests: 1 passed, 0 failed\n", 0], `${entry}: the test alone does not reach the claim`);
+      const p = command(entry, [passing[which], "--phases", "check,test"]);
+      assert.deepEqual([p.stdout, p.stderr, p.status], ["test t: passed\ntests: 1 passed, 0 failed\n", "", 0], entry);
+    }
+    // A later phase with a test phase is a finding, and nothing is launched.
+    const later = command("allegretto.ts", [passing.file, "--phases", "test", "--later", "n=1"]);
+    assert.deepEqual([later.stdout, later.stderr, later.status], ["", 'the setting later is given with the phases "test": no later phase follows the tests\n', 1]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
