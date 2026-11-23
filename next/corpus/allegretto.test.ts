@@ -555,6 +555,34 @@ test("under check, run a later line follows the run: the lines above it are prin
   assert.deepEqual(run.lines, ["start", "one"]);
 });
 
+test("the programs of a check are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["uncalled", ["check"]], ["unknown-condition", ["check"]], ["input-waits", ["check"]], ["dropped-write", ["check"]], ["report", ["check"]],
+    ["run-prints", ["check", "run"]], ["run-refuted", ["check", "run"]], ["run-input", ["check", "run"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/check-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+});
+
+test("program m3/check-report.alg hands no message under check, and m3/check-run-refuted.alg prints a line when run alone", async () => {
+  const report = `${PROGRAMS_DIR}/m3/check-report.alg`;
+  const checked = await runProgram(text(report), report);
+  assert.deepEqual(checked.problems, []);
+  assert.deepEqual(checked.messages, []);
+  // The same text with no phases line runs alone, and its calls on report act.
+  const alone = await runProgram(text(report).replace("// phases: check\n", ""), report);
+  assert.deepEqual(alone.messages.map((m) => m.text), ["noted"]);
+  assert.equal(alone.status, 3);
+  const refuted = `${PROGRAMS_DIR}/m3/check-run-refuted.alg`;
+  const ran = await runProgram(text(refuted).replace("// phases: check, run\n", ""), refuted);
+  assert.deepEqual(ran.lines, ["hello"], "run alone prints the line before the false claim");
+  assert.equal(ran.end, "refuted: a claim that is not true");
+});
+
 // ── The check claim at line (chunk Q13, part 5) ───────────────────────
 
 test("the check claim at lines are read as the claim at lines are, apart from them", () => {
