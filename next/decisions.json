@@ -244,7 +244,7 @@
     {"title":"One reference kernel is the root of trust","part":"VI","chapter":"Trust","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"A primitive's purity is assumed and named unless something stronger is shown","part":"VI","chapter":"Trust","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"A tool reads a phase's result and adds no analysis of its own","part":"VI","chapter":"Tools","type":"capability","present":"settled","owner":"Q","state":"none","unit":null},
-    {"title":"Check reaches every claim","part":"VI","chapter":"Tools","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
+    {"title":"Check reaches every claim","part":"VI","chapter":"Tools","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null},
     {"title":"A phase leaves a capability out as not yet given or as not needed","part":"VI","chapter":"Tools","type":"capability","present":"open","owner":"Q","state":"none","unit":null},
     {"title":"A command is a configuration","part":"VI","chapter":"Tools","type":"capability","present":"settled","owner":"Q","state":"none","unit":null},
     {"title":"A module's summary is the weakest strength among its claims","part":"VI","chapter":"Tools","type":"capability","present":"partly built","owner":"Q","state":"none","unit":null},

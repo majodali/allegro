@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-23 — A check that reaches every claim, in the kernel.**
+  `Kernel.check` evaluates an expression ahead of what is done: nothing
+  is performed, both branches of an unknown conditional are evaluated,
+  and then everything left untouched is evaluated too: a binding
+  nothing read, an argument nothing needed, an entry nothing read, and
+  the body of every function met, with its parameters unknown. The
+  result has a record for every claim reached and a list of the other
+  refutations found, each with its place. On both kernel variants. The
+  launcher's check does not use it yet.
 - **2026-11-23 — A hook for diagnostics.** `Kernel.observe` gives the
   kernel's host one call for each branch taken, call opened, claim
   decided and effect performed, with the place of the part and whether

@@ -245,6 +245,12 @@ export interface Result {
    * the refutation stands, and this says the list of them may be short.
    */
   readonly cutShort?: true;
+  /**
+   * From `check` only: the refutations found in parts that do not refute
+   * the whole, each with the place of the part where it has one. A
+   * refuted claim is not repeated here: it is among `claims`.
+   */
+  readonly refutations?: ReadonlyArray<{ readonly reason: string; readonly at?: Place }>;
 }
 
 /**
@@ -422,12 +428,18 @@ export interface Place {
  *   "claim"   an evaluation of a claim came out. `part` is the claim as
  *             written. "waiting" says it is not decided yet.
  *   "effect"  a part of a capability was performed.
+ *   "refutation" a check found a part refuted that the program as a
+ *             whole is not refuted by: a branch under an unknown
+ *             condition, a function nothing called, a value nothing
+ *             read. It is one entry of the result's `refutations`, told
+ *             when it is found.
  */
 export type Observed =
   | { readonly kind: "branch"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly taken: "then" | "else" | "both" | "neither" }
   | { readonly kind: "call"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly function: Value }
   | { readonly kind: "claim"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly outcome: Outcome | "waiting" }
-  | { readonly kind: "effect"; readonly part: Value; readonly at?: Place; readonly ahead: false; readonly capability: string; readonly operation: string };
+  | { readonly kind: "effect"; readonly part: Value; readonly at?: Place; readonly ahead: false; readonly capability: string; readonly operation: string }
+  | { readonly kind: "refutation"; readonly part: Value; readonly at?: Place; readonly ahead: boolean; readonly reason: string };
 
 /** What `Kernel.keyOf` reads of a key. */
 export interface KeyDescription {
@@ -559,6 +571,24 @@ export interface Kernel {
    * it.
    */
   evaluate(expression: Value, limits?: Limits): Result;
+  /**
+   * Evaluates an expression as a check does, so that every claim in it is
+   * reached. Nothing is performed and nothing waits: a call on a
+   * capability stays in what is left, and an unfilled cell is one more
+   * unknown. Both branches of a conditional whose condition is unknown
+   * are evaluated. Then everything the evaluation left untouched is
+   * evaluated too, with what it needs unknown: a binding nothing read, an
+   * argument nothing needed, an entry nothing read, and the body of every
+   * function met, called or not. A function is opened once.
+   *
+   * `value` is what is left of the expression. `claims` has a record for
+   * every claim reached: decided, refuted, or waiting. `refutations` has
+   * what else was found refuted. `refuted` is true only where the whole
+   * is refuted whatever is unknown. A check is given a budget, since a
+   * recursion whose argument changes runs to it; a spent budget ends the
+   * check at "limit", with the records so far.
+   */
+  check(expression: Value, limits?: Limits): Result;
   /**
    * Takes up every evaluation in this kernel that waited on a cell filled
    * since the last call, within the limits. The kernel knows which

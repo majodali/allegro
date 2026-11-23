@@ -200,7 +200,7 @@ export const createMachine: CreateKernel = () => {
   } = core;
   /** The instances of each module: one for each distinct set of arguments. */
   const instancesOf = new WeakMap<Fn, { args: readonly V[]; value: Lazy }[]>();
-  const VARIANT = "machine-k17";
+  const VARIANT = "machine-k18";
   /**
    * The tasks `advance` is to take up, in order. A task is put here when what it waits for
    * arrives, so answers are acted on in the order they arrive.
@@ -248,6 +248,21 @@ export const createMachine: CreateKernel = () => {
   let cut = false;
   /** True while a function is specialized: both branches of a conditional whose condition is unknown are evaluated. */
   let speculative = false;
+  /**
+   * Set while a check is made (`check`): what the evaluation made and has not needed, each
+   * to be evaluated before the check is over, the functions it met, each to have its body
+   * evaluated, and the refutations found in parts that do not refute the whole.
+   */
+  interface Reaching { readonly lazies: Lazy[]; readonly fns: Fn[]; readonly opened: Set<Fn>; readonly found: { reason: string; at?: Place }[]; readonly noted: Set<Refuted>; draining: boolean }
+  let reaching: Reaching | undefined;
+  /** A part came out refuted that the whole is not refuted by. A refuted claim is in the claims' records already. */
+  const found = (r: V, part: V): void => {
+    if (reaching === undefined || !(r instanceof Refuted) || counted.has(r) || reaching.noted.has(r)) return;
+    reaching.noted.add(r);
+    const at = part instanceof Expr || part instanceof Fn || part instanceof Struct ? part.at : undefined;
+    reaching.found.push({ reason: r.reason, ...(at === undefined ? {} : { at }) });
+    tell(part, { kind: "refutation", reason: r.reason });
+  };
   /** The functions being opened while evaluating ahead. */
   const opening: Fn[] = [];
   /** The sequences whose first part is being evaluated now, outermost first. */
@@ -1093,7 +1108,11 @@ export const createMachine: CreateKernel = () => {
       if (v.source !== undefined) rest(v.source);
       return v.value as V;
     }
-    if (v instanceof Fn) return close(v, scope);
+    if (v instanceof Fn) {
+      const made = close(v, scope);
+      reaching?.fns.push(made);
+      return made;
+    }
     if (v instanceof Lazy) {
       if (v.done) {
         v.rests.forEach(rest);
@@ -1170,7 +1189,14 @@ export const createMachine: CreateKernel = () => {
           if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
           // Specializing, both branches are evaluated though the condition is unknown. A
           // refutation inside a branch stays in that branch.
-          if (speculative) return after(evaluate(v.args[1], scope), (yes) => after(evaluate(v.args[2], scope), (no) => new Expr(fn, [condition, yes, no])));
+          if (speculative)
+            return after(evaluate(v.args[1], scope), (yes) =>
+              after(evaluate(v.args[2], scope), (no) => {
+                found(yes, v.args[1]);
+                found(no, v.args[2]);
+                return new Expr(fn, [condition, yes, no]);
+              }),
+            );
           return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
         });
       }
@@ -1184,7 +1210,11 @@ export const createMachine: CreateKernel = () => {
           const name = k === null ? undefined : seen(k);
           if (!(name instanceof Sym)) return new Refuted("each binding of a block is keyed by a symbol", undefined);
           if (inner.bindings.has(name)) return new Refuted(`the name ${name.fqn} is bound twice in one block`, undefined);
-          inner.bindings.set(name, { value: e instanceof Fn || !(e instanceof Expr || e instanceof Sym || e instanceof Struct) ? e : new Lazy(e, inner), memo: undefined, rests: [] });
+          const bound = e instanceof Fn || !(e instanceof Expr || e instanceof Sym || e instanceof Struct) ? e : new Lazy(e, inner);
+          if (bound instanceof Lazy) reaching?.lazies.push(bound);
+          // A function bound by a block is a function met, whether or not anything reads the name.
+          else if (bound instanceof Fn && reaching !== undefined) reaching.lazies.push(new Lazy(new NameRef(inner, name), inner));
+          inner.bindings.set(name, { value: bound, memo: undefined, rests: [] });
         }
         return evaluate(v.args[1], inner);
       }
@@ -1345,14 +1375,17 @@ export const createMachine: CreateKernel = () => {
         return l;
       });
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
-      if (observed() && !(ahead && opening.includes(fn))) tell(v, { kind: "call", function: out(fn) });
+      // Ahead of what is done, a function already being opened ahead is not opened again,
+      // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
+      // refutation early, and a loop that carries state would otherwise never end. And where
+      // a check goes over what was left untouched, a function it has opened is not opened again.
+      const leftAsCall = ahead && (opening.includes(fn) || (reaching?.draining === true && reaching.opened.has(fn)));
+      if (observed() && !leftAsCall) tell(v, { kind: "call", function: out(fn) });
+      if (!leftAsCall) reaching?.opened.add(fn);
       // The body is evaluated from `run`, in place of this call: a function that calls itself
       // as the value of its body goes round with no frame kept for each turn.
       if (!ahead) return bounce(() => evaluate(substitute(fn.body, env, new Map()), scope));
-      // Ahead of what is done, a function already being opened ahead is not opened again,
-      // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
-      // refutation early, and a loop that carries state would otherwise never end.
-      if (opening.includes(fn)) return new Expr(fn, given);
+      if (leftAsCall) return new Expr(fn, given);
       return new Call(openingGen(fn, () => evaluate(substitute(fn.body, env, new Map()), scope)), undefined);
     }
     if (!(fn instanceof Prim)) {
@@ -1866,7 +1899,10 @@ export const createMachine: CreateKernel = () => {
 
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
-    return tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)) ? new Lazy(tied, scope) : tied;
+    if (!(tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)))) return tied;
+    const made = new Lazy(tied, scope);
+    reaching?.lazies.push(made);
+    return made;
   };
 
   /** Runs one piece of evaluation under a budget. A stack that runs out is a limit too. */
@@ -2016,6 +2052,57 @@ export const createMachine: CreateKernel = () => {
         ...(cut ? { cutShort: true as const } : {}),
         ...(limited.length > 0 ? { limited } : {}),
       };
+    },
+    check: (expression, limits): Result => {
+      const e = into(expression, "the expression");
+      tallies.clear();
+      cut = false;
+      const reach: Reaching = { lazies: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>(), draining: false };
+      reaching = reach;
+      const [wasAhead, wasSpeculative] = [ahead, speculative];
+      ahead = true;
+      speculative = true;
+      collectors = [];
+      groups = [];
+      account = { left: limits?.steps ?? Infinity, dead: false, handle: undefined };
+      pauseAt = Infinity;
+      try {
+        const r = within(limits, (): V => {
+          const scope = new ScopeV(undefined);
+          const value = run(evaluate(e, scope));
+          // What the evaluation left untouched is evaluated too, and the body of every
+          // function it met, each with its parameters unknown. What that leaves untouched
+          // in turn is gone over as well, until nothing is left.
+          reach.draining = true;
+          const reached = new Set<Fn>();
+          while (reach.lazies.length > 0 || reach.fns.length > 0) {
+            const l = reach.lazies.pop();
+            if (l !== undefined) {
+              if (!l.done && !l.busy) found(run(evaluate(l, l.scope)), l.value);
+              continue;
+            }
+            const f = reach.fns.pop() as Fn;
+            // Every function is specialized, one a call has opened with known values too.
+            if (reached.has(f)) continue;
+            reached.add(f);
+            reach.opened.add(f);
+            const params = f.params.map((p) => new Param(p.name));
+            opening.push(f);
+            try {
+              found(run(evaluate(substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map()), scope)), f);
+            } finally {
+              opening.pop();
+            }
+          }
+          return value;
+        });
+        const value = r.value ?? e;
+        return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), refutations: reach.found, ...(cut ? { cutShort: true as const } : {}) };
+      } finally {
+        ahead = wasAhead;
+        speculative = wasSpeculative;
+        reaching = undefined;
+      }
     },
     current: (value) => {
       const v = into(value, "the value");
