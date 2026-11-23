@@ -3447,3 +3447,77 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      has a run leave out, as not needed, a capability that check gives a
      module. The run of PR #299 supplies `report`, so that a script's
      messages and status are handed over.
+- **2026-11-23 — Places: the notation writes where each part was written, and a result gives a claim's place.**
+  B-196 (the rebuild's acceptance side), chunks Q5 (the first notation
+  and the bootstrap) and Q13 (check and run as configurations, and what a
+  result holds). The kernel stream's PR #301 lets a part say where it was
+  written. The bootstrap's emitter now writes that place into every
+  record, and the launcher's result copies it onto each claim. Nothing
+  printed changes. The six points, as built:
+  1. **The emitter writes a place on every node it may.** Each node of
+     kind `expression`, `function` or `structure` that a part of the
+     text gives rise to carries `at`, the kernel's `Place`. Its `source`
+     is the name the text is emitted under: the file, as the driver has
+     it, or `<text>` for a text emitted with no name (`UNNAMED` of
+     `next/bootstrap/emit.ts`, the name `describeFinding` already gave
+     such a text). `start` and `end` are the index, line and column of
+     the part's first character and of the point after its last. The
+     reader keeps offsets and the line and column of a start only, so
+     `locationAt` of `next/bootstrap/reader.ts` gives the line and
+     column of any offset; the reader's own places use it too. The
+     reader's module keeps the text it read (`Module.text`), its line
+     ends `\r\n` written `\n`, and every index counts in it. A node made
+     for what a form stands for takes the form's place: the claim, the
+     negation and the call of `is_failure` that a dropped statement
+     stands for take the statement's; the call an operator stands for
+     takes the operator expression's; `get` takes the place of `p.a`;
+     the kernel's block, its bindings and each link of its chain take
+     the block's; the module function and the structure it yields take
+     the whole text's. The emitter shared no node that now carries a
+     place, so no sharing was undone and the records have the same
+     nodes. A test loads every record of the corpus with and without its
+     places, on the kernel the environment chooses, and the identity is
+     the same.
+  2. **The driver** emits each text under its file, so an imported
+     text's parts name their own file.
+  3. **A result gives each claim's place.** `ClaimResult` gains `place`,
+     copied field by field from the first record of the claim that gives
+     `ClaimRecord.at`. The key `at` keeps its name. The comment says that
+     the kernel's record names the two the other way round.
+  4. **Nothing printed changes.** No command prints `place`, and no
+     `// end:` line changed. Showing a place is chunk Q14 (the commands).
+  5. **The corpus runner** reads `// claim at: <line>:<column> <word>`.
+     The word is `claimWord` of `next/launch/launcher.ts`, the summary's
+     rule for one claim, which `summaryOf` now reads too. It gives
+     `waiting` where the summary's rule says undecided because the claim
+     still waits. A line that names a place where no claim is written
+     fails the program. Five programs gained two lines each:
+     `claim-holds`, `claim-refuted`, `result-assumed`, `assume-undecided`
+     and `input-not-supplied`. The line names a place of the program's
+     own text only, so no line states a claim in an imported text.
+  6. **The fixture** `next/launch/fixtures/hello.json` is regenerated with
+     the emitter, since a test compares it with what the emitter writes
+     for `hello.alg`. Its places name `<text>`, as that test emits it.
+     `npm run launch -- next/launch/fixtures/hello.json` prints `hello,
+     world`.
+  - **The nodes that carry no place.** The nodes of the kinds that have
+    no `at`: bits, symbol, datum, param, kernel and primitive. The nodes
+    of Allegretto's own functions, `is_failure`, `handle`, `each` and
+    the rest: their text is kept in the emitter, not in a file the
+    program names. So a claim written inside `each` has no place in a
+    result (`streams.alg` shows one). The structure of `int`, `float`,
+    `text` or `bits`, which Allegretto binds and the emitter writes once.
+    The block around the module's own that binds the own functions a
+    text uses, which no part of the text writes.
+  - **One existing assertion changed.** The driver's test that compares
+    its record with the emitter's emits the text under the driver's file
+    name, since every place names the file.
+  - **What the kernel did.** Both variants gave every claim the place of
+    the claim's node, and the same places in every program and test.
+    Nothing was found that the interface or the forms do not say.
+  - **Measured.** `npm run test:next` runs 893 tests on the default
+    kernel and 892 with `ALLEGRO_KERNEL=reference`; all pass but one
+    marked to do on each. 15 tests are new on each. `npm run harness:next` runs 110
+    programs, and all pass on both variants. The corpus gives 124
+    records, which hold 5,360 nodes of the three kinds; 3,758 carry a
+    place.
