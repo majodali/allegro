@@ -496,7 +496,7 @@ export interface LaunchResult {
 export interface RefutationData {
   readonly reason: string;
   /** Where the part was written, copied from the kernel's `at` where it gives one. */
-  readonly place?: Place;
+  readonly at?: Place;
 }
 
 /** One phase applied, and the result as it stood when the phase was over. */
@@ -903,7 +903,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       // With no budget set, the largest the kernel takes: a recursion whose argument changes runs to it.
       const checked = kernel.check(kernel.expression(moduleFn, checkArgs), { steps: budget ?? Number.MAX_SAFE_INTEGER });
       tallies.add(checked.claims);
-      refutations = (checked.refutations ?? []).map((r) => (r.at === undefined ? { reason: r.reason } : { reason: r.reason, place: placeData(r.at) }));
+      refutations = (checked.refutations ?? []).map((r) => (r.at === undefined ? { reason: r.reason } : { reason: r.reason, at: placeData(r.at) }));
       // Refuted where the whole is, where a claim is, or where a part is: each reason once, in the order found.
       const refutedClaims = tallies.claims().filter((c) => c.refuted > 0);
       if (checked.refuted || refutedClaims.length > 0 || refutations.length > 0) {

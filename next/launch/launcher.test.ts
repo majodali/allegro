@@ -1504,7 +1504,7 @@ const RUN_AFTER = { name: "run", capabilities: ["output"] } as const;
 const endWords = (end: LaunchOutcome["end"]): string => (end.kind === "completed" ? "completed" : describe(end));
 /** The word of the claim written at this line and column of `<text>`; undefined where none is. */
 const wordAt = (result: LaunchResult, line: number, column: number) => {
-  const c = result.claims.find((x) => x.place?.start.line === line && x.place.start.column === column);
+  const c = result.claims.find((x) => x.at?.start.line === line && x.at.start.column === column);
   return c === undefined ? undefined : claimWord(c);
 };
 
@@ -1529,7 +1529,7 @@ test("under a check a capability it names is not needed: a call answers the empt
   const named: Configuration = { ceiling: ["note"], phases: [{ name: "check", check: true, capabilities: ["note"] }] };
   // count(x) is 0 only of the empty structure: the claim is decided where the stand-in answers it.
   const empty = await launch({ createKernel, program: program("count(x) == 0"), configuration: named, target });
-  const claim = resultOf(empty).claims.find((c) => c.place?.start.line === 3);
+  const claim = resultOf(empty).claims.find((c) => c.at?.start.line === 3);
   assert.ok(claim !== undefined && claim.decided > 0, JSON.stringify(resultOf(empty).claims.map(counts)));
   // A claim that the answer has an entry is refuted by the empty structure.
   const one = await launch({ createKernel, program: program("count(x) == 1"), configuration: named, target });
@@ -1596,7 +1596,7 @@ test("a check's result gives the refutations found in parts that do not refute t
   const result = resultOf(outcome);
   const found = result.refutations.find((r) => /nowhere is bound by no block/.test(r.reason));
   assert.ok(found !== undefined, JSON.stringify(result.refutations));
-  assert.deepEqual([found.place?.source, found.place?.start.line], ["free.alg", 2]);
+  assert.deepEqual([found.at?.source, found.at?.start.line], ["free.alg", 2]);
   assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
   // A run gives none: the function is never called.
@@ -1634,10 +1634,10 @@ test("check then run, on one kernel: two phases, the run a fresh evaluation, its
   const [checked, ran] = outcome.phases ?? [];
   assert.equal(ran.result, outcome.result);
   // The claim in the function nothing calls is the check's: the run never reaches it, and its result holds none of the check's.
-  assert.ok(wordAt(checked.result, 3, 14) !== undefined, JSON.stringify(checked.result.claims.map((c) => c.place?.start)));
+  assert.ok(wordAt(checked.result, 3, 14) !== undefined, JSON.stringify(checked.result.claims.map((c) => c.at?.start)));
   assert.equal(wordAt(ran.result, 3, 14), undefined);
   assert.equal(wordAt(checked.result, 4, 1), "decided");
-  const runClaim = ran.result.claims.find((c) => c.place?.start.line === 4);
+  const runClaim = ran.result.claims.find((c) => c.at?.start.line === 4);
   assert.ok(runClaim !== undefined && runClaim.decided > 0);
   assert.deepEqual(JSON.parse(JSON.stringify(outcome.phases)), outcome.phases, "each result is plain data");
 });
