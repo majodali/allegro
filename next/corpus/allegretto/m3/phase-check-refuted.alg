@@ -1,5 +1,6 @@
-// Under check alone a false claim written before any effect is refuted.
-// The write after it never happens, and nothing is printed.
+// Under check alone a false claim written before any effect is refuted,
+// and the check ends the launch. Nothing is performed under check, so the
+// write after it never happens, and nothing is printed.
 capability output
 claim(2 + 2 == 5)
 output.write("never")

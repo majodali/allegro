@@ -1,14 +1,15 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
 // acceptance side), chunk Q7 (the minimal launcher), parts 1 to 5; chunk
 // Q13 (check and run as configurations, and what a result holds), part 2,
-// for the configuration's sources, and part 3, for `--phases`; chunk Q16
-// (the capabilities the launchers ship), part 3, for check output and the
-// exit code). The only
+// for the configuration's sources, part 3, for `--phases`, and part 5, for
+// `--phases check` as the kernel's check and for `--phases check,run`;
+// chunk Q16 (the capabilities the launchers ship), part 3, for check
+// output and the exit code). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>]
 //
 // Each `--import` names the saved program of a module the program
 // imports, directly or through another, in the order they are loaded: a
@@ -48,10 +49,10 @@
 // first:
 //   - the command line: `--steps <n>` sets the step budget,
 //     `--ceiling a,b` the ceiling, which may only narrow the terminal's,
-//     and `--phases` the phases: `run` or `check` (the setting `phases`
-//     of next/tools/configuration.ts). A name the terminal does not
-//     supply, and a list of phases that is not built, `check,run` among
-//     them, are findings;
+//     and `--phases` the phases: `run`, `check` or `check,run` (the
+//     setting `phases` of next/tools/configuration.ts). A name the
+//     terminal does not supply, and a list of phases that is not built,
+//     are findings;
 //   - the environment: `ALLEGRO_STEPS`, a whole number, sets the step
 //     budget;
 //   - what is built into the launcher: the ceiling that grants every
@@ -62,12 +63,17 @@
 // line each, and the entry exits 1; nothing is launched. The run's result
 // names the source of each value (`restsOn.configuration` of
 // next/launch/launcher.ts), and nothing printed for a run changes. Under
-// `--phases check` nothing is printed, since check supplies the check
-// capabilities alone (`CHECK_CAPABILITIES` of
-// next/tools/configuration.ts): the messages of `report` are written, and
-// a call on `output` waits. The entry exits as for any run: a run left
-// waiting on a capability no phase supplies exits 1 at least. What else
-// check shows is chunk Q14 (the commands).
+// `--phases check` the launcher hands the module to the kernel's `check`
+// (`Phase.check` of next/launch/launcher.ts). Nothing is performed: no
+// line is printed, no request is made, and a call on `report` hands no
+// message and no status, since the check hands the check capabilities
+// (`CHECK_CAPABILITIES` of next/tools/configuration.ts) as not needed. A
+// check that finds a refutation writes the end's reason and exits 1; one
+// that finds none completes and exits 0. Under `--phases check,run` the
+// check comes first, and where it finds nothing the lines, the messages,
+// the end and the exit code are the run's. The exit code follows the end
+// and the status as for any run. What else check shows is chunk Q14 (the
+// commands).
 // `--restore <builder>` and `--kernel <name>` are reserved to the command
 // line by the decision and are not built. The environment variable
 // `ALLEGRO_KERNEL` is read by next/kernel/create.ts, not here.
@@ -130,7 +136,7 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
       ceiling = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
     } else if (argv[i] === "--phases") {
       const names = argv[++i];
-      if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run or check\n${usage}`);
+      if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run, check, or check,run\n${usage}`);
       phases = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
     } else if (file === undefined) file = argv[i];
     else fail(`unexpected argument ${argv[i]}`);
@@ -215,7 +221,7 @@ function readRecord(file: string): unknown {
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check>]";
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>]";
   const rest: string[] = [];
   const imported: string[] = [];
   for (let i = 0; i < argv.length; i++) {
