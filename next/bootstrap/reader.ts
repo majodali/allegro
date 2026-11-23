@@ -304,7 +304,7 @@ export function read(text: string): ReadResult {
       case "string":
         return string(t);
       case "symbol_lit":
-        return { k: "symbol", name: leafText(child(t, "ident")), at: at(t) };
+        return { k: "symbol", name: leafText(child(t, "symbol_name")), at: at(t) };
       case "ident":
         return { k: "name", name: leafText(t), at: at(t) };
       case "paren":

@@ -1550,6 +1550,17 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The check-output capability, first version (B-196, chunk Q16 (the capabilities the launchers ship), part 3)
+
+B-196 (the rebuild's acceptance side). The terminal ships a fourth
+capability, `report`, the maintainer's check output: `report.message`
+hands a message and `report.status` an exit status to whatever ran the
+program, and neither gives the program anything. Check supplies it and
+no other capability; run supplies it with the rest. The terminal writes
+each message to stderr as the line build tools read, and both commands
+exit with the higher of the end's code and the highest status. The
+corpus gains the lines `// reports:` and `// status:` and eleven
+programs `m3/report-*`. The launcher is unchanged.
 ### 2026-11 — Milestone 3, brought for signing (B-196, chunk Q8 (the speed tests of milestone 3))
 
 B-196 (the rebuild's acceptance side). The kernel stream's switch made

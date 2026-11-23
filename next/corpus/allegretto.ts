@@ -6,7 +6,8 @@
 // part 1, for the HTTP capability and the `// serves:` lines; chunk Q13
 // (check and run as configurations, and what a result holds), part 1, for
 // the result and the `// summary:` line, and part 3, for the `// phases:`
-// line): how a
+// line; chunk Q16, part 3, for the check-output capability and the
+// `// reports:` and `// status:` lines): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -55,19 +56,38 @@
 //                             `// later:` line cannot stand with it.
 //                             `check, run` fails the program with the
 //                             resolver's finding. The `// expect:`,
-//                             `// end:` and `// summary:` lines hold for
-//                             the whole launch.
+//                             `// end:`, `// summary:`, `// reports:` and
+//                             `// status:` lines hold for the whole launch.
+//                             Check supplies the check capabilities of the
+//                             ceiling, `report` alone, and no other;
+//   // reports: <level>: <text>
+//                             a message the program hands to
+//                             `report.message`, one line for each, in the
+//                             order handed over, compared as `// expect:`
+//                             lines are. A message with a file is written
+//                             as the terminal writes it, with its place
+//                             first (`messageLine` of
+//                             next/launch/report.ts). A program that states
+//                             no such line is not compared on its
+//                             messages; one that states any must hand over
+//                             exactly those;
+//   // status: <n>           the highest status the program hands to
+//                             `report.status`, 0 where it hands none: a
+//                             whole number from 0 to 255. At most one line.
+//                             A program that states none is not compared
+//                             on it.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
-// next/launch/launcher.ts on the reference kernel, the imported ones
+// next/launch/launcher.ts on the kernel next/kernel/create.ts gives, the imported ones
 // loaded first, with the output capability, the timer capability, the
-// shipped primitives and its inputs. It passes when its lines, its end,
-// the lines printed before each later phase and, where stated, its yielded
-// keys and its summary are the expected ones. A run gives the launcher's
+// HTTP capability, the check-output capability, the shipped primitives and
+// its inputs. It passes when its lines, its end, the lines printed before
+// each later phase and, where stated, its yielded keys, its summary, its
+// messages and its status are the expected ones. A run gives the launcher's
 // result (`ProgramRun.result`): its claims, its summary and what it rests
 // on.
 //
-// The ceiling grants `output`, `timer` and `http`. The timer capability
+// The ceiling grants `output`, `timer`, `http` and `report`. The timer capability
 // (next/launch/timer.ts) is made, for each run, with a new virtual clock
 // (`virtualClock` of next/launch/clock.ts): it runs no real time, and
 // answers the waits in the order they fall due, the earlier asked first
@@ -78,7 +98,11 @@
 // next/launch/scripted-transport.ts) that serves the program's
 // `// serves:` lines and reaches no network. It answers in the order the
 // requests were asked, so two runs print the same. The requests it was
-// handed are part of what a run gives (`ProgramRun.requests`).
+// handed are part of what a run gives (`ProgramRun.requests`). The
+// check-output capability (next/launch/report.ts) is made, for each run,
+// with a sink that keeps the messages and the highest status (`collector`),
+// and both are part of what a run gives (`ProgramRun.messages` and
+// `ProgramRun.status`).
 //
 // Where a program is, and where its imported texts are: a program is a
 // `.alg` file directly in a directory `m<milestone>`, or the file
@@ -104,6 +128,7 @@ import { timer } from "../launch/timer.js";
 import { virtualClock } from "../launch/clock.js";
 import { http, type HttpRequest } from "../launch/http.js";
 import { scriptedTransport, type Served } from "../launch/scripted-transport.js";
+import { collector, HIGHEST_STATUS, LEVELS, messageLine, report, type ReportMessage } from "../launch/report.js";
 import { shipped, shippedByName } from "../prims/index.js";
 
 /** Where the programs are, relative to the repository root. */
@@ -126,7 +151,7 @@ export function readUnder(root: string): ReadText {
 export const STEPS = 1_000_000;
 
 /** The capabilities the ceiling grants every program. */
-export const CEILING: readonly string[] = ["output", "timer", "http"];
+export const CEILING: readonly string[] = ["output", "timer", "http", "report"];
 
 /** What a program's comments say it must do, and the cases it names. */
 export interface Pins {
@@ -269,6 +294,48 @@ export function readPhases(text: string): { phases: string[] | undefined; proble
   return { phases, problems };
 }
 
+/**
+ * A program's `// reports:` lines: each message as the line states it, in
+ * order, or undefined where it states none; and the problems of the lines
+ * that cannot be read. A line is `<level>: <text>`, with the place first
+ * where the message has one, as `messageLine` writes it: so it holds one
+ * of the levels `error`, `warning` and `note`, followed by a colon and a
+ * space, at the start or after a place.
+ */
+export function readReports(text: string): { reports: string[] | undefined; problems: string[] } {
+  let reports: string[] | undefined;
+  const problems: string[] = [];
+  const level = new RegExp(`(?:^|: )(?:${LEVELS.join("|")}):(?: |$)`);
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*reports:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    const stated = m[1].trimEnd();
+    if (!level.test(stated)) problems.push(`the line ${JSON.stringify(line.trim())} is not of the form reports: <level>: <text>, the level one of ${LEVELS.join(", ")}`);
+    else (reports ??= []).push(stated);
+  }
+  return { reports, problems };
+}
+
+/**
+ * A program's `// status:` line: the status it states, and the problems of
+ * the lines that cannot be read. The status is a whole number from 0 to
+ * 255. Two lines are a problem.
+ */
+export function readStatus(text: string): { status: number | undefined; problems: string[] } {
+  let status: number | undefined;
+  const problems: string[] = [];
+  let lines = 0;
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*status:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    if (++lines === 2) problems.push("the program has two `// status:` lines");
+    const word = m[1].trim();
+    if (/^(0|[1-9][0-9]{0,2})$/.test(word) && Number(word) <= HIGHEST_STATUS) status ??= Number(word);
+    else problems.push(`the line ${JSON.stringify(line.trim())} states no status: a status is a whole number from 0 to ${HIGHEST_STATUS}`);
+  }
+  return { status, problems };
+}
+
 /** A run's end as a program's `// end:` line writes it. */
 export function endText(end: LaunchEnd): string {
   if (end.kind === "refuted") return `refuted: ${end.reason}`;
@@ -349,6 +416,10 @@ export interface ProgramRun {
   readonly requests: HttpRequest[];
   /** The launcher's result: the claims, the summary and what the run rests on. Undefined where nothing was launched or the launcher refused. */
   readonly result: LaunchResult | undefined;
+  /** The messages the program handed to `report.message`, in order, as host data; empty when it was not launched. */
+  readonly messages: ReportMessage[];
+  /** The highest status the program handed to `report.status`; 0 where it handed none or was not launched. */
+  readonly status: number;
   /** Each way the run differs from the pins; empty when the program passes. */
   readonly problems: string[];
 }
@@ -376,26 +447,31 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
     if (summaryLine.summary !== undefined) problems.push("nothing was launched, and the program states a `// summary:` line");
     if (readPhases(text).phases !== undefined) problems.push("nothing was launched, and the program states a `// phases:` line");
+    if (readReports(text).reports !== undefined || readStatus(text).status !== undefined) problems.push("nothing was launched, and the program states a `// reports:` or `// status:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
-    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], result: undefined, problems };
+    return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], result: undefined, messages: [], status: 0, problems };
   }
   const given = inputsOf(pins);
   const network = readServes(text);
   const phaseLine = readPhases(text);
+  const reportLines = readReports(text);
+  const statusLine = readStatus(text);
   // The phases, as the resolver makes them of the setting `phases`.
-  const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later);
+  const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later, CEILING);
   const shapeProblems = shape === undefined || shape.ok ? [] : [...shape.findings];
-  if ("problems" in given || network.problems.length > 0 || summaryLine.problems.length > 0 || phaseLine.problems.length > 0 || shapeProblems.length > 0) {
-    problems.push(...("problems" in given ? given.problems : []), ...network.problems, ...summaryLine.problems, ...phaseLine.problems, ...shapeProblems);
-    return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, problems };
+  const lineProblems = [...network.problems, ...summaryLine.problems, ...phaseLine.problems, ...shapeProblems, ...reportLines.problems, ...statusLine.problems];
+  if ("problems" in given || lineProblems.length > 0) {
+    problems.push(...("problems" in given ? given.problems : []), ...lineProblems);
+    return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, messages: [], status: 0, problems };
   }
   const transport = scriptedTransport(network.served);
+  const reported = collector();
   const outcome = await launch({
     createKernel,
     program: e.program,
     imports: e.imports,
     configuration: { ceiling: CEILING, steps: STEPS, ...(shape !== undefined && shape.ok ? shape.shape : {}) },
-    target: { capabilities: [output, timer(virtualClock().clock), http(transport.transport)], primitives: shipped },
+    target: { capabilities: [output, timer(virtualClock().clock), http(transport.transport), report(reported.sink)], primitives: shipped },
   });
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
@@ -415,6 +491,12 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     else if (outcome.result.summary !== summaryLine.summary)
       problems.push(`the summary is ${JSON.stringify(outcome.result.summary)}, expected ${JSON.stringify(summaryLine.summary)}`);
   }
+  // The messages and the status, where the program states them: compared as `// expect:` lines are.
+  // A line's trailing spaces are not stated, as for `// expect:` lines.
+  const handed = reported.messages.map((m) => messageLine(m).trimEnd());
+  if (reportLines.reports !== undefined && JSON.stringify(handed) !== JSON.stringify(reportLines.reports))
+    problems.push(`reported ${JSON.stringify(handed)}, expected ${JSON.stringify(reportLines.reports)}`);
+  if (statusLine.status !== undefined && reported.status() !== statusLine.status) problems.push(`the status is ${reported.status()}, expected ${statusLine.status}`);
   let yields: (string | null)[] | undefined;
   if (pins.yields !== undefined) {
     const y = yieldedKeys(e.program, given, e.imports);
@@ -424,7 +506,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
       if (JSON.stringify(y.keys) !== JSON.stringify(pins.yields)) problems.push(`yields ${JSON.stringify(y.keys)}, expected ${JSON.stringify(pins.yields)}`);
     }
   }
-  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, result: outcome.result, problems };
+  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, result: outcome.result, messages: [...reported.messages], status: reported.status(), problems };
 }
 
 /**
