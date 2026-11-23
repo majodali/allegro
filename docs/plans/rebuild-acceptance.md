@@ -3742,3 +3742,75 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   no program changed. Three assertions read the fields under their new
   names and hold what they held: the two that match a key against
   `sha256:` and 64 hexadecimal digits, and the ones that read a place.
+- **2026-11-23 — Fifteen asks answered by the maintainer.**
+  This stream put fifteen asks to the maintainer in session, grouped by
+  PR #304 (a claim's place in a result), PR #306 (the launcher's check),
+  the session and older housekeeping. The answers, in the maintainer's
+  words, each with what this stream does on it:
+  1. *The names of a claim's key and place in a result* (the kernel's
+     names recommended), *the word for one claim* (`claimWord`, six
+     words, as built) and *the corpus line `// claim at:`* (as built):
+     "1-3: I agree with your recommendations". The entry above made the
+     rename. A refutation in a result names its place `at` too.
+  2. *A module's calls on `report` are not performed under check*
+     (ask 4): "The solution arrived at in the kernel session changes the
+     approach and naming for the check phase. `check` is now a kernel
+     method that behaves similarly to `specialize` - it performs no
+     effects, analyzes every reachable branch, returns a program
+     specialized via PE. So `report` methods have little use there. The
+     `check` method only performs some of the work of a full check
+     phase, the rest is performed by the launcher on information passed
+     from the `check` operation and via the host-side hook. As you say,
+     the goal is to keep the launcher simple, so the actual checks are
+     performed by a host-side module configured for a project's specific
+     requirements. In the long term this host-side module will be
+     implemented in Allegro, but for now you can implement it in host
+     code to test the process." So the calls stay unperformed under the
+     kernel's `check`, as built. The module that performs a project's
+     checks on what `check` returns and on what the hook tells is not
+     built: its shape is a proposal this stream owes.
+  3. *How a check ends* and *the launcher's form* (asks 5 and 6): "5 &
+     6: I agree with your recommendation." Both stand as built: any
+     refutation ends a check refuted, a budget that runs out ends it at
+     its limit, and a check that leaves claims waiting passes.
+  4. *Inputs and later phases given with check alone are no finding*
+     (ask 7): "Can you clarify this ask?" Answered in session: before
+     PR #306 a project file that named later phases was refused when
+     the command line asked for check alone, and an input given under
+     check ended the launch waiting on it. Now a check leaves every
+     input unknown, so neither setting is an error of the configuration.
+     The ask stays open until the maintainer answers the clarification.
+  5. *The corpus line `// check claim at:`* (ask 8): "Agreed."
+  6. *The four findings on the kernel's `check`* (ask 9): "Do you have
+     examples for these four findings in the current acceptance tests?
+     Please give the examples for each and I'll take them to the kernel
+     session." No test of this stream holds them, by the rule that a
+     test here never fails because the kernel gains something. The
+     examples are in the entry "Q13, part 5" above and were given in
+     session.
+  7. *Does a run supply `report`* (ask 10): "The main use case for
+     `report` is in the test phase. For Allegretto programs, the test
+     phase is at least as important as the check phase. Let's implement
+     it right away. `report` may still be of use to the run phase, but
+     we need strong use cases for that to be a priority." So the test
+     phase is this stream's next chunk. A run keeps supplying `report`
+     as built, and nothing more is built on that.
+  8. *The terms* (ask 11): "To clarify these terms perhaps we need
+     different names for the `check` kernel method and the check phase.
+     The capabilities should be named for the phase. For "held claim" go
+     ahead and use the term "a claim that waits"." From this entry on
+     the record says "a claim that waits". The entries before it keep
+     their words. The two names are a proposal owed to the maintainer,
+     and the kernel method's name is the kernel stream's.
+  9. *The decision map* (ask 12): "I agree, let's hold them until we've
+     resolved these questions." The four rows stay as they are.
+  10. *The co-author line* (ask 13): "Agreed". *Branches* (ask 14):
+      "I'll tidy up the branches".
+  11. *`CLAUDE.md` and the choice of kernel* (ask 15): "Go ahead with
+      the PR to update Claude.md. Let's standardize on command line
+      only." This stream reads the second sentence as: the kernel
+      variant is chosen on the command line and by the launcher, as the
+      decision has it, and never from the environment. It builds
+      `--kernel` on its commands and tells the kernel stream that the
+      reading of `ALLEGRO_KERNEL` in `next/kernel/create.ts` is theirs
+      to remove. The reading is put to the maintainer for confirmation.
