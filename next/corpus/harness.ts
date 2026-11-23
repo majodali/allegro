@@ -62,7 +62,7 @@
 //
 // It runs each program in process with `runProgram` of
 // next/corpus/allegretto.ts, the implementation the programs' test uses:
-// emitted with the texts it imports, launched on the reference kernel, and
+// emitted with the texts it imports, launched on the kernel next/kernel/create.ts gives, and
 // its lines, end and yielded keys compared with its pins. The texts a
 // program imports, under a directory of its own, are no programs and are
 // not run alone (next/corpus/allegretto/README.md). A case is realised when a passing program

@@ -4,7 +4,8 @@
 // capability), part 3, for the inputs, part 4, for imports, and part 5,
 // for the timer capability; chunk Q13 (check and run as configurations,
 // and what a result holds), part 2, for the configuration's sources, and
-// part 3, for `--phases`): it emits
+// part 3, for `--phases`; chunk Q16 (the capabilities the launchers ship),
+// part 3, for check output and the exit code): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
@@ -13,8 +14,12 @@
 //   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
 //   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
 //
-// It prints the lines the program writes and exits 0 when the run
-// completed. Otherwise it writes the end's reason to stderr and exits 1.
+// It prints the lines the program writes. Where the run did not complete
+// it writes the end's reason to stderr. Each message the program hands to
+// `report.message` is written to stderr, one line each, as
+// next/launch/terminal.ts writes it. The exit code is the higher of 0 for
+// a completed run or 1 otherwise, and the highest status the program
+// handed to `report.status` (`exitCode` of next/launch/terminal.ts).
 // A text the driver refuses, for a finding of the reader or the emitter in
 // it or in a text it imports, an imported text not found or outside the
 // project's directory, or a cycle of imports, prints each finding as `npm run emit` does,
@@ -23,16 +28,17 @@
 // it (`importedFile` of the driver).
 //
 // The target is the terminal's: `output`, `timer` on the host's real
-// timer, `http` on the host's `fetch` (chunk Q16 (the capabilities the
-// launchers ship), part 1), and the shipped pure primitives.
+// timer, `http` on the host's `fetch` (part 1 of Q16), `report` on the
+// terminal's sink (part 3 of Q16), and the shipped pure primitives.
 //
 // The configuration comes from four sources, highest first, resolved by
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
 //     narrows the ceiling. `--phases` sets the phases: `run` or `check`;
-//     check supplies no capability and no input, and run every
-//     capability of the ceiling and the inputs. `check,run` is a finding,
+//     check supplies the check capabilities of the ceiling, `report`
+//     alone today, and no input, and run every capability of the ceiling
+//     and the inputs. `check,run` is a finding,
 //     since it is not built yet. Each `--input name=<literal>` supplies
 //     the input `name` at the start. Each `--later name=<literal>` is one
 //     later phase that supplies it, in the order written. The value is
@@ -46,7 +52,7 @@
 //     list of names such as `["check"]`. An input it gives is
 //     replaced by an `--input` of the same name;
 //   - the environment: `ALLEGRO_STEPS`;
-//   - the launcher's own value: the ceiling that grants all three
+//   - the launcher's own value: the ceiling that grants all four
 //     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts).
 // A finding of the file or of the resolution, a setting the file may not
 // set among them, is written to stderr, one line each, and exits 1;

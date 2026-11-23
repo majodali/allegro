@@ -34,6 +34,8 @@ Each statement is a comment line of its own:
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
 | `// phases: check` | the run applies check alone; at most one line (see "Phases") |
 | `// serves: <METHOD> <url> = <status> <literal>` | the network answers this request; one line per request served (see "Requests") |
+| `// reports: <level>: <text>` | a message the program hands to `report.message`; one line per message, in order (see "Messages and status") |
+| `// status: <n>` | the highest status the program hands to `report.status`; at most one line (see "Messages and status") |
 
 A program written for the purpose that shows no case of the present
 tree has no `// realises:` line.
@@ -71,12 +73,13 @@ launcher's count of the lines printed before each phase
 `runProgram` of `next/corpus/allegretto.ts` reads these lines. It emits
 the text and the texts it imports with the driver of
 `next/bootstrap/driver.ts` and runs the records with the launcher of
-`next/launch/launcher.ts` on the reference kernel, the imported ones
+`next/launch/launcher.ts` on the kernel `next/kernel/create.ts` gives, the imported ones
 loaded first, with the output capability, the timer capability, the
-HTTP capability, the shipped primitives, its inputs and a budget of
-1,000,000 steps. A program passes when its printed lines, its end, the
-lines printed before each later phase and its yielded keys are the ones
-stated, and its summary where it states one. The yielded keys are read
+HTTP capability, the check-output capability, the shipped primitives,
+its inputs and a budget of 1,000,000 steps. A program passes when its
+printed lines, its end, the lines printed before each later phase and
+its yielded keys are the ones stated, and its summary, its messages and
+its status where it states them. The yielded keys are read
 with the program's inputs handed in and its imported records loaded.
 
 ## Phases
@@ -84,11 +87,15 @@ with the program's inputs handed in and its imported records loaded.
 `// phases: check` is the one line built. It names the phases the run
 applies, as the setting `phases` of `next/tools/configuration.ts` names
 them. A program with no such line runs as `run` alone, which is what the
-runner did before the line existed. Check supplies no capability and no
-input: a declared capability is a cell that nothing fills, so a
-statement that calls it waits, and nothing is printed. So a `// later:`
+runner did before the line existed. Check supplies the check
+capabilities of the ceiling, `report` alone today
+(`CHECK_CAPABILITIES` of `next/tools/configuration.ts`), and no other
+capability and no input. Any other declared capability is a cell that
+nothing fills, so a statement that calls it waits, and nothing is
+printed. A call on `report` acts (see "Messages and status"). So a `// later:`
 line with `// phases: check` fails the program. The `// expect:`,
-`// end:` and `// summary:` lines hold for the whole launch. A line not
+`// end:`, `// summary:`, `// reports:` and `// status:` lines hold for
+the whole launch. A line not
 of the form `phases: <name>, <name>`, a list that is not built, and two
 lines each fail the program, and it is not launched.
 
@@ -150,7 +157,7 @@ would be written.
 
 ## Waits
 
-The runner's ceiling grants `output`, `timer` and `http`. `timer.wait(n)`
+The runner's ceiling grants `output`, `timer`, `http` and `report`. `timer.wait(n)`
 (`next/launch/timer.ts`) answers late with the number `n` once `n`
 milliseconds have passed. In the runner they pass on a clock that runs
 no real time (`virtualClock` of `next/launch/clock.ts`), made anew for
@@ -197,6 +204,52 @@ every run. What the transport was handed is part of what a run gives
 (`requests` of `runProgram`), so a test can see the headers and the body
 a program sent. `npm run allegretto` grants `http` on the host's
 `fetch`.
+
+## Messages and status
+
+`report` (`next/launch/report.ts`) is the check-output capability: a
+check capability, which check supplies and a run supplies with the rest.
+It hands messages and an exit status to whatever ran the program. Its
+two parts give the program nothing: each answers at once with the empty
+structure, whatever it is given, so leaving a call out changes nothing
+the program computes.
+
+`report.message(m)` hands a message. `m` is a structure with `level`,
+one of the symbols `` `error ``, `` `warning `` and `` `note ``, and
+`text`, a text; `file`, a text, and `line` and `column`, whole numbers,
+may be added. A text alone is a note. Any other value is a note that
+says it was no message and names its kind. A message does not set the
+status.
+
+`report.status(n)` hands a status, a whole number from 0 to 255. The
+highest handed over in a run stands. A value that is no status counts as
+255, and a note says so.
+
+The runner makes the capability, for each run, with a sink that keeps
+the messages and the highest status. Two lines state them:
+
+```
+// reports: warning: an unused binding
+// reports: main.alg:3:7: error: a name bound twice
+// status: 2
+```
+
+Each `// reports:` line is one message, in the order handed over,
+compared exactly as an `// expect:` line is. It is the line the terminal
+writes for the message: `level: text`, with the place first where the
+message gives a file, `file:line:column: level: text` with the parts it
+has (`messageLine` of `next/launch/report.ts`). A program that states no
+`// reports:` line is not compared on its messages; one that states any
+must hand over exactly those. `// status: <n>` states the highest
+status, 0 where none was handed over; a program that states none is not
+compared on it. A line not of these forms, and two `// status:` lines,
+each fail the program, and it is not launched. What the program handed
+over is part of what a run gives (`messages` and `status` of
+`runProgram`).
+
+`npm run allegretto` and `npm run launch` write each message to stderr as
+that line, as it is handed over. They exit with the higher of two
+numbers: 0 for a completed run and 1 otherwise, and the highest status.
 
 ## A text of the standard language
 

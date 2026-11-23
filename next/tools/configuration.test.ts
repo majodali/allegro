@@ -1,12 +1,14 @@
 // Tests of a configuration from its sources (B-196 (the rebuild's
 // acceptance side), chunk Q13 (check and run as configurations, and what a
-// result holds), part 2, and part 3 for the setting `phases`): `resolve`,
+// result holds), part 2, and part 3 for the setting `phases`; chunk Q16
+// (the capabilities the launchers ship), part 3, for the check
+// capabilities): `resolve`,
 // `shapeOf`, `readProjectFile` and `readEnvironment` of
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
-// next/kernel/create.ts gives: the reference, or the variant that keeps its
-// own stack with `ALLEGRO_KERNEL=machine`. The two commands end to end are
+// next/kernel/create.ts gives: the variant that keeps its own stack, or the
+// reference with `ALLEGRO_KERNEL=reference`. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 
 import { test } from "node:test";
@@ -20,7 +22,7 @@ import { readLiteral } from "../bootstrap/literal.js";
 import { launch, type Inputs, type Plain, type SourceName } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shipped } from "../prims/index.js";
-import { MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
+import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const text = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
@@ -302,4 +304,20 @@ test("the resolver reaches no host API", () => {
   const source = fs.readFileSync(path.join(here, "configuration.ts"), "utf8").replace(/^\s*\/\/.*$/gm, "");
   assert.doesNotMatch(source, /\bprocess\b|from "fs"|from "path"|from "os"|from "child_process"|\bBuffer\b|\bglobalThis\b/);
   assert.match(source, /export function resolve\(sources: Sources\): Resolved/);
+});
+
+// ── The check capabilities (chunk Q16, part 3) ────────────────────────
+
+test("check supplies the check capabilities the ceiling grants, report alone today, and no other", () => {
+  assert.deepEqual([...CHECK_CAPABILITIES], ["report"]);
+  const terminal: Settings = { ceiling: ["output", "timer", "http", "report"] };
+  const check = resolved(resolve({ "command line": { phases: ["check"] }, launcher: terminal }));
+  assert.deepEqual(check.configuration.phases, [{ name: "check", capabilities: ["report"] }]);
+  const narrowed = resolved(resolve({ "command line": { phases: ["check"], ceiling: ["output", "timer"] }, launcher: terminal }));
+  assert.deepEqual(narrowed.configuration.phases, [{ name: "check", capabilities: [] }], "a ceiling narrowed to leave report out: check supplies nothing");
+  const run = resolved(resolve({ "command line": { phases: ["run"] }, launcher: terminal }));
+  assert.equal(run.configuration.phases, undefined, "run supplies every capability of the ceiling, report among them");
+  assert.deepEqual(run.configuration.ceiling, ["output", "timer", "http", "report"]);
+  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["report", "output"]), { ok: true, shape: { phases: [{ name: "check", capabilities: ["report"] }] } });
+  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["output", "http"]), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } });
 });

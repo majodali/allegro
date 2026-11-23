@@ -27,6 +27,9 @@
 // part 1, added the launcher's result to a run (`ProgramRun.result`), the
 // `// summary:` line, and the program `m3/result-assumed.alg`. Chunk Q13,
 // part 3, added the `// phases:` line and the programs `m3/phase-*.alg`.
+// Chunk Q16, part 3, added the check-output capability, which the runner
+// grants on a sink that keeps the messages and the highest status, the
+// `// reports:` and `// status:` lines, and the programs `m3/report-*`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -48,7 +51,7 @@ import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPhases, readPins, readServes, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -452,4 +455,95 @@ test("the programs that run under check are there, in milestone 3's directory, a
     assert.ok(FILES.includes(file), name);
     assert.deepEqual(readPhases(text(file)).phases, ["check"], file);
   }
+});
+
+
+// ── The reports and status lines (chunk Q16, part 3) ──────────────────
+
+test("the reports lines are read as the convention states: level: text, with the place first where there is one, in order", () => {
+  assert.deepEqual(readReports(["capability report", "// reports: error: e", "//reports:a.alg:3:7: warning: w  ", "// reports: note:", "// reports: a.alg: note: n"].join("\n")), {
+    reports: ["error: e", "a.alg:3:7: warning: w", "note:", "a.alg: note: n"],
+    problems: [],
+  });
+  assert.deepEqual(readReports("capability report\n"), { reports: undefined, problems: [] });
+  assert.deepEqual(readReports("// reports: fatal: x\n// reports: just a text\n").problems, [
+    'the line "// reports: fatal: x" is not of the form reports: <level>: <text>, the level one of error, warning, note',
+    'the line "// reports: just a text" is not of the form reports: <level>: <text>, the level one of error, warning, note',
+  ]);
+});
+
+test("the status line is read as the convention states: a whole number from 0 to 255, at most one line", () => {
+  assert.deepEqual(readStatus("capability report\n//status:  7 \n"), { status: 7, problems: [] });
+  assert.deepEqual(readStatus("// status: 0\n"), { status: 0, problems: [] });
+  assert.deepEqual(readStatus("// status: 255\n"), { status: 255, problems: [] });
+  assert.deepEqual(readStatus("capability report\n"), { status: undefined, problems: [] });
+  for (const bad of ["256", "-1", "07", "x", ""])
+    assert.deepEqual(readStatus(`// status: ${bad}\n`).problems, [`the line ${JSON.stringify(`// status: ${bad}`.trim())} states no status: a status is a whole number from 0 to 255`], bad);
+  assert.deepEqual(readStatus("// status: 1\n// status: 2\n").problems, ["the program has two `// status:` lines"]);
+});
+
+test("a program that states reports lines must hand over exactly those; one that states none is not compared on its messages", async () => {
+  const program = 'capability report\nreport.message("one")\nreport.message({level: `warning, text: "two", file: "f.alg", line: 1})\n// end: completed\n';
+  const unstated = await runProgram(program);
+  assert.deepEqual(unstated.problems, []);
+  assert.deepEqual(unstated.messages, [{ level: "note", text: "one" }, { level: "warning", text: "two", file: "f.alg", line: 1n }]);
+  assert.deepEqual((await runProgram(program + "// reports: note: one\n// reports: f.alg:1: warning: two\n")).problems, []);
+  assert.deepEqual((await runProgram(program + "// reports: note: one\n")).problems, ['reported ["note: one","f.alg:1: warning: two"], expected ["note: one"]']);
+  assert.deepEqual((await runProgram(program + "// reports: f.alg:1: warning: two\n// reports: note: one\n")).problems, ['reported ["note: one","f.alg:1: warning: two"], expected ["f.alg:1: warning: two","note: one"]']);
+  const none = await runProgram("capability report\n// end: completed\n// reports: note: one\n");
+  assert.deepEqual(none.problems, ['reported [], expected ["note: one"]']);
+});
+
+test("a program that states a status passes only with the highest status handed over, 0 where none is; one that states none is not compared on it", async () => {
+  const program = "capability report\nreport.status(5)\nreport.status(2)\n// end: completed\n";
+  const unstated = await runProgram(program);
+  assert.deepEqual(unstated.problems, []);
+  assert.equal(unstated.status, 5);
+  assert.deepEqual((await runProgram(program + "// status: 5\n")).problems, []);
+  assert.deepEqual((await runProgram(program + "// status: 2\n")).problems, ["the status is 5, expected 2"]);
+  assert.deepEqual((await runProgram("capability report\n// end: completed\n// status: 1\n")).problems, ["the status is 0, expected 1"]);
+  assert.deepEqual((await runProgram("capability report\n// end: completed\n// status: 0\n")).problems, []);
+});
+
+test("a malformed reports or status line fails the program, which is not launched; and either line where nothing is launched fails it", async () => {
+  const body = 'capability output\ncapability report\noutput.write("launched")\n// expect: launched\n// end: completed\n';
+  for (const [line, problem] of [
+    ["// reports: loud: x", 'the line "// reports: loud: x" is not of the form reports: <level>: <text>, the level one of error, warning, note'],
+    ["// status: 300", 'the line "// status: 300" states no status: a status is a whole number from 0 to 255'],
+    ["// status: 1\n// status: 1", "the program has two `// status:` lines"],
+  ] as const) {
+    const run = await runProgram(body + line + "\n");
+    assert.ok(run.problems.includes(problem), `${line}: ${JSON.stringify(run.problems)}`);
+    assert.deepEqual(run.lines, [], line);
+  }
+  const notLaunched = await runProgram("capability report\nreport.message(x)\n// end: refused: the name x is bound nowhere in the text\n// status: 0\n");
+  assert.deepEqual(notLaunched.problems, ["nothing was launched, and the program states a `// reports:` or `// status:` line"]);
+});
+
+test("the runner grants report, and under a phases line of check it is supplied while output waits", async () => {
+  const run = await runProgram('capability output\ncapability report\nreport.message("checked")\noutput.write("never")\n// phases: check\n// reports: note: checked\n// end: waiting: the program waits on the capability(ies) output, which no phase supplies\n');
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.lines, []);
+});
+
+test("the programs that hand messages and statuses are there, in milestone 3's directory, and none names a case", () => {
+  for (const name of ["levels", "place", "text", "not-message", "status-rising", "status-falling", "status-invalid", "error-no-status", "check", "answer"]) {
+    const file = `${PROGRAMS_DIR}/m3/report-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+  assert.ok(FILES.includes(`${PROGRAMS_DIR}/m3/report-import/main.alg`));
+  assert.deepEqual(readPhases(text(`${PROGRAMS_DIR}/m3/report-check.alg`)).phases, ["check"]);
+});
+
+test("program m3/report-place.alg hands its messages with the file, the line and the column as given", async () => {
+  const file = `${PROGRAMS_DIR}/m3/report-place.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.messages, [
+    { level: "warning", text: "unused binding", file: "main.alg", line: 3n, column: 7n },
+    { level: "note", text: "here", file: "main.alg", line: 4n },
+    { level: "note", text: "in this file", file: "main.alg" },
+    { level: "note", text: "no file", line: 9n, column: 2n },
+  ]);
 });

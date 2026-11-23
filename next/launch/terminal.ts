@@ -1,7 +1,9 @@
 // The terminal's entry to the minimal launcher (B-196 (the rebuild's
 // acceptance side), chunk Q7 (the minimal launcher), parts 1 to 5; chunk
 // Q13 (check and run as configurations, and what a result holds), part 2,
-// for the configuration's sources, and part 3, for `--phases`). The only
+// for the configuration's sources, and part 3, for `--phases`; chunk Q16
+// (the capabilities the launchers ship), part 3, for check output and the
+// exit code). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
@@ -21,16 +23,23 @@
 // the configuration does not supply. `npm run allegretto` takes them.
 //
 // It reads the saved program, runs it with the launcher of
-// next/launch/launcher.ts, writes each line the program prints to
-// stdout, and exits 0 when the run completed. Otherwise it writes the
-// reason to stderr and exits 1.
+// next/launch/launcher.ts, and writes each line the program prints to
+// stdout. Where the run did not complete it writes the reason to stderr.
+// Each message the program hands to `report.message` is written to stderr
+// as it is handed over, one line each, `file:line:column: level: text`
+// with the parts it has, or `level: text` where it has no file
+// (`messageLine` of next/launch/report.ts): the form build tools read.
+// The exit code is the higher of two numbers: 0 for a completed run and 1
+// for any other end, and the highest status the program handed to
+// `report.status`, 0 where it handed none (`exitCode`).
 //
-// The target supplies three capabilities: `output` (next/launch/output.ts);
+// The target supplies four capabilities: `output` (next/launch/output.ts);
 // `timer` (next/launch/timer.ts), made with the host's real timer
-// (`realClock` of next/launch/clock.ts); and `http` (next/launch/http.ts,
-// chunk Q16 (the capabilities the launchers ship), part 1), made with the
-// host's `fetch` (`fetchTransport`). Its pure primitives are the shipped
-// ones, `shipped` of next/prims/index.ts.
+// (`realClock` of next/launch/clock.ts); `http` (next/launch/http.ts,
+// part 1 of Q16), made with the host's `fetch` (`fetchTransport`); and
+// `report` (next/launch/report.ts, part 3 of Q16), the check-output
+// capability, made with the terminal's sink (`terminalReport`). Its pure
+// primitives are the shipped ones, `shipped` of next/prims/index.ts.
 //
 // The configuration is resolved from its sources by `resolve` of
 // next/tools/configuration.ts, which reads nothing itself; this file reads
@@ -53,10 +62,12 @@
 // line each, and the entry exits 1; nothing is launched. The run's result
 // names the source of each value (`restsOn.configuration` of
 // next/launch/launcher.ts), and nothing printed for a run changes. Under
-// `--phases check` nothing is printed, since check supplies no
-// capability, and the entry exits as the end says, as for any run: a run
-// left waiting on a capability no phase supplies exits 1. What check
-// shows, and how its command exits, is chunk Q14 (the commands).
+// `--phases check` nothing is printed, since check supplies the check
+// capabilities alone (`CHECK_CAPABILITIES` of
+// next/tools/configuration.ts): the messages of `report` are written, and
+// a call on `output` waits. The entry exits as for any run: a run left
+// waiting on a capability no phase supplies exits 1 at least. What else
+// check shows is chunk Q14 (the commands).
 // `--restore <builder>` and `--kernel <name>` are reserved to the command
 // line by the decision and are not built. The environment variable
 // `ALLEGRO_KERNEL` is read by next/kernel/create.ts, not here.
@@ -73,11 +84,12 @@ import { pathToFileURL } from "url";
 import type { CreateKernel } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
 import { readEnvironment, resolve, type Settings } from "../tools/configuration.js";
-import { describe, launch, type Configuration, type ConfigurationSource } from "./launcher.js";
+import { describe, launch, type Configuration, type ConfigurationSource, type LaunchEnd } from "./launcher.js";
 import { output } from "./output.js";
 import { realClock } from "./clock.js";
 import { timer } from "./timer.js";
 import { fetchTransport, http } from "./http.js";
+import { collector, messageLine, report, type ReportMessage } from "./report.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
 export const KERNEL_MODULE = "next/kernel/create.ts";
@@ -134,7 +146,7 @@ export function failFindings(findings: readonly string[]): never {
 }
 
 /** The ceiling of both terminal commands: every capability the terminal supplies. It is the launcher's own value, and the command line may narrow it. */
-export const TERMINAL_CEILING: readonly string[] = ["output", "timer", "http"];
+export const TERMINAL_CEILING: readonly string[] = ["output", "timer", "http", "report"];
 
 /** A configuration resolved from its sources, and the source of each value. */
 export interface TerminalConfiguration {
@@ -156,23 +168,41 @@ export function resolveOnTerminal(commandLine: Settings, file?: Settings): Termi
 }
 
 /**
+ * The exit code of both terminal commands: the higher of the code the end
+ * gives, 0 for a completed run and 1 for any other, and the highest status
+ * handed to `report.status`.
+ */
+export function exitCode(end: LaunchEnd, status: number): number {
+  return Math.max(end.kind === "completed" ? 0 : 1, status);
+}
+
+/** The terminal's sink for `report`: each message written to stderr as one line as it is handed over, and the highest status kept. */
+export function terminalReport(write: (line: string) => void = (line) => process.stderr.write(line + "\n")): ReturnType<typeof collector> {
+  return collector((m: ReportMessage) => write(messageLine(m)));
+}
+
+/**
  * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
  * the configuration resolved and the source of each value, and the
- * terminal's target. Writes each line to stdout; on any end but completed,
- * writes the reason to stderr and exits 1.
+ * terminal's target. Writes each line to stdout and each message of
+ * `report` to stderr; on any end but completed, writes the reason to
+ * stderr. Exits with `exitCode`.
  */
 export async function runOnTerminal(program: unknown, resolved: TerminalConfiguration, imports: readonly unknown[] = []): Promise<void> {
   const createKernel = await kernelFactory();
+  const reported = terminalReport();
   const outcome = await launch({
     createKernel,
     program,
     imports,
     configuration: resolved.configuration,
     sources: resolved.sources,
-    target: { capabilities: [output, timer(realClock), http(fetchTransport)], primitives: shipped },
+    target: { capabilities: [output, timer(realClock), http(fetchTransport), report(reported.sink)], primitives: shipped },
     onLine: (line) => process.stdout.write(line + "\n"),
   });
-  if (outcome.end.kind !== "completed") fail(describe(outcome.end));
+  const code = exitCode(outcome.end, reported.status());
+  if (outcome.end.kind !== "completed") fail(describe(outcome.end), code);
+  process.exitCode = code;
 }
 
 /** Reads a saved program's JSON, or fails saying why. */
