@@ -4,7 +4,7 @@
 // Whose: the kernel stream (lane R). Taken out of next/kernel/kernel.ts on
 // 2026-11-20 with no change (docs/plans/book-pass.md section 9).
 
-import type { Declaration, PrimitiveDeclaration, Rest } from "./interface.js";
+import type { Declaration, Place, PrimitiveDeclaration, Rest } from "./interface.js";
 
 // ---- The representation --------------------------------------------------
 
@@ -77,6 +77,8 @@ export interface Mark {
 export class Struct {
   /** Written by the kernel when a module is made or a function is built, and kept by every copy. */
   owner: Mark | undefined = undefined;
+  /** Where it was written, where whoever made it said. Kept by every copy. */
+  at: Place | undefined = undefined;
   private own: ReadonlyArray<readonly [V | null, V]> | undefined;
   /** For a structure that shares its entries: the list, which may go on past its own, and how many are its own. */
   shared: { readonly items: (readonly [V | null, V])[]; readonly length: number } | undefined = undefined;
@@ -100,10 +102,14 @@ export class Expr {
   owner: Mark | undefined = undefined;
   /** For what is left of a claim: the claim as it was written. */
   site: Expr | undefined = undefined;
+  /** Where it was written, where whoever made it said. Kept by every copy and by what an evaluation leaves of it. */
+  at: Place | undefined = undefined;
   constructor(readonly fn: V, readonly args: readonly V[]) {}
 }
 export class Fn {
   owner: Mark | undefined = undefined;
+  /** Where it was written, where whoever made it said. Kept by every copy. */
+  at: Place | undefined = undefined;
   constructor(readonly params: readonly Param[], readonly body: V) {}
 }
 export class Prim {

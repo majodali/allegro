@@ -44,7 +44,7 @@
 // module's body is evaluated, by the extension's own constructors), and
 // the host-code form.
 
-import type { Declaration, Kernel, Rest, Value } from "./interface.js";
+import type { Declaration, Kernel, Place, Rest, Value } from "./interface.js";
 
 export const SAVED_PROGRAM_FORMAT = "allegro-saved-program";
 export const SAVED_PROGRAM_VERSION = 1;
@@ -65,11 +65,15 @@ export type Node =
   /** A positional parameter. Each param node is listed by exactly one function node. */
   | { readonly k: "param"; readonly name: string }
   /** A structure: entries of [key or null, value]. */
-  | { readonly k: "structure"; readonly entries: ReadonlyArray<readonly [Ref | null, Ref]> }
+  | { readonly k: "structure"; readonly entries: ReadonlyArray<readonly [Ref | null, Ref]>; readonly at?: Place }
   /** An unevaluated application. */
-  | { readonly k: "expression"; readonly fn: Ref; readonly args: readonly Ref[] }
-  /** A composed function. */
-  | { readonly k: "function"; readonly params: readonly Ref[]; readonly body: Ref }
+  | { readonly k: "expression"; readonly fn: Ref; readonly args: readonly Ref[]; readonly at?: Place }
+  /**
+   * A composed function. A structure, an application and a function may each say where it
+   * was written, in `at` (added 2026-11-22, and optional: a record without it loads as
+   * before). A place is no part of a module's identity.
+   */
+  | { readonly k: "function"; readonly params: readonly Ref[]; readonly body: Ref; readonly at?: Place }
   /** One of the kernel's own primitives, by name. */
   | { readonly k: "kernel"; readonly name: string }
   /** A pure primitive function, by content hash. It must be listed in `needs`. */
@@ -141,9 +145,9 @@ const NODE_KEYS: Record<Node["k"], readonly string[]> = {
   symbol: ["k", "fqn"],
   datum: ["k", "fqn"],
   param: ["k", "name"],
-  structure: ["k", "entries"],
-  expression: ["k", "fn", "args"],
-  function: ["k", "params", "body"],
+  structure: ["k", "entries", "at"],
+  expression: ["k", "fn", "args", "at"],
+  function: ["k", "params", "body", "at"],
   kernel: ["k", "name"],
   primitive: ["k", "hash"],
 };
@@ -210,6 +214,14 @@ export function check2(doc: unknown): string[] {
     }
     return true;
   };
+  /** A node's place, where it has one: a source and a location at each end. */
+  const place = (x: unknown, at: number): void => {
+    if (x === undefined) return;
+    const whole = (n: unknown): boolean => typeof n === "number" && Number.isInteger(n) && n >= 0;
+    const location = (l: unknown): boolean => isObject(l) && whole(l.index) && whole(l.line) && whole(l.column) && extraKeys(l, ["index", "line", "column"]).length === 0;
+    if (!isObject(x) || typeof x.source !== "string" || !location(x.start) || !location(x.end) || extraKeys(x, ["source", "start", "end"]).length > 0)
+      out.push(`nodes[${at}].at is not a place: {source, start, end}, each end {index, line, column}`);
+  };
   nodes.forEach((node, i) => {
     if (!isObject(node) || typeof node.k !== "string" || !(node.k in NODE_KEYS)) {
       out.push(`nodes[${i}] is not a node of a known kind`);
@@ -246,6 +258,7 @@ export function check2(doc: unknown): string[] {
         else usedNeeds.add(node.hash);
         break;
       case "structure":
+        place(node.at, i);
         if (!Array.isArray(node.entries)) out.push(`nodes[${i}].entries is not a list`);
         else
           node.entries.forEach((entry, j) => {
@@ -258,11 +271,13 @@ export function check2(doc: unknown): string[] {
           });
         break;
       case "expression":
+        place(node.at, i);
         ref(node.fn, i, "fn");
         if (!Array.isArray(node.args)) out.push(`nodes[${i}].args is not a list`);
         else node.args.forEach((arg, j) => ref(arg, i, `args[${j}]`));
         break;
       case "function":
+        place(node.at, i);
         ref(node.body, i, "body");
         if (!Array.isArray(node.params)) out.push(`nodes[${i}].params is not a list`);
         else
@@ -366,13 +381,13 @@ function build(kernel: Kernel, doc: SavedProgram, primitives: ReadonlyMap<string
         values.push(kernel.param(node.name));
         break;
       case "structure":
-        values.push(kernel.structure(node.entries.map(([key, value]) => [key === null ? null : values[key], values[value]] as const)));
+        values.push(kernel.structure(node.entries.map(([key, value]) => [key === null ? null : values[key], values[value]] as const), node.at));
         break;
       case "expression":
-        values.push(kernel.expression(values[node.fn], node.args.map((a) => values[a])));
+        values.push(kernel.expression(values[node.fn], node.args.map((a) => values[a]), node.at));
         break;
       case "function":
-        values.push(kernel.composedFunction(node.params.map((p) => values[p]), values[node.body]));
+        values.push(kernel.composedFunction(node.params.map((p) => values[p]), values[node.body], node.at));
         break;
       case "kernel":
         values.push(kernel.kernelPrimitive(node.name));

@@ -90,7 +90,12 @@ a form and no name: `get` is written `p.a` and `p[i]`, `same` is `==`,
 `if` is `if c then a else b`, and `block` is the indented block. What `describe` gives is a program that means the same as the
 function: where the function reads names of a block, or holds an
 argument used more than once and not yet evaluated, the description is
-a block around the function that binds them. A check the standard
+a block around the function that binds them. A description is a
+structure keyed by name: `d.form` is a symbol such as `` `apply ``, the
+form's parts are read by name (`d.function`, `d.arguments`, `d.body`),
+and `d.at`, where there is one, is the place the part was written at:
+`{source, start, end}` with `{index, line, column}` at each end.
+`build` passes over an entry it does not know. A check the standard
 language writes as an annotation is written as a claim: ``claim(kind(x) == `bits)``.
 
 Data whose shape the text does not fix is built and read with five more:
