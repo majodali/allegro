@@ -3539,3 +3539,194 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   a run supplies `report`, as PR #299 built it, or leaves it out as not
   needed, as the use case of "A phase leaves a capability out as not
   yet given or as not needed" has it.
+- **2026-11-23 — Q13, part 5: the launcher's check reaches every claim, and check then run.**
+  B-196 (the rebuild's acceptance side), chunk Q13 (check and run as
+  configurations, and what a result holds). The kernel stream's PR #303
+  gives the kernel `check`. The launcher's check now hands the module to
+  it, so every claim of a module is reached, and `check, run` is built as
+  a check followed by an ordinary run. The names and forms are this
+  stream's proposal, for the maintainer to ratify. The eleven points, as
+  built:
+  1. **A phase may be a check.** `Phase` of `next/launch/launcher.ts`
+     gains `check?: true`. A check after the first phase is refused before
+     anything is evaluated: "the phase <name> is a check after the first
+     phase: only the first phase may be a check". So is a check that names
+     inputs: "the phase <name> is a check and supplies the input(s) <names>:
+     a check supplies no input, and leaves every input unknown".
+  2. **How a check is evaluated.** The launcher builds the module
+     function applied to its capabilities and inputs and hands it to
+     `kernel.check` once. Nothing is filled and nothing is advanced. Every
+     input is a fresh cell. A capability the check names is not needed:
+     a structure with an entry for each part, each a composed function of
+     as many parameters as the part's primitive takes, whose body is the
+     empty structure. Every other declared capability is a fresh cell, not
+     yet given. The budget is the configuration's `steps`, or
+     `Number.MAX_SAFE_INTEGER` where none is set. A test with a recording
+     target holds that no part of any capability's implementation is
+     called under a check.
+  3. **How a check ends.** `refuted` where the whole is refuted, a claim
+     has a refuted evaluation, or `refutations` has an entry. The reasons
+     are, each once and in this order: the reason of the whole, the
+     reasons of the refuted claims, the reasons of the refutations.
+     `limit` where the budget ran out and nothing was refuted, with the
+     reason a run gives. Otherwise the check is over: the launch goes on
+     to the next phase, or ends `completed`.
+  4. **The phase after a check is an ordinary run**: a fresh `evaluate` of
+     the module function in the same kernel, with what that phase
+     supplies, under the budget a run alone has. The rule that a phase
+     after the first may name no capability counts from the first phase
+     that is no check. The inputs are checked in the phases of the run, so
+     the run's inputs are said to be supplied "at the start".
+     `linesBeforePhase` counts the run after a check as a later phase, so
+     the corpus runner reads a `// later:` line one entry further on under
+     `check, run`.
+  5. **Each phase has its own result.** `phases` gives the check's and the
+     run's. The run's claims are summed apart from the check's, and the
+     outcome's `result` is the run's. `LaunchResult` gains `refutations`,
+     `{reason, place?}`, empty where there are none; its comment says only
+     a check gives any. A test holds the refutation of a name nothing binds
+     in a function nothing calls. The launcher refuses a module with a free
+     name at loading, so the test uses a record of the first version, which
+     makes no module.
+  6. **The lines and the end** of `check, run` are the run's where the
+     check found nothing. Where the check ends the launch nothing was
+     performed: no line is printed and no request made.
+  7. **The setting.** `PHASE_VALUES` of `next/tools/configuration.ts` is
+     `run`, `check` and `check, run`. `check` is a check phase that names
+     the check capabilities the ceiling grants. `check, run` is that phase,
+     then a phase `run` with every capability of the ceiling and the
+     inputs, then one phase `later` for each entry of `later`. `inputs` and
+     `later` with `check` alone are no finding, and the list of sources
+     names them as before. The finding for `later` with `check` alone is
+     withdrawn, and so is the finding that `check, run` is not built.
+  8. **Both commands** take `--phases check,run`. The exit code follows
+     the end and the status as before. Under `check` alone a call on
+     `report` is not performed, so no message is written and no status
+     handed over.
+  9. **The corpus convention.** `// phases: check, run` is built. The
+     `// claim at:` and `// summary:` lines hold for the last phase's
+     result. `// check claim at: <line>:<column> <word>` states a claim's
+     word in the check's result where the phases are `check, run`; with
+     other phases it fails the program. The README's section "Phases"
+     says both.
+  10. **The launcher adds no analysis.** It hands the kernel one
+      expression and sums what the kernel reports.
+  11. **The path that is left.** A first phase that is no check and does
+      not supply a declared capability still hands a cell and may end
+      `waiting`. Its tests stand unchanged, and the launcher's header says
+      that nothing shipped uses it.
+  - **What the kernel did that its interface does not say.** The two
+    variants gave the same in every case below.
+    - *A check leaves its claims' level of waiting standing.* After
+      `check`, `waiting()` is empty, and a later `evaluate` in the same
+      kernel reports for a claim the check left waiting the level the check
+      left. Smallest case, through the interface: `f = composedFunction([x],
+      claim(x))`; `check(f(cell))` gives the record decided 0, waiting 2;
+      then `evaluate(f(true))` gives decided 1, waiting 2, where a fresh
+      kernel gives decided 1, waiting 0. So under `check, run` a claim the
+      run decides comes out `waiting` in the run's result, and the run's
+      summary is undecided where run alone gives decided:
+      `capability output` and `output.write("ok")` shows it. The launcher
+      sums the counts apart, as point 5 says, and takes the level as the
+      kernel gives it. No test and no program holds the level.
+    - *A claim through a call of a composed function waits.* The measured
+      table's last row, `claim(sum(2) == 4)`, is one case of it. The
+      smallest program: `capability output`, `square(n) => n * n`,
+      `claim(square(7) == 49)`. The check gives the claim one decided
+      evaluation and one that waits, so its word is `waiting`, though
+      nothing in it is unknown and a run decides it. `claim(7 * 7 == 49)`
+      is decided. So `phase-check-prints` no longer says its claim is
+      decided.
+    - *A function held as an entry or an argument is not opened.*
+      `capability output` and `x = [n => claim(1 == 2)]`: the check
+      completes with no record of the claim. The same where the function
+      is an argument that nothing calls: `k(f) => 0`,
+      `y = k(n => claim(1 == 2))`. A function a block binds is opened.
+      The decision says a claim is never passed over, and the interface
+      says the check evaluates the body of every function met.
+    - *A claim on a call of a capability that is not needed waits.* The
+      check evaluates the module function again with its parameters
+      unknown, by the first ruling of 2026-11-23. There the capability is
+      unknown, so the claim a dropped `report.message("note")` stands for
+      has one decided evaluation and one that waits. Its word is
+      `waiting`, as with a cell. The stand-in shows in the counts, and in
+      a claim the empty structure refutes: `x <- note.message("n")` and
+      `claim(count(x) == 1)` are refuted under the stand-in and wait under
+      a cell.
+  - **What building showed against the points.** Point 2: by the last
+    finding, not needed decides no claim's word under check that not yet
+    given leaves waiting. Point 5: by the first finding, the run's result
+    after a check holds the check's level of waiting. Point 8 says nothing
+    either command prints changes; the message of `--phases` given no
+    list now names `check,run` beside `run` and `check`.
+  - **The existing programs changed.** In
+    `next/corpus/allegretto/m3/`:
+    - `phase-check-prints.alg`: `// end: waiting: the program waits on
+      the capability(ies) output, which no phase supplies` became
+      `// end: completed`. Its comment said the program has no capability,
+      the claim is decided and the run ends waiting; it now says the
+      kernel's check evaluates it, output is not yet given, the claim is
+      reached, and the check finds no refutation.
+    - `phase-check-refuted.alg`: its comment adds that the check ends the
+      launch and that nothing is performed under check. Its lines stand.
+    - `phase-check-bound.alg`: in its comment, "which no phase supplies"
+      became "which is not yet given under check". Its lines stand.
+    - `report-check.alg`: `// reports: warning: checked` is gone, since
+      no message is handed over and a program that states none is not
+      compared; `// status: 2` became `// status: 0`; `// end: waiting:
+      the program waits on the capability(ies) output, which no phase
+      supplies` became `// end: completed`. Its comment says report is
+      not needed under check. A test holds that it hands no message.
+  - **The existing tests changed.**
+    - `next/launch/launcher.test.ts`. "both commands take --phases": under
+      `--phases check` the fixture gave stderr `waiting: the program waits
+      on the capability(ies) output, which no phase supplies` and exit 1,
+      and gives nothing and exit 0, from both commands; `--phases
+      check,run` gave the finding that it is not built yet and exit 1, and
+      gives `hello, world` and exit 0; the value not built lists
+      `"check, run"` too; the message for `--phases` with no list said
+      "run or check" and says "run, check, or check,run". "npm run
+      allegretto under --phases check": the project's file setting check
+      gave the waiting line and exit 1, and gives nothing and exit 0.
+      "both commands under --phases check": stderr `warning:
+      checked` and the waiting line, exit 4, became nothing and exit 0;
+      its name says report is not needed. The comment of the section on
+      phases says that its phase `CHECK` is no check.
+    - `next/tools/configuration.test.ts`. The values of the setting
+      phases list three, and each check phase has `check: true`. The test
+      that `check, run` is a finding became a test of what it resolves to,
+      from each source. The test that `later` with `check` alone is a
+      finding became one that `inputs` and `later` with `check` alone are
+      none, and the values not built list `"check, run"`. The test value
+      of phases for the environment was `["check"]` and is
+      `["check", "run"]`.
+    - `next/launch/report.test.ts`. "under check alone the phase supplies
+      report": the messages were `warning: checked`, the status 2 and the
+      end waiting; they are none, 0 and completed, and the test adds the
+      same program under `check, run`, where the run's calls act.
+    - `next/corpus/allegretto.test.ts`. "a program with a phases line":
+      its program's end was waiting and is completed, and run alone is
+      told apart by its printed line. "a malformed phases line": the
+      cases of `check, run` and of `later` with `check` alone were
+      findings, and are now launched; the value not built lists three.
+      "the runner grants report": the program stated a message and the
+      waiting end, and states status 0 and the end completed.
+  - **The new programs.** Eight, under `next/corpus/allegretto/m3/`,
+    none with a `// realises:` line. The cases of the present evaluator's
+    Rule 2 (B-172 (the partial-evaluation rules as implemented against the spine)) are about its residual and its
+    effects, which no program here shows. `check-uncalled` (a false claim
+    in a function nothing calls), `check-unknown-condition` (one under a
+    condition on an unknown input), `check-input-waits` (a claim over an
+    input waits, one over nothing unknown is decided, the launch
+    completes, the summary undecided), `check-dropped-write` (a false
+    claim after a dropped write, nothing printed), `check-report` (report
+    not needed: no message, status 0, the claim after the calls decided),
+    `check-run-prints` (the lines and end of run alone),
+    `check-run-refuted` (nothing printed, where run alone prints the line
+    first), `check-run-input` (the input unknown to the check and given to
+    the run).
+  - **Measured.** `npm run test:next` runs 926 tests on the default
+    kernel and 925 with `ALLEGRO_KERNEL=reference`; all pass but one
+    marked to do on each. 24 tests are new on each: 16 written here and
+    one for each of the eight programs. `npm run harness:next` runs 118
+    programs, and all pass on both variants.
