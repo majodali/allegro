@@ -38,6 +38,37 @@
 // `without`, `refuse("the capability c was withheld by the importing
 // module")`.
 //
+// Places were added on 2026-11-23, after the kernel stream's PR #301.
+// Each node of kind `expression`, `function` or `structure` that a part
+// of the text gives rise to carries `at`, the kernel's `Place`
+// (next/kernel/interface.ts). Its `source` is the name the text is
+// emitted under: the driver gives each text its file, and a text emitted
+// with no name is `<text>` (`UNNAMED`). Its `start` and `end` are the
+// index, line and column of the part's first character and of the point
+// after its last. The reader keeps offsets, and `locationAt` of
+// next/bootstrap/reader.ts gives the line and column of each.
+// A node made for what a form stands for takes the form's place:
+//   - the claim, the negation and the call of `is_failure` that a dropped
+//     statement stands for take the statement's;
+//   - the call an operator stands for takes the operator expression's,
+//     and so do the call of `same` and the negation of `!=`;
+//   - `get` takes the place of `p.a` or `p[i]`, `put` and the structure
+//     before it the structure literal's;
+//   - the kernel's block, the structure of its bindings and each link of
+//     its chain take the block's;
+//   - the call of an imported module takes the import line's, and the
+//     refusal for a name after `without` that name's;
+//   - the module function and the structure it yields take the whole
+//     text's, its end after the text's last character.
+// These carry no place: the nodes of the kinds that have no `at` (bits,
+// symbol, datum, param, kernel, primitive); the nodes of Allegretto's own
+// functions, whose text the emitter keeps and no file holds; the
+// structure of `int`, `float`, `text` or `bits`, which Allegretto binds
+// and the emitter writes once; and the block around the module's own that
+// binds the own functions the text uses, which no part of the text
+// writes. No node with a place is shared: two parts written alike are two
+// nodes. A place is no part of a module's identity.
+//
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Allegretto is a small language for the kernel and nothing else"
 //   "A saved program is a recorded sequence of interface calls": the
@@ -126,7 +157,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { read, type Expr, type Header, type Item, type Module, type Name, type Place } from "./reader.js";
+import { lineStarts, locationAt, read, type Expr, type Header, type Item, type Module, type Name, type Place } from "./reader.js";
+import type { Place as WrittenAt } from "../kernel/interface.js";
 import { check2, encode, SAVED_PROGRAM_FORMAT, SAVED_PROGRAM_VERSION_2, type Declared, type Need, type Node, type Ref, type SavedProgram } from "../kernel/saved-program.js";
 import { shippedByName } from "../prims/index.js";
 
@@ -350,8 +382,11 @@ export type EmitResult =
   | { readonly ok: true; readonly program: SavedProgram; readonly forms: readonly FormId[] }
   | { readonly ok: false; readonly findings: readonly Finding[]; readonly forms: readonly FormId[] };
 
+/** The name a text emitted with no file is given: in a finding's line for a person, and as the source of every place in its record. */
+export const UNNAMED = "<text>";
+
 /** One line for a finding, for a person. */
-export function describeFinding(f: Finding, file = "<text>"): string {
+export function describeFinding(f: Finding, file = UNNAMED): string {
   return `${file}:${f.at.line}:${f.at.column}: ${f.message}`;
 }
 
@@ -386,17 +421,17 @@ class Builder {
   primitive(hash: string): Ref {
     return this.constant({ k: "primitive", hash });
   }
-  apply(fn: Ref, args: readonly Ref[]): Ref {
-    return this.add({ k: "expression", fn, args });
+  apply(fn: Ref, args: readonly Ref[], at?: WrittenAt): Ref {
+    return this.add(at === undefined ? { k: "expression", fn, args } : { k: "expression", fn, args, at });
   }
   param(name: string): Ref {
     return this.add({ k: "param", name });
   }
-  fn(params: readonly Ref[], body: Ref): Ref {
-    return this.add({ k: "function", params, body });
+  fn(params: readonly Ref[], body: Ref, at?: WrittenAt): Ref {
+    return this.add(at === undefined ? { k: "function", params, body } : { k: "function", params, body, at });
   }
-  structure(entries: ReadonlyArray<readonly [Ref | null, Ref]>): Ref {
-    return this.add({ k: "structure", entries });
+  structure(entries: ReadonlyArray<readonly [Ref | null, Ref]>, at?: WrittenAt): Ref {
+    return this.add(at === undefined ? { k: "structure", entries } : { k: "structure", entries, at });
   }
 }
 
@@ -477,8 +512,19 @@ const isBinding = (i: Item): i is BindingItem => i.k === "binding" || i.k === "f
  * change version when the text gains a `.`. A record has a key slot for
  * each `key` header line, and no stored outcomes.
  */
-export function emitModule(module: Module, imports: Imports = new Map()): EmitResult {
+export function emitModule(module: Module, imports: Imports = new Map(), source: string = UNNAMED): EmitResult {
   const b = new Builder();
+  const starts = lineStarts(module.text);
+  /**
+   * False while one of Allegretto's own functions is written: its parts are of a text the emitter keeps, not of the
+   * text read, and carry no place.
+   */
+  let placing = true;
+  /** The kernel's place of a part of the text read: its source, and the index, line and column of each end. */
+  const where = (p: Place): WrittenAt | undefined =>
+    placing ? { source, start: locationAt(starts, p.start), end: locationAt(starts, p.end) } : undefined;
+  /** The place of the whole text: of the module, and of what the module stands for. */
+  const whole = where({ start: 0, end: module.text.length, line: 1, column: 1 });
   const findings: Finding[] = [];
   const forms = new Set<FormId>();
   const unbound: Array<{ name: string; at: Place }> = [];
@@ -511,7 +557,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
   };
   const FALSE = (): Ref => truth(false);
   const TRUE = (): Ref => truth(true);
-  const cond = (c: Ref, a: Ref, e: Ref): Ref => b.apply(b.kernel("if"), [c, a, e]);
+  const cond = (c: Ref, a: Ref, e: Ref, at: WrittenAt | undefined): Ref => b.apply(b.kernel("if"), [c, a, e], at);
   const shipped = (name: string, at: Place, form: FormId): Ref => {
     forms.add(form);
     const p = shippedByName.get(name);
@@ -543,7 +589,13 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
     if (r !== undefined) return r;
     const kept = [...forms];
     const it = ownFunctions().find((f) => f.name.name === name) as FunctionItem;
-    r = bindingValue(it, ownScope);
+    const wasPlacing = placing;
+    placing = false;
+    try {
+      r = bindingValue(it, ownScope);
+    } finally {
+      placing = wasPlacing;
+    }
     forms.clear();
     for (const f of kept) forms.add(f);
     ownNodes.set(name, r);
@@ -605,19 +657,19 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
           bind(inner, p, { k: "param", ref });
           return ref;
         });
-        return b.fn(params, expr(e.body, inner));
+        return b.fn(params, expr(e.body, inner), where(e.at));
       }
       case "apply": {
         forms.add("application");
         const fn = expr(e.fn, scope);
         const args = e.args.map((a) => expr(a, scope));
-        return b.apply(fn, args);
+        return b.apply(fn, args, where(e.at));
       }
       case "pipe": {
         forms.add("pipe");
         const value = expr(e.value, scope);
         const fn = expr(e.fn, scope);
-        return b.apply(fn, [value]);
+        return b.apply(fn, [value], where(e.at));
       }
       case "dot": {
         // `int.add` and its kin, where the structure is Allegretto's: the primitive itself, which means the same as reading the entry.
@@ -634,52 +686,55 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
         }
         const object = e.object.k === "name" ? scope.lookup(e.object.name) : undefined;
         forms.add(object?.k === "param" && object.role === "capability" ? "capability part" : "entry by key");
-        return b.apply(b.kernel("get"), [expr(e.object, scope), b.datum(e.name.name)]);
+        return b.apply(b.kernel("get"), [expr(e.object, scope), b.datum(e.name.name)], where(e.at));
       }
       case "index": {
         forms.add("entry at place");
         const object = expr(e.object, scope);
-        return b.apply(b.kernel("get"), [object, expr(e.index, scope)]);
+        return b.apply(b.kernel("get"), [object, expr(e.index, scope)], where(e.at));
       }
       case "if": {
         forms.add("if");
-        return cond(expr(e.condition, scope), expr(e.then, scope), expr(e.else, scope));
+        return cond(expr(e.condition, scope), expr(e.then, scope), expr(e.else, scope), where(e.at));
       }
       case "unary": {
         const operand = expr(e.operand, scope);
         if (e.op === "!") {
           forms.add("&& || !");
-          return cond(operand, FALSE(), TRUE());
+          return cond(operand, FALSE(), TRUE(), where(e.at));
         }
-        return b.apply(shipped("int.neg", e.at, "integer operator"), [operand]);
+        return b.apply(shipped("int.neg", e.at, "integer operator"), [operand], where(e.at));
       }
       case "binary": {
+        // Each node an operator stands for takes the operator expression's place.
         const left = expr(e.left, scope);
         const right = expr(e.right, scope);
+        const at = where(e.at);
         switch (e.op) {
           case "&&":
             forms.add("&& || !");
-            return cond(left, right, FALSE());
+            return cond(left, right, FALSE(), at);
           case "||":
             forms.add("&& || !");
-            return cond(left, TRUE(), right);
+            return cond(left, TRUE(), right, at);
           case "==":
             forms.add("== !=");
-            return b.apply(b.kernel("same"), [left, right]);
+            return b.apply(b.kernel("same"), [left, right], at);
           case "!=":
             forms.add("== !=");
-            return cond(b.apply(b.kernel("same"), [left, right]), FALSE(), TRUE());
+            return cond(b.apply(b.kernel("same"), [left, right], at), FALSE(), TRUE(), at);
           case "++":
             forms.add("++");
-            return b.apply(b.kernel("join"), [left, right]);
+            return b.apply(b.kernel("join"), [left, right], at);
           default:
-            return b.apply(shipped(INT_OPERATORS[e.op], e.at, "integer operator"), [left, right]);
+            return b.apply(shipped(INT_OPERATORS[e.op], e.at, "integer operator"), [left, right], at);
         }
       }
       case "record": {
         // The entries up to the first computed key are the structure node, a private entry keyed by its key's
         // parameter among them; each entry from there on is put on what comes before it, in written order.
         forms.add("structure");
+        const at = where(e.at);
         const prefix: Array<readonly [Ref, Ref]> = [];
         let built: Ref | undefined;
         for (const f of e.fields) {
@@ -689,20 +744,20 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
             prefix.push([f.k === "named" ? b.symbol(f.name.name) : (key as Ref), expr(f.value, scope)]);
             continue;
           }
-          built ??= b.structure(prefix);
+          built ??= b.structure(prefix, at);
           const k = f.k === "named" ? b.datum(f.name.name) : key ?? expr(f.key, scope);
-          built = b.apply(b.kernel("put"), [built, k, expr(f.value, scope)]);
+          built = b.apply(b.kernel("put"), [built, k, expr(f.value, scope)], at);
         }
-        return built ?? b.structure(prefix);
+        return built ?? b.structure(prefix, at);
       }
       case "list": {
         forms.add("list");
         const entries = e.items.map((i) => [null, expr(i, scope)] as const);
-        return b.structure(entries);
+        return b.structure(entries, where(e.at));
       }
       case "block": {
         forms.add("block");
-        const value = block(e.items, new Scope(scope), undefined, e.sync);
+        const value = block(e.items, new Scope(scope), undefined, e.sync, where(e.at));
         if (value === undefined) {
           findings.push({ at: e.at, kind: "refused", message: "a block with no statement has no value" });
           return NONE;
@@ -721,7 +776,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       bind(inner, p, { k: "param", ref });
       return ref;
     });
-    return b.fn(params, expr(it.body, inner));
+    return b.fn(params, expr(it.body, inner), where(it.at));
   };
 
   /** True for a statement that is itself a claim: an application of the kernel's claim. It needs no claim of its own. */
@@ -742,13 +797,17 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
    * block's last, and `x <- e`; a claim needs no claim of its own. `tail`
    * ends the chain where it is given: the module's structure of its
    * bindings, after which no written statement is the last. The value is
-   * undefined for a block with no statement and no tail.
+   * undefined for a block with no statement and no tail. `at` is the
+   * block's place, which the kernel's block, the structure of its bindings
+   * and each link of its chain take; the nodes a dropped statement stands
+   * for take the statement's.
    */
   const block = (
     items: readonly Item[],
     scope: Scope,
     tail: (() => Ref) | undefined,
     sync: boolean,
+    at: WrittenAt | undefined,
     more: ReadonlyArray<{ readonly name: string; readonly value: () => Ref }> = [],
   ): Ref | undefined => {
     const group = items.filter(isBinding);
@@ -770,13 +829,14 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       const value = expr(it.expr, scope);
       if ((tail === undefined && i === lines.length - 1) || isClaim(it.expr, scope)) return value;
       forms.add("dropped statement");
-      return b.apply(b.kernel("claim"), [cond(b.apply(ownFunction("is_failure"), [value]), FALSE(), TRUE())]);
+      const stated = where(it.at);
+      return b.apply(b.kernel("claim"), [cond(b.apply(ownFunction("is_failure"), [value], stated), FALSE(), TRUE(), stated)], stated);
     });
     if (tail !== undefined) parts.push(tail());
     if (parts.length === 0) return undefined;
     let chain = parts[parts.length - 1];
-    for (let i = parts.length - 2; i >= 0; i--) chain = b.apply(b.kernel(sync ? "then" : "also"), [parts[i], chain]);
-    return values.length === 0 ? chain : b.apply(b.kernel("block"), [b.structure(values), chain]);
+    for (let i = parts.length - 2; i >= 0; i--) chain = b.apply(b.kernel(sync ? "then" : "also"), [parts[i], chain], at);
+    return values.length === 0 ? chain : b.apply(b.kernel("block"), [b.structure(values, at), chain], at);
   };
 
   // The module: its header lines are its parameters, keys first, each role in written order; its block the body.
@@ -816,7 +876,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
     const takes = imported.declares.filter((d) => d.role !== "module");
     const declared = new Set(takes.map((d) => d.name));
     const handed = new Map<string, Expr>();
-    const withheld = new Set<string>();
+    const withheld = new Map<string, Name>();
     for (const p of h.with) {
       forms.add("import with");
       if (!declared.has(p.name.name)) findings.push({ at: p.name.at, kind: "import", message: `the import of ${name} hands ${p.name.name} with with, and ${name} declares no capability or input ${p.name.name}` });
@@ -828,14 +888,16 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       if (!declared.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} withholds ${c.name}, and ${name} declares no capability or input ${c.name}` });
       else if (handed.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} both hands and withholds ${c.name}` });
       else if (withheld.has(c.name)) findings.push({ at: c.at, kind: "import", message: `the import of ${name} withholds ${c.name} twice` });
-      withheld.add(c.name);
+      withheld.set(c.name, c);
     }
     const args = takes.map((d) => {
       const given = handed.get(d.name);
       if (given !== undefined) return expr(given, top);
-      if (withheld.has(d.name)) {
+      const without = withheld.get(d.name);
+      if (without !== undefined) {
+        // The refusal stands for the name after without, and takes its place.
         const reason = new TextEncoder().encode(withheldReason(d.name));
-        return b.apply(b.kernel("refuse"), [b.bits(reason, reason.length * 8)]);
+        return b.apply(b.kernel("refuse"), [b.bits(reason, reason.length * 8)], where(without.at));
       }
       const own = top.names.get(d.name);
       if (own?.k === "param" && (own.role === "capability" || own.role === "input")) return own.ref;
@@ -846,7 +908,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       });
       return NONE;
     });
-    return b.apply(ref, args);
+    return b.apply(ref, args, where(h.at));
   };
 
   // What the module yields: the structure of its bindings, keyed by the symbols of their names, in written order. An
@@ -858,7 +920,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
       ? exported.map((i) => i.name)
       : [...own.map((i) => i.name), ...importLines.map((l) => l.h.name)].sort((x, y) => x.at.start - y.at.start);
   const more = importLines.map((l) => ({ name: l.h.name.name, value: importValue(l) }));
-  let body = block(module.items, top, () => b.structure(yielded.map((n) => [b.symbol(n.name), b.symbol(n.name)] as const)), false, more) as Ref;
+  let body = block(module.items, top, () => b.structure(yielded.map((n) => [b.symbol(n.name), b.symbol(n.name)] as const), whole), false, whole, more) as Ref;
   // The own functions the text names, and those they name in turn, until none is added: one block around the module's own.
   for (let grew = true; grew; ) {
     grew = false;
@@ -879,7 +941,7 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
     version: SAVED_PROGRAM_VERSION_2,
     needs: [...needs.values()].sort((x, y) => x.name.localeCompare(y.name)),
     nodes: b.nodes,
-    module: b.fn([...keyParams, ...params], body),
+    module: b.fn([...keyParams, ...params], body, whole),
     declares,
     keys: keyParams.length,
     outcomes: [],
@@ -890,10 +952,10 @@ export function emitModule(module: Module, imports: Imports = new Map()): EmitRe
 }
 
 /** Reads a text and emits it, with the declarations and identity of each module it imports. */
-export function emit(text: string, imports: Imports = new Map()): EmitResult {
+export function emit(text: string, imports: Imports = new Map(), source: string = UNNAMED): EmitResult {
   const r = read(text);
   if (!r.ok) return { ok: false, findings: r.findings.map((f) => ({ at: f.at, kind: "read" as const, message: f.message })), forms: [] };
-  return emitModule(r.module, imports);
+  return emitModule(r.module, imports, source);
 }
 
 // ── The command ───────────────────────────────────────────────────────

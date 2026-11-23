@@ -31,6 +31,13 @@
 // `0b…`. It also refuses a header line in a block inside the module, and
 // `export` there.
 //
+// Each node keeps its place as offsets of its start and of the point
+// after its end, and the line and column of its start (`Place` of this
+// file, which is another type than the kernel's). The line and column of
+// any offset are `locationAt`'s: the emitter takes both ends of the
+// kernel's place from it. The offsets count in the text with its line
+// ends `\r\n` written `\n`, which the module keeps (`Module.text`).
+//
 // It checks one thing about names (forms.md §2 "Failures", the paragraph
 // on `<-`): a statement written above `x <- e` in its block that needs
 // `x`, itself or through a binding of that block, is refused, since it
@@ -131,10 +138,15 @@ export interface Header {
   readonly without: readonly Name[];
 }
 
-/** A text read as one module: its header lines, in written order, and its block. */
+/**
+ * A text read as one module: its header lines, in written order, and its
+ * block; and the text as read, its line ends `\r\n` written `\n`, which
+ * every offset of a place counts in.
+ */
 export interface Module {
   readonly headers: readonly Header[];
   readonly items: readonly Item[];
+  readonly text: string;
 }
 
 /** Why a text is refused, at a place. */
@@ -155,6 +167,31 @@ const BINARY_TAGS: Readonly<Record<string, BinaryOp>> = {
   or: "||", and: "&&", eq: "==", neq: "!=", lt: "<", gt: ">", lte: "<=", gte: ">=", join: "++", add: "+", sub: "-", mul: "*", div: "/", mod: "%",
 };
 
+/** The offset at which each line of a text starts, the first line's 0 among them. */
+export function lineStarts(text: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < text.length; i++) if (text[i] === "\n") starts.push(i + 1);
+  return starts;
+}
+
+/**
+ * The line and column of an offset of a text, from 1, with the offset,
+ * from 0, given the text's `lineStarts`. The one place a line and a
+ * column are computed: the reader's places take the line and column of
+ * their start from it, and the emitter (next/bootstrap/emit.ts) the line
+ * and column of both ends.
+ */
+export function locationAt(starts: readonly number[], index: number): { readonly index: number; readonly line: number; readonly column: number } {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid] <= index) lo = mid;
+    else hi = mid - 1;
+  }
+  return { index, line: lo + 1, column: index - starts[lo] + 1 };
+}
+
 class Refused extends Error {
   constructor(readonly finding: ReadFinding) {
     super(finding.message);
@@ -166,17 +203,10 @@ type Branch = Extract<ParseTree, { kind: "branch" }>;
 /** Reads a text as one Allegretto module. */
 export function read(text: string): ReadResult {
   const source = text.replace(/\r\n/g, "\n");
-  const lineStarts = [0];
-  for (let i = 0; i < source.length; i++) if (source[i] === "\n") lineStarts.push(i + 1);
+  const starts = lineStarts(source);
   const place = (start: number, end: number = start): Place => {
-    let lo = 0;
-    let hi = lineStarts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (lineStarts[mid] <= start) lo = mid;
-      else hi = mid - 1;
-    }
-    return { start, end, line: lo + 1, column: start - lineStarts[lo] + 1 };
+    const { line, column } = locationAt(starts, start);
+    return { start, end, line, column };
   };
   const at = (t: ParseTree): Place => place(t.range.start, t.range.end);
   const refuse = (where: Place, message: string): never => {
@@ -483,7 +513,7 @@ export function read(text: string): ReadResult {
   }
   arrowsInPlace(items, headers.filter((h) => h.k === "import"));
   if (findings.length > 0) return { ok: false, findings: [...findings].sort((a, b) => a.at.start - b.at.start) };
-  return { ok: true, module: { headers, items } };
+  return { ok: true, module: { headers, items, text: source } };
 }
 
 // ── The names an expression uses ──────────────────────────────────────

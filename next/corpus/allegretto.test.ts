@@ -46,7 +46,7 @@ import * as path from "path";
 import { spawnSync } from "child_process";
 import { createKernel } from "../kernel/create.js";
 import type { Value } from "../kernel/interface.js";
-import { load } from "../kernel/saved-program.js";
+import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
@@ -340,6 +340,37 @@ test("the programs and the texts they import write every form of forms.md §2, i
   }
   const missing = (Object.keys(FORMS) as FormId[]).filter((f) => !used.has(f));
   assert.deepEqual(missing, []);
+});
+
+test("every record of the programs and their imported texts checks, carries places, and has the identity it has with every place taken out", () => {
+  const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
+  /** The identity of a record's module, loaded into a new kernel after the records it imports. */
+  const identity = (records: readonly SavedProgram[]): string | undefined => {
+    const k = createKernel();
+    const primitives = new Map(records.flatMap((doc) => doc.needs).map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+    let last: Value | undefined;
+    for (const doc of records) last = load(k, doc, primitives);
+    return k.moduleOf(last as Value);
+  };
+  /** The record with `at` taken out of every node. */
+  const unplaced = (doc: SavedProgram): SavedProgram => ({ ...doc, nodes: doc.nodes.map((n) => ("at" in n ? (({ at: _, ...rest }) => rest)(n) : n) as SavedProgram["nodes"][number]) });
+  let records = 0;
+  for (const file of FILES) {
+    const r = drive(text(file), file, readUnder(ROOT));
+    if (!r.ok) continue;
+    const docs = r.records.map((x) => JSON.parse(encode(x.program)) as SavedProgram);
+    docs.forEach((doc, i) => {
+      const where = r.records[i].file;
+      assert.deepEqual(check2(doc), [], where);
+      assert.ok(doc.nodes.some((n) => "at" in n && n.at?.source === where), `${where}: a node carries a place in its own file`);
+      const placedId = identity(docs.slice(0, i + 1));
+      assert.match(placedId ?? "", /^sha256:[0-9a-f]{64}$/, where);
+      assert.equal(identity([...docs.slice(0, i), unplaced(doc)]), placedId, `${where}: a place is no part of the module's identity`);
+      assert.equal(placedId, r.records[i].identity, `${where}: the identity the driver took`);
+      records++;
+    });
+  }
+  assert.ok(records > 0);
 });
 
 test("npm run allegretto emits and launches in one step: it prints the lines, and exits 0 on completed and 1 otherwise", () => {
