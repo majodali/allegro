@@ -574,6 +574,10 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-24 — A plan for the parser engine and the module loader.**
+  `docs/plans/book-pass.md` §10 and eleven chunks in its §5: an engine
+  and a loader written in Allegretto under `next/ext/`, ending with the
+  bootstrap deleted. No code yet.
 - **2026-11-23 — A check that reaches every claim, in the kernel.**
   `Kernel.check` evaluates an expression ahead of what is done: nothing
   is performed, both branches of an unknown conditional are evaluated,

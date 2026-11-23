@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -599,6 +599,17 @@ are:
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | done 2026-11-20: a 23rd kernel primitive on both variants, eight tests. The machine cancels what lost and keeps the answer of a named value in a list of its own, `kept`; the reference keeps nothing of what lost, and the tests say so |
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
+| E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
+| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto | their tests; a map of ten thousand entries is built and read in time that grows with its size |
+| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on | its tests; the corpus cases of the parser engine that need no more |
+| E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | its tests |
+| E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
+| E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
+| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
+| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
+| E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
+| E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program; the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
+| E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1753,6 +1764,9 @@ its approval.
   not take is not evaluated; the second phase's analyses are Allegro
   code that the launcher hands a check's result to; a refutation is
   told to a host under the name `refutation`.
+- **2026-11-24 — a plan for the parser engine and the module loader**
+  (the review session): §10, and eleven chunks E1 to E11 added to §5
+  by amendment. No code.
 
 ## 8. Sessions
 
@@ -1972,4 +1986,148 @@ split.
 Metadata fields and their rules; the module loader and the parser
 engine in Allegretto; capabilities that offer streams; the standard
 language. They follow, on the machine.
+
+## 10. The parser engine and the module loader
+
+This section is the plan of the eleven chunks E1 to E11 of §5's table.
+It is self-contained for a reader who knows the decision inventory.
+
+### 10.1 Outcome
+
+A parser engine and a module loader written in Allegretto, under
+`next/ext/`. A program's texts are then read, loaded and run with no
+code of the present tree: the bootstrap in `next/bootstrap/`, which
+reads Allegretto with the present tree's engine, is deleted. That is
+milestone 8 of `docs/plans/rebuild.md`.
+
+### 10.2 What the rulings ask
+
+Each line names the decision that asks.
+
+| It must | Decision |
+|---|---|
+| Be written in Allegretto, test first and in small steps, on nothing of the standard language | "The parser engine and the module loader are written in Allegretto" |
+| Take a grammar as a value, in seven rule forms | "Grammars are values" |
+| Accept left recursion; give the order of alternatives no meaning; report every parse; settle the parse up to each change of grammar; carry a state beside the position | "Any parsing algorithm will do that meets five conditions" |
+| Read characters, with no scanner before it | "Scannerless parsing" |
+| Take a terminal as a function of the position and the state | "A terminal is a function, so a grammar can define its own" |
+| Answer a description, with the place of each part | "Parsing is evaluation"; "A description is plain data in a fixed set of forms" |
+| Answer a failure as data for a text that does not parse | "Parsing is evaluation" |
+| Treat two parses of a text as a refutation, and hold a production marked `unambiguous` to one reading at its end | "Ambiguity is a claim" |
+| Change the grammar in the middle of a text, from a production so marked, by a capability | "A text can change the grammar it is read in" |
+| Check that a notation only adds, on the grammar, with no text parsed | "A notation a text uses can only add" |
+| Combine grammars the same in either order, or refuse | "Grammars combine without regard to order" |
+| Find a text through a capability, and never fetch a value | "The loader reaches files through a capability"; "A module is an extension that arrives as a file" |
+| Ship already built, as expressions | "The platform's parser engine ships already built" |
+
+### 10.3 What exists
+
+- **A toy engine**, `next/corpus/speed/parser.alg`, the acceptance
+  stream's speed test: 156 lines, five rule forms, first match wins, no
+  left recursion. It shows the notation is enough to write an engine
+  in. It meets one of the five conditions.
+- **The bootstrap**, `next/bootstrap/`, the acceptance stream's:
+  Allegretto's grammar for the present tree's engine, a reader of that
+  engine's parse tree, and an emitter of saved programs. It refuses
+  `use`.
+- **The kernel's side**: `describe` and `build`, with descriptions
+  keyed by name and places; `module`, which takes a function, the
+  number of its keys and its declarations; `specialize`.
+- **The present tree's engine**, `src/grammar2/`, 7,266 lines of host
+  code. It meets two of the five conditions: left recursion and a
+  state. It gives the order of alternatives a meaning. It is read for
+  what a grammar needs, and nothing of it is carried over.
+
+### 10.4 The design proposed
+
+**The algorithm.** A descent that keeps what it has tried, where what
+a rule gives at a position and a state is the set of all its results:
+each an end position, a state, and what was matched. The order of
+alternatives then has no meaning, since every alternative is tried and
+every result kept, and every parse is reported. A rule that recurses on
+the left is met again at the same position while it is being tried; it
+is then given the results found so far, and tried again until a turn
+adds no result. A rule entered again at the same position with a
+changed state is refused, as ruled.
+
+This is simpler to write test first than the algorithm the present
+book names, and it meets the five conditions. Its cost for a grammar
+without ambiguity is close to the size of the text times the number of
+rules. It is the first thing the maintainer is asked to rule on.
+
+**What it stands on.** Allegretto has structures, and no table that is
+changed in place. What the engine has tried is kept in a map written
+in Allegretto, as a tree, where putting an entry makes a few small
+structures and copies nothing else. Chunk E2 builds it and measures
+it, since the engine's speed rests on it.
+
+**Places.** "A parser records where each expression came from in its
+text" says a place is a metadata field that the parser's extension
+registers. The ruling of 2026-11-22 made a place an entry of a part's
+description, `at`. The engine follows the later ruling: it writes `at`.
+The earlier entry is to be reworded when the chunk that builds it is
+recorded; the maintainer is asked to confirm.
+
+**What a parse of a module gives.** Three things, as ruled: the
+description of the module's function, its declarations in order, and
+the number of its keys. The loader builds the function from the
+description and hands the kernel the three.
+
+**A text that changes its grammar.** The engine settles the parse at a
+production marked `unambiguous`. The form there stands for an
+expression that calls `parser.extend`; the engine has it evaluated,
+takes the new grammar, and reads on. So the engine is called with the
+capability to evaluate what it read, and parsing and evaluation take
+turns.
+
+**Shipped built.** The engine and the loader are a saved program,
+emitted once by the bootstrap while it exists and by the engine itself
+after. A parser for one grammar is the engine specialized over that
+grammar, with the kernel's `specialize`.
+
+### 10.5 How it is known to be right
+
+- **Test first.** Each chunk's tests are written before its code, as
+  Allegretto modules whose claims are the assertions. A test passes
+  where every claim is decided.
+- **The corpus.** The acceptance stream's corpus holds 61 cases of the
+  parser engine, due at milestone 8. Each chunk names the cases it
+  makes pass.
+- **Two readers.** From E7 the engine and the bootstrap both read every
+  program of the corpus, and the two results must be the same module,
+  by identity. The acceptance stream's chunk that retires the
+  bootstrap holds this until the bootstrap goes.
+- **The engine reads itself** (E10): its own text, read by the engine,
+  gives a module of the same identity as the one that read it.
+- **Deliberate faults**, as in every chunk so far.
+- **Speed**, measured at E3 and at E10 and reported. No condition is
+  set on it here; the acceptance stream's speed tests are theirs.
+
+### 10.6 What can go wrong
+
+1. **Speed.** The toy engine read 64 terms in about 15 seconds on the
+   reference kernel. The machine is faster and its time grows with the
+   work, and a specialized engine does less. Whether that is enough for
+   texts of a few thousand lines is not known. E3 measures it early.
+2. **The map.** If a map written in Allegretto is too slow, the kernel
+   needs one more shared form: a structure where an entry is put in
+   place of another without copying the rest. That would be a chunk of
+   its own, asked for when E2's measurement shows it.
+3. **Reading Allegretto before the engine exists.** The engine's own
+   text is Allegretto, read by the bootstrap until E10. So the engine
+   may use no form the bootstrap does not read, `use` among them.
+4. **Running tests in this lane.** The tests need a text read and a
+   module run. Both are the acceptance stream's code today. This stream
+   calls it and does not edit it; where it lacks something, the need
+   goes to them through a pull request's hand-off.
+5. **Recovery after a parse fails.** "Parse failure reporting and
+   recovery" asks for error productions and recovery points. The plan
+   has the farthest point in E3 and nothing more. Recovery is left
+   until a tool needs it; the maintainer is asked to confirm.
+
+### 10.7 What is not in it
+
+The grammar of the standard language, and its `grammar { … }` block;
+metadata fields; a session at a prompt; the analyses of a check's
+second phase, which wait for this engine to show which are of use.
 
