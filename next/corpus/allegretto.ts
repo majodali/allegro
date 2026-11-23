@@ -9,7 +9,9 @@
 // line; chunk Q16, part 3, for the check-output capability and the
 // `// reports:` and `// status:` lines; chunk Q5 (the first notation and
 // the bootstrap) with chunk Q13, for the `// claim at:` line; chunk Q13,
-// part 5, for `// phases: check, run` and the `// check claim at:` line): how a
+// part 5, for `// phases: check, run` and the `// check claim at:` line;
+// chunk Q13, part 6, for `// phases: test`, `// phases: check, test` and
+// the `// test:` line): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -62,8 +64,9 @@
 //                             program;
 //   // phases: check         the phases the launch applies, as the setting
 //                             `phases` of next/tools/configuration.ts names
-//                             them: `check` alone or `check, run`, the
-//                             values built beside `run`. At most one line.
+//                             them: `check` alone, `check, run`, `test`
+//                             or `check, test`, the values built beside
+//                             `run`. At most one line.
 //                             A program that states none runs as `run`
 //                             alone. Check is the kernel's check
 //                             (`Phase.check` of next/launch/launcher.ts):
@@ -76,7 +79,21 @@
 //                             `// end:`, `// reports:` and `// status:`
 //                             lines hold for the whole launch, and the
 //                             `// summary:` and `// claim at:` lines for
-//                             the last phase's result;
+//                             the last phase's result. Under `test` and
+//                             `check, test` the module is a test module:
+//                             it is loaded, with the `// input:` lines,
+//                             and each of its tests is called
+//                             (`Phase.test` of next/launch/launcher.ts).
+//                             The `// expect:` lines are then the lines of
+//                             the load and of every test, in order, and
+//                             the `// summary:` and `// claim at:` lines
+//                             hold for the load's result;
+//   // test: <name>: <end>   one test the test phase called, in order:
+//                             its name and how it ended, `passed` where it
+//                             completed, else the end as `// end:` writes
+//                             it. A program that states any must state
+//                             exactly the tests called. One with phases
+//                             that are no test phase fails;
 //   // check claim at: <line>:<column> <word>
 //                             as `// claim at:`, for the check's result,
 //                             where the phases are `check, run`. A program
@@ -143,7 +160,7 @@ import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.
 import { boundedReader } from "../launch/files.js";
 import { nodeFiles } from "../launch/node-files.js";
 import { readLiteral } from "../bootstrap/literal.js";
-import { CLAIM_WORDS, claimWord, launch, plainValue, STRENGTHS, type ClaimWord, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
+import { CLAIM_WORDS, claimWord, launch, plainValue, STRENGTHS, type ClaimWord, type Inputs, type LaunchEnd, type LaunchOutcome, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
 import { shapeOf } from "../tools/configuration.js";
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
@@ -406,6 +423,36 @@ export function readStatus(text: string): { status: number | undefined; problems
   return { status, problems };
 }
 
+/** One `// test:` line: a test's name and its end, `passed` or as `// end:` writes it. */
+export interface TestLine {
+  readonly name: string;
+  readonly end: string;
+}
+
+/**
+ * A program's `// test:` lines, in order, or undefined where it states
+ * none; and the problems of the lines that cannot be read. A line is
+ * `<name>: <end>`: the name a symbol's name, the end `passed` or one an
+ * `// end:` line may state.
+ */
+export function readTestLines(text: string): { tests: TestLine[] | undefined; problems: string[] } {
+  let tests: TestLine[] | undefined;
+  const problems: string[] = [];
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*test:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    const s = /^([A-Za-z_][A-Za-z0-9_]*):\s+(passed|(?:refuted|limit|waiting|fault|refused): .*\S)\s*$/.exec(m[1].trim());
+    if (s === null) problems.push(`the line ${JSON.stringify(line.trim())} is not of the form test: <name>: <end>, the end passed or one an \`// end:\` line states`);
+    else (tests ??= []).push({ name: s[1], end: s[2] });
+  }
+  return { tests, problems };
+}
+
+/** A test's end as a program's `// test:` line writes it: `passed` where it completed. */
+export function testEndText(end: LaunchEnd): string {
+  return end.kind === "completed" ? "passed" : endText(end);
+}
+
 /** A run's end as a program's `// end:` line writes it. */
 export function endText(end: LaunchEnd): string {
   if (end.kind === "refuted") return `refuted: ${end.reason}`;
@@ -490,6 +537,8 @@ export interface ProgramRun {
   readonly messages: ReportMessage[];
   /** The highest status the program handed to `report.status`; 0 where it handed none or was not launched. */
   readonly status: number;
+  /** Under a test phase, the load's outcome and each test's, as the launcher gives them; undefined otherwise, or where the load was not started. */
+  readonly tests?: NonNullable<LaunchOutcome["tests"]>;
   /** Each way the run differs from the pins; empty when the program passes. */
   readonly problems: string[];
 }
@@ -522,6 +571,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (checkClaimLines.claims.length > 0) problems.push("nothing was launched, and the program states a `// check claim at:` line");
     if (readPhases(text).phases !== undefined) problems.push("nothing was launched, and the program states a `// phases:` line");
     if (readReports(text).reports !== undefined || readStatus(text).status !== undefined) problems.push("nothing was launched, and the program states a `// reports:` or `// status:` line");
+    if (readTestLines(text).tests !== undefined) problems.push("nothing was launched, and the program states a `// test:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
     return { pins, findings: e.findings, lines: [], end: `refused: ${e.messages.some(states) ? stated : e.messages[0]}`, yields: undefined, requests: [], result: undefined, messages: [], status: 0, problems };
   }
@@ -530,13 +580,17 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   const phaseLine = readPhases(text);
   const reportLines = readReports(text);
   const statusLine = readStatus(text);
+  const testLines = readTestLines(text);
   // The phases, as the resolver makes them of the setting `phases`.
   const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later, CEILING);
   const shapeProblems = shape === undefined || shape.ok ? [] : [...shape.findings];
   // A `// check claim at:` line states a word of the check's result, which a launch has beside the run's only under check, run.
   const checkThenRun = JSON.stringify(phaseLine.phases) === JSON.stringify(["check", "run"]);
   const checkLineProblems = checkClaimLines.claims.length > 0 && !checkThenRun ? ["the program states a `// check claim at:` line, and its phases are not check, run"] : [];
-  const lineProblems = [...network.problems, ...summaryLine.problems, ...claimLines.problems, ...checkClaimLines.problems, ...checkLineProblems, ...phaseLine.problems, ...shapeProblems, ...reportLines.problems, ...statusLine.problems];
+  // A `// test:` line states a test the test phase called: the phases must have one.
+  const testing = phaseLine.phases?.includes("test") === true;
+  const testLineProblems = testLines.tests !== undefined && !testing ? ["the program states a `// test:` line, and its phases are not test or check, test"] : [];
+  const lineProblems = [...network.problems, ...summaryLine.problems, ...claimLines.problems, ...checkClaimLines.problems, ...checkLineProblems, ...phaseLine.problems, ...shapeProblems, ...reportLines.problems, ...statusLine.problems, ...testLines.problems, ...testLineProblems];
   if ("problems" in given || lineProblems.length > 0) {
     problems.push(...("problems" in given ? given.problems : []), ...lineProblems);
     return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, messages: [], status: 0, problems };
@@ -585,6 +639,12 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   if (reportLines.reports !== undefined && JSON.stringify(handed) !== JSON.stringify(reportLines.reports))
     problems.push(`reported ${JSON.stringify(handed)}, expected ${JSON.stringify(reportLines.reports)}`);
   if (statusLine.status !== undefined && reported.status() !== statusLine.status) problems.push(`the status is ${reported.status()}, expected ${statusLine.status}`);
+  // The tests called, where the program states any: each name and end, in order, and no other.
+  if (testLines.tests !== undefined) {
+    const called = (outcome.tests?.tests ?? []).map((t) => `${t.name}: ${testEndText(t.end)}`);
+    const stated = testLines.tests.map((t) => `${t.name}: ${t.end}`);
+    if (JSON.stringify(called) !== JSON.stringify(stated)) problems.push(`the tests called are ${JSON.stringify(called)}, expected ${JSON.stringify(stated)}`);
+  }
   let yields: (string | null)[] | undefined;
   if (pins.yields !== undefined) {
     const y = yieldedKeys(e.program, given, e.imports);
@@ -594,7 +654,10 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
       if (JSON.stringify(y.keys) !== JSON.stringify(pins.yields)) problems.push(`yields ${JSON.stringify(y.keys)}, expected ${JSON.stringify(pins.yields)}`);
     }
   }
-  return { pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, result: outcome.result, messages: [...reported.messages], status: reported.status(), problems };
+  return {
+    pins, findings: [], lines: outcome.lines, end, yields, requests: transport.asked, result: outcome.result, messages: [...reported.messages], status: reported.status(),
+    ...(outcome.tests === undefined ? {} : { tests: outcome.tests }), problems,
+  };
 }
 
 /**
