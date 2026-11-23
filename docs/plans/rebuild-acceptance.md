@@ -3521,3 +3521,21 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     programs, and all pass on both variants. The corpus gives 124
     records, which hold 5,360 nodes of the three kinds; 3,758 carry a
     place.
+- **2026-11-23 — A held claim is neither refuted nor logged.**
+  The maintainer, in session, on 2026-11-23: "I worked through the
+  check phase handling of claims with the kernel session. Held claims
+  will neither be refused or logged." This closes the question this
+  stream had put, who chooses whether a held claim is refuted or
+  logged, and this stream withdraws the setting it proposed. It reads
+  the ruling with the decision "Check reaches every claim": under check
+  a claim comes out decided, refuted, or waiting, and the result names
+  what it waits for. A claim that waits stays in the result as waiting,
+  and the summary counts it as undecided, as ratified. Nothing refutes
+  it and nothing writes a message about it. A configuration may require
+  more, such as that no claim is left waiting. The word for one claim
+  in a result has `waiting` among its values since the entry above
+  (`claimWord`), which fits this.
+  One question is open with the maintainer, asked the same day: whether
+  a run supplies `report`, as PR #299 built it, or leaves it out as not
+  needed, as the use case of "A phase leaves a capability out as not
+  yet given or as not needed" has it.
