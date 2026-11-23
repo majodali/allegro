@@ -467,7 +467,7 @@ test("a program that states a claim at a place passes only with that word; a pla
   const program = 'capability output\nclaim(1 == 1)\nassume(2 == 2)\noutput.write("after")\nclaim(1 == 2)\n// expect: after\n// end: refuted: a claim that is not true\n';
   const plain = await runProgram(program, "dir/claims.alg");
   assert.deepEqual(plain.problems, []);
-  assert.ok(plain.result?.claims.some((c) => c.place?.source === "dir/claims.alg" && c.place.start.line === 2), "each claim has its place in the program's own file");
+  assert.ok(plain.result?.claims.some((c) => c.at?.source === "dir/claims.alg" && c.at.start.line === 2), "each claim has its place in the program's own file");
   assert.deepEqual((await runProgram(program + "// claim at: 2:1 decided\n// claim at: 3:1 assumed\n// claim at: 5:1 refuted\n", "dir/claims.alg")).problems, []);
   assert.deepEqual((await runProgram(program + "// claim at: 2:1 assumed\n", "dir/claims.alg")).problems, ["the claim at 2:1 came out decided, expected assumed"]);
   assert.deepEqual((await runProgram(program + "// claim at: 2:2 decided\n", "dir/claims.alg")).problems, ["no claim of the result is written at 2:2 of dir/claims.alg"]);

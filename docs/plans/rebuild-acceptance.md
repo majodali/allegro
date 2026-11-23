@@ -3730,3 +3730,15 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     marked to do on each. 24 tests are new on each: 16 written here and
     one for each of the eight programs. `npm run harness:next` runs 118
     programs, and all pass on both variants.
+- **2026-11-23 — A result names a claim's key and its place as the kernel does.**
+  The entry "Places" above built the result with `at` for the claim's
+  key and `place` for where it was written, and said the kernel's record
+  names the two the other way round. This stream asked the maintainer
+  which names a result keeps, and recommended the kernel's. The
+  maintainer, in session, on 2026-11-23: "1-3: I agree with your
+  recommendations". So `ClaimResult` has `key`, the claim's key, and
+  `at`, the plain data of `ClaimRecord.at`. Nothing else changed: no
+  command prints either, the `// claim at:` line reads as before, and
+  no program changed. Three assertions read the fields under their new
+  names and hold what they held: the two that match a key against
+  `sha256:` and 64 hexadecimal digits, and the ones that read a place.

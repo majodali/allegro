@@ -918,7 +918,7 @@ test("a claim evaluated once is one entry with one decided evaluation, the modul
   assert.equal(claim.module, result.restsOn.modules[result.restsOn.modules.length - 1], "the module run wrote it");
   assert.ok(claim.restsOn.some((r) => r.kind === "kernel" && r.variant === variant));
   assert.ok(primitiveNames(claim).includes("int.mul"));
-  assert.match(claim.at ?? "", /^sha256:[0-9a-f]{64}$/, "a claim of a module is told apart by its key");
+  assert.match(claim.key ?? "", /^sha256:[0-9a-f]{64}$/, "a claim of a module is told apart by its key");
   assert.equal(result.summary, "decided");
 });
 
@@ -1078,12 +1078,12 @@ test("the result holds no kernel handle: it survives JSON unchanged", async () =
 
 // ── Where a claim was written (chunks Q5 and Q13, 2026-11-23) ─────────
 //
-// `place` is the plain data of the kernel's `ClaimRecord.at`, copied as
-// the kernel gives it. `at` stays the claim's key.
+// `at` is the plain data of the kernel's `ClaimRecord.at`, copied as
+// the kernel gives it. `key` is the claim's key. The names are the kernel's.
 
 /** A claim's place as `source:line:column-line:column`, for a short assertion. */
 const placeText = (c: ClaimResult): string | undefined =>
-  c.place === undefined ? undefined : `${c.place.source}:${c.place.start.line}:${c.place.start.column}-${c.place.end.line}:${c.place.end.column}`;
+  c.at === undefined ? undefined : `${c.at.source}:${c.at.start.line}:${c.at.start.column}-${c.at.end.line}:${c.at.end.column}`;
 
 test("a result gives each claim the place it was written, and keeps its key in at", async () => {
   const text = "capability output\nclaim(1 == 1)\nassume(2 == 2)\noutput.write(\n  \"done\")\nclaim(3 == 4)\n";
@@ -1092,20 +1092,20 @@ test("a result gives each claim the place it was written, and keeps its key in a
   for (const p of ["<text>:2:1-2:14", "<text>:4:1-5:10", "<text>:6:1-6:14"]) assert.ok(places.includes(p), `${p} among ${JSON.stringify(places)}`);
   const refuted = result.claims.find((c) => placeText(c) === "<text>:6:1-6:14");
   assert.ok(refuted !== undefined && refuted.refuted === 1, "the claim at line 6 is the refuted one");
-  assert.match(refuted.at ?? "", /^sha256:[0-9a-f]{64}$/, "at is the claim's key");
+  assert.match(refuted.key ?? "", /^sha256:[0-9a-f]{64}$/, "key is the claim's key");
   const first = result.claims.find((c) => placeText(c) === "<text>:2:1-2:14");
-  assert.deepEqual(first?.place, { source: "<text>", start: { index: text.indexOf("claim(1"), line: 2, column: 1 }, end: { index: text.indexOf("claim(1") + 13, line: 2, column: 14 } });
+  assert.deepEqual(first?.at, { source: "<text>", start: { index: text.indexOf("claim(1"), line: 2, column: 1 }, end: { index: text.indexOf("claim(1") + 13, line: 2, column: 14 } });
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
 });
 
 test("a claim in an imported module names that module's file", async () => {
   const records = drivenRecords("capability output\nimport lib\noutput.write(int.text(lib.double(21)))\n", { lib: "export double(n) => sync\n  claim(n >= 0)\n  n * 2\n" });
   const result = resultOf(await launchDriven(records));
-  const inLib = result.claims.find((c) => c.place?.source === path.join("dir", "lib.alg"));
+  const inLib = result.claims.find((c) => c.at?.source === path.join("dir", "lib.alg"));
   assert.ok(inLib !== undefined, JSON.stringify(result.claims.map(placeText)));
-  assert.deepEqual([inLib.place?.start.line, inLib.place?.start.column], [2, 3]);
+  assert.deepEqual([inLib.at?.start.line, inLib.at?.start.column], [2, 3]);
   assert.equal(inLib.module, result.restsOn.modules[0], "the module that wrote it is the imported one");
-  assert.ok(result.claims.some((c) => c.place?.source === "dir/main.alg"), "the write in the main text is a claim of its own file");
+  assert.ok(result.claims.some((c) => c.at?.source === "dir/main.alg"), "the write in the main text is a claim of its own file");
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
 });
 

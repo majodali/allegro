@@ -328,12 +328,12 @@ export function readClaimLines(text: string, label: "claim at" | "check claim at
  * The problems of a run's claims against the `// claim at:` lines: for
  * each line, every claim of the result written at that line and column of
  * `file` must have the word stated, and there must be one. The launcher's
- * `place` says where a claim was written; nothing here reads more.
+ * `at` says where a claim was written; nothing here reads more.
  */
 export function claimProblems(result: LaunchResult, file: string, stated: readonly ClaimLine[]): string[] {
   const problems: string[] = [];
   for (const s of stated) {
-    const there = result.claims.filter((c) => c.place !== undefined && c.place.source === file && c.place.start.line === s.line && c.place.start.column === s.column);
+    const there = result.claims.filter((c) => c.at !== undefined && c.at.source === file && c.at.start.line === s.line && c.at.start.column === s.column);
     if (there.length === 0) problems.push(`no claim of the result is written at ${s.line}:${s.column} of ${file}`);
     for (const c of there) {
       const word = claimWord(c);

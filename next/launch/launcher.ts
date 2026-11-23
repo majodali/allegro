@@ -151,13 +151,12 @@
 //        evaluation and every later call reported for that claim, its
 //        level of waiting is the last one reported, and its reasons and
 //        what it rests on are each listed once. Records of one claim are
-//        matched by the handle `ClaimRecord.claim`. An entry's `at` is the
+//        matched by the handle `ClaimRecord.claim`. An entry's `key` is the
 //        key the kernel gives the claim in its module's function, resting
 //        on nothing (`claimKey`), so a reader can tell claims apart. Its
-//        `place` is where the claim was written, copied from the kernel's
-//        record (`ClaimRecord.at`) where the kernel gives one. The
-//        kernel's record names the two the other way round: its `at` is
-//        the place;
+//        `at` is where the claim was written, copied from the kernel's
+//        record (`ClaimRecord.at`) where the kernel gives one. The two
+//        names are the kernel's;
 //      - `summary`, the weakest strength among the claims (`summaryOf`);
 //      - `restsOn`, what the run as a whole rests on: the kernel variant,
 //        the pure primitives the records name, the modules loaded, the
@@ -407,15 +406,15 @@ export interface ClaimResult {
    * in the same function have the same key. Absent where the kernel names
    * no module for the claim, or does not give a key for it.
    */
-  readonly at?: string;
+  readonly key?: string;
   /**
    * Where the claim was written: the text's name, and the index, line and
    * column of its start and of the point after its end. It is the plain
    * data of the kernel's `ClaimRecord.at`, copied from the first record of
-   * the claim that gives one, and absent where none does. `at` above is
-   * the claim's key; the kernel's record calls the place `at`.
+   * the claim that gives one, and absent where none does. The name is the
+   * kernel's.
    */
-  readonly place?: Place;
+  readonly at?: Place;
   /** The identity of the module whose code wrote the claim, where the kernel gives one. */
   readonly module?: string;
   /** Evaluations that came out decided, over the whole run. */
@@ -607,8 +606,8 @@ function placeData(at: Place): Place {
 
 /** One claim's records, as they are summed. */
 interface Tally {
-  at?: string;
-  place?: Place;
+  key?: string;
+  at?: Place;
   module?: string;
   decided: number;
   sampled: number;
@@ -630,23 +629,23 @@ interface Tally {
  */
 class ClaimTallies {
   private readonly byClaim = new Map<Value, Tally>();
-  constructor(private readonly atOf: (record: ClaimRecord) => string | undefined) {}
+  constructor(private readonly keyOf: (record: ClaimRecord) => string | undefined) {}
 
   add(records: readonly ClaimRecord[]): void {
     for (const r of records) {
       let t = this.byClaim.get(r.claim);
       if (t === undefined) {
-        const at = this.atOf(r);
+        const key = this.keyOf(r);
         t = {
-          ...(at === undefined ? {} : { at }),
-          ...(r.at === undefined ? {} : { place: placeData(r.at) }),
+          ...(key === undefined ? {} : { key }),
+          ...(r.at === undefined ? {} : { at: placeData(r.at) }),
           ...(r.module === undefined ? {} : { module: r.module }),
           decided: 0, sampled: 0, assumed: 0, undecided: 0, refuted: 0, waiting: 0, reasons: [], restsOn: [], seen: new Set(),
         };
         this.byClaim.set(r.claim, t);
       }
       // The place, from the first record that gives one: the launcher copies what the kernel says and keeps it.
-      if (t.place === undefined && r.at !== undefined) t.place = placeData(r.at);
+      if (t.at === undefined && r.at !== undefined) t.at = placeData(r.at);
       t.decided += r.decided;
       t.sampled += r.sampled;
       t.assumed += r.assumed;
