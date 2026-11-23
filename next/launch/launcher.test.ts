@@ -7,7 +7,7 @@
 // by `npm run test:next`. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of
 // the configuration's sources, part 2; of phases, part 3; of a check, and
-// check then run, part 5. The tests of the
+// check then run, part 5; of the test phase, part 6. The tests of the
 // two commands' exit code with check output are chunk Q16 (the
 // capabilities the launchers ship), part 3.
 
@@ -1691,4 +1691,158 @@ test("both commands under --phases check and --phases check,run: the lines, the 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+
+// ── The test phase (chunk Q13, part 6) ────────────────────────────────
+//
+// A test phase (`Phase.test`) loads a test module by an ordinary
+// evaluation of its function, and then calls each test, an entry of the
+// structure it yields whose value is a composed function of no
+// parameters, by its own evaluation. Every test here passes on both kernel
+// variants. It asserts what must be present: a name, an end, a word, a
+// count above zero. It holds no step count.
+
+const TEST_CEILING = ["output", "timer"];
+const TESTING: Phase = { name: "test", test: true, capabilities: TEST_CEILING };
+const TEST_TARGET = (): Target => ({ capabilities: [output, timer(virtualClock().clock)], primitives: shipped });
+/** Launches a text under a test phase, after a check where `checked` is true. */
+const tested = (text: string, more: { steps?: number; inputs?: Configuration["inputs"]; checked?: boolean } = {}) =>
+  launch({
+    createKernel,
+    program: emitted(text),
+    configuration: {
+      ceiling: TEST_CEILING,
+      ...(more.steps === undefined ? {} : { steps: more.steps }),
+      phases: [...(more.checked === true ? [CHECKING] : []), { ...TESTING, ...(more.inputs === undefined ? {} : { inputs: more.inputs }) }],
+    },
+    target: TEST_TARGET(),
+  });
+/** Each test's name and end, as words. */
+const testEnds = (outcome: LaunchOutcome): Array<[string, string]> => (outcome.tests?.tests ?? []).map((t) => [t.name, t.end.kind === "completed" ? "passed" : describe(t.end)]);
+
+test("the tests of a module that marks exports: its exported functions of no parameters, in the order the structure holds them", async () => {
+  const outcome = await tested('capability output\nexport b() => claim(2 == 2)\nexport takes(n) => claim(n == n)\nhidden() => claim(1 == 2)\nexport a() => claim(1 == 1)\nexport n = 3\nexport alias = () => claim(3 == 3)\n');
+  assert.deepEqual(testEnds(outcome), [["b", "passed"], ["a", "passed"], ["alias", "passed"]]);
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(outcome.tests?.load.end.kind, "completed");
+});
+
+test("the tests of a module that marks none: every function of no parameters it binds, in order; another kind of entry, or a function with parameters, is no test", async () => {
+  const outcome = await tested('capability output\nfirst() => claim(1 == 1)\nhelper(n) => n + 1\ncount_ = 4\nsecond() => claim(helper(1) == 2)\nmark <- output.write("loaded")\n');
+  assert.deepEqual(testEnds(outcome), [["first", "passed"], ["second", "passed"]]);
+  assert.deepEqual(outcome.tests?.load.lines, ["loaded"], "the load runs the module's top-level statements");
+  assert.deepEqual(outcome.lines, ["loaded"]);
+});
+
+test("a refuted test ends that test and no other: the next is still called, and the launch ends as the first test that did not complete", async () => {
+  const outcome = await tested('capability output\nexport one() => claim(1 == 1)\nexport two() => claim(1 == 2)\nexport three() => claim(3 == 3)\nexport four() => claim(4 == 5)\n');
+  assert.deepEqual(testEnds(outcome), [["one", "passed"], ["two", "refuted: a claim that is not true"], ["three", "passed"], ["four", "refuted: a claim that is not true"]]);
+  assert.equal(describe(outcome.end), "refuted: a claim that is not true");
+  const [, two] = outcome.tests?.tests ?? [];
+  assert.equal(wordAt(two.result, 3, 17), "refuted", "the refuted test's result names its claim's place");
+  assert.equal(outcome.end, two.end, "the launch's end is the first test's that did not complete");
+});
+
+test("each test's result is its own: a claim only one test reaches is in that test's result alone, and a claim both reach is counted in each", async () => {
+  const outcome = await tested("capability output\nshared(n) => claim(n == n)\nexport a() =>\n  claim(1 == 1)\n  shared(1)\nexport b() =>\n  claim(2 == 2)\n  shared(2)\n");
+  const [a, b] = outcome.tests?.tests ?? [];
+  assert.deepEqual([a.name, b.name], ["a", "b"]);
+  assert.equal(wordAt(a.result, 4, 3), "decided");
+  assert.equal(wordAt(a.result, 7, 3), undefined, "a's result holds nothing of b's claim");
+  assert.equal(wordAt(b.result, 7, 3), "decided");
+  assert.equal(wordAt(b.result, 4, 3), undefined, "b's result holds nothing of a's claim");
+  for (const t of [a, b]) {
+    const c = t.result.claims.find((x) => x.at?.start.line === 2);
+    assert.ok(c !== undefined && c.decided > 0 && c.refuted === 0 && c.waiting === 0, `${t.name}: ${JSON.stringify(t.result.claims.map(counts))}`);
+    assert.equal(t.result.summary, "decided", t.name);
+  }
+  assert.deepEqual(outcome.tests?.load.result.claims, [], "the load reached no claim");
+  assert.equal(outcome.result, outcome.tests?.load.result, "the launch's result is the load's");
+  assert.deepEqual(JSON.parse(JSON.stringify(outcome.tests)), outcome.tests, "the outcome of the tests is plain data");
+});
+
+test("each test has the step budget of the launch to itself: one that exceeds a small budget ends at its limit, and the next still runs", async () => {
+  const text = "capability output\nloop(n) => if n == 0 then 0 else loop(n - 1)\nexport big() => claim(loop(200) == 0)\nexport small() => claim(1 == 1)\nexport again() => claim(2 == 2)\n";
+  const outcome = await tested(text, { steps: 200 });
+  assert.deepEqual(testEnds(outcome), [["big", "limit: the step budget of 200 ran out"], ["small", "passed"], ["again", "passed"]]);
+  assert.equal(describe(outcome.end), "limit: the step budget of 200 ran out");
+  // With no budget, each completes.
+  assert.deepEqual(testEnds(await tested(text)), [["big", "passed"], ["small", "passed"], ["again", "passed"]]);
+});
+
+test("a load that does not complete calls no test: the phase ends as the load ended", async () => {
+  const outcome = await tested('capability output\nclaim(1 == 2)\nexport prints() => output.write("called")\n');
+  assert.equal(describe(outcome.end), "refuted: a claim that is not true");
+  assert.equal(outcome.tests?.load.end, outcome.end);
+  assert.deepEqual(outcome.tests?.tests, []);
+  assert.deepEqual(outcome.lines, [], "the test that prints was not called");
+  const waits = await tested("capability output\ninput n\nclaim(n == 1)\nexport t() => claim(1 == 1)\n");
+  assert.equal(describe(waits.end), "waiting: the program waits on the input(s) n, which the configuration does not supply");
+  assert.deepEqual(waits.tests?.tests, []);
+});
+
+test("a test's lines are its own, and a test that waits on the timer is advanced until it is over", async () => {
+  const outcome = await tested('capability output\ncapability timer\noutput.write("load")\nexport first() => output.write("one")\nexport waits() =>\n  t <- timer.wait(5000)\n  output.write("waited")\n  claim(t == 5000)\nexport last() => output.write("three")\n');
+  assert.deepEqual(testEnds(outcome), [["first", "passed"], ["waits", "passed"], ["last", "passed"]]);
+  assert.deepEqual(outcome.tests?.load.lines, ["load"]);
+  assert.deepEqual(outcome.tests?.tests.map((t) => t.lines), [["one"], ["waited"], ["three"]]);
+  assert.deepEqual(outcome.lines, ["load", "one", "waited", "three"]);
+  assert.equal(wordAt(outcome.tests!.tests[1].result, 8, 3), "decided");
+});
+
+test("the inputs of a test phase go to the load; a test that reads an input no phase supplies ends waiting on it, and the next still runs", async () => {
+  const text = "capability output\ninput n\nexport reads() => claim(n == 1)\nexport other() => claim(2 == 2)\n";
+  const supplied = await tested(text, { inputs: { n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 1), bitLength: 64 } } });
+  assert.deepEqual(testEnds(supplied), [["reads", "passed"], ["other", "passed"]]);
+  const missing = await tested(text);
+  assert.deepEqual(testEnds(missing), [["reads", "waiting: the program waits on the input(s) n, which the configuration does not supply"], ["other", "passed"]]);
+  assert.equal(missing.end.kind, "waiting");
+});
+
+test("a module with no test: the load completes, no test is called, and the launch completes", async () => {
+  const outcome = await tested("capability output\nexport n = 1\nexport f(x) => x\n");
+  assert.deepEqual(outcome.tests?.tests, []);
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(outcome.phases?.map((p) => p.name), ["test"]);
+});
+
+test("check then test: the check reaches a false claim in a function no test calls, and no test is called; where it finds nothing, the tests run in a fresh evaluation", async () => {
+  const refuted = await tested('capability output\nunused(n) => claim(1 == 2)\nexport t() => output.write("called")\n', { checked: true });
+  assert.equal(describe(refuted.end), "refuted: a claim that is not true");
+  assert.equal(refuted.tests, undefined, "the load was not started");
+  assert.deepEqual(refuted.lines, []);
+  const r = recording();
+  const passes = await launch({
+    createKernel: r.createKernel, program: emitted('capability output\nhelper(n) => claim(n == n)\nexport a() =>\n  helper(1)\n  output.write("a ran")\nexport b() => claim(2 == 2)\n'),
+    configuration: { ceiling: TEST_CEILING, phases: [CHECKING, TESTING] }, target: TEST_TARGET(),
+  });
+  assert.equal(r.created(), 1);
+  assert.deepEqual(r.calls.filter((c) => c === "check" || c === "evaluate").slice(0, 2), ["check", "evaluate"]);
+  assert.deepEqual(passes.phases?.map((p) => p.name), ["check", "test"]);
+  assert.deepEqual(testEnds(passes), [["a", "passed"], ["b", "passed"]]);
+  assert.deepEqual(passes.lines, ["a ran"]);
+  assert.equal(passes.end.kind, "completed");
+  // After a check a claim's level of waiting may carry into the tests (a known limit of the kernel): a count above zero, not the summary.
+  for (const t of passes.tests?.tests ?? []) assert.ok(t.result.claims.some((c) => c.decided > 0), `${t.name}: ${JSON.stringify(t.result.claims.map(counts))}`);
+});
+
+test("a test phase is the first phase or follows a check, and no phase follows it: each is refused before anything is evaluated", async () => {
+  const cases: Array<[Configuration, string]> = [
+    [{ ceiling: ["output"], phases: [RUN_AFTER, { ...TESTING, capabilities: [] }] }, "the phase test is a test phase after a phase that is no check: a test phase is the first phase, or follows a check"],
+    [{ ceiling: ["output"], phases: [{ ...TESTING, capabilities: ["output"] }, { name: "run", capabilities: [] }] }, "the phase run follows the test phase test: no phase follows the tests"],
+    [{ ceiling: ["output"], phases: [{ name: "both", check: true, test: true, capabilities: [] }] }, "the phase both is both a check and a test phase"],
+  ];
+  for (const [configuration, reason] of cases) {
+    const r = recording();
+    const outcome = await launch({ createKernel: r.createKernel, program: PRINTS_N, configuration, target: TERMINAL });
+    assert.equal(outcome.end.kind === "refused" && outcome.end.reason, reason);
+    assert.ok(!r.calls.includes("evaluate") && !r.calls.includes("check"));
+    assert.equal(outcome.tests, undefined);
+  }
+});
+
+test("a run has no tests", async () => {
+  const outcome = await launch({ createKernel, program: HELLO, configuration: ONLY_OUTPUT, target: TERMINAL });
+  assert.equal(outcome.tests, undefined);
 });
