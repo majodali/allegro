@@ -600,15 +600,15 @@ are:
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
 | E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
-| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto | their tests; a map of ten thousand entries is built and read in time that grows with its size |
-| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on | its tests; the corpus cases of the parser engine that need no more |
+| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | their tests; a map of ten thousand entries is built and read in time that grows with its size |
+| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | its tests; the corpus cases of the parser engine that need no more; **the speed target of §10.6 item 1, measured. Where it is missed the plan stops here for a ruling** |
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | its tests |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | its tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
 | E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
-| E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program; the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
+| E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
 | E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
@@ -1766,7 +1766,11 @@ its approval.
   told to a host under the name `refutation`.
 - **2026-11-24 — a plan for the parser engine and the module loader**
   (the review session): §10, and eleven chunks E1 to E11 added to §5
-  by amendment. No code.
+  by amendment. No code. Ruled the same day: the algorithm; the order
+  of the chunks; a place written as `at`; recovery after a failed
+  parse waits; this stream runs its tests on the acceptance stream's
+  reader and launcher; a speed target that E3 must meet or stop at;
+  terminals may be shipped primitives.
 
 ## 8. Sessions
 
@@ -2051,9 +2055,40 @@ adds no result. A rule entered again at the same position with a
 changed state is refused, as ruled.
 
 This is simpler to write test first than the algorithm the present
-book names, and it meets the five conditions. Its cost for a grammar
-without ambiguity is close to the size of the text times the number of
-rules. It is the first thing the maintainer is asked to rule on.
+book names, and it meets the five conditions. It is of the family of
+Earley's algorithm: a table of what was tried at each position, every
+parse reported, cubic at worst on an ambiguous grammar. It works from
+the top down over whole rules, where Earley's works from the bottom up
+over a rule with a mark in it, so it can carry a state and call a
+terminal that is a function. Its cost for a grammar without ambiguity
+is close to the size of the text times the number of rules tried at
+each position. Ruled on 2026-11-24.
+
+**Made to be fast from the start.** The algorithm is not what makes an
+engine on the kernel slow; the work at each character is. Four things
+are in the design from the first chunk that has an engine:
+
+- *What cannot match is not tried.* An analysis of the grammar gives
+  the characters each alternative can start with, and the engine tests
+  one character before it tries an alternative.
+- *A terminal does its work in one step.* A terminal is a function, and
+  a shipped primitive is one: such as a primitive that measures a run
+  of characters of a class. The maintainer: these "can be built on an
+  optimal tokenizer that is configured from grammar productions", with
+  no need to build that at once.
+- *Only what pays is remembered*: the results of a rule that recurses
+  on the left or is reached by more than one path.
+- *The engine is specialized over its grammar*, which removes the
+  looking up of rules.
+
+**A research goal this serves.** The maintainer, on 2026-11-24: "I
+have a research goal to demonstrate that highly sophisticated PE
+specialization can optimize an Earley parser into an optimally
+efficient parser with performance equal to GLL. That makes me more
+interested in starting with the algorithm you've described, and using
+it to find improvements for the Allegro PE algorithm." So where the
+engine is slow, each chunk reports what specialization left undone, as
+a finding for the kernel.
 
 **What it stands on.** Allegretto has structures, and no table that is
 changed in place. What the engine has tried is kept in a map written
@@ -2105,10 +2140,19 @@ grammar, with the kernel's `specialize`.
 
 ### 10.6 What can go wrong
 
-1. **Speed.** The toy engine read 64 terms in about 15 seconds on the
-   reference kernel. The machine is faster and its time grows with the
-   work, and a specialized engine does less. Whether that is enough for
-   texts of a few thousand lines is not known. E3 measures it early.
+1. **Speed.** On the machine the toy engine reads 64 terms in 2.2
+   seconds: about 33 milliseconds a term, for five rules and nothing
+   remembered. An engine that tried every alternative of Allegretto's
+   grammar at every character, with no more thought, would take
+   minutes for a module and about an hour for the corpus. The four
+   things of §10.4 are meant to prevent that, and how far they do is
+   not known. **The target, ruled on 2026-11-24: a module of 200 lines
+   of Allegretto is read in under 10 seconds, and the engine's own
+   tests take under a minute in all.** E3 measures it. Where it is
+   missed the plan stops for a ruling. The ways on from there are a
+   faster kernel for what specialization leaves, which the rebuild's
+   plan has as a later track, or a comparison over the corpus that
+   runs apart from the gate.
 2. **The map.** If a map written in Allegretto is too slow, the kernel
    needs one more shared form: a structure where an entry is put in
    place of another without copying the rest. That would be a chunk of
