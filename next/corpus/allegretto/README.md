@@ -131,7 +131,7 @@ of the run (`ProgramRun.result`).
 
 ## A claim by its place
 
-Each claim of the result gives the place it was written (`place` of
+Each claim of the result gives the place it was written (`at` of
 `ClaimResult` in `next/launch/launcher.ts`): the file, and the line and
 column of its start and of the point after its end. The emitter writes
 each part's place into the record, and the launcher copies the kernel's.
