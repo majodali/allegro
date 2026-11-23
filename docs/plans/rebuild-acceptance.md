@@ -3408,3 +3408,42 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   standard language's notation in the bootstrap), which waits on the
   forms the kernel stream rules, and chunk Q12 (the cases of each
   milestone, realised) for milestone 4.
+- **2026-11-23 — The asks of PR #299 confirmed, and what the kernel stream's merges of the day open.**
+  The maintainer, on PR #299 and in session, on 2026-11-23: "All asks
+  confirmed", and the pull request is set to merge. So the check-output
+  capability stands as built: the name `report` and its parts `message`
+  and `status`; what a message is; that neither part gives a program
+  anything or refuses a value; the highest status from 0 to 255; that a
+  message does not set the status; the exit code of both commands; the
+  terminal's line; and the reader's fix, a symbol literal that names any
+  word.
+  The kernel stream merged two pull requests the same day, after the
+  maintainer carried this stream's message to that session.
+  - PR #301: a part of a program can say where it was written, and a
+    claim's record gives that place. A saved program's node of kind
+    `expression`, `function` or `structure` may carry `at`. Three
+    decisions are recorded in `docs/plans/book-pass-inventory.md`, and
+    the decision map gives two of them to this stream: "Check reaches
+    every claim" and "A phase leaves a capability out as not yet given
+    or as not needed".
+  - PR #302: `Kernel.observe`, a hook that tells the host of a branch,
+    a call, a claim and an effect, each with its place.
+  What this changes for this stream:
+  1. **The emitter can write places**, and a result can then show a
+     claim by its file and line. That is the next chunk, and it waits on
+     nothing.
+  2. **Check is to reach every claim**: it specializes with nothing
+     bound, takes both branches of a conditional whose condition is
+     unknown, and specializes every function a module binds. A claim
+     comes out decided, refuted, or waiting with what it waits for
+     named. A check has three phases: the specialization, an analysis by
+     the host, and running tests. The kernel's part, an evaluation of a
+     module that takes both branches, is the kernel stream's and is not
+     built. The launcher's check follows it.
+  3. **A phase leaves a capability out in one of two ways**, not yet
+     given or not needed, and the choice is the phase's. Nothing of it
+     is built, and the maintainer holds that it needs more analysis on
+     real cases. One point to settle with it: the decision's use case
+     has a run leave out, as not needed, a capability that check gives a
+     module. The run of PR #299 supplies `report`, so that a script's
+     messages and status are handed over.
