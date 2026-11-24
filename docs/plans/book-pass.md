@@ -2071,6 +2071,54 @@ its approval.
     ends, are E8's.
   - *Deliberate faults*: 24 made in `change.alg`, `analysis.alg` and
     `grammar.alg`, 24 caught.
+- **2026-11-27 — rulings on PR #314, and what they asked built** (the
+  review session). The maintainer asked for each of E6's four asks in
+  more detail. Going through them showed three places where the
+  proposal was changed, and the maintainer confirmed the four as then
+  put: "I confirm all asks."
+  - *Ask 1, a notation and the state.* Ruled: the state gets named
+    parts, each a bits value, when `use` is built in E8; a terminal
+    then says which part it reads and writes, and a notation's
+    terminal is held to a part its own change declares. Until then a
+    notation brings no terminal that touches the state unless the text
+    names its rule. The discussion proposed to let through a terminal
+    that is already in the grammar in force. That is not built:
+    nothing can tell that a terminal a notation holds is the one in
+    force, since two functions are not compared, and a name can be
+    copied. What serves instead needs no code: a notation names the
+    grammar's rule, with `ref`, and a grammar gives a rule to each
+    terminal it means others to use.
+  - *Ask 2, operators.* Ruled: a notation may add an operator. Built:
+    a row keeps what it was made from. `change.level(rule, level)`
+    adds a level and `change.signs(rule, level, signs)` adds signs to
+    a level the row has. `levels.making` gives a level a function of
+    its own for what its signs give, so an added level says what it
+    means. A level or signs added count as an item appended: two
+    changes may each add a level to one row, in either order. A level
+    added to a rule that is no row, signs for a level the row has not,
+    and a level of a name the row has or another change adds, are
+    conflicts. The operations on a rule are made in a fixed order,
+    whatever order they are listed in: what replaces, then levels and
+    signs, then what wraps, then what is appended.
+  - *Ask 3, settling a conflict.* Ruled: the using text settles it.
+    Built: `changed_by(g, changes, own)`. Where `own`, the text's own
+    change, replaces or removes a rule, what the other changes do to
+    that rule is set aside, and `own` is then judged with the rest. Two
+    notations that both wrap `number` are used together by a text that
+    replaces `number` with the form it means.
+  - *Ask 4, when faults are looked for.* Ruled: split. Built:
+    `analysis.errors(g)` is what no grammar means, a rule or a
+    reserved set named that the grammar has not, the start among them.
+    `prepared` refuses the first, and so does `changed`: a change that
+    removes a rule another still names is refused with no text read,
+    which E6 did not catch. A rule nothing reaches stays in `faults`
+    alone, for a tool to show.
+  - *Measured.* The 252 lines of the speed test take 2,426,852 steps,
+    where they took 2,422,140: looking a grammar over for errors when
+    it is prepared costs under 5,000 steps.
+  - *Deliberate faults*: 19 made, 18 caught at first; the one missed
+    showed a missing test, of words reserved in a set that has a
+    replaced rule's name, which is added.
 
 ## 8. Sessions
 

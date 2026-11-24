@@ -170,6 +170,15 @@ claim(count(apart) == 2 && apart[0] == "nothing reaches the rule u" && apart[1] 
 unset = analysis.faults(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words)}))
 claim(count(unset) == 1 && unset[0] == "the rule s names the reserved set words, which the grammar has not")
 
+// What no grammar means is refused when a grammar is prepared; a rule
+// nothing reaches is not, and is no error.
+claim(count(analysis.errors(g)) == 0 && count(analysis.errors(sound)) == 0)
+claim(count(analysis.errors(grammar.grammar(`s, {s: ref(`a), a: lit("a"), u: ref(`v), v: ref(`w)}))) == 1)
+claim(attempt(analysis.prepared(grammar.grammar(`s, {s: seq([lit("a"), ref(`t)])})), 100000).reason == "the rule s names the rule t, which the grammar has not")
+claim(attempt(analysis.prepared(grammar.grammar(`t, {s: lit("a")})), 100000).reason == "the grammar begins with the rule t, which it has not")
+claim(attempt(analysis.prepared(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words)})), 100000).reason == "the rule s names the reserved set words, which the grammar has not")
+claim(analysis.prepared(grammar.grammar(`s, {s: ref(`a), a: lit("a"), u: ref(`a)})).start == `s)
+
 output.write("analysis: ok")
 // expect: analysis: ok
 // end: completed

@@ -14,6 +14,9 @@
 //   remove(name)           the rule is gone
 //   wrap(name, around)     around(form) in place of the rule's form
 //   reserve(set, words)    more words for a reserved set
+//   level(name, l)         one more level for the rule, which is a row
+//                          of signs (levels.alg)
+//   signs(name, l, signs)  more signs for the level l of that row
 //
 // `changed(g, changes)` gives the grammar with every change of a list
 // made. The grammar it is given is untouched: a grammar is a value.
@@ -27,10 +30,24 @@
 //   a rule replaced or wrapped twice
 //   a rule replaced or wrapped, and also appended to, removed or added
 //   a rule removed, and also appended to or added
+//   a level added to a rule that is no row, or signs to a level it has not
+//   two changes add a level of one name to a row, or one adds a level it has
 //
 // Appending to one rule twice is no conflict, since the order of the
 // items of an `alt` has no meaning; nor is appending to a rule another
-// change adds, nor removing a rule twice.
+// change adds, nor removing a rule twice, nor two levels added to one
+// row. A level or signs added count as appended in the lines above.
+//
+// A conflict is settled by whoever uses the changes together.
+// `changed_by(g, changes, own)` takes one change more, the using text's
+// own. Where `own` replaces or removes a rule, what the other changes do
+// to that rule is set aside: the text has said what the rule is. So two
+// notations that both wrap `number` are used together by a text that
+// replaces `number` with the form it means.
+//
+// The grammar that results is refused where it names a rule or a
+// reserved set it has not (analysis.alg, `errors`): a change that
+// removes a rule another still names is found here, with no text read.
 //
 // `used(g, change, named)` is for a notation a text brings in, which
 // can only add. `named` is {rules, words}: the names of rules and the
@@ -48,12 +65,23 @@
 //   a form it brings has a terminal that reads or changes the state,
 //   and its rule is not named
 //
+// The last is stricter than its decision, which lets a notation's
+// terminal write a part of the state its own grammar declares: a state
+// here has no parts yet. A notation that wants the blocks of the
+// grammar in force names that grammar's rule for them, with `ref`; it
+// does not hold the grammar's terminal, since nothing can tell that a
+// terminal a notation holds is the one in force. So a grammar gives a
+// rule to each terminal it means others to use. A level or signs added
+// to a row are judged as an item appended is.
+//
 // The decision's first rule, that neither longest match nor precedence
 // prefers between an item in force and an added one, needs no check:
 // the engine tries every item and keeps every result, so an added item
 // can only add a reading, and a text that then reads two ways refutes
 // the claim that it reads one way.
+import analysis
 import grammar
+import levels
 
 export add(name, form) => {op: `add, name: name, form: form}
 export append(name, form) => {op: `append, name: name, form: form}
@@ -61,6 +89,8 @@ export replace(name, form) => {op: `replace, name: name, form: form}
 export remove(name) => {op: `remove, name: name, form: []}
 export wrap(name, around) => {op: `wrap, name: name, form: around}
 export reserve(set, words) => {op: `reserve, name: set, form: words}
+export level(name, l) => {op: `level, name: name, form: l}
+export signs(name, l, signs) => {op: `signs, name: name, form: {level: l, signs: signs}}
 
 // ---- Small things on structures with no keys ----
 
@@ -81,11 +111,18 @@ names_of(ops, i, out) =>
 
 // ---- Conflicts ----
 
-export conflicts(g, changes) => conflicts_in(g, all(changes, 0, []))
-conflicts_in(g, ops) => each_name(g, ops, names_of(ops, 0, []), 0, [])
+export conflicts(g, changes) => conflicts_by(g, changes, [])
+export conflicts_by(g, changes, own) => conflicts_in(g, taken(all(changes, 0, []), own))
+// Every operation but those on a rule the using text's own change replaces or removes, and then its own.
+taken(ops, own) => joined(own, 0, left(ops, own, 0, []))
+left(ops, own, i, out) =>
+  if i == count(ops) then out
+  else if ops[i].op != `reserve && how_many(own, `replace, ops[i].name, 0, 0) + how_many(own, `remove, ops[i].name, 0, 0) > 0 then left(ops, own, i + 1, out)
+  else left(ops, own, i + 1, put(out, [], ops[i]))
+conflicts_in(g, ops) => rows_judged(g, ops, 0, each_name(g, ops, names_of(ops, 0, []), 0, []))
 each_name(g, ops, names, i, out) =>
   if i == count(names) then out
-  else each_name(g, ops, names, i + 1, judged(g, names[i], has_key(g.rules, names[i], 0), how_many(ops, `add, names[i], 0, 0), how_many(ops, `append, names[i], 0, 0), how_many(ops, `replace, names[i], 0, 0) + how_many(ops, `wrap, names[i], 0, 0), how_many(ops, `remove, names[i], 0, 0), out))
+  else each_name(g, ops, names, i + 1, judged(g, names[i], has_key(g.rules, names[i], 0), how_many(ops, `add, names[i], 0, 0), how_many(ops, `append, names[i], 0, 0) + how_many(ops, `level, names[i], 0, 0) + how_many(ops, `signs, names[i], 0, 0), how_many(ops, `replace, names[i], 0, 0) + how_many(ops, `wrap, names[i], 0, 0), how_many(ops, `remove, names[i], 0, 0), out))
 // `had`: the grammar has the rule. Then how many operations add it,
 // append to it, replace or wrap it, and remove it.
 judged(g, name, had, adds, appends, remakes, removes, out) =>
@@ -97,12 +134,29 @@ judged(g, name, had, adds, appends, remakes, removes, out) =>
   else if removes > 0 && (appends > 0 || adds > 0) then put(out, [], "the rule " ++ spelling(name) ++ " is removed, and changed besides")
   else out
 
+// A level or signs added: to a row, the level a new one, the signs to a level the row has.
+rows_judged(g, ops, i, out) =>
+  if i == count(ops) then out
+  else if ops[i].op != `level && ops[i].op != `signs then rows_judged(g, ops, i + 1, out)
+  else if !has_key(g.rules, ops[i].name, 0) then rows_judged(g, ops, i + 1, out)
+  else if !levels.is_row(get(g.rules, ops[i].name)) then rows_judged(g, ops, i + 1, put(out, [], "a level is added to the rule " ++ spelling(ops[i].name) ++ ", which is no row of signs"))
+  else rows_judged(g, ops, i + 1, row_judged(get(g.rules, ops[i].name), ops, ops[i], i, out))
+row_judged(row, ops, o, i, out) =>
+  if o.op == `signs then (if levels.has_level(row, o.form.level) then out else put(out, [], "signs are added to the level " ++ spelling(o.form.level) ++ ", which the rule " ++ spelling(o.name) ++ " has not"))
+  else if levels.has_level(row, o.form.name) then put(out, [], "a change adds the level " ++ spelling(o.form.name) ++ ", which the rule " ++ spelling(o.name) ++ " has")
+  else if earlier_level(ops, o, i, 0) then put(out, [], "two changes add the level " ++ spelling(o.form.name) ++ " to the rule " ++ spelling(o.name))
+  else out
+earlier_level(ops, o, i, k) => k < i && (ops[k].op == `level && ops[k].name == o.name && ops[k].form.name == o.form.name || earlier_level(ops, o, i, k + 1))
+
 // ---- Making the changes ----
 
-export changed(g, changes) => made(g, all(changes, 0, []), conflicts(g, changes))
+export changed(g, changes) => changed_by(g, changes, [])
+export changed_by(g, changes, own) => made(g, taken(all(changes, 0, []), own), conflicts_by(g, changes, own))
 made(g, ops, found) =>
   if count(found) > 0 then refuse(found[0])
-  else reserved(grammar.with_rules(g, added(ops, 0, kept(g.rules, ops, 0, []), ops)), ops, 0)
+  else whole(reserved(grammar.with_rules(g, added(ops, 0, kept(g.rules, ops, 0, []), ops)), ops, 0))
+whole(g) => unbroken(g, analysis.errors(g))
+unbroken(g, found) => if count(found) > 0 then refuse(found[0]) else g
 // The rules the grammar has, each as the operations leave it.
 kept(rules, ops, i, out) =>
   if i == count(rules) then out
@@ -113,14 +167,20 @@ added(ops, i, out, every) =>
   if i == count(ops) then out
   else if ops[i].op == `add then added(ops, i + 1, put(out, ops[i].name, remade(ops[i].form, ops[i].name, every, 0)), every)
   else added(ops, i + 1, out, every)
-// A form after every operation on its name.
-remade(form, name, ops, i) =>
+// A form after every operation on its name: first what replaces it;
+// then levels and signs, which need the row as it was written; then what
+// is wrapped around it; then the items appended. So the order the
+// operations are listed in has no say.
+remade(form, name, ops, i) => appended(wrapped_all(rowed(replaced(form, name, ops, 0), name, ops, 0), name, ops, 0), name, ops, 0)
+on(o, op, name) => o.op == op && o.name == name
+replaced(form, name, ops, i) => if i == count(ops) then form else replaced(if on(ops[i], `replace, name) then ops[i].form else form, name, ops, i + 1)
+rowed(form, name, ops, i) =>
   if i == count(ops) then form
-  else if ops[i].name != name || ops[i].op == `reserve then remade(form, name, ops, i + 1)
-  else if ops[i].op == `replace then remade(ops[i].form, name, ops, i + 1)
-  else if ops[i].op == `wrap then remade(wrapped(ops[i].form, form), name, ops, i + 1)
-  else if ops[i].op == `append then remade(with_item(form, ops[i].form), name, ops, i + 1)
-  else remade(form, name, ops, i + 1)
+  else if on(ops[i], `level, name) then rowed(levels.with_level(form, ops[i].form), name, ops, i + 1)
+  else if on(ops[i], `signs, name) then rowed(levels.with_signs(form, ops[i].form.level, ops[i].form.signs), name, ops, i + 1)
+  else rowed(form, name, ops, i + 1)
+wrapped_all(form, name, ops, i) => if i == count(ops) then form else wrapped_all(if on(ops[i], `wrap, name) then wrapped(ops[i].form, form) else form, name, ops, i + 1)
+appended(form, name, ops, i) => if i == count(ops) then form else appended(if on(ops[i], `append, name) then with_item(form, ops[i].form) else form, name, ops, i + 1)
 wrapped(around, form) => around(form)
 // One more item: in the `alt` itself where the form is one that gives
 // what its items give, and in an `alt` around the form otherwise.
@@ -145,7 +205,7 @@ weighed(g, change, named, tested_names, o, out) =>
   if o.op == `reserve then barred_words(g, o.name, o.form, named.words, 0, out)
   else if has(named.rules, o.name, 0) then out
   else if (o.op == `replace || o.op == `remove || o.op == `wrap) && how_many(change, `add, o.name, 0, 0) == 0 then put(out, [], "the notation changes the rule " ++ spelling(o.name) ++ ", which it did not add and the text does not name")
-  else if o.op == `append && has(tested_names, o.name, 0) then put(out, [], "the notation adds to the rule " ++ spelling(o.name) ++ ", which a rule in force tests cannot be read")
+  else if (o.op == `append || o.op == `level || o.op == `signs) && has(tested_names, o.name, 0) then put(out, [], "the notation adds to the rule " ++ spelling(o.name) ++ ", which a rule in force tests cannot be read")
   else if (o.op == `add || o.op == `append || o.op == `replace) && touches(o.form) then put(out, [], "the notation brings a terminal that reads or changes the state, in the rule " ++ spelling(o.name))
   else out
 // A word added to a set that a terminal in force keeps out.

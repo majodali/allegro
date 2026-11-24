@@ -32,12 +32,14 @@
 // is not the same for every state.
 //
 // Nothing here parses a text. Each part is worked out when it is first
-// read, and once.
+// read, and once. A grammar that names a rule or a reserved set it has
+// not is refused (`errors`, at the end).
 import class
 import grammar
 import set
 
-export prepared(g) => made(g, facts(g))
+export prepared(g) => sound(g, errors(g))
+sound(g, found) => if count(found) > 0 then refuse(found[0]) else made(g, facts(g))
 made(g, x) => {start: g.start, top: ready(grammar.ref(g.start), x), rules: readied(g.rules, x, 0, []), kept: kept_names(g.rules, x, 0, []), state: g.state, space: g.space}
 
 // What the analysis knows of a grammar: its rules, the number of each
@@ -188,11 +190,16 @@ of_size(words, n, i, out) =>
 
 // ---- What is wrong with a grammar, before any text is read ----
 
-// `faults(g)` gives what is wrong with a grammar, as texts, and none
-// where nothing is: a rule named that the grammar has not, the start
-// among them; a rule nothing reaches from the start; a reserved set a
-// terminal names that the grammar has not. Preparing a grammar does not
-// look for them: a grammar with a fault fails where the fault is met.
+// `errors(g)` gives what no grammar means, as texts, and none where
+// nothing is: a rule named that the grammar has not, the start among
+// them, and a reserved set a terminal names that the grammar has not.
+// Preparing a grammar refuses the first, and so does changing one, so
+// an error is found before any text is read.
+//
+// `faults(g)` gives those and one thing more, which may be meant: a rule
+// nothing reaches from the start. A grammar may hold a rule for a
+// notation to name later. Nothing refuses it; it is for a tool to show.
+export errors(g) => reached(g, has_rule(g.rules, g.start, 0), unknown(g, 0, [])).faults
 export faults(g) => unreached(g, 0, reached(g, has_rule(g.rules, g.start, 0), unknown(g, 0, [])))
 has_rule(rules, name, i) => i < count(rules) && (key(rules, i) == name || has_rule(rules, name, i + 1))
 listed(l, x, i) => i < count(l) && (l[i] == x || listed(l, x, i + 1))

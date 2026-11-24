@@ -58,6 +58,23 @@ claim(v.sign == "+" && v.left == "10" && v.right.sign == "*" && v.right.left == 
 claim(v.at.start.index == 0 && v.at.end.index == 12 && v.at.source == "row")
 claim(v.right.at.start.index == 5 && v.right.at.end.index == 12 && v.right.at.start.column == 6)
 
+// ---- A row is open ----
+plain_row = levels.row(number, [sum], grammar.lit, bracketed)
+claim(levels.is_row(plain_row) && !levels.is_row(number) && !levels.is_row(grammar.seq([number])))
+claim(levels.has_level(plain_row, `sum) && !levels.has_level(plain_row, `product))
+by(row, text) => engine.parse(engine.prepared(grammar.grammar(`e, {e: row})), text)
+// One more level, and it is a row still.
+two = levels.with_level(plain_row, product)
+claim(by(two, "1+2*3") == "(1+(2*3))" && levels.is_row(two) && levels.has_level(two, `product) && levels.has_level(two, `sum))
+claim(by(levels.with_level(two, power), "1+2*3^4^5") == "(1+(2*(3^(4^5))))")
+// More signs for a level, beside those it has.
+claim(by(levels.with_signs(two, `product, ["%"]), "8%3*2+1/1") == "(((8%3)*2)+(1/1))")
+// A level with a function of its own for what its signs give; the other levels keep the row's.
+named_power = levels.making(power, (sign, left, right, at) => "pow(" ++ left ++ "," ++ right ++ ")")
+claim(by(levels.with_level(two, named_power), "1+2^3*4") == "(1+(pow(2,3)*4))")
+// Placing a level leaves its function as it was, and adding signs too.
+claim(by(levels.with_signs(levels.with_level(two, levels.after(levels.making(levels.level(`power, ["^"], `right), (sign, left, right, at) => "p"), [`product])), `power, ["**"]), "2**3") == "p")
+
 output.write("levels: ok")
 // expect: levels: ok
 // end: completed

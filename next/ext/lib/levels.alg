@@ -22,25 +22,50 @@
 // the end of the right. A row of one operand gives what the operand
 // gives.
 //
+// A row is open: `with_level` gives the row with one more level, and
+// `with_signs` the row with more signs for a level it has. A level made
+// with `making` has a function of its own for what its signs give, so a
+// level that is added says what it means.
+//
 // Not here yet: a level whose signs do not group at all, so that
 // a < b < c is no reading.
 import grammar
 
-export level(name, signs, side) => {name: name, signs: signs, side: side, after: [], before: []}
-export after(l, names) => {name: l.name, signs: l.signs, side: l.side, after: names, before: l.before}
-export before(l, names) => {name: l.name, signs: l.signs, side: l.side, after: l.after, before: names}
+export level(name, signs, side) => {name: name, signs: signs, side: side, after: [], before: [], make: []}
+export after(l, names) => {name: l.name, signs: l.signs, side: l.side, after: names, before: l.before, make: l.make}
+export before(l, names) => {name: l.name, signs: l.signs, side: l.side, after: l.after, before: names, make: l.make}
+// The level with a function of its own for what its signs give, in place of the row's.
+export making(l, make) => {name: l.name, signs: l.signs, side: l.side, after: l.after, before: l.before, make: make}
 
-export row(operand, levels, sign, make) => made(placed(operand), levels, sign, make, tighter_table(levels, 0, []))
-made(operand, levels, sign, make, table) =>
-  grammar.giving(grammar.seq([operand, grammar.star(grammar.seq([grammar.alt(signs_of(levels, sign, 0, [])), operand]))]), (v, at) => grouped(levels, table, make, v[1], 0, {h: v[0], t: []}, []))
+export row(operand, levels, sign, make) => made(operand, placed(operand), levels, sign, make, tighter_table(levels, 0, []))
+// The form keeps what it was made from, as `row`, so that a level or a sign can be added to it.
+made(operand, shown, levels, sign, make, table) =>
+  kept(grammar.giving(grammar.seq([shown, grammar.star(grammar.seq([grammar.alt(signs_of(levels, sign, make, 0, [])), shown]))]), (v, at) => grouped(levels, table, make, v[1], 0, {h: v[0], t: []}, [])), {operand: operand, levels: levels, sign: sign, make: make})
+kept(form, parts) => {op: form.op, gives: form.gives, items: form.items, row: parts}
+
+// True where a form is a row.
+export is_row(form) => has_key(form, `row, 0)
+has_key(s, k, i) => i < count(s) && (kind(key(s, i)) == `symbol && key(s, i) == k || has_key(s, k, i + 1))
+// The row with one more level, and the row with more signs for a level it has.
+export with_level(form, l) => row(form.row.operand, put(form.row.levels, [], l), form.row.sign, form.row.make)
+export with_signs(form, name, signs) => row(form.row.operand, more_signs(form.row.levels, name, signs, 0, []), form.row.sign, form.row.make)
+more_signs(levels, name, signs, i, out) =>
+  if i == count(levels) then out
+  else if levels[i].name == name then more_signs(levels, name, signs, i + 1, put(out, [], {name: name, signs: joined_lists(signs, 0, levels[i].signs), side: levels[i].side, after: levels[i].after, before: levels[i].before, make: levels[i].make}))
+  else more_signs(levels, name, signs, i + 1, put(out, [], levels[i]))
+joined_lists(a, i, out) => if i == count(a) then out else joined_lists(a, i + 1, put(out, [], a[i]))
+// True where the row has a level of that name.
+export has_level(form, name) => named_level(form.row.levels, name, 0)
+named_level(levels, name, i) => i < count(levels) && (levels[i].name == name || named_level(levels, name, i + 1))
 // An operand with its place beside what it gives.
 placed(operand) => grammar.giving(operand, (v, at) => {v: v, at: at})
 
-// A terminal for each sign of each level, giving the sign and the number of its level.
-signs_of(levels, sign, i, out) => if i == count(levels) then out else signs_of(levels, sign, i + 1, signs_in(levels[i].signs, sign, i, 0, out))
-signs_in(signs, sign, level, k, out) =>
+// A terminal for each sign of each level, giving the sign, the number of
+// its level, and the function for what it gives: the level's own, or the row's.
+signs_of(levels, sign, make, i, out) => if i == count(levels) then out else signs_of(levels, sign, make, i + 1, signs_in(levels[i].signs, sign, i, if kind(levels[i].make) == `function then levels[i].make else make, 0, out))
+signs_in(signs, sign, level, make, k, out) =>
   if k == count(signs) then out
-  else signs_in(signs, sign, level, k + 1, put(out, [], grammar.giving(sign(signs[k]), (v, at) => {sign: v, level: level})))
+  else signs_in(signs, sign, level, make, k + 1, put(out, [], grammar.giving(sign(signs[k]), (v, at) => {sign: v, level: level, make: make})))
 
 // ---- Which level binds tighter ----
 
@@ -74,7 +99,7 @@ settled(levels, table, make, rest, i, operands, signs, s) =>
   else grouped(levels, table, make, rest, i + 1, {h: rest[i][1], t: operands}, {h: s, t: signs})
 closed(make, operands, signs) => if count(signs) == 0 then operands.h.v else closed(make, joined(make, operands, signs.h), signs.t)
 // The two last operands as one, under a sign.
-joined(make, operands, s) => {h: both(make, s.sign, operands.t.h, operands.h), t: operands.t.t}
+joined(make, operands, s) => {h: both(s.make, s.sign, operands.t.h, operands.h), t: operands.t.t}
 both(make, sign, left, right) => under(make, sign, left, right, {source: left.at.source, start: left.at.start, end: right.at.end})
 under(make, sign, left, right, at) => {v: make(sign, left.v, right.v, at), at: at}
 // True where the sign a, written before the sign b, takes its operands first.

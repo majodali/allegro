@@ -4,6 +4,7 @@ import change
 import class
 import engine
 import grammar
+import levels
 
 lit = grammar.lit
 ref = grammar.ref
@@ -127,6 +128,61 @@ claim(attempt(change.used(base, [change.remove(`plain)], nothing_named), 100000)
 // reads as it did, and the claim that it reads one way is what fails.
 doubled = change.used(base, [change.append(`value, grammar.run("digits", "09"))], nothing_named)
 claim(ways(base, "a+1") == 1 && ways(doubled, "a+1") == 2 && ways(doubled, "a") == 1)
+
+// ---- A change that leaves a rule named and gone is refused, with no text read ----
+claim(attempt(change.changed(base, [[change.remove(`number)]]), 100000).reason == "the rule value names the rule number, which the grammar has not")
+claim(attempt(change.changed(base, [[change.append(`value, ref(`nowhere))]]), 100000).reason == "the rule value names the rule nowhere, which the grammar has not")
+claim(attempt(change.changed(base, [[change.add(`worded, grammar.unless(name, `others))], [change.append(`value, ref(`worded))]]), 100000).reason == "the rule worded names the reserved set others, which the grammar has not")
+
+// ---- Levels and signs added to a row ----
+bracketed = (sign, left, right, at) => "(" ++ left ++ sign ++ right ++ ")"
+rowed = grammar.grammar(`e, {e: levels.row(grammar.run("a number", "09"), [levels.level(`sum, ["+"], `left)], lit, bracketed), other: lit("o")})
+read_row(g, text) => engine.parse(engine.prepared(g), text)
+// A level says where it binds and what its signs give.
+power = [change.level(`e, levels.after(levels.making(levels.level(`power, ["^"], `right), (sign, left, right, at) => "pow(" ++ left ++ "," ++ right ++ ")"), [`sum]))]
+claim(read_row(change.changed(rowed, [power]), "1+2^3^4") == "(1+pow(2,pow(3,4)))")
+claim(read_row(rowed, "1+2") == "(1+2)" && is_failure(engine.parses(engine.prepared(rowed), "1+2^3")))
+// More signs for a level the row has.
+minus = [change.signs(`e, `sum, ["-"])]
+claim(read_row(change.changed(rowed, [minus]), "1-2+3") == "((1-2)+3)")
+// Two changes, each with a level, in either order; and a level with signs for a level.
+times = [change.level(`e, levels.after(levels.before(levels.level(`product, ["*"], `left), [`power]), [`sum]))]
+claim(read_row(change.changed(rowed, [power, times, minus]), "1-2*3^4") == "(1-(2*pow(3,4)))")
+claim(read_row(change.changed(rowed, [minus, times, power]), "1-2*3^4") == "(1-(2*pow(3,4)))")
+claim(count(change.conflicts(rowed, [power, times, minus])) == 0)
+// What cannot be added.
+claim(change.conflicts(rowed, [[change.level(`other, levels.level(`x, ["x"], `left))]])[0] == "a level is added to the rule other, which is no row of signs")
+claim(change.conflicts(rowed, [[change.signs(`e, `product, ["*"])]])[0] == "signs are added to the level product, which the rule e has not")
+claim(change.conflicts(rowed, [[change.level(`e, levels.level(`sum, ["-"], `left))]])[0] == "a change adds the level sum, which the rule e has")
+claim(change.conflicts(rowed, [power, power])[0] == "two changes add the level power to the rule e")
+claim(change.conflicts(rowed, [power, [change.replace(`e, lit("e"))]])[0] == "the rule e is replaced or wrapped, and changed besides")
+claim(change.conflicts(rowed, [[change.level(`nothing, levels.level(`x, ["x"], `left))]])[0] == "a change is to the rule nothing, which the grammar has not")
+// A notation may add a level, as it may append an item; not to a row a guard in force tests cannot be read.
+claim(count(change.breaches(rowed, power, nothing_named)) == 0)
+guarded_row = grammar.with_rules(rowed, put(rowed.rules, `other, seq([grammar.guard(ref(`e), false), lit("o")])))
+claim(count(change.breaches(guarded_row, power, nothing_named)) == 1 && count(change.breaches(guarded_row, minus, nothing_named)) == 1)
+claim(count(change.breaches(guarded_row, power, {rules: [`e], words: []})) == 0)
+
+// ---- A conflict is settled by the text that uses the changes together ----
+// Two notations each wrap `number`: one for a unit after it, one for a sign of money before it.
+units = [change.wrap(`number, form => seq([form, grammar.opt(lit("kg"))]))]
+money = [change.wrap(`number, form => seq([grammar.opt(lit("$")), form]))]
+claim(count(change.conflicts(base, [units, money])) == 1)
+// The using text says what `number` is, and what the two do to it is set aside.
+own = [change.replace(`number, seq([grammar.opt(lit("$")), grammar.run("a number", "09"), grammar.opt(lit("kg"))]))]
+claim(count(change.conflicts_by(base, [units, money], own)) == 0)
+settled_by_text = change.changed_by(base, [units, money, brackets], own)
+claim(reads(settled_by_text, "$3kg+(a)") && reads(settled_by_text, "3") && !reads(base, "$3kg"))
+// What the notations do to other rules is still done, and what they reserve.
+claim(count(settled_by_text.rules.value.items) == 3)
+claim(!reads(change.changed_by(base, [units, [change.reserve(`words, ["of"])]], own), "of"))
+// A reserved set is no rule: words reserved in a set that has a replaced rule's name are still reserved.
+claim(count(change.changed_by(base, [[change.reserve(`number, ["x"])]], own).reserved.number) == 1)
+// A rule the text removes: what a notation does to it is set aside too.
+claim(count(change.changed_by(base, [[change.wrap(`plain, f => f)], [change.append(`plain, lit("p"))]], [change.remove(`plain)]).rules) == 4)
+// The text's own change is judged as any other.
+claim(change.conflicts_by(base, [units], [change.replace(`number, lit("n")), change.replace(`number, lit("m"))])[0] == "the rule number is replaced or wrapped twice")
+claim(change.conflicts_by(base, [], [change.append(`nothing, lit("n"))])[0] == "a change is to the rule nothing, which the grammar has not")
 
 output.write("change: ok")
 // expect: change: ok

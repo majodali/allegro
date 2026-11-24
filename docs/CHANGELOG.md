@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-27 — Rows open to new signs, conflicts settled by the text,
+  and errors refused before a text is read.** A row of signs keeps what
+  it was made from: `change.level` adds a level to it and
+  `change.signs` adds signs to a level it has, and a level may say what
+  its own signs give. `change.changed_by` takes the using text's own
+  change: where it replaces or removes a rule, what other changes do to
+  that rule is set aside. Preparing a grammar, and changing one, refuse
+  a rule or a reserved set named that the grammar has not; a rule
+  nothing reaches is still only reported.
 - **2026-11-27 — Grammars changed and combined.** `next/ext/lib/change.alg`,
   new: a change is operations on rules by name: add, append, replace,
   remove, wrap, and reserve for a set of words. `changed` makes a list
