@@ -122,6 +122,40 @@ npm run check-deployed              # audit live site vs origin/main (needs site
 `basics.alg` output and every `tests/*.alg` demo are suite-pinned via
 `// expect:` comments (`docs/book/process.md` §5) — the suite is the oracle.
 
+### The new tree (`next/`)
+
+The rebuild's code (`docs/plans/rebuild.md`) has its own commands. None
+of them runs the present tree's suite. CI runs the four marked below as
+one step, beside the present tree's gate.
+
+```bash
+npm run typecheck:next              # typecheck of next/ (five projects) — IN CI
+npm run test:next                   # every next/**/*.test.ts, on the default kernel
+                                    #   variant (~15s) — IN CI
+ALLEGRO_KERNEL=reference npm run test:next  # the same on the reference kernel; a
+                                    #   change under next/ passes on both variants
+npm run lint:decisions              # next/decisions.json against the inventory's
+                                    #   decisions — IN CI
+npm run lint:corpus                 # next/corpus/cases.json is consistent — IN CI
+npm run harness:next                # the Allegretto programs of next/corpus/allegretto/
+                                    #   on the new kernel, by milestone
+                                    #   (--milestone N, --file <program>)
+npm run harness:present             # the calibration: every pinned program of
+                                    #   next/corpus/cases.json on the present tree
+npm run emit -- f.alg [-o out.json] # the bootstrap: a text in the first notation
+                                    #   to a saved program
+npm run launch -- program.json      # run a saved program (--import, --steps,
+                                    #   --ceiling, --phases; the usage line lists them)
+npm run allegretto -- f.alg         # emit and run a text and what it imports
+                                    #   (--input, --later and the flags of launch)
+npm run bench:next                  # the speed tests on the new kernel and against
+                                    #   the present tree; gates nothing (minutes)
+```
+
+The first notation is `next/ext/allegretto/forms.md`. The lines a
+program of the corpus states (`// expect:`, `// end:` and the rest) are
+in `next/corpus/allegretto/README.md`.
+
 ## What Allegro is
 
 A programmable language platform: **Allegretto** (minimal base — 7
