@@ -1,6 +1,7 @@
 // Tests of a configuration from its sources (B-196 (the rebuild's
 // acceptance side), chunk Q13 (check and run as configurations, and what a
-// result holds), part 2, and part 3 for the setting `phases`; chunk Q16
+// result holds), part 2, part 3 for the setting `phases`, and part 5 for
+// check as a check phase and for check then run; chunk Q16
 // (the capabilities the launchers ship), part 3, for the check
 // capabilities): `resolve`,
 // `shapeOf`, `readProjectFile` and `readEnvironment` of
@@ -44,8 +45,8 @@ function valueOf(setting: Setting, source: SourceName): Settings[Setting] {
     case "kernel":
       return `variant-${i}`;
     case "phases":
-      // Two values are built, so the four sources share them.
-      return [["check"], ["run"], ["check"], ["run"]][i];
+      // Three values are built, so the four sources share them.
+      return [["check"], ["run"], ["check", "run"], ["run"]][i];
   }
 }
 const one = (setting: Setting, source: SourceName): Sources => ({ [source]: { [setting]: valueOf(setting, source) } });
@@ -262,8 +263,8 @@ test("a run's result names the source of each value of its configuration: values
 
 const CEILING3: Settings = { ceiling: ["output", "timer"] };
 
-test("the setting phases: run alone is today's shape, and check alone is one phase that supplies nothing", () => {
-  assert.deepEqual(PHASE_VALUES.map((v) => [...v]), [["run"], ["check"]]);
+test("the setting phases: run alone is today's shape, and check alone is one check phase that names nothing the ceiling does not grant", () => {
+  assert.deepEqual(PHASE_VALUES.map((v) => [...v]), [["run"], ["check"], ["check", "run"]]);
   const inputs = { n: text("n") };
   const run = resolved(resolve({ "command line": { phases: ["run"], inputs, later: [{ m: text("m") }] }, launcher: CEILING3 }));
   assert.equal(run.configuration.phases, undefined);
@@ -272,25 +273,41 @@ test("the setting phases: run alone is today's shape, and check alone is one pha
   const none = resolved(resolve({ "command line": { inputs }, launcher: CEILING3 }));
   assert.deepEqual(none.configuration, { ceiling: ["output", "timer"], inputs }, "with no source setting phases, run alone");
   const check = resolved(resolve({ file: { phases: ["check"] }, launcher: CEILING3 }));
-  assert.deepEqual(check.configuration.phases, [{ name: "check", capabilities: [] }]);
+  assert.deepEqual(check.configuration.phases, [{ name: "check", check: true, capabilities: [] }]);
   assert.equal(sourceOf(check, "phases"), "file");
 });
 
-test("check then run is a finding of its own: a later phase cannot supply a capability", () => {
+test("check then run, from each source: the check phase, then run with every capability of the ceiling and the inputs, then each entry of later", () => {
+  const inputs = { n: text("n") };
+  const later: Inputs[] = [{ m: text("m") }, { k: text("k") }];
   for (const source of SOURCES) {
-    const r = resolve({ launcher: CEILING3, [source]: { ...(source === "launcher" ? CEILING3 : {}), phases: ["check", "run"] } });
-    assert.deepEqual(r.ok ? [] : r.findings, ['the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'], source);
+    const sources: Sources = { launcher: CEILING3, file: { inputs, later } };
+    const r = resolved(resolve({ ...sources, [source]: { ...sources[source], phases: ["check", "run"] } }));
+    assert.deepEqual(r.configuration.phases, [
+      { name: "check", check: true, capabilities: [] },
+      { name: "run", capabilities: ["output", "timer"], inputs },
+      { name: "later", capabilities: [], inputs: later[0] },
+      { name: "later", capabilities: [], inputs: later[1] },
+    ], source);
+    assert.equal(r.configuration.inputs, undefined, "with phases the inputs are the run's");
+    assert.equal(r.configuration.later, undefined);
+    assert.equal(sourceOf(r, "phases"), source);
+    assert.equal(sourceOf(r, "inputs.n"), "file", "the list of sources names the inputs as before");
+    assert.equal(sourceOf(r, "later"), "file");
   }
+  const bare = resolved(resolve({ "command line": { phases: ["check", "run"] }, launcher: { ceiling: ["output", "report"] } }));
+  assert.deepEqual(bare.configuration.phases, [{ name: "check", check: true, capabilities: ["report"] }, { name: "run", capabilities: ["output", "report"] }]);
 });
 
-test("a value of phases that is not built is a finding that says what is built, and later with check alone is a finding", () => {
-  for (const value of [["run", "check"], ["export"], [], ["check", "check"]]) {
+test("a value of phases that is not built is a finding that says what is built; inputs and later with check alone are no finding, and the check does not use them", () => {
+  for (const value of [["run", "check"], ["export"], [], ["check", "check"], ["check", "run", "run"]]) {
     const r = resolve({ "command line": { phases: value }, launcher: CEILING3 });
-    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check"`], JSON.stringify(value));
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check", "check, run"`], JSON.stringify(value));
   }
-  const later = resolve({ "command line": { phases: ["check"] }, file: { later: [{ m: text("m") }] }, launcher: CEILING3 });
-  assert.deepEqual(later.ok ? [] : later.findings, ['the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input']);
-  assert.deepEqual(shapeOf(["check"], undefined, []), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } }, "an empty list of later phases is none");
+  const given = resolved(resolve({ "command line": { phases: ["check"] }, file: { inputs: { n: text("n") }, later: [{ m: text("m") }] }, launcher: CEILING3 }));
+  assert.deepEqual(given.configuration, { ceiling: ["output", "timer"], phases: [{ name: "check", check: true, capabilities: [] }] });
+  assert.deepEqual(given.sources.map((s) => s.setting), ["inputs.n", "later", "ceiling", "phases"], "the list of sources names them as before");
+  assert.deepEqual(shapeOf(["check"], undefined, []), { ok: true, shape: { phases: [{ name: "check", check: true, capabilities: [] }] } }, "an empty list of later phases is none");
 });
 
 test("the project's file reads phases as a list of names", () => {
@@ -312,12 +329,12 @@ test("check supplies the check capabilities the ceiling grants, report alone tod
   assert.deepEqual([...CHECK_CAPABILITIES], ["report"]);
   const terminal: Settings = { ceiling: ["output", "timer", "http", "report"] };
   const check = resolved(resolve({ "command line": { phases: ["check"] }, launcher: terminal }));
-  assert.deepEqual(check.configuration.phases, [{ name: "check", capabilities: ["report"] }]);
+  assert.deepEqual(check.configuration.phases, [{ name: "check", check: true, capabilities: ["report"] }]);
   const narrowed = resolved(resolve({ "command line": { phases: ["check"], ceiling: ["output", "timer"] }, launcher: terminal }));
-  assert.deepEqual(narrowed.configuration.phases, [{ name: "check", capabilities: [] }], "a ceiling narrowed to leave report out: check supplies nothing");
+  assert.deepEqual(narrowed.configuration.phases, [{ name: "check", check: true, capabilities: [] }], "a ceiling narrowed to leave report out: check names nothing");
   const run = resolved(resolve({ "command line": { phases: ["run"] }, launcher: terminal }));
   assert.equal(run.configuration.phases, undefined, "run supplies every capability of the ceiling, report among them");
   assert.deepEqual(run.configuration.ceiling, ["output", "timer", "http", "report"]);
-  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["report", "output"]), { ok: true, shape: { phases: [{ name: "check", capabilities: ["report"] }] } });
-  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["output", "http"]), { ok: true, shape: { phases: [{ name: "check", capabilities: [] }] } });
+  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["report", "output"]), { ok: true, shape: { phases: [{ name: "check", check: true, capabilities: ["report"] }] } });
+  assert.deepEqual(shapeOf(["check"], undefined, undefined, ["output", "http"]), { ok: true, shape: { phases: [{ name: "check", check: true, capabilities: [] }] } });
 });

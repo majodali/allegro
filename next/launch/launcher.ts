@@ -6,7 +6,8 @@
 // result holds), part 1, adds the result: what the run found; part 2 adds
 // to it the source of each value of the configuration; part 3 makes a
 // launch apply a sequence of phases, each supplying capabilities and
-// inputs.
+// inputs; part 5 makes the first phase a check where it is one, evaluated
+// by the kernel's `check`, and a run after it.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -23,7 +24,16 @@
 //    phases are applied in order on one kernel, and the next phase takes
 //    up what the one before left waiting on an input. A later phase
 //    supplies no capability, and what a phase must leave decided is not
-//    built
+//    built. After a check the phases are rerun, by the note of 2026-11-18:
+//    the run is a fresh evaluation of the module function in the same
+//    kernel
+//   "Check reaches every claim": a check hands the module function,
+//    applied to its capabilities and inputs, to the kernel's `check`, and
+//    sums the claims it reports, decided, refuted or waiting. A check
+//    leaves every input unknown (the maintainer, 2026-11-21)
+//   "A phase leaves a capability out as not yet given or as not needed":
+//    a check hands the capabilities it names as not needed and every
+//    other declared capability as not yet given
 //   "A result names everything it rests on", as far as this part goes,
 //   "A tool reads a phase's result and adds no analysis of its own" and
 //   "A module's summary is the weakest strength among its claims": the
@@ -54,8 +64,10 @@
 //   4  creates the capabilities of the ceiling, each part an effectful
 //      primitive function, and hands the module function exactly those
 //      its `declares` names with role `capability`, in the function's
-//      order. A declared capability the first phase does not supply is
-//      handed as a fresh cell in its place. The ceiling's capabilities go to the main module alone: an
+//      order. A declared capability the first phase of the run does not
+//      supply is handed as a fresh cell in its place. Nothing shipped uses
+//      that path now: run supplies every capability of the ceiling, and a
+//      check is evaluated as step 5a says. The ceiling's capabilities go to the main module alone: an
 //      imported module gets a capability only as the module that imports
 //      it hands it on. A capability is handed as a structure of its parts, keyed by
 //      the symbols of the part names, so a program reads a part as an
@@ -68,12 +80,35 @@
 //      anything is evaluated;
 //   5  builds the application of the module function to those arguments,
 //      its capabilities and inputs only, never an argument for an import,
-//      and has the kernel evaluate it, under the step budget. The budget
+//      and has the kernel evaluate it, under the step budget. After a
+//      check this is a fresh evaluation of the module function, in the
+//      same kernel, with what the first phase after the check supplies,
+//      under the budget a run alone has. The budget
 //      is given once, to that evaluation, and the kernel counts against
 //      it the work every later call does for the evaluation. Where the
 //      configuration sets none there is none: the launcher gives no
 //      default, and a run goes on as a host program does (the
 //      maintainer's ruling of 2026-11-20);
+//   5a where the first phase is a check (`Phase.check`), before step 5:
+//      builds the same application, with every input a fresh cell, each
+//      capability the check names not needed, and every other declared
+//      capability a fresh cell, not yet given. A capability not needed is
+//      a structure with an entry for each part, each a composed function
+//      of as many parameters as the part's primitive takes, whose body is
+//      the empty structure: a call on it performs nothing and answers the
+//      empty structure, and no part of the capability's implementation is
+//      called. It hands the application to the kernel's `check` once,
+//      under the configuration's budget, or the largest the kernel takes
+//      (`Number.MAX_SAFE_INTEGER`) where none is set (the maintainer,
+//      2026-11-21). Nothing is filled and nothing is advanced. The check
+//      ends the launch `refuted` where the whole is refuted, a claim has a
+//      refuted evaluation, or the kernel lists a refutation; `limit` where
+//      its budget ran out and nothing was refuted. Otherwise the check is
+//      over, and the launch goes on to step 5 with the phases after it, or
+//      ends `completed` where there are none. Only the first phase may be
+//      a check, and a check names no input. The rule that a phase after
+//      the first supplies no capability counts from the first phase that
+//      is no check;
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`. When it waits and no capability's
 //      answer is due, it applies the next phase: it fills the cells of the
@@ -128,8 +163,15 @@
 //        capabilities the module run declares, the builder whose
 //        stored outcomes the configuration accepts, and the source of
 //        each value of the configuration, as the caller gives it
-//        (`Launch.sources`).
-//      The launcher adds no analysis: it sums what the kernel reports and
+//        (`Launch.sources`);
+//      - `refutations`, the plain data of the kernel's
+//        `Result.refutations`, each with its place: only a check gives
+//        any.
+//      A check's result is its own. The claims of a run after it are
+//      summed apart, and the outcome's `result` is the last phase's.
+//      Where the check ends the launch nothing was performed, so no line
+//      was printed and no request made. The launcher adds no analysis: it
+//      hands the kernel one expression, sums what the kernel reports and
 //      names what it was given. It decides no claim and drops none. Under
 //      a phase that supplies no capability it does the same: what is
 //      decided there is what the kernel decided.
@@ -224,8 +266,10 @@ export interface Configuration {
   /**
    * The phases, in order, each by what it supplies. The first is applied
    * at the start, and each later one when the kernel waits and no
-   * capability's answer is due. Only the first may supply capabilities:
-   * the kernel fills a cell with plain data only. None: one phase that
+   * capability's answer is due. The first may be a check (`Phase.check`),
+   * and then the run begins with the second. Only the first phase that is
+   * no check may supply capabilities: the kernel fills a cell with plain
+   * data only. None: one phase that
    * supplies every capability of the ceiling and `inputs`, and then one
    * for each entry of `later`, each named `later`. A configuration that
    * gives `phases` gives neither `inputs` nor `later`.
@@ -244,12 +288,21 @@ export interface Phase {
   /** A word for reports, such as `check` or `run`. */
   readonly name: string;
   /**
+   * True for a check: the module function is evaluated by the kernel's
+   * `check`, once, with nothing filled and nothing advanced. Only the
+   * first phase may be a check, and a check names no input: it leaves
+   * every input unknown. A capability it names is handed as not needed,
+   * and every other declared capability as not yet given.
+   */
+  readonly check?: true;
+  /**
    * The capabilities this phase supplies, each of the ceiling. Only the
-   * first phase may name any: a later one cannot put a capability into a
-   * cell, since the kernel fills a cell with plain data only.
+   * first phase that is no check may name any: a later one cannot put a
+   * capability into a cell, since the kernel fills a cell with plain data
+   * only. A check names the capabilities it hands as not needed.
    */
   readonly capabilities: readonly string[];
-  /** The inputs this phase supplies, as `Configuration.inputs` holds them. */
+  /** The inputs this phase supplies, as `Configuration.inputs` holds them. A check supplies none. */
   readonly inputs?: Inputs;
 }
 
@@ -429,6 +482,21 @@ export interface LaunchResult {
   /** The weakest strength among the claims (`summaryOf`). */
   readonly summary: Strength;
   readonly restsOn: RunRestsOn;
+  /**
+   * The refutations the kernel found in parts that do not refute the
+   * whole, in the order it gives them: the plain data of the kernel's
+   * `Result.refutations`, each with the place of the part where it has
+   * one. A refuted claim is not repeated here: it is among `claims`. Only
+   * a check gives any; it is empty for a phase that is no check.
+   */
+  readonly refutations: readonly RefutationData[];
+}
+
+/** One refutation found in a part that does not refute the whole, as plain data. */
+export interface RefutationData {
+  readonly reason: string;
+  /** Where the part was written, copied from the kernel's `at` where it gives one. */
+  readonly at?: Place;
 }
 
 /** One phase applied, and the result as it stood when the phase was over. */
@@ -440,7 +508,9 @@ export interface PhaseOutcome {
   /**
    * The result as it stood when the phase was over: just before the next
    * phase was applied, or at the end. The last phase's is the outcome's
-   * `result`.
+   * `result`. A check's result is its own: the claims of the run after it
+   * are summed apart and do not hold the check's counts. The phases of
+   * the run, which share one evaluation, sum their claims together.
    */
   readonly result: LaunchResult;
 }
@@ -679,18 +749,28 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     { name: "run", capabilities: configuration.ceiling, ...(configuration.inputs === undefined ? {} : { inputs: configuration.inputs }) },
     ...(configuration.later ?? []).map((inputs) => ({ name: "later", capabilities: [], inputs })),
   ];
-  // Each capability a phase supplies is of the ceiling, and only the first phase supplies any.
+  // A check is the first phase or none, and supplies no input.
+  phases.forEach((phase, i) => {
+    if (phase.check !== true) return;
+    if (i > 0) problems.push(`the phase ${phase.name} is a check after the first phase: only the first phase may be a check`);
+    const named = namesOf(phase.inputs);
+    if (named.length > 0) problems.push(`the phase ${phase.name} is a check and supplies the input(s) ${named.join(", ")}: a check supplies no input, and leaves every input unknown`);
+  });
+  // The check, where the first phase is one, and the phases of the run after it.
+  const checkPhase = phases[0]?.check === true ? phases[0] : undefined;
+  const runPhases = checkPhase === undefined ? phases : phases.slice(1);
+  // Each capability a phase supplies is of the ceiling, and only the first phase that is no check supplies any.
   phases.forEach((phase, i) => {
     for (const name of phase.capabilities) {
       if (!configuration.ceiling.includes(name)) problems.push(`the phase ${phase.name} supplies the capability ${name}, which the ceiling does not grant`);
-      if (i > 0)
+      if (i > (checkPhase === undefined ? 0 : 1))
         problems.push(`the phase ${phase.name} supplies the capability ${name} after the first phase: the kernel fills a cell with plain data only, so a capability is supplied by the first phase or by none`);
     }
   });
-  // The inputs, by declared name: each declared, and each supplied once.
+  // The inputs, by declared name: each declared, and each supplied once. Counted in the phases of the run.
   const declaredInputs = new Set(program.declares.filter((d) => d.role === "input").map((d) => d.name));
   const suppliedIn = new Map<string, number>();
-  phases.map((p) => p.inputs).forEach((inputs, phase) => {
+  runPhases.map((p) => p.inputs).forEach((inputs, phase) => {
     for (const name of namesOf(inputs)) {
       const where = phase === 0 ? "at the start" : `in later phase ${phase}`;
       if (!declaredInputs.has(name)) problems.push(`the configuration supplies the input ${name} ${where}, which the module does not declare`);
@@ -703,7 +783,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
 
   // Step 7's result: the claims the kernel reports, summed, and what the run rests on.
   const modules = new Map<string, { readonly fn: Value; readonly declares: readonly Declaration[] }>();
-  const tallies = new ClaimTallies((record) => {
+  const keyOf = (record: ClaimRecord): string | undefined => {
     const within = record.module === undefined ? undefined : modules.get(record.module);
     if (within === undefined) return undefined;
     try {
@@ -712,7 +792,10 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       if (e instanceof InterfaceError) return undefined;
       throw e;
     }
-  });
+  };
+  // The claims of the phase going on, and the refutations a check found. A check's are summed apart from the run's.
+  let tallies = new ClaimTallies(keyOf);
+  let refutations: RefutationData[] = [];
   const result = (): LaunchResult => {
     const claims = tallies.claims();
     const builder = configuration.restoreAs === undefined ? {} : { builder: configuration.restoreAs };
@@ -728,6 +811,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         ...builder,
         ...sources,
       },
+      refutations: refutations.map((r) => ({ ...r })),
     };
   };
   // Each phase applied, with the lines printed before it, and the result as it stood when it was over.
@@ -783,6 +867,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
 
     // Step 4: the capabilities of the ceiling, each a structure of its parts keyed by the symbols of their names.
     const granted = new Map<string, Value>();
+    const arities = new Map<string, readonly number[]>();
     for (const name of configuration.ceiling) {
       const implementation = supplied.get(name)!;
       const parts = implementation.create(host);
@@ -790,16 +875,67 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         return ended({ kind: "fault", reason: `the capability ${name} did not make one effectful primitive for each of its parts` });
       const names = implementation.definition.parts;
       granted.set(name, kernel.structure(parts.map((p, i) => [kernel.symbol(names[i]), kernel.primitiveFunction(p)] as const)));
+      arities.set(name, parts.map((p) => p.arity));
     }
-    // Each capability: the one the first phase supplies, or else a fresh cell that nothing fills.
-    // Each input: the plain data the first phase supplies, or else a fresh cell that a later phase may fill.
+    // A capability handed as not needed: a structure with an entry for each part, each a
+    // composed function of as many parameters as the part's primitive takes, whose body is the
+    // empty structure. A call on it performs nothing, and the program reads the empty structure.
+    const notNeeded = (name: string): Value => {
+      const names = supplied.get(name)!.definition.parts;
+      const arity = arities.get(name)!;
+      return kernel.structure(names.map((part, i) => {
+        const params = Array.from({ length: arity[i] }, (_, j) => kernel.param(`${part}.${j + 1}`));
+        return [kernel.symbol(part), kernel.composedFunction(params, kernel.structure([]))] as const;
+      }));
+    };
+    // A kernel may end at a limit of its own with no budget set (its stack runs out).
+    const budget = configuration.steps;
+    const limitReason = budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out`;
+
+    // A check, where the first phase is one: the module function applied to its capabilities
+    // and inputs, handed to the kernel's `check` once. Nothing is filled and nothing advanced.
+    if (checkPhase !== undefined) {
+      applied.push({ name: checkPhase.name, linesBefore: 0 });
+      // Each input is a cell, so check leaves it unknown. Each capability the check names is
+      // not needed; every other is a cell, not yet given.
+      const checkArgs = program.declares.filter((d) => d.role !== "module").map((d) =>
+        d.role === "capability" && checkPhase.capabilities.includes(d.name) ? notNeeded(d.name) : kernel.cell());
+      // With no budget set, the largest the kernel takes: a recursion whose argument changes runs to it.
+      const checked = kernel.check(kernel.expression(moduleFn, checkArgs), { steps: budget ?? Number.MAX_SAFE_INTEGER });
+      tallies.add(checked.claims);
+      refutations = (checked.refutations ?? []).map((r) => (r.at === undefined ? { reason: r.reason } : { reason: r.reason, at: placeData(r.at) }));
+      // Refuted where the whole is, where a claim is, or where a part is: each reason once, in the order found.
+      const refutedClaims = tallies.claims().filter((c) => c.refuted > 0);
+      if (checked.refuted || refutedClaims.length > 0 || refutations.length > 0) {
+        const reasons: string[] = [];
+        const add = (reason: string): void => {
+          if (!reasons.includes(reason)) reasons.push(reason);
+        };
+        if (checked.refuted) add(kernel.reasonOf(checked.value) ?? "the kernel gives no reason for this refutation");
+        for (const c of refutedClaims) for (const reason of c.reasons) add(reason);
+        for (const r of refutations) add(r.reason);
+        if (reasons.length === 0) add("the kernel gives no reason for this refutation");
+        return ended({ kind: "refuted", steps: checked.steps, reason: reasons.join("; "), reasons });
+      }
+      if (checked.ended === "limit") return ended({ kind: "limit", steps: checked.steps, reason: limitReason });
+      if (runPhases.length === 0) return ended({ kind: "completed", steps: checked.steps });
+      // The check is over. The run after it is a fresh evaluation, and its claims are summed apart.
+      over.push(result());
+      linesBeforePhase.push(lines.length);
+      tallies = new ClaimTallies(keyOf);
+      refutations = [];
+    }
+
+    // Each capability: the one the first phase of the run supplies, or else a fresh cell that nothing fills.
+    // Each input: the plain data that phase supplies, or else a fresh cell that a later phase may fill.
     const capabilityCells = new Map<string, Cell>();
     const inputCells = new Map<string, Cell>();
-    const atStart = phases[0].inputs ?? {};
+    const first = runPhases[0];
+    const atStart = first.inputs ?? {};
     // One argument for each capability and input, in order; none for an import, which the kernel supplies.
     const args = program.declares.filter((d) => d.role !== "module").map((d) => {
       if (d.role !== "input") {
-        if (phases[0].capabilities.includes(d.name)) return granted.get(d.name)!;
+        if (first.capabilities.includes(d.name)) return granted.get(d.name)!;
         const cell = kernel.cell();
         capabilityCells.set(d.name, cell);
         return cell;
@@ -812,14 +948,11 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
 
     // Step 5: instantiate the module, under the budget. The budget is the
     // evaluation's: the kernel counts the work every later call does for it.
-    const budget = configuration.steps;
-    applied.push({ name: phases[0].name, linesBefore: 0 });
+    applied.push({ name: first.name, linesBefore: lines.length });
     const evaluated = kernel.evaluate(kernel.expression(moduleFn, args), budget === undefined ? {} : { steps: budget });
     tallies.add(evaluated.claims);
     let steps = evaluated.steps;
-    // A kernel may end at a limit of its own with no budget set (its stack runs out).
-    const atLimit = (): LaunchOutcome =>
-      ended({ kind: "limit", steps, reason: budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out` });
+    const atLimit = (): LaunchOutcome => ended({ kind: "limit", steps, reason: limitReason });
     const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
       const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
       return ended({ kind: "refuted", steps, reason: reasons.join("; "), reasons });
@@ -867,10 +1000,10 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         continue;
       }
       // The kernel waits and no capability's answer is due: the next later phase, if there is one.
-      if (nextPhase < phases.length) {
+      if (nextPhase < runPhases.length) {
         over.push(result());
         linesBeforePhase.push(lines.length);
-        const phase = phases[nextPhase++];
+        const phase = runPhases[nextPhase++];
         applied.push({ name: phase.name, linesBefore: lines.length });
         const inputs = phase.inputs ?? {};
         for (const name of namesOf(inputs)) {

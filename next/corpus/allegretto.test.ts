@@ -30,6 +30,9 @@
 // Chunk Q16, part 3, added the check-output capability, which the runner
 // grants on a sink that keeps the messages and the highest status, the
 // `// reports:` and `// status:` lines, and the programs `m3/report-*`.
+// Chunk Q13, part 5, made `// phases: check` the kernel's check, added
+// `// phases: check, run`, the `// check claim at:` line and the programs
+// `m3/check-*.alg`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -514,23 +517,22 @@ test("the phases line is read as the convention states: names separated by comma
 });
 
 test("a program with a phases line runs those phases, and its lines hold for the whole launch", async () => {
-  const program = 'capability output\nclaim(1 == 1)\noutput.write("hello")\n// end: waiting: the program waits on the capability(ies) output, which no phase supplies\n// summary: undecided\n';
+  // Under check the write waits on output, which is not yet given, so its claim waits and the summary is undecided.
+  const program = 'capability output\nclaim(1 == 1)\noutput.write("hello")\n// end: completed\n// summary: undecided\n';
   const checked = await runProgram(program + "// phases: check\n");
   assert.deepEqual(checked.problems, []);
   assert.deepEqual(checked.lines, []);
   const unstated = await runProgram(program);
   assert.deepEqual(unstated.lines, ["hello"], "a program with no phases line runs as run alone");
-  assert.ok(unstated.problems.includes('ended "completed", expected "waiting: the program waits on the capability(ies) output, which no phase supplies"'), JSON.stringify(unstated.problems));
+  assert.ok(unstated.problems.includes('printed ["hello"], expected []'), JSON.stringify(unstated.problems));
 });
 
-test("a malformed phases line, a list that is not built, two lines, and later lines with check alone each fail the program, which is not launched", async () => {
+test("a malformed phases line, a list that is not built, and two lines each fail the program, which is not launched", async () => {
   const body = 'capability output\ninput a\noutput.write("launched")\n// end: completed\n';
   for (const [lines, problem] of [
     ["// phases: check run", 'the line "// phases: check run" is not of the form phases: <name>, <name>'],
-    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check"'],
-    ["// phases: check, run", 'the setting phases is "check, run", which is not built yet: a later phase cannot supply a capability, since the kernel fills a cell with plain data only'],
+    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"'],
     ["// phases: check\n// phases: run", "the program has two `// phases:` lines"],
-    ['// phases: check\n// later: a = "x"', 'the setting later is given with the phases "check" alone: each later phase follows run, and check supplies no input'],
   ] as const) {
     const run = await runProgram(body + lines + "\n");
     assert.ok(run.problems.includes(problem), `${lines}: ${JSON.stringify(run.problems)}`);
@@ -538,6 +540,75 @@ test("a malformed phases line, a list that is not built, two lines, and later li
   }
   const notLaunched = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// phases: check\n");
   assert.deepEqual(notLaunched.problems, ["nothing was launched, and the program states a `// phases:` line"]);
+  // Check, run is built: the program is launched, and its run prints.
+  const both = await runProgram('capability output\noutput.write("launched")\n// expect: launched\n// end: completed\n// phases: check, run\n');
+  assert.deepEqual(both.problems, []);
+  // A later line with check alone is no finding: the program is launched under check, and the later phase is never applied.
+  const later = await runProgram(body + '// phases: check\n// later: a = "x"\n');
+  assert.deepEqual(later.problems, ["the later phase that supplies a (phase 1) was not applied"]);
+});
+
+test("under check, run a later line follows the run: the lines above it are printed before it", async () => {
+  const program = 'capability output\ninput a\noutput.write("start")\noutput.write(a)\n// phases: check, run\n// expect: start\n// later: a = "one"\n// expect: one\n// end: completed\n';
+  const run = await runProgram(program);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.lines, ["start", "one"]);
+});
+
+test("the programs of a check are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["uncalled", ["check"]], ["unknown-condition", ["check"]], ["input-waits", ["check"]], ["dropped-write", ["check"]], ["report", ["check"]],
+    ["run-prints", ["check", "run"]], ["run-refuted", ["check", "run"]], ["run-input", ["check", "run"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/check-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+});
+
+test("program m3/check-report.alg hands no message under check, and m3/check-run-refuted.alg prints a line when run alone", async () => {
+  const report = `${PROGRAMS_DIR}/m3/check-report.alg`;
+  const checked = await runProgram(text(report), report);
+  assert.deepEqual(checked.problems, []);
+  assert.deepEqual(checked.messages, []);
+  // The same text with no phases line runs alone, and its calls on report act.
+  const alone = await runProgram(text(report).replace("// phases: check\n", ""), report);
+  assert.deepEqual(alone.messages.map((m) => m.text), ["noted"]);
+  assert.equal(alone.status, 3);
+  const refuted = `${PROGRAMS_DIR}/m3/check-run-refuted.alg`;
+  const ran = await runProgram(text(refuted).replace("// phases: check, run\n", ""), refuted);
+  assert.deepEqual(ran.lines, ["hello"], "run alone prints the line before the false claim");
+  assert.equal(ran.end, "refuted: a claim that is not true");
+});
+
+// ── The check claim at line (chunk Q13, part 5) ───────────────────────
+
+test("the check claim at lines are read as the claim at lines are, apart from them", () => {
+  const text = "// check claim at: 2:1 refuted\n// claim at: 3:1 decided\n//check claim at:  4:7   waiting \n";
+  assert.deepEqual(readClaimLines(text, "check claim at"), { claims: [{ line: 2, column: 1, word: "refuted" }, { line: 4, column: 7, word: "waiting" }], problems: [] });
+  assert.deepEqual(readClaimLines(text), { claims: [{ line: 3, column: 1, word: "decided" }], problems: [] });
+  assert.deepEqual(readClaimLines("// check claim at: 2 decided\n", "check claim at").problems, [
+    'the line "// check claim at: 2 decided" is not of the form check claim at: <line>:<column> <word>, the word one of refuted, undecided, waiting, assumed, sampled, decided',
+  ]);
+});
+
+test("a check claim at line states a word of the check's result under check, run; the claim at lines hold for the run's", async () => {
+  const program = "capability output\ninput n\nclaim(n == 1)\nclaim(2 + 2 == 4)\noutput.write(\"x\")\nunused(m) => claim(2 == 2)\n// phases: check, run\n// input: n = 1\n// expect: x\n// end: completed\n";
+  assert.deepEqual((await runProgram(program + "// check claim at: 3:1 waiting\n// check claim at: 4:1 decided\n// claim at: 4:1 decided\n")).problems, []);
+  // The claim in the function nothing calls is in the check's result and not in the run's.
+  assert.deepEqual((await runProgram(program + "// claim at: 6:14 decided\n")).problems, ["no claim of the result is written at 6:14 of <text>"]);
+  assert.ok(!(await runProgram(program + "// check claim at: 6:14 decided\n")).problems.some((p) => p.includes("no claim of the result is written")));
+  assert.deepEqual((await runProgram(program + "// check claim at: 3:1 decided\n")).problems, ["in the check's result, the claim at 3:1 came out waiting, expected decided"]);
+  assert.deepEqual((await runProgram(program + "// check claim at: 9:1 waiting\n")).problems, ["in the check's result, no claim of the result is written at 9:1 of <text>"]);
+  const malformed = await runProgram(program + "// check claim at: two decided\n");
+  assert.match(malformed.problems[0], /is not of the form check claim at: <line>:<column> <word>/);
+  assert.deepEqual(malformed.lines, [], "a malformed line: the program is not launched");
+  const alone = await runProgram("capability output\nclaim(1 == 1)\n// phases: check\n// end: completed\n// check claim at: 2:1 decided\n");
+  assert.deepEqual(alone.problems, ["the program states a `// check claim at:` line, and its phases are not check, run"]);
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// check claim at: 2:1 decided\n");
+  assert.ok(notEmitted.problems.includes("nothing was launched, and the program states a `// check claim at:` line"), JSON.stringify(notEmitted.problems));
 });
 
 test("the programs that run under check are there, in milestone 3's directory, and each states its phases", () => {
@@ -611,10 +682,13 @@ test("a malformed reports or status line fails the program, which is not launche
   assert.deepEqual(notLaunched.problems, ["nothing was launched, and the program states a `// reports:` or `// status:` line"]);
 });
 
-test("the runner grants report, and under a phases line of check it is supplied while output waits", async () => {
-  const run = await runProgram('capability output\ncapability report\nreport.message("checked")\noutput.write("never")\n// phases: check\n// reports: note: checked\n// end: waiting: the program waits on the capability(ies) output, which no phase supplies\n');
+test("the runner grants report, and under a phases line of check it is not needed, so no message is handed over, while output waits", async () => {
+  const run = await runProgram('capability output\ncapability report\nreport.message("checked")\noutput.write("never")\n// phases: check\n// status: 0\n// end: completed\n');
   assert.deepEqual(run.problems, []);
   assert.deepEqual(run.lines, []);
+  assert.deepEqual(run.messages, []);
+  const checked = await runProgram(text(`${PROGRAMS_DIR}/m3/report-check.alg`), `${PROGRAMS_DIR}/m3/report-check.alg`);
+  assert.deepEqual(checked.messages, [], "m3/report-check.alg hands no message under check");
 });
 
 test("the programs that hand messages and statuses are there, in milestone 3's directory, and none names a case", () => {
