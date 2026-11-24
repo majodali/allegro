@@ -25,6 +25,9 @@
 // capabilities the launchers ship), part 2). The driver reports the
 // refusal as a finding at the import and reads nothing of the file.
 //
+// Each text is emitted under its file (`emitModule`'s `source`), so
+// every place in an imported text's record names the imported file.
+//
 // What it answers: the records in the order they are to be loaded, the
 // main text's last, each once however many texts import it. What it
 // refuses, with the file each finding is in:
@@ -170,7 +173,8 @@ export function drive(text: string, file: string, readText: ReadText, createKern
       }
       // A text that imports one with a finding is not emitted: that finding is the one to read.
       if (!complete) return undefined;
-      const e = emitModule(r.module, imports);
+      // The text's parts name the file it was read from (`DriveFinding.file` names the same).
+      const e = emitModule(r.module, imports, at);
       if (!e.ok) {
         for (const f of e.findings) findings.push({ file: at, at: f.at, kind: f.kind, message: f.message });
         return undefined;

@@ -1550,6 +1550,14 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — A claim's place in a result (B-196, chunks Q5 (the first notation and the bootstrap) and Q13 (check and run as configurations, and what a result holds))
+
+B-196 (the rebuild's acceptance side). The bootstrap's emitter writes the
+place of each part into a saved program: the file, and the line and
+column of each end. Each claim of a launch's result gives the place it
+was written. The corpus gains the line `// claim at:`, which states the
+word of the claim written at a line and column. Nothing printed changes.
+
 ### 2026-11 — The check-output capability, first version (B-196, chunk Q16 (the capabilities the launchers ship), part 3)
 
 B-196 (the rebuild's acceptance side). The terminal ships a fourth

@@ -41,7 +41,8 @@ test("a text that imports nothing gives its one record, as the emitter writes it
   const text = 'capability output\noutput.write("hi")\n';
   const [only, ...rest] = driven(text, {});
   assert.deepEqual(rest, []);
-  const e = emit(text);
+  // Emitted under the file the driver read it from: every place in the record names that file.
+  const e = emit(text, new Map(), "dir/main.alg");
   assert.ok(e.ok);
   assert.deepEqual(only.program, e.program);
   assert.equal(only.file, "dir/main.alg");
@@ -65,6 +66,19 @@ test("the imported texts come first, in dependency order, the main one last; eac
   const [base, derived, main] = records;
   assert.equal(derived.program.declares.find((d) => d.role === "module")?.identity, base.identity);
   assert.equal(main.program.declares.find((d) => d.role === "module")?.identity, derived.identity);
+});
+
+test("each text's parts name its own file: an imported text's places are in the imported file", () => {
+  const lib = path.join("dir", "lib.alg");
+  const records = driven("capability output\nimport lib\noutput.write(int.text(lib.double(21)))\n", { [lib]: "export double(n) =>\n  n * 2\n" });
+  const sources = (r: DrivenRecord): string[] => [
+    ...new Set(r.program.nodes.flatMap((n) => ((n.k === "expression" || n.k === "function" || n.k === "structure") && n.at !== undefined ? [n.at.source] : []))),
+  ];
+  assert.deepEqual(records.map((r) => [r.file, sources(r)]), [[lib, [lib]], ["dir/main.alg", ["dir/main.alg"]]]);
+  // The function the imported text binds, from its line to the end of its body on the next line.
+  const fn = records[0].program.nodes.find((n) => n.k === "function" && n.params.length === 1);
+  assert.ok(fn !== undefined && fn.k === "function" && fn.at !== undefined);
+  assert.deepEqual([fn.at.start, fn.at.end], [{ index: 0, line: 1, column: 1 }, { index: 27, line: 2, column: 8 }]);
 });
 
 test("a text two others import is read and emitted once", () => {
