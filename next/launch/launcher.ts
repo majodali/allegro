@@ -7,7 +7,9 @@
 // to it the source of each value of the configuration; part 3 makes a
 // launch apply a sequence of phases, each supplying capabilities and
 // inputs; part 5 makes the first phase a check where it is one, evaluated
-// by the kernel's `check`, and a run after it.
+// by the kernel's `check`, and a run after it; part 6 adds the test phase:
+// the tests of a module, each called by its own evaluation, and their
+// outcomes in the launch's.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -38,6 +40,10 @@
 //   "A tool reads a phase's result and adds no analysis of its own" and
 //   "A module's summary is the weakest strength among its claims": the
 //    result
+//   "A test is a claim, and its result is the claim's record", with the
+//    note of 2026-11-23 on the phases of a check: the test phase, ordinary
+//    evaluation of a test module and then of each test, each with a result
+//    of its own (step 5b)
 //
 // It is a library and host-neutral: no process, no fs, no Buffer. It is
 // built against the kernel's interface (`Kernel` of
@@ -109,6 +115,31 @@
 //      a check, and a check names no input. The rule that a phase after
 //      the first supplies no capability counts from the first phase that
 //      is no check;
+//   5b where the first phase that is no check is a test phase
+//      (`Phase.test`), in place of steps 6 and 7 for a run: the evaluation
+//      of step 5 is the load. It is advanced as a run is, with no later
+//      phase. Then each entry of the structure the module yields, keyed by
+//      a symbol, is read by an evaluation of its own of the kernel's `get`,
+//      as part of the load: an entry is evaluated when it is read, so a
+//      binding nothing had read is evaluated then. A test is an entry whose
+//      value is a composed function of no parameters (`kind` and
+//      `composedFunctionOf`); its name is the entry's key. Where the load
+//      did not complete, the phase ends as it ended and no test is called.
+//      Otherwise each test is called in order, in the same kernel and of
+//      the same module instance, by an evaluation of its own of the
+//      function applied to nothing, under the launch's budget, and advanced
+//      as a run is until its evaluation is over or nothing more is due. Its
+//      claims are summed in fresh tallies. When an evaluation of the phase
+//      is over, the answers it asked and has not had are not filled, and
+//      what it waited on is not waited for by the next, unless the next's
+//      own value is still a residual. The launch ends `completed` where the
+//      load and every test completed, and otherwise as the first that did
+//      not, the load first (`LaunchOutcome.tests`). The launcher hands no
+//      message and adds no word of its own: a test that completed passed,
+//      and that is the reader's word (next/launch/test-output.ts). A test
+//      phase anywhere else than first or after a check, a phase after it,
+//      and a phase that is both a check and a test phase are refused before
+//      anything is evaluated;
 //   6  while the kernel waits on cells, fills those whose answers have
 //      arrived and calls `advance`. When it waits and no capability's
 //      answer is due, it applies the next phase: it fills the cells of the
@@ -194,7 +225,7 @@
 // Tested by next/launch/launcher.test.ts, on the kernel that
 // next/kernel/create.ts gives.
 
-import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Value } from "../kernel/interface.js";
+import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
 
@@ -295,6 +326,15 @@ export interface Phase {
    * and every other declared capability as not yet given.
    */
   readonly check?: true;
+  /**
+   * True for a test phase: the module, a test module, is loaded by an
+   * ordinary evaluation of its function, and then each test is called by
+   * its own evaluation (`LaunchOutcome.tests`). A test phase is the first
+   * phase, or the second after a check, and no phase follows it: the
+   * module tested is a test module, and no run of the program stands with
+   * it. It supplies capabilities, and its inputs go to the load.
+   */
+  readonly test?: true;
   /**
    * The capabilities this phase supplies, each of the ceiling. Only the
    * first phase that is no check may name any: a later one cannot put a
@@ -532,6 +572,35 @@ export interface LaunchOutcome {
    * applied.
    */
   readonly phases?: readonly PhaseOutcome[];
+  /**
+   * Under a test phase: the load's outcome, and each test's, in the order
+   * called. Present where the load was started; `tests` is empty where the
+   * load did not complete, since no test is then called. The launch's
+   * `end` is `completed` where the load and every test completed, and
+   * otherwise the end of the first that did not, the load first. The
+   * launch's `lines` are the load's and then each test's, in order, and
+   * its `result` is the load's.
+   */
+  readonly tests?: { readonly load: LoadOutcome; readonly tests: readonly TestOutcome[] };
+}
+
+/** How the load of a test module ended, the lines it printed, and its result. */
+export interface LoadOutcome {
+  readonly end: LaunchEnd;
+  /** The lines printed while the module was loaded. */
+  readonly lines: readonly string[];
+  /** The load's result: the claims of the module function's evaluation and of reading its entries. */
+  readonly result: LaunchResult;
+}
+
+/**
+ * One test, called by its own evaluation: its name, how it ended, the
+ * lines it printed and its own result, from tallies of its own. A test
+ * that completed passed.
+ */
+export interface TestOutcome extends LoadOutcome {
+  /** The test's name: the key of its entry in the structure the module yields, a symbol's name. */
+  readonly name: string;
 }
 
 function refused(lines: string[], reason: string, findings: readonly string[] = []): LaunchOutcome {
@@ -700,15 +769,19 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   const answers = new Map<Cell, Promise<void>>();
   const arrived = new Map<Cell, Plain>();
   let capabilityFault: string | null = null;
+  // Under a test phase each evaluation's answers are its own: an answer asked in an
+  // evaluation that is over is not filled, and a fault of it is not counted (`forget`).
+  let generation = 0;
   const host: CapabilityHost = {
     line(text) {
       lines.push(text);
       request.onLine?.(text);
     },
     later(cell, answer) {
+      const asked = generation;
       answers.set(cell, answer.then(
-        (plain) => { arrived.set(cell, plain); },
-        (e) => { capabilityFault ??= `a capability's answer failed: ${e instanceof Error ? e.message : String(e)}`; },
+        (plain) => { if (asked === generation) arrived.set(cell, plain); },
+        (e) => { if (asked === generation) capabilityFault ??= `a capability's answer failed: ${e instanceof Error ? e.message : String(e)}`; },
       ));
     },
   };
@@ -759,6 +832,14 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   // The check, where the first phase is one, and the phases of the run after it.
   const checkPhase = phases[0]?.check === true ? phases[0] : undefined;
   const runPhases = checkPhase === undefined ? phases : phases.slice(1);
+  // A test phase is the first phase that is no check, and the last: no run stands with it.
+  phases.forEach((phase, i) => {
+    if (phase.test !== true) return;
+    if (phase.check === true) problems.push(`the phase ${phase.name} is both a check and a test phase`);
+    else if (i !== (checkPhase === undefined ? 0 : 1))
+      problems.push(`the phase ${phase.name} is a test phase after a phase that is no check: a test phase is the first phase, or follows a check`);
+    if (i < phases.length - 1) problems.push(`the phase ${phases[i + 1].name} follows the test phase ${phase.name}: no phase follows the tests`);
+  });
   // Each capability a phase supplies is of the ceiling, and only the first phase that is no check supplies any.
   phases.forEach((phase, i) => {
     for (const name of phase.capabilities) {
@@ -796,8 +877,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   // The claims of the phase going on, and the refutations a check found. A check's are summed apart from the run's.
   let tallies = new ClaimTallies(keyOf);
   let refutations: RefutationData[] = [];
-  const result = (): LaunchResult => {
-    const claims = tallies.claims();
+  const result = (of: ClaimTallies = tallies): LaunchResult => {
+    const claims = of.claims();
     const builder = configuration.restoreAs === undefined ? {} : { builder: configuration.restoreAs };
     const sources = request.sources === undefined ? {} : { configuration: request.sources.map((s) => ({ setting: s.setting, source: s.source })) };
     return {
@@ -817,9 +898,15 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   // Each phase applied, with the lines printed before it, and the result as it stood when it was over.
   const applied: Array<{ readonly name: string; readonly linesBefore: number }> = [];
   const over: LaunchResult[] = [];
+  // Under a test phase, the load's outcome and each test's, once the load has started.
+  let tested: { load: LoadOutcome; tests: TestOutcome[] } | undefined;
   const ended = (end: LaunchEnd): LaunchOutcome => {
-    const last = result();
-    return { lines, linesBeforePhase, end, result: last, phases: applied.map((p, i) => ({ ...p, result: i < over.length ? over[i] : last })) };
+    // Under a test phase the launch's result is the load's.
+    const last = tested?.load.result ?? result();
+    return {
+      lines, linesBeforePhase, end, result: last, phases: applied.map((p, i) => ({ ...p, result: i < over.length ? over[i] : last })),
+      ...(tested === undefined ? {} : { tests: { load: tested.load, tests: [...tested.tests] } }),
+    };
   };
 
   try {
@@ -949,94 +1036,159 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     // Step 5: instantiate the module, under the budget. The budget is the
     // evaluation's: the kernel counts the work every later call does for it.
     applied.push({ name: first.name, linesBefore: lines.length });
-    const evaluated = kernel.evaluate(kernel.expression(moduleFn, args), budget === undefined ? {} : { steps: budget });
-    tallies.add(evaluated.claims);
-    let steps = evaluated.steps;
-    const atLimit = (): LaunchOutcome => ended({ kind: "limit", steps, reason: limitReason });
-    const refutedEnd = (values: readonly Value[]): LaunchOutcome => {
-      const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
-      return ended({ kind: "refuted", steps, reason: reasons.join("; "), reasons });
-    };
-    if (evaluated.refuted) return refutedEnd([evaluated.value]);
-    if (evaluated.ended === "limit") return atLimit();
-    // A fill that holds evaluates nothing, and its claims are summed like any call's.
-    const fill = (cell: Cell, value: Value): void => {
-      const held: Advance = kernel.fill(cell, value, { hold: true });
-      tallies.add(held.claims);
+    const limits = budget === undefined ? {} : { steps: budget };
+    // Cells something waited on when an evaluation of a test phase was over: no later evaluation waits on them.
+    const stale = new Set<Value>();
+
+    // Step 6: deliver the values that arrive later, and apply the later phases
+    // where `later` is true. How one evaluation ended, its claims summed in `into`.
+    const settle = async (evaluated: Result, into: ClaimTallies, later: boolean): Promise<LaunchEnd> => {
+      into.add(evaluated.claims);
+      let steps = evaluated.steps;
+      const atLimit = (): LaunchEnd => ({ kind: "limit", steps, reason: limitReason });
+      const refutedEnd = (values: readonly Value[]): LaunchEnd => {
+        const reasons = values.map((v) => kernel.reasonOf(v) ?? "the kernel gives no reason for this refutation");
+        return { kind: "refuted", steps, reason: reasons.join("; "), reasons };
+      };
+      if (evaluated.refuted) return refutedEnd([evaluated.value]);
+      if (evaluated.ended === "limit") return atLimit();
+      // A fill that holds evaluates nothing, and its claims are summed like any call's.
+      const fill = (cell: Cell, value: Value): void => {
+        const held: Advance = kernel.fill(cell, value, { hold: true });
+        into.add(held.claims);
+      };
+      let nextPhase = 1;
+      const advanceOnce = (): LaunchEnd | undefined => {
+        const advanced = kernel.advance();
+        into.add(advanced.claims);
+        steps += advanced.steps;
+        if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
+        // The launch is one evaluation: named in `limited`, its budget is spent and it is over.
+        if (advanced.ended === "limit" || (advanced.limited?.length ?? 0) > 0) return atLimit();
+        return undefined;
+      };
+      for (;;) {
+        if (capabilityFault !== null) return { kind: "fault", reason: capabilityFault };
+        const all = kernel.waiting();
+        let waiting: readonly Cell[] = all.filter((c) => !stale.has(c));
+        if (waiting.length === 0) {
+          // Only cells an evaluation that is over waited on: this one waits on them too where its value is still a residual.
+          if (waiting.length === all.length || kernel.kind(kernel.current(evaluated.value)) !== "expression") break;
+          waiting = all;
+        }
+        let filled = 0;
+        for (const [cell, plain] of arrived) {
+          if (!kernel.filled(cell)) {
+            fill(cell, plainValue(kernel, plain));
+            filled++;
+          }
+          arrived.delete(cell);
+          answers.delete(cell);
+        }
+        if (filled > 0) {
+          const stop = advanceOnce();
+          if (stop !== undefined) return stop;
+          continue;
+        }
+        const due = waiting.filter((c) => answers.has(c)).map((c) => answers.get(c)!);
+        if (due.length > 0) {
+          await Promise.race(due);
+          continue;
+        }
+        // The kernel waits and no capability's answer is due: the next later phase, if there is one.
+        if (later && nextPhase < runPhases.length) {
+          over.push(result());
+          linesBeforePhase.push(lines.length);
+          const phase = runPhases[nextPhase++];
+          applied.push({ name: phase.name, linesBefore: lines.length });
+          const inputs = phase.inputs ?? {};
+          for (const name of namesOf(inputs)) {
+            const cell = inputCells.get(name)!;
+            fill(cell, plainValue(kernel, inputs[name]));
+            inputCells.delete(name);
+          }
+          const stop = advanceOnce();
+          if (stop !== undefined) return stop;
+          continue;
+        }
+        // The cells of inputs and of capabilities no phase supplied are named by the declared name.
+        const supplier = new Set<Value>([...inputCells.values(), ...capabilityCells.values()]);
+        const inputs = [...inputCells.keys()].filter((name) => waiting.includes(inputCells.get(name)!));
+        const capabilities = [...capabilityCells.keys()].filter((name) => waiting.includes(capabilityCells.get(name)!));
+        const unanswered = waiting.filter((c) => !supplier.has(c)).length;
+        const parts = [
+          ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
+          ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
+          ...(capabilities.length > 0 ? [`the capability(ies) ${capabilities.join(", ")}, which no phase supplies`] : []),
+        ];
+        return {
+          kind: "waiting",
+          steps,
+          reason: `the program waits on ${parts.join(" and on ")}`,
+          unanswered,
+          inputs,
+          ...(configuration.phases === undefined ? {} : { capabilities }),
+        };
+      }
+      return { kind: "completed", steps };
     };
 
-    // Step 6: deliver the values that arrive later, and apply the later phases.
-    let nextPhase = 1;
-    const advanceOnce = (): LaunchOutcome | undefined => {
-      const advanced = kernel.advance();
-      tallies.add(advanced.claims);
-      steps += advanced.steps;
-      if (advanced.refuted.length > 0) return refutedEnd(advanced.refuted);
-      // The launch is one evaluation: named in `limited`, its budget is spent and it is over.
-      if (advanced.ended === "limit" || (advanced.limited?.length ?? 0) > 0) return atLimit();
-      return undefined;
+    const loadStart = lines.length;
+    const evaluated = kernel.evaluate(kernel.expression(moduleFn, args), limits);
+    // Step 7, for a run.
+    if (first.test !== true) return ended(await settle(evaluated, tallies, true));
+
+    // A test phase. The evaluation of the module function is the load, and reading its
+    // entries is part of it: an entry is evaluated when it is read.
+    // When one evaluation is over, what it still waited on is no later evaluation's: the answers it
+    // asked are not filled, and a later evaluation waits on the cells it waited on only where its
+    // own value is still a residual (`settle`).
+    const forget = (): void => {
+      generation++;
+      for (const c of answers.keys()) stale.add(c);
+      for (const c of kernel.waiting()) stale.add(c);
+      answers.clear();
+      arrived.clear();
+      capabilityFault = null;
     };
-    for (;;) {
-      if (capabilityFault !== null) return ended({ kind: "fault", reason: capabilityFault });
-      const waiting = kernel.waiting();
-      if (waiting.length === 0) break;
-      let filled = 0;
-      for (const [cell, plain] of arrived) {
-        if (!kernel.filled(cell)) {
-          fill(cell, plainValue(kernel, plain));
-          filled++;
+    let loadEnd = await settle(evaluated, tallies, false);
+    let loadSteps = loadEnd.kind === "completed" ? loadEnd.steps : 0;
+    const found: Array<{ readonly name: string; readonly fn: Value }> = [];
+    const yielded = kernel.current(evaluated.value);
+    if (loadEnd.kind === "completed" && kernel.kind(yielded) === "structure") {
+      for (const [key] of kernel.entriesOf(yielded)) {
+        if (key === null || kernel.kind(key) !== "symbol") continue;
+        const name = kernel.symbolName(key);
+        forget();
+        const read = kernel.evaluate(kernel.expression(kernel.kernelPrimitive("get"), [yielded, kernel.symbolData(name)]), limits);
+        const readEnd = await settle(read, tallies, false);
+        if (readEnd.kind !== "completed") {
+          loadEnd = readEnd;
+          break;
         }
-        arrived.delete(cell);
-        answers.delete(cell);
+        loadSteps += readEnd.steps;
+        // A test: a composed function of no parameters.
+        const value = kernel.current(read.value);
+        if (kernel.kind(value) === "composed-function" && kernel.composedFunctionOf(value).params.length === 0) found.push({ name, fn: value });
       }
-      if (filled > 0) {
-        const stop = advanceOnce();
-        if (stop !== undefined) return stop;
-        continue;
-      }
-      const due = waiting.filter((c) => answers.has(c)).map((c) => answers.get(c)!);
-      if (due.length > 0) {
-        await Promise.race(due);
-        continue;
-      }
-      // The kernel waits and no capability's answer is due: the next later phase, if there is one.
-      if (nextPhase < runPhases.length) {
-        over.push(result());
-        linesBeforePhase.push(lines.length);
-        const phase = runPhases[nextPhase++];
-        applied.push({ name: phase.name, linesBefore: lines.length });
-        const inputs = phase.inputs ?? {};
-        for (const name of namesOf(inputs)) {
-          const cell = inputCells.get(name)!;
-          fill(cell, plainValue(kernel, inputs[name]));
-          inputCells.delete(name);
-        }
-        const stop = advanceOnce();
-        if (stop !== undefined) return stop;
-        continue;
-      }
-      // The cells of inputs and of capabilities no phase supplied are named by the declared name.
-      const supplier = new Set<Value>([...inputCells.values(), ...capabilityCells.values()]);
-      const inputs = [...inputCells.keys()].filter((name) => waiting.includes(inputCells.get(name)!));
-      const capabilities = [...capabilityCells.keys()].filter((name) => waiting.includes(capabilityCells.get(name)!));
-      const unanswered = waiting.filter((c) => !supplier.has(c)).length;
-      const parts = [
-        ...(unanswered > 0 ? [`${unanswered} cell(s) that no capability will answer`] : []),
-        ...(inputs.length > 0 ? [`the input(s) ${inputs.join(", ")}, which the configuration does not supply`] : []),
-        ...(capabilities.length > 0 ? [`the capability(ies) ${capabilities.join(", ")}, which no phase supplies`] : []),
-      ];
-      return ended({
-        kind: "waiting",
-        steps,
-        reason: `the program waits on ${parts.join(" and on ")}`,
-        unanswered,
-        inputs,
-        ...(configuration.phases === undefined ? {} : { capabilities }),
-      });
     }
-
-    // Step 7.
-    return ended({ kind: "completed", steps });
+    if (loadEnd.kind === "completed") loadEnd = { kind: "completed", steps: loadSteps };
+    tested = { load: { end: loadEnd, lines: lines.slice(loadStart), result: result() }, tests: [] };
+    if (loadEnd.kind !== "completed") return ended(loadEnd);
+    // Each test by its own evaluation, in order, of the same module instance, with fresh tallies.
+    let steps = loadSteps;
+    let end: LaunchEnd | undefined;
+    for (const t of found) {
+      forget();
+      const start = lines.length;
+      const own = new ClaimTallies(keyOf);
+      const testEnd = await settle(kernel.evaluate(kernel.expression(t.fn, []), limits), own, false);
+      tested.tests.push({ name: t.name, end: testEnd, lines: lines.slice(start), result: result(own) });
+      if (testEnd.kind === "completed") steps += testEnd.steps;
+      else end ??= testEnd;
+    }
+    forget();
+    return ended(end ?? { kind: "completed", steps });
   } catch (e) {
     return ended({ kind: "fault", reason: e instanceof Error ? e.message : String(e) });
   }
