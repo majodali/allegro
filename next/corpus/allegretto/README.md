@@ -33,7 +33,8 @@ Each statement is a comment line of its own:
 | `// yields: a, b` | the keys of the structure the module yields, in order |
 | `// input: name = <literal>` | the configuration supplies this input at the start |
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
-| `// phases: check` | the run applies check alone; at most one line (see "Phases") |
+| `// check claim at: <line>:<column> <word>` | as `// claim at:`, for the check's result, where the phases are `check, run` (see "Phases") |
+| `// phases: check` | the launch applies check alone, or with `// phases: check, run` check and then run; at most one line (see "Phases") |
 | `// serves: <METHOD> <url> = <status> <literal>` | the network answers this request; one line per request served (see "Requests") |
 | `// reports: <level>: <text>` | a message the program hands to `report.message`; one line per message, in order (see "Messages and status") |
 | `// status: <n>` | the highest status the program hands to `report.status`; at most one line (see "Messages and status") |
@@ -86,24 +87,40 @@ with the program's inputs handed in and its imported records loaded.
 
 ## Phases
 
-`// phases: check` is the one line built. It names the phases the run
-applies, as the setting `phases` of `next/tools/configuration.ts` names
-them. A program with no such line runs as `run` alone, which is what the
-runner did before the line existed. Check supplies the check
-capabilities of the ceiling, `report` alone today
-(`CHECK_CAPABILITIES` of `next/tools/configuration.ts`), and no other
-capability and no input. Any other declared capability is a cell that
-nothing fills, so a statement that calls it waits, and nothing is
-printed. A call on `report` acts (see "Messages and status"). So a `// later:`
-line with `// phases: check` fails the program. The `// expect:`,
-`// end:`, `// summary:`, `// reports:` and `// status:` lines hold for
-the whole launch. A line not
-of the form `phases: <name>, <name>`, a list that is not built, and two
-lines each fail the program, and it is not launched.
+`// phases: check` and `// phases: check, run` are the lines built. Each
+names the phases the launch applies, as the setting `phases` of
+`next/tools/configuration.ts` names them. A program with no such line
+runs as `run` alone, which is what the runner did before the line
+existed.
 
-`// phases: check, run` fails the program with the resolver's finding.
-Run would have to put a capability into the cell that check left
-waiting, and the kernel fills a cell with plain data only.
+Check is the kernel's check (`Phase.check` of
+`next/launch/launcher.ts`). The launcher hands the module to the
+kernel's `check` once, and nothing is performed. Every input is unknown,
+so the `// input:` lines are not used. The check capabilities of the
+ceiling, `report` alone today (`CHECK_CAPABILITIES` of
+`next/tools/configuration.ts`), are not needed: a call on a part
+performs nothing and answers the empty structure, so no message and no
+status is handed over (see "Messages and status"). Every other declared
+capability is not yet given: a call on it waits, and nothing is printed.
+The check ends the launch refuted where it finds a refuted claim or any
+other refutation, and at its limit where its budget runs out.
+Otherwise it is over, and check alone completes. A `// later:` line
+with check alone is never applied, so it fails the program.
+
+Under `check, run` the run follows a check that found nothing. It is an
+ordinary run, given the `// input:` lines, and each `// later:` line is
+a phase after it. A check that finds a refutation ends the launch, and
+nothing is printed.
+
+The `// expect:`, `// end:`, `// reports:` and `// status:` lines hold
+for the whole launch. The `// summary:` and `// claim at:` lines hold for
+the last phase's result: the check's under check alone, the run's under
+`check, run`. `// check claim at: <line>:<column> <word>` states a
+claim's word in the check's result, where the phases are `check, run`;
+it is read as `// claim at:` is (see "A claim by its place"). Such a
+line with other phases, a line not of the form `phases: <name>, <name>`,
+a list that is not built, and two lines each fail the program, and it is
+not launched.
 
 ## The summary
 
@@ -236,7 +253,8 @@ a program sent. `npm run allegretto` grants `http` on the host's
 ## Messages and status
 
 `report` (`next/launch/report.ts`) is the check-output capability: a
-check capability, which check supplies and a run supplies with the rest.
+check capability, which check hands as not needed and a run supplies
+with the rest.
 It hands messages and an exit status to whatever ran the program. Its
 two parts give the program nothing: each answers at once with the empty
 structure, whatever it is given, so leaving a call out changes nothing
