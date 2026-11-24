@@ -3779,7 +3779,9 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      the command line asked for check alone, and an input given under
      check ended the launch waiting on it. Now a check leaves every
      input unknown, so neither setting is an error of the configuration.
-     The ask stays open until the maintainer answers the clarification.
+     The maintainer, in session, on 2026-11-24: "PR#306 ask 7 - I agree
+     we should allow the command line to specify check alone." So it
+     stands as built, and every ask of PR #306 is answered.
   5. *The corpus line `// check claim at:`* (ask 8): "Agreed."
   6. *The four findings on the kernel's `check`* (ask 9): "Do you have
      examples for these four findings in the current acceptance tests?
