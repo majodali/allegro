@@ -248,6 +248,8 @@ export const createMachine: CreateKernel = () => {
   let cut = false;
   /** True while a function is specialized: both branches of a conditional whose condition is unknown are evaluated. */
   let speculative = false;
+  /** Under a check: how many conditions it could not decide enclose what is being evaluated. */
+  let unsure = 0;
   /**
    * Set while a check is made (`check`): what the evaluation made and has not needed, each
    * to be evaluated before the check is over, the functions it met, each to have its body
@@ -1191,14 +1193,19 @@ export const createMachine: CreateKernel = () => {
           if (known(condition)) return new Refuted("a condition that is neither true nor false", condition);
           // Specializing, both branches are evaluated though the condition is unknown. A
           // refutation inside a branch stays in that branch.
-          if (speculative)
+          if (speculative) {
+            // Counted until both branches are evaluated. A branch that is left waiting leaves the
+            // count up, and what is evaluated after it is then held to the stricter rule.
+            unsure++;
             return after(evaluate(v.args[1], scope), (yes) =>
               after(evaluate(v.args[2], scope), (no) => {
+                unsure--;
                 found(yes, v.args[1]);
                 found(no, v.args[2]);
                 return new Expr(fn, [condition, yes, no]);
               }),
             );
+          }
           return new Expr(fn, [condition, later(v.args[1], scope), later(v.args[2], scope)]);
         });
       }
@@ -1381,7 +1388,11 @@ export const createMachine: CreateKernel = () => {
       // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
       // refutation early, and a loop that carries state would otherwise never end. And where
       // a check goes over what was left untouched, a function it has opened is not opened again.
-      const leftAsCall = ahead && (opening.includes(fn) || (reaching?.draining === true && reaching.opened.has(fn)));
+      // A check is otherwise: it has a budget, and it must find what a run would find. There a
+      // call stays a call only under a condition the check could not decide, where a run might
+      // not make it. A call a run would make is opened as a run would open it, a function that
+      // calls itself among them, so a claim that rests on such a call is decided or refuted.
+      const leftAsCall = ahead && (reaching === undefined || unsure > 0) && (opening.includes(fn) || (reaching?.draining === true && reaching.opened.has(fn)));
       if (observed() && !leftAsCall) tell(v, { kind: "call", function: out(fn) });
       if (!leftAsCall) reaching?.opened.add(fn);
       // The body is evaluated from `run`, in place of this call: a function that calls itself
@@ -1901,7 +1912,11 @@ export const createMachine: CreateKernel = () => {
 
   const later = (a: V, scope: ScopeV): V => {
     const tied = tie(a, scope, new Map());
-    if (!(tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)))) return tied;
+    if (!(tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)))) {
+      // A function written as an argument or an entry is a function met, though nothing may call it or read it.
+      if (tied instanceof Fn) reaching?.lazies.push(new Lazy(tied, scope));
+      return tied;
+    }
     const made = new Lazy(tied, scope);
     reaching?.lazies.push(made);
     return made;
@@ -2061,6 +2076,10 @@ export const createMachine: CreateKernel = () => {
       cut = false;
       const reach: Reaching = { lazies: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>(), draining: false };
       reaching = reach;
+      unsure = 0;
+      // A check performs nothing and what it evaluated is dropped when it ends, so a claim it
+      // left waiting waits for nothing afterwards: the count of waiting claims is put back.
+      const waitingBefore = new Map(waitingAt);
       const [wasAhead, wasSpeculative] = [ahead, speculative];
       ahead = true;
       speculative = true;
@@ -2104,6 +2123,9 @@ export const createMachine: CreateKernel = () => {
         ahead = wasAhead;
         speculative = wasSpeculative;
         reaching = undefined;
+        unsure = 0;
+        waitingAt.clear();
+        for (const [site, n] of waitingBefore) waitingAt.set(site, n);
       }
     },
     current: (value) => {

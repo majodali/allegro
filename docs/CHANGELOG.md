@@ -574,6 +574,14 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-28 — Three faults of the kernel's check, found by the
+  acceptance stream, fixed on both variants.** A check opens a call a
+  run would make, a function that calls itself among them, so a claim
+  that rests on one is decided or refuted; a call stays a call only
+  under a condition the check could not decide. What a check leaves
+  waiting does not outlast it. A function nothing binds by name, written
+  as an entry or handed to a function that does not call it, is opened.
+  `createKernelOf(variant)` gives a kernel of a variant by name.
 - **2026-11-28 — Allegretto read by the engine: the same tree as the
   bootstrap's.** `next/ext/lib/allegretto.alg`, new: Allegretto's whole
   grammar as a value, blocks by indentation among it, giving the tree

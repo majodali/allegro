@@ -2188,6 +2188,57 @@ its approval.
     digits in small letters, has a test now.
   - *The engine's tests in under a minute* is missed too: the two test
     files take about 45 and 30 seconds.
+- **2026-11-28 — the acceptance stream's findings on `Kernel.check`**
+  (the review session), carried by the maintainer in a note of
+  2026-11-23. The maintainer ruled on PR #316 meanwhile: speed work is
+  held to what later chunks will not undo and what makes their tests
+  run faster; E7 is two chunks; the three layouts the engine reads and
+  the bootstrap refuses are Allegretto; the target of a minute is for
+  the library modules' own tests, and the comparison of the corpus is a
+  command with a budget of its own; the acceptance stream adds the six
+  names to its emitter.
+  - *Finding i, a fault, fixed.* Ahead of what is done, a function
+    being opened was not opened again, whatever it was given, so a
+    claim through a function that calls itself was left waiting and a
+    false one was not found. That rule is for evaluation ahead inside
+    a run, which has no budget of its own. A check has one, and must
+    find what a run finds. Under a check a call now stays a call only
+    under a condition the check could not decide. A program that runs
+    for ever by design then uses up a check's budget, as it would a
+    run's; a loop whose end rests on an effect's answer does not, since
+    the answer is unknown and the call is under an undecided condition.
+  - *Finding ii, a fault, fixed.* A check's count of claims waiting was
+    left in the kernel. It is put back to what it was when the check
+    ends.
+  - *Finding iii, a fault, fixed.* A function written as an argument or
+    as an entry was handed on as it was written and never met. It is
+    now gone over as every function met is.
+  - *Finding iv, open.* A check goes over the function it was handed
+    with its parameters unknown, as it does every function. So what a
+    host handed for a capability is not there the second time, and "not
+    needed" reads as "not yet given". Proposed: the function at the
+    head of the expression a check is handed is the one function not
+    gone over again; the host has said what each of its parameters is.
+    That is an exception to the ruling that an opened function is
+    checked again with its parameters unknown, so it is the
+    maintainer's to rule.
+  - *The count of two.* A claim at a module's top level is counted
+    twice under a check for the same reason, and the proposal for
+    finding iv ends that. A claim inside a function that is called is
+    still counted for the call and again for the function gone over
+    with its parameter unknown, where it may wait though every call
+    made decides it. A record cannot tell the two apart. Proposed: a
+    record counts apart what was found with a function's parameters
+    unknown.
+  - *The three other asks.* `createKernelOf(variant)` is built, in
+    `next/kernel/create.ts`. Whether a host can tell what a binding is
+    without evaluating it: not today; a read of a function's count of
+    parameters, for a name a block binds to a function as written, is
+    proposed. Another name for the method `check`: `speculate` is
+    proposed.
+  - *Deliberate faults*: 5 made in each variant's fix. 4 caught in
+    each; the fifth, the counts not put back after a check, changes
+    nothing a test could be made to see, and the line is kept.
 
 ## 8. Sessions
 
