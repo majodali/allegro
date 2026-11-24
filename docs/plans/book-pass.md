@@ -604,7 +604,7 @@ are:
 | E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | done 2026-11-25: `class.alg`, `grammar.alg`, `analysis.alg`, `engine.alg` and `flat.alg` under `next/ext/lib/`, each with a test module; **the speed target is met: a module of 207 lines is read in 2,280,434 steps and about 7 seconds**; the engine specialized over a grammar is measured and gains little (§7) |
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
-| E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | its tests; a conflict is refuted before any text is read |
+| E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
 | E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
@@ -2022,6 +2022,55 @@ its approval.
     that is not named for it. The runner's condition changed: it was
     "every claim is decided" for every module.
   - *Deliberate faults*: 26 made in the five modules, 26 caught.
+- **2026-11-27 — chunk E6, grammars changed and combined** (the review
+  session). The maintainer confirmed E5's asks: the mark `unambiguous`
+  as one result at most where a marked rule is read; a place counts
+  bytes; the rewording of "A parser records where each expression came
+  from in its text"; what is refused for levels; the runner's
+  condition.
+  - *A change.* `change.alg`: a change is a structure of operations on
+    rules by name, the five of "Every production can be extended" and
+    `reserve` for a set of words. `changed(g, changes)` gives a new
+    grammar; the one it is given is untouched.
+  - *Any order, or a conflict.* The operations of every change are
+    taken together and each rule is judged by how many operations of
+    each kind are on it. Two changes may append to one rule, since the
+    order of the items of an `alt` has no meaning to the engine; that
+    is what the held finding of 2026-11-12 on appended alternatives
+    asked for. A rule added twice, changed where the grammar has none,
+    replaced or wrapped twice, or replaced, wrapped or removed and
+    changed besides, is a conflict. `changed` refuses the first with
+    its text; `conflicts` lists all.
+  - *A notation can only add.* `used(g, change, named)`, with `named`
+    the rules and the words the using text names. Of the decision's
+    three rules:
+    - "Neither longest match nor precedence prefers between an
+      alternative in force and an added one" needs no check. The
+      engine tries every item and keeps every result, so an added item
+      can only add a reading. A test holds it: a text that read one
+      way reads two, and its first reading is still there.
+    - "Nothing is added to what a rule in force tests negatively" is
+      two checks: no item appended to a rule that can be reached from
+      the item of a guard whose `holds` is false, through whatever
+      rules; and no word reserved in a set that a terminal in force
+      names.
+    - "An added terminal writes only the part of the parser's state
+      that its own grammar declares" is built more strictly than it is
+      worded: a notation brings no terminal made with `stepper` at
+      all, unless the using text names its rule. A state here is one
+      bits value with no parts, so a terminal cannot be held to a part
+      of it. Parts would be a change to `grammar.with_state`; no
+      notation yet needs a state of its own. The maintainer is asked
+      to confirm.
+  - *What is wrong with a grammar.* `analysis.faults(g)`: a rule named
+    that the grammar has not, the start among them; a rule nothing
+    reaches; a reserved set named that the grammar has not. Preparing a
+    grammar does not call it. A repetition of an item that can read no
+    byte is no fault here: the engine drops a reading that reads none.
+  - *Not here.* The notation of a change in a text, and where a change
+    ends, are E8's.
+  - *Deliberate faults*: 24 made in `change.alg`, `analysis.alg` and
+    `grammar.alg`, 24 caught.
 
 ## 8. Sessions
 

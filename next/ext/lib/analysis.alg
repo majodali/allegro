@@ -185,3 +185,35 @@ of_size(words, n, i, out) =>
   if i == count(words) then out
   else if bits.length(words[i]) == n * 8 then of_size(words, n, i + 1, put(out, [], words[i]))
   else of_size(words, n, i + 1, out)
+
+// ---- What is wrong with a grammar, before any text is read ----
+
+// `faults(g)` gives what is wrong with a grammar, as texts, and none
+// where nothing is: a rule named that the grammar has not, the start
+// among them; a rule nothing reaches from the start; a reserved set a
+// terminal names that the grammar has not. Preparing a grammar does not
+// look for them: a grammar with a fault fails where the fault is met.
+export faults(g) => unreached(g, 0, reached(g, has_rule(g.rules, g.start, 0), unknown(g, 0, [])))
+has_rule(rules, name, i) => i < count(rules) && (key(rules, i) == name || has_rule(rules, name, i + 1))
+listed(l, x, i) => i < count(l) && (l[i] == x || listed(l, x, i + 1))
+// Every name a form holds that is no rule, and every set that is none.
+unknown(g, i, out) => if i == count(g.rules) then out else unknown(g, i + 1, unknown_in(g, key(g.rules, i), get(g.rules, i), out))
+unknown_in(g, rule, f, out) =>
+  if f.op == `term then (if kind(f.unless) == `symbol && !has_rule(g.reserved, f.unless, 0) then put(out, [], "the rule " ++ spelling(rule) ++ " names the reserved set " ++ spelling(f.unless) ++ ", which the grammar has not") else out)
+  else if f.op == `ref then (if has_rule(g.rules, f.name, 0) then out else put(out, [], "the rule " ++ spelling(rule) ++ " names the rule " ++ spelling(f.name) ++ ", which the grammar has not"))
+  else if f.op == `seq || f.op == `alt then unknown_items(g, rule, f.items, 0, out)
+  else unknown_in(g, rule, f.item, out)
+unknown_items(g, rule, items, i, out) => if i == count(items) then out else unknown_items(g, rule, items, i + 1, unknown_in(g, rule, items[i], out))
+reached(g, has_start, out) => if has_start then {faults: out, names: reach(g.rules, grammar.ref(g.start), [])} else {faults: put(out, [], "the grammar begins with the rule " ++ spelling(g.start) ++ ", which it has not"), names: []}
+// The names of the rules a form reaches, through whatever rules.
+reach(rules, f, out) =>
+  if f.op == `term then out
+  else if f.op == `ref then (if listed(out, f.name, 0) || !has_rule(rules, f.name, 0) then out else reach(rules, get(rules, f.name), put(out, [], f.name)))
+  else if f.op == `seq || f.op == `alt then reach_items(rules, f.items, 0, out)
+  else reach(rules, f.item, out)
+reach_items(rules, items, i, out) => if i == count(items) then out else reach_items(rules, items, i + 1, reach(rules, items[i], out))
+// With no start there is nothing to reach from, and no rule is called unreached.
+unreached(g, i, r) =>
+  if i == count(g.rules) || count(r.names) == 0 then r.faults
+  else if listed(r.names, key(g.rules, i), 0) then unreached(g, i + 1, r)
+  else unreached(g, i + 1, {faults: put(r.faults, [], "nothing reaches the rule " ++ spelling(key(g.rules, i))), names: r.names})

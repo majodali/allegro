@@ -574,6 +574,16 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-27 — Grammars changed and combined.** `next/ext/lib/change.alg`,
+  new: a change is operations on rules by name: add, append, replace,
+  remove, wrap, and reserve for a set of words. `changed` makes a list
+  of changes in whatever order, or refuses a conflict before any text
+  is read. `used` is for a notation a text brings in: it refuses one
+  that changes a rule it did not add, adds to a rule a guard in force
+  tests cannot be read, reserves a word in a set in force, or brings a
+  terminal that touches the state, unless the text names what is
+  changed. `analysis.faults` gives what is wrong with a grammar: a rule
+  or a reserved set named that it has not, and a rule nothing reaches.
 - **2026-11-26 — What a parse gives.** In `next/ext/lib/engine.alg` a
   reading gives a value and no longer a tree: a terminal the text it
   read, a sequence and a repetition what their items give, and a form

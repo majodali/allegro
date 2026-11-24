@@ -153,6 +153,23 @@ claim(acting.rules.t.acts && acting.rules.t.gives(0, 0) == 5 && !acting.rules.t.
 // A rule the grammar marks settled is marked wherever it is named.
 claim(acting.rules.s.items[0].settles && acting.rules.s.items[1].settles && !acting.top.settles)
 
+// ---- What is wrong with a grammar ----
+// In the first grammar above nothing reaches blank, padded, either or ahead.
+claim(count(analysis.faults(g)) == 4 && analysis.faults(g)[0] == "nothing reaches the rule blank")
+sound = grammar.with_reserved(grammar.grammar(`s, {s: seq([ref(`a), grammar.star(alt([ref(`b), ref(`s)]))]), a: grammar.unless(grammar.run("a name", "az"), `words), b: grammar.opt(grammar.guard(ref(`a), false))}), `words, ["if"])
+claim(count(analysis.faults(sound)) == 0)
+// A rule named that the grammar has not, wherever in a form it is named.
+missing = analysis.faults(grammar.grammar(`s, {s: seq([lit("a"), grammar.opt(grammar.star(grammar.guard(alt([ref(`t), ref(`s)]), true)))])}))
+claim(count(missing) == 1 && missing[0] == "the rule s names the rule t, which the grammar has not")
+// The start.
+claim(analysis.faults(grammar.grammar(`t, {s: lit("a")}))[0] == "the grammar begins with the rule t, which it has not" && count(analysis.faults(grammar.grammar(`t, {s: lit("a")}))) == 1)
+// A rule nothing reaches from the start: u and v reach each other, and nothing reaches them.
+apart = analysis.faults(grammar.grammar(`s, {s: ref(`a), a: lit("a"), u: ref(`v), v: seq([ref(`u), ref(`a)])}))
+claim(count(apart) == 2 && apart[0] == "nothing reaches the rule u" && apart[1] == "nothing reaches the rule v")
+// A reserved set a terminal names that the grammar has not.
+unset = analysis.faults(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words)}))
+claim(count(unset) == 1 && unset[0] == "the rule s names the reserved set words, which the grammar has not")
+
 output.write("analysis: ok")
 // expect: analysis: ok
 // end: completed

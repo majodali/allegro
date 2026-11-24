@@ -69,6 +69,8 @@ no_space = (text, at, state) => 0
 export with_state(g, state) => {start: g.start, rules: g.rules, state: state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: g.settled}
 export with_space(g, space, reads) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: space, space_reads: reads, settled: g.settled}
 export with_reserved(g, name, words) => {start: g.start, rules: g.rules, state: g.state, reserved: put(g.reserved, name, added(words, 0, words_of(g.reserved, name, 0))), space: g.space, space_reads: g.space_reads, settled: g.settled}
+// The grammar with other rules, and all else as it was.
+export with_rules(g, rules) => {start: g.start, rules: rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: g.settled}
 // The grammar with the rules of these names marked settled, beside those marked already.
 export with_settled(g, names) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: added(names, 0, g.settled)}
 // The words of the set of that name, or none where there is no such set.
