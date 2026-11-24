@@ -1,6 +1,7 @@
 // Tests of the check-output capability, first version (B-196 (the
 // rebuild's acceptance side), chunk Q16 (the capabilities the launchers
-// ship), part 3): next/launch/report.ts, through the launcher of
+// ship), part 3; chunk Q13 (check and run as configurations, and what a
+// result holds), part 5, for report under check): next/launch/report.ts, through the launcher of
 // next/launch/launcher.ts on the kernel `createKernel` of
 // next/kernel/create.ts gives: the reference, or the variant that keeps its
 // own stack with `ALLEGRO_KERNEL=machine`. Run by `npm run test:next`.
@@ -222,15 +223,23 @@ test("leaving the calls on report out changes nothing the program computes: the 
   assert.deepEqual(without.outcome.lines, ["one", "8"]);
 });
 
-test("under check alone the phase supplies report: its calls act, while a call on output waits and nothing is printed", async () => {
+test("under check alone report is not needed: no message and no status is handed over, a call on output waits and nothing is printed; under check, run the run's calls act", async () => {
   const shape = shapeOf(["check"], undefined, undefined, ["output", "report"]);
   assert.ok(shape.ok);
-  assert.deepEqual(shape.shape.phases, [{ name: "check", capabilities: ["report"] }]);
-  const r = await run(['report.message({level: `warning, text: "checked"})', "report.status(2)", 'output.write("never")', 'report.message("held")'], { ceiling: ["output", "report"], ...shape.shape });
+  assert.deepEqual(shape.shape.phases, [{ name: "check", check: true, capabilities: ["report"] }]);
+  const body = ['report.message({level: `warning, text: "checked"})', "report.status(2)", 'output.write("printed by the run")', 'report.message("held")'];
+  const r = await run(body, { ceiling: ["output", "report"], ...shape.shape });
   assert.deepEqual(r.outcome.lines, []);
-  assert.deepEqual(lines(r.messages), ["warning: checked"]);
-  assert.equal(r.status, 2);
-  assert.equal(describe(r.outcome.end), "waiting: the program waits on the capability(ies) output, which no phase supplies");
+  assert.deepEqual(r.messages, []);
+  assert.equal(r.status, 0);
+  assert.equal(r.outcome.end.kind, "completed");
+  const both = shapeOf(["check", "run"], undefined, undefined, ["output", "report"]);
+  assert.ok(both.ok);
+  const ran = await run(body, { ceiling: ["output", "report"], ...both.shape });
+  assert.deepEqual(ran.outcome.lines, ["printed by the run"]);
+  assert.deepEqual(lines(ran.messages), ["warning: checked", "note: held"]);
+  assert.equal(ran.status, 2);
+  assert.equal(ran.outcome.end.kind, "completed");
 });
 
 test("a module that hands report on to an imported module: the imported module reports through it", async () => {

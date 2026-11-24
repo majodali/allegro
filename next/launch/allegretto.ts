@@ -3,16 +3,18 @@
 // bootstrap), part 3; chunk Q7 (the minimal launcher and the output
 // capability), part 3, for the inputs, part 4, for imports, and part 5,
 // for the timer capability; chunk Q13 (check and run as configurations,
-// and what a result holds), part 2, for the configuration's sources, and
-// part 3, for `--phases`; chunk Q16 (the capabilities the launchers ship),
-// part 3, for check output and the exit code): it emits
+// and what a result holds), part 2, for the configuration's sources,
+// part 3, for `--phases`, and part 5, for `--phases check` as the kernel's
+// check and for `--phases check,run`;
+// chunk Q16 (the capabilities the launchers ship), part 3, for check
+// output and the exit code): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]… [--later name=<literal>]…
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]… [--later name=<literal>]…
 //
 // It prints the lines the program writes. Where the run did not complete
 // it writes the end's reason to stderr. Each message the program hands to
@@ -35,11 +37,13 @@
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
-//     narrows the ceiling. `--phases` sets the phases: `run` or `check`;
-//     check supplies the check capabilities of the ceiling, `report`
-//     alone today, and no input, and run every capability of the ceiling
-//     and the inputs. `check,run` is a finding,
-//     since it is not built yet. Each `--input name=<literal>` supplies
+//     narrows the ceiling. `--phases` sets the phases: `run`, `check` or
+//     `check,run`. Check hands the module to the kernel's `check`: it
+//     performs nothing, leaves every input unknown, and hands the check
+//     capabilities of the ceiling, `report` alone today, as not needed.
+//     Run supplies every capability of the ceiling and the inputs.
+//     `check,run` is the check and, where it finds nothing, the run, whose
+//     lines and end are the command's. Each `--input name=<literal>` supplies
 //     the input `name` at the start. Each `--later name=<literal>` is one
 //     later phase that supplies it, in the order written. The value is
 //     one Allegretto literal, read by `readLiteral` of
@@ -68,7 +72,7 @@ import type { Inputs, Plain } from "./launcher.js";
 import { projectReader } from "./node-files.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run>] [--input name=<literal>]... [--later name=<literal>]...";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);

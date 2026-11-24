@@ -1634,6 +1634,20 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The launcher's check reaches every claim, and check then run (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 5)
+
+B-196 (the rebuild's acceptance side). `--phases check` now hands the
+module to the kernel's `check`, which reaches every claim: one in a
+function nothing calls, and one in either branch of a conditional on an
+unknown input. Nothing is performed under check. Every input is
+unknown, `report` is not needed, and every other capability is not yet
+given. The check ends refuted where it finds a refutation, and
+completes otherwise. `--phases check,run` is built: a run follows a
+check that found nothing, and its lines and end are the run's. A result
+gives the refutations a check found. The corpus gains
+`// phases: check, run`, the line `// check claim at:` and eight
+programs `m3/check-*`.
+
 ### 2026-11 — A claim's place in a result (B-196, chunks Q5 (the first notation and the bootstrap) and Q13 (check and run as configurations, and what a result holds))
 
 B-196 (the rebuild's acceptance side). The bootstrap's emitter writes the
