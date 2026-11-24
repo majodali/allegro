@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-28 — Allegretto read by the engine: the same tree as the
+  bootstrap's.** `next/ext/lib/allegretto.alg`, new: Allegretto's whole
+  grammar as a value, blocks by indentation among it, giving the tree
+  of a text with the place of each part. `next/ext/readers.ts` writes
+  the bootstrap's tree and the engine's in one form and compares them:
+  of the 167 `.alg` texts under `next/`, 165 give the same tree, places
+  among them, and 2 are refused by both. The engine's own text is one
+  of the 165. A place's line is found in a table of where lines begin.
+  With the whole grammar a module of 252 lines takes 3,954,627 steps
+  and about 13 seconds, over the target of 10. What a tree means, its
+  function's description, is not built yet.
 - **2026-11-27 — Rows open to new signs, conflicts settled by the text,
   and errors refused before a text is read.** A row of signs keeps what
   it was made from: `change.level` adds a level to it and

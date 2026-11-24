@@ -37,18 +37,26 @@ export before(l, names) => {name: l.name, signs: l.signs, side: l.side, after: l
 // The level with a function of its own for what its signs give, in place of the row's.
 export making(l, make) => {name: l.name, signs: l.signs, side: l.side, after: l.after, before: l.before, make: make}
 
-export row(operand, levels, sign, make) => made(operand, placed(operand), levels, sign, make, tighter_table(levels, 0, []))
+export row(operand, levels, sign, make) => rebuilt({operand: operand, last: [], levels: levels, sign: sign, make: make})
+// A row whose last operand may be of another form: one that takes all
+// that follows it, as a conditional does, so that it can stand nowhere
+// but last.
+export row_ending(operand, last, levels, sign, make) => rebuilt({operand: operand, last: last, levels: levels, sign: sign, make: make})
+rebuilt(parts) => made(parts, placed(parts.operand), grammar.alt(signs_of(parts.levels, parts.sign, parts.make, 0, [])), tighter_table(parts.levels, 0, []))
 // The form keeps what it was made from, as `row`, so that a level or a sign can be added to it.
-made(operand, shown, levels, sign, make, table) =>
-  kept(grammar.giving(grammar.seq([shown, grammar.star(grammar.seq([grammar.alt(signs_of(levels, sign, make, 0, [])), shown]))]), (v, at) => grouped(levels, table, make, v[1], 0, {h: v[0], t: []}, [])), {operand: operand, levels: levels, sign: sign, make: make})
+made(parts, shown, signs, table) =>
+  if kind(parts.last) == `structure && count(parts.last) == 0 then kept(grammar.giving(grammar.seq([shown, grammar.star(grammar.seq([signs, shown]))]), (v, at) => grouped(parts.levels, table, parts.make, v[1], 0, {h: v[0], t: []}, [])), parts)
+  else kept(grammar.giving(grammar.seq([shown, grammar.star(grammar.seq([signs, shown])), grammar.opt(grammar.seq([signs, placed(parts.last)]))]), (v, at) => grouped(parts.levels, table, parts.make, with_last(v[1], v[2]), 0, {h: v[0], t: []}, [])), parts)
+// The pairs of a sign and an operand, the last pair among them where there is one.
+with_last(pairs, last) => if count(last) == 0 then pairs else put(pairs, [], last[0])
 kept(form, parts) => {op: form.op, gives: form.gives, items: form.items, row: parts}
 
 // True where a form is a row.
 export is_row(form) => has_key(form, `row, 0)
 has_key(s, k, i) => i < count(s) && (kind(key(s, i)) == `symbol && key(s, i) == k || has_key(s, k, i + 1))
 // The row with one more level, and the row with more signs for a level it has.
-export with_level(form, l) => row(form.row.operand, put(form.row.levels, [], l), form.row.sign, form.row.make)
-export with_signs(form, name, signs) => row(form.row.operand, more_signs(form.row.levels, name, signs, 0, []), form.row.sign, form.row.make)
+export with_level(form, l) => rebuilt({operand: form.row.operand, last: form.row.last, levels: put(form.row.levels, [], l), sign: form.row.sign, make: form.row.make})
+export with_signs(form, name, signs) => rebuilt({operand: form.row.operand, last: form.row.last, levels: more_signs(form.row.levels, name, signs, 0, []), sign: form.row.sign, make: form.row.make})
 more_signs(levels, name, signs, i, out) =>
   if i == count(levels) then out
   else if levels[i].name == name then more_signs(levels, name, signs, i + 1, put(out, [], {name: name, signs: joined_lists(signs, 0, levels[i].signs), side: levels[i].side, after: levels[i].after, before: levels[i].before, make: levels[i].make}))

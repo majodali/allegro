@@ -129,7 +129,7 @@ const READER = [
 /** Three modules of this directory that are written flat, as one text: a little over 200 lines. */
 const MODULE = ["grammar.alg", "class.alg", "map.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
 
-test("the speed target: a module of 200 lines of Allegretto is read, one way, in under 10 seconds", DEPTH, async () => {
+test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in under 10 seconds", DEPTH, async () => {
   assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);
   const run = await timed(READER, "next/ext/lib/reader.alg", 50_000_000, MODULE);
   assert.equal(run.end, "completed");
@@ -138,6 +138,20 @@ test("the speed target: a module of 200 lines of Allegretto is read, one way, in
   // The steps do not depend on the machine the test runs on, so they are what is held tight.
   assert.ok(run.steps < 2_600_000, `${run.steps} steps`);
   assert.ok(run.ms < 10_000, `${run.ms} ms`);
+});
+
+// With Allegretto's whole grammar (allegretto.alg), blocks by indentation among it, the same text takes
+// about 1.6 times the steps, and the time is over the target: 13 seconds where this was measured. That
+// is recorded and not hidden: the test holds the steps, so that they do not grow unseen, and prints the
+// time. Whether the target stands, and what is done to meet it, is the maintainer's to rule.
+test("the same module with Allegretto's whole grammar: read one way, the steps held, the time printed", DEPTH, async () => {
+  const reader = READER.replace("import flat", "import allegretto").replace("flat.allegretto", "allegretto.language");
+  assert.notEqual(reader, READER);
+  const run = await timed(reader, "next/ext/lib/reader.alg", 50_000_000, MODULE);
+  assert.equal(run.end, "completed");
+  assert.deepEqual(run.lines, ["1"], "the text reads one way");
+  console.log(`engine, whole grammar: ${MODULE.split("\n").length} lines, ${MODULE.length} bytes, read in ${run.steps} steps and ${run.ms} ms`);
+  assert.ok(run.steps < 4_300_000, `${run.steps} steps`);
 });
 
 test("a text of twice the length takes about twice the steps", DEPTH, async () => {

@@ -605,7 +605,7 @@ are:
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
-| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | with the acceptance stream: both readers agree on every program of the corpus |
+| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Open: what a tree means, compared by identity; and the speed target, missed with the whole grammar (§7) |
 | E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
 | E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
@@ -2119,6 +2119,75 @@ its approval.
   - *Deliberate faults*: 19 made, 18 caught at first; the one missed
     showed a missing test, of words reserved in a set that has a
     replaced rule's name, which is added.
+- **2026-11-28 — chunk E7, first part: the tree of a text** (the
+  review session). The maintainer confirmed the reading of the rulings
+  on PR #315: yes to operators added by a notation and to a conflict
+  settled by the using text; and what was built for the state stands
+  until E8.
+  - *Two parts.* The row of E7 asks that a module's text give its
+    function's description, its declarations and the number of its
+    keys, the same as the bootstrap's by identity. The bootstrap does
+    that in two steps: a reader, which gives a tree of what is written,
+    and an emitter, which gives the tree a meaning. This part is the
+    first step. The second is the emitter's 991 lines of host code
+    written in Allegretto. The maintainer is asked to take them as two
+    chunks.
+  - *The grammar.* `allegretto.alg`: 20 rules. It is the bootstrap's
+    grammar read off `src/grammar2/base-grammar.ts` and
+    `next/bootstrap/allegretto-grammar.ts`, where the first item that
+    matches wins, written for an engine that tries every item. Four
+    places needed care, each a text the engine could read two ways:
+    - a body on the line after `=>` is a block where one can be read,
+      and an expression carried on otherwise: the expression's item
+      has a guard that no block can be read there;
+    - `x <- e` could be `x < -e`: the statement's item has a guard;
+    - a function and a conditional take all that follows them, so
+      `x => x + 1` is not `(x => x) + 1`: among signs they stand last,
+      by `levels.row_ending`, new, or not at all;
+    - a minus before a fraction written out is part of the number.
+  - *The same tree.* `next/ext/readers.ts` writes each reader's tree
+    as one text in one form, with every place, and compares.
+    `npx tsx next/ext/readers.ts` reads every `.alg` under `next/`:
+    167 texts, 165 the same, 2 refused by both, in 116,209,098 steps
+    and about seven minutes. The suite compares a part of 14 texts and
+    7 small ones, in about 30 seconds. The first comparison differed in
+    one thing: a block's place begins at the end of the line before
+    it, and with `sync` straight after the sign. `offside.indent_from`
+    is for that.
+  - *The engine reads itself.* `engine.alg`, `analysis.alg`,
+    `grammar.alg` and `allegretto.alg` are among the 165: the engine
+    reads its own text into the tree the bootstrap gives it.
+  - *Where the two readers are known to differ, outside the corpus.*
+    The engine reads a little more: a word or a sign reads the space
+    after it, so `x` on one line and `= 1` on a deeper one is read
+    where the bootstrap wants them on one line. The bootstrap parses
+    `and`, `or` and `0b101` and then refuses them; the engine does not
+    read them. A line that holds only a comment has no column here;
+    in the bootstrap its column can end a block. A tab is one column
+    here, as ruled, and up to four there.
+  - *Places.* A line was counted from the beginning of the text for
+    every place: the first comparison took six times the steps it
+    takes now. The engine keeps the positions at which lines begin,
+    made once for a text when a line is first asked for, and finds a
+    line by halving.
+  - *Speed, with the whole grammar.* The 252 lines of the speed test:
+    3,954,627 steps and about 13 seconds, where `flat.alg` takes
+    2,426,852 and 8. The target of 10 seconds is missed. The plan says
+    it stops for a ruling where the target is missed; this is that
+    stop. What was measured: the guard on a body costs 7 to 11 percent
+    of the steps, and the functions of the forms 6 percent, so most of
+    the difference is the grammar itself: nine kinds of line, each
+    tried from a name, and space that reads the state at every word.
+    What may help, none of it built: the four text primitives, once an
+    Allegretto text can name them; one reading shared by a body's
+    block and its guard; rules remembered under a state; a faster
+    kernel.
+  - *Deliberate faults*: 18 made in the grammar, the line table and
+    the row's ending, judged by the comparison with the bootstrap and
+    the grammar's own tests. 17 caught at first; the one missed, hex
+    digits in small letters, has a test now.
+  - *The engine's tests in under a minute* is missed too: the two test
+    files take about 45 and 30 seconds.
 
 ## 8. Sessions
 

@@ -82,7 +82,7 @@ only(a) => if is_failure(a) then a else then(claim(count(a.readings.t) == 0), a.
 context(p, text, source) => knot(p, text, source, bits.length(text) / 8)
 // The table reads the context it is part of.
 knot(p, text, source, len) =>
-  c = {text: text, source: source, len: len, rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: []}
+  c = {text: text, source: source, len: len, lines: line_starts(text, len, 0, [0]), rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: []}
   c
 
 read_all(c, p) => answer(c, read(c, p.top, 0, p.state))
@@ -101,10 +101,19 @@ length(l, n) => if count(l) == 0 then n else length(l.t, n + 1)
 // ---- Places ----
 
 // The place from the byte `start` to the byte `stop` of the text.
-place(c, start, stop) => {source: c.source, start: location(c.text, start), end: location(c.text, stop)}
-location(text, i) => {index: i, line: line_of(text, i, 0, 1), column: i - line_start(text, i) + 1}
-line_of(text, i, k, n) => if k >= i then n else line_of(text, i, k + 1, if grammar.byte(text, k) == 10 then n + 1 else n)
-line_start(text, i) => if i == 0 || grammar.byte(text, i - 1) == 10 then i else line_start(text, i - 1)
+place(c, start, stop) => {source: c.source, start: location(c, start), end: location(c, stop)}
+// The line of a position is found in `lines`, the positions at which the
+// lines of the text begin: the last that is not after it. The list is
+// made once for a text, when a line is first asked for.
+location(c, i) => located(c, i, line_at(c.lines, i, 0, count(c.lines) - 1))
+located(c, i, n) => {index: i, line: n + 1, column: i - get(c.lines, n) + 1}
+line_at(lines, i, low, high) => if low >= high then low else line_half(lines, i, low, high, (low + high + 1) / 2)
+line_half(lines, i, low, high, mid) => if get(lines, mid) <= i then line_at(lines, i, mid, high) else line_at(lines, i, low, mid - 1)
+line_starts(text, len, i, out) =>
+  if i >= len then out
+  else if grammar.byte(text, i) == 10 then line_starts_next(text, len, i + 1, put(out, [], i + 1))
+  else line_starts(text, len, i + 1, out)
+line_starts_next(text, len, i, out) => then(out, line_starts(text, len, i, out))
 
 // ---- The table of what is remembered ----
 
@@ -228,7 +237,7 @@ next_turn(c, name, body, at, st, n, k, p, m) =>
   else if k > c.len - at + 1 then refuse("a rule reads itself and no byte between")
   else in_turns(c, name, body, at, st, p.rs, m, k + 1)
 // The context with one more rule being read in turns at this position.
-seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, rules: c.rules, space: c.space, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}}
+seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, lines: c.lines, rules: c.rules, space: c.space, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}}
 // What a rule being read in turns at this position has so far, as {h}, or [].
 seed_of(c, name, at) => if at == c.seed_at then seed_in(c.seeds, name) else []
 seed_in(l, name) => if count(l) == 0 then [] else if l.name == name then {h: l} else seed_in(l.t, name)

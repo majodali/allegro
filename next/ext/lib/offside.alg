@@ -21,6 +21,10 @@
 //              it, where that line is at the block's column.
 //   indent     reads nothing: holds at the first thing on a line that is
 //              deeper than the block. That column is the new block's.
+//   indent_from  the same, for a grammar whose words read no space before
+//              a block: it stands at the end of a line, reads up to what
+//              the next line with anything on it has, where that is
+//              deeper than the block, and that column is the new block's.
 //   dedent     reads nothing: holds at the end of a line where the next
 //              line with anything on it is less deep than the block, or
 //              there is none. The block before is the block again.
@@ -58,6 +62,7 @@ export made(blank) => {
   space: (text, at, st) => space_to(text, blank, at, st, blank(text, at)),
   newline: grammar.stepper("a new line", (text, at, st) => line_to(text, blank, at, st, blank(text, at)), false, class.no_ranges, false),
   indent: grammar.stepper("a deeper line", (text, at, st) => deeper(text, at, st), false, class.no_ranges, true),
+  indent_from: grammar.stepper("a deeper line", (text, at, st) => deeper_from(text, at, st, content(text, blank, at + 1)), false, class.no_ranges, false),
   dedent: grammar.stepper("the end of a block", (text, at, st) => shallower(text, blank, st, blank(text, at)), false, class.no_ranges, true),
   sameline: grammar.term("more on the line", (text, at) => if leads(text, at) || byte(text, at) == 10 || byte(text, at) == -1 then -1 else 0, false, class.no_ranges, true),
   ending: grammar.term("the end of the text", (text, at) => if content(text, blank, at) < 0 then bits.length(text) / 8 - at else -1, false, class.no_ranges, true)}
@@ -70,6 +75,10 @@ level(text, at, st, r) => if r >= 0 && column(text, r) == top(st) then {read: r 
 
 deeper(text, at, st) =>
   if leads(text, at) && byte(text, at) != 10 && byte(text, at) != -1 && column(text, at) > top(st) then {read: 0, state: column(text, at) ++ st}
+  else []
+
+deeper_from(text, at, st, r) =>
+  if byte(text, at) == 10 && r >= 0 && column(text, r) > top(st) then {read: r - at, state: column(text, r) ++ st}
   else []
 
 shallower(text, blank, st, p) =>

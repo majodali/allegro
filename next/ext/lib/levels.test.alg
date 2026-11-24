@@ -75,6 +75,16 @@ claim(by(levels.with_level(two, named_power), "1+2^3*4") == "(1+(pow(2,3)*4))")
 // Placing a level leaves its function as it was, and adding signs too.
 claim(by(levels.with_signs(levels.with_level(two, levels.after(levels.making(levels.level(`power, ["^"], `right), (sign, left, right, at) => "p"), [`product])), `power, ["**"]), "2**3") == "p")
 
+// ---- A row whose last operand may be of another form ----
+// Here a last operand may be "all" and then letters: it takes whatever letters follow.
+rest = grammar.giving(grammar.seq([grammar.lit("all"), grammar.run("letters", "az")]), (v, at) => "<" ++ v[1] ++ ">")
+ended = levels.row_ending(number, rest, [sum, product], grammar.lit, bracketed)
+claim(by(ended, "1+2*allxyz") == "(1+(2*<xyz>))" && by(ended, "1*2+allxyz") == "((1*2)+<xyz>)" && by(ended, "1+2") == "(1+2)" && by(ended, "7") == "7")
+// It stands nowhere but last, and a row is not that form alone.
+claim(is_failure(engine.parses(engine.prepared(grammar.grammar(`e, {e: ended})), "allx+1")) && is_failure(engine.parses(engine.prepared(grammar.grammar(`e, {e: ended})), "allx")))
+// A level added to such a row leaves its last operand as it was.
+claim(by(levels.with_level(ended, power), "2^allq") == "(2^<q>)")
+
 output.write("levels: ok")
 // expect: levels: ok
 // end: completed
