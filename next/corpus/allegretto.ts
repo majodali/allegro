@@ -7,7 +7,8 @@
 // (check and run as configurations, and what a result holds), part 1, for
 // the result and the `// summary:` line, and part 3, for the `// phases:`
 // line; chunk Q16, part 3, for the check-output capability and the
-// `// reports:` and `// status:` lines): how a
+// `// reports:` and `// status:` lines; chunk Q5 (the first notation and
+// the bootstrap) with chunk Q13, for the `// claim at:` line): how a
 // program under next/corpus/allegretto/ states what it must do, and how it
 // is run and compared. The convention is next/corpus/allegretto/README.md.
 // One implementation, used by the programs' test
@@ -47,6 +48,17 @@
 //                             `undecided`, `assumed`, `sampled` or
 //                             `decided`. At most one line. A program that
 //                             states none is not compared on it;
+//   // claim at: <line>:<column> <word>
+//                             the claim written at that line and column
+//                             of the program's own text came out with
+//                             that word (`claimWord` of
+//                             next/launch/launcher.ts, the rule the
+//                             summary uses for one claim): `decided`,
+//                             `sampled`, `assumed`, `undecided`,
+//                             `refuted` or `waiting`. A program may state
+//                             several. A line that names a place where no
+//                             claim of the result is written fails the
+//                             program;
 //   // phases: check         the phases the run applies, as the setting
 //                             `phases` of next/tools/configuration.ts names
 //                             them: `check` alone is the one value built
@@ -82,10 +94,11 @@
 // loaded first, with the output capability, the timer capability, the
 // HTTP capability, the check-output capability, the shipped primitives and
 // its inputs. It passes when its lines, its end, the lines printed before
-// each later phase and, where stated, its yielded keys, its summary, its
-// messages and its status are the expected ones. A run gives the launcher's
-// result (`ProgramRun.result`): its claims, its summary and what it rests
-// on.
+// each later phase and, where stated, its yielded keys, its summary, the
+// word of each claim it names by its place, its messages and its status
+// are the expected ones. A run gives the launcher's result
+// (`ProgramRun.result`): its claims, each with its place, its summary and
+// what it rests on.
 //
 // The ceiling grants `output`, `timer`, `http` and `report`. The timer capability
 // (next/launch/timer.ts) is made, for each run, with a new virtual clock
@@ -121,7 +134,7 @@ import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.
 import { boundedReader } from "../launch/files.js";
 import { nodeFiles } from "../launch/node-files.js";
 import { readLiteral } from "../bootstrap/literal.js";
-import { launch, plainValue, STRENGTHS, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
+import { CLAIM_WORDS, claimWord, launch, plainValue, STRENGTHS, type ClaimWord, type Inputs, type LaunchEnd, type LaunchResult, type Plain, type Strength } from "../launch/launcher.js";
 import { shapeOf } from "../tools/configuration.js";
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
@@ -271,6 +284,51 @@ export function readSummary(text: string): { summary: Strength | undefined; prob
     else problems.push(`the line ${JSON.stringify(line.trim())} states no summary: the words are ${STRENGTHS.join(", ")}`);
   }
   return { summary, problems };
+}
+
+/** One `// claim at:` line: the line and column of the program's own text where the claim is written, and its word. */
+export interface ClaimLine {
+  readonly line: number;
+  readonly column: number;
+  readonly word: ClaimWord;
+}
+
+/**
+ * A program's `// claim at:` lines, in order, and the problems of the
+ * lines that cannot be read. A line is `<line>:<column> <word>`: the line
+ * and column whole numbers from 1, the word one of `CLAIM_WORDS`.
+ */
+export function readClaimLines(text: string): { claims: ClaimLine[]; problems: string[] } {
+  const claims: ClaimLine[] = [];
+  const problems: string[] = [];
+  for (const line of text.split("\n")) {
+    const m = /^\s*\/\/\s*claim at:\s?(.*)$/.exec(line);
+    if (m === null) continue;
+    const s = /^([1-9][0-9]*):([1-9][0-9]*)\s+(\S+)\s*$/.exec(m[1].trim());
+    if (s === null || !(CLAIM_WORDS as readonly string[]).includes(s[3]))
+      problems.push(`the line ${JSON.stringify(line.trim())} is not of the form claim at: <line>:<column> <word>, the word one of ${CLAIM_WORDS.join(", ")}`);
+    else claims.push({ line: Number(s[1]), column: Number(s[2]), word: s[3] as ClaimWord });
+  }
+  return { claims, problems };
+}
+
+/**
+ * The problems of a run's claims against the `// claim at:` lines: for
+ * each line, every claim of the result written at that line and column of
+ * `file` must have the word stated, and there must be one. The launcher's
+ * `at` says where a claim was written; nothing here reads more.
+ */
+export function claimProblems(result: LaunchResult, file: string, stated: readonly ClaimLine[]): string[] {
+  const problems: string[] = [];
+  for (const s of stated) {
+    const there = result.claims.filter((c) => c.at !== undefined && c.at.source === file && c.at.start.line === s.line && c.at.start.column === s.column);
+    if (there.length === 0) problems.push(`no claim of the result is written at ${s.line}:${s.column} of ${file}`);
+    for (const c of there) {
+      const word = claimWord(c);
+      if (word !== s.word) problems.push(`the claim at ${s.line}:${s.column} came out ${word}, expected ${s.word}`);
+    }
+  }
+  return problems;
 }
 
 /**
@@ -437,6 +495,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   const problems: string[] = [];
   if (pins.end === undefined) problems.push("the program states no `// end:` line");
   const summaryLine = readSummary(text);
+  const claimLines = readClaimLines(text);
   const e = emitted(text, file, readText);
   if ("findings" in e) {
     const stated = pins.end !== undefined && pins.end.startsWith("refused: ") ? pins.end.slice("refused: ".length) : undefined;
@@ -446,6 +505,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (pins.lines.length > 0) problems.push(`nothing was launched, and ${pins.lines.length} \`// expect:\` line(s) are stated`);
     if (pins.later.length > 0 || pins.yields !== undefined) problems.push("nothing was launched, and the program states a `// later:` or `// yields:` line");
     if (summaryLine.summary !== undefined) problems.push("nothing was launched, and the program states a `// summary:` line");
+    if (claimLines.claims.length > 0) problems.push("nothing was launched, and the program states a `// claim at:` line");
     if (readPhases(text).phases !== undefined) problems.push("nothing was launched, and the program states a `// phases:` line");
     if (readReports(text).reports !== undefined || readStatus(text).status !== undefined) problems.push("nothing was launched, and the program states a `// reports:` or `// status:` line");
     // The end is the refusal as the program states it where a finding matches, and the first finding's message otherwise.
@@ -459,7 +519,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   // The phases, as the resolver makes them of the setting `phases`.
   const shape = "problems" in given || phaseLine.problems.length > 0 ? undefined : shapeOf(phaseLine.phases, given.inputs, given.later, CEILING);
   const shapeProblems = shape === undefined || shape.ok ? [] : [...shape.findings];
-  const lineProblems = [...network.problems, ...summaryLine.problems, ...phaseLine.problems, ...shapeProblems, ...reportLines.problems, ...statusLine.problems];
+  const lineProblems = [...network.problems, ...summaryLine.problems, ...claimLines.problems, ...phaseLine.problems, ...shapeProblems, ...reportLines.problems, ...statusLine.problems];
   if ("problems" in given || lineProblems.length > 0) {
     problems.push(...("problems" in given ? given.problems : []), ...lineProblems);
     return { pins, findings: [], lines: [], end: null, yields: undefined, requests: [], result: undefined, messages: [], status: 0, problems };
@@ -490,6 +550,11 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     if (outcome.result === undefined) problems.push(`the launcher refused the run, and the program states the summary ${summaryLine.summary}`);
     else if (outcome.result.summary !== summaryLine.summary)
       problems.push(`the summary is ${JSON.stringify(outcome.result.summary)}, expected ${JSON.stringify(summaryLine.summary)}`);
+  }
+  // Each claim the program states by its place: the launcher's place and the summary's rule for one claim.
+  if (claimLines.claims.length > 0) {
+    if (outcome.result === undefined) problems.push("the launcher refused the run, and the program states a `// claim at:` line");
+    else problems.push(...claimProblems(outcome.result, file, claimLines.claims));
   }
   // The messages and the status, where the program states them: compared as `// expect:` lines are.
   // A line's trailing spaces are not stated, as for `// expect:` lines.

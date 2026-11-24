@@ -46,12 +46,12 @@ import * as path from "path";
 import { spawnSync } from "child_process";
 import { createKernel } from "../kernel/create.js";
 import type { Value } from "../kernel/interface.js";
-import { load } from "../kernel/saved-program.js";
+import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -342,6 +342,37 @@ test("the programs and the texts they import write every form of forms.md §2, i
   assert.deepEqual(missing, []);
 });
 
+test("every record of the programs and their imported texts checks, carries places, and has the identity it has with every place taken out", () => {
+  const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
+  /** The identity of a record's module, loaded into a new kernel after the records it imports. */
+  const identity = (records: readonly SavedProgram[]): string | undefined => {
+    const k = createKernel();
+    const primitives = new Map(records.flatMap((doc) => doc.needs).map((n) => [n.hash, k.primitiveFunction(byHash.get(n.hash)!)] as const));
+    let last: Value | undefined;
+    for (const doc of records) last = load(k, doc, primitives);
+    return k.moduleOf(last as Value);
+  };
+  /** The record with `at` taken out of every node. */
+  const unplaced = (doc: SavedProgram): SavedProgram => ({ ...doc, nodes: doc.nodes.map((n) => ("at" in n ? (({ at: _, ...rest }) => rest)(n) : n) as SavedProgram["nodes"][number]) });
+  let records = 0;
+  for (const file of FILES) {
+    const r = drive(text(file), file, readUnder(ROOT));
+    if (!r.ok) continue;
+    const docs = r.records.map((x) => JSON.parse(encode(x.program)) as SavedProgram);
+    docs.forEach((doc, i) => {
+      const where = r.records[i].file;
+      assert.deepEqual(check2(doc), [], where);
+      assert.ok(doc.nodes.some((n) => "at" in n && n.at?.source === where), `${where}: a node carries a place in its own file`);
+      const placedId = identity(docs.slice(0, i + 1));
+      assert.match(placedId ?? "", /^sha256:[0-9a-f]{64}$/, where);
+      assert.equal(identity([...docs.slice(0, i), unplaced(doc)]), placedId, `${where}: a place is no part of the module's identity`);
+      assert.equal(placedId, r.records[i].identity, `${where}: the identity the driver took`);
+      records++;
+    });
+  }
+  assert.ok(records > 0);
+});
+
 test("npm run allegretto emits and launches in one step: it prints the lines, and exits 0 on completed and 1 otherwise", () => {
   const run = (file: string) => spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   const hello = run("next/launch/fixtures/hello.alg");
@@ -408,6 +439,66 @@ test("the programs that state a summary: a claim that holds, one refuted, one as
     const run = await runProgram(text(file), file);
     assert.deepEqual(run.problems, [], file);
     assert.equal(run.result?.summary, summary, file);
+  }
+});
+
+
+// ── The claim at line (chunks Q5 and Q13, 2026-11-23) ─────────────────
+
+test("the claim at lines are read as the convention states: a line, a column and a word, several in order", () => {
+  assert.deepEqual(readClaimLines("// claim at: 2:1 decided\n//claim at:  10:7   waiting  \n"), {
+    claims: [{ line: 2, column: 1, word: "decided" }, { line: 10, column: 7, word: "waiting" }],
+    problems: [],
+  });
+  assert.deepEqual(readClaimLines("capability output\n"), { claims: [], problems: [] });
+  const form = "is not of the form claim at: <line>:<column> <word>, the word one of refuted, undecided, waiting, assumed, sampled, decided";
+  assert.deepEqual(readClaimLines("// claim at: 2 decided\n// claim at: 0:1 decided\n// claim at: 2:1 proven\n// claim at: 2:1\n").problems, [
+    `the line "// claim at: 2 decided" ${form}`,
+    `the line "// claim at: 0:1 decided" ${form}`,
+    `the line "// claim at: 2:1 proven" ${form}`,
+    `the line "// claim at: 2:1" ${form}`,
+  ]);
+});
+
+test("a program that states a claim at a place passes only with that word; a place where no claim is written fails it", async () => {
+  const program = 'capability output\nclaim(1 == 1)\nassume(2 == 2)\noutput.write("after")\nclaim(1 == 2)\n// expect: after\n// end: refuted: a claim that is not true\n';
+  const plain = await runProgram(program, "dir/claims.alg");
+  assert.deepEqual(plain.problems, []);
+  assert.ok(plain.result?.claims.some((c) => c.at?.source === "dir/claims.alg" && c.at.start.line === 2), "each claim has its place in the program's own file");
+  assert.deepEqual((await runProgram(program + "// claim at: 2:1 decided\n// claim at: 3:1 assumed\n// claim at: 5:1 refuted\n", "dir/claims.alg")).problems, []);
+  assert.deepEqual((await runProgram(program + "// claim at: 2:1 assumed\n", "dir/claims.alg")).problems, ["the claim at 2:1 came out decided, expected assumed"]);
+  assert.deepEqual((await runProgram(program + "// claim at: 2:2 decided\n", "dir/claims.alg")).problems, ["no claim of the result is written at 2:2 of dir/claims.alg"]);
+  assert.deepEqual((await runProgram(program + "// claim at: 9:1 decided\n")).problems, ["no claim of the result is written at 9:1 of <text>"]);
+  const malformed = await runProgram(program + "// claim at: two:one decided\n");
+  assert.equal(malformed.problems.length, 1);
+  assert.match(malformed.problems[0], /is not of the form claim at: <line>:<column> <word>/);
+  assert.deepEqual(malformed.lines, [], "a program whose lines cannot be read is not launched");
+});
+
+test("a claim that still waits when the run ends is stated waiting; a claim at line where nothing is launched fails the program", async () => {
+  const waits = await runProgram(
+    "capability output\ninput n\nclaim(n == 1)\n// end: waiting: the program waits on the input(s) n, which the configuration does not supply\n// claim at: 3:1 waiting\n",
+  );
+  assert.deepEqual(waits.problems, []);
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// claim at: 2:1 decided\n");
+  assert.deepEqual(notEmitted.problems, ["nothing was launched, and the program states a `// claim at:` line"]);
+  const refusedRun = await runProgram("capability output\ninput a\nclaim(a == 1)\n// input: b = 1\n// end: refused: the configuration supplies the input b at the start, which the module does not declare\n// claim at: 3:1 decided\n");
+  assert.deepEqual(refusedRun.problems, ["the launcher refused the run, and the program states a `// claim at:` line"]);
+});
+
+
+test("the programs that state claims by their place: claims that hold, one refuted, one assumed, one undecided, and one that waits when the run ends", async () => {
+  for (const [name, stated] of [
+    ["claim-holds", ["4:1 decided", "7:1 decided"]],
+    ["claim-refuted", ["5:1 decided", "7:1 refuted"]],
+    ["result-assumed", ["7:1 decided", "8:1 assumed"]],
+    ["assume-undecided", ["7:1 assumed", "10:1 undecided"]],
+    ["input-not-supplied", ["8:1 decided", "10:1 waiting"]],
+  ] as const) {
+    const file = `${PROGRAMS_DIR}/m3/${name}.alg`;
+    assert.deepEqual(readClaimLines(text(file)).claims.map((c) => `${c.line}:${c.column} ${c.word}`), stated, file);
+    const run = await runProgram(text(file), file);
+    assert.deepEqual(run.problems, [], file);
   }
 });
 
