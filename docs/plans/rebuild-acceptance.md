@@ -3981,3 +3981,36 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     kernel and 968 with `ALLEGRO_KERNEL=reference`; all pass but one
     marked to do on each. 43 tests are new on each. `npm run
     harness:next` runs 129 programs, and all pass on both variants.
+- **2026-11-24 — The nine asks of PR #313 answered: the test phase stands as built.**
+  This stream set out the nine asks of PR #313 in session, each with a
+  run of the PR's head and a recommendation. The maintainer, in session,
+  on 2026-11-24: "1-9: I agree with your recommendations." And: "On ask
+  3 - I can see some value in making (b), each test gets its own module
+  instance, an option available via configuration. Not a priority now,
+  we can revisit later if the need arises." What that settles, by ask:
+  1. *What a test is.* A function of no parameters among what a module
+     yields, named by its binding. A test passes when its evaluation
+     completes, whether or not it evaluated a claim. Flagging a test
+     that evaluates no claim is left as a later check.
+  2. *How tests are evaluated.* One load, then each test by its own
+     evaluation in the same kernel and of the same module instance, each
+     with the step budget to itself.
+  3. *An answer a finished test did not wait for* is dropped, as built.
+     A fresh module instance for each test may become an option of the
+     configuration later. It is not built and has no date.
+  4. *The test versions of capabilities* the terminal gives. Serving
+     canned answers to a project's tests through `http` is the first
+     addition named, and is not built.
+  5. *What the commands print and hand over*, the load's lines not shown
+     for a passing run and a status handed through `report` standing
+     where every test passes included.
+  6. *The setting's values* `test` and `check, test`.
+  7. *The corpus lines.*
+  8. *Finding the tests evaluates the bindings read.* Accepted: a test
+     module is written for the test phase. This stream carries to the
+     kernel session the question whether a host can tell what a binding
+     is without evaluating it.
+  9. *The terms* "test module", "the load" and "test version of a
+     capability" are ratified.
+  The same day the maintainer answered the last ask of PR #306, and
+  PR #304, PR #306 and PR #311 merged.
