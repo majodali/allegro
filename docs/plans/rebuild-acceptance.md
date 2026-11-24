@@ -3408,3 +3408,146 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   standard language's notation in the bootstrap), which waits on the
   forms the kernel stream rules, and chunk Q12 (the cases of each
   milestone, realised) for milestone 4.
+- **2026-11-23 — The asks of PR #299 confirmed, and what the kernel stream's merges of the day open.**
+  The maintainer, on PR #299 and in session, on 2026-11-23: "All asks
+  confirmed", and the pull request is set to merge. So the check-output
+  capability stands as built: the name `report` and its parts `message`
+  and `status`; what a message is; that neither part gives a program
+  anything or refuses a value; the highest status from 0 to 255; that a
+  message does not set the status; the exit code of both commands; the
+  terminal's line; and the reader's fix, a symbol literal that names any
+  word.
+  The kernel stream merged two pull requests the same day, after the
+  maintainer carried this stream's message to that session.
+  - PR #301: a part of a program can say where it was written, and a
+    claim's record gives that place. A saved program's node of kind
+    `expression`, `function` or `structure` may carry `at`. Three
+    decisions are recorded in `docs/plans/book-pass-inventory.md`, and
+    the decision map gives two of them to this stream: "Check reaches
+    every claim" and "A phase leaves a capability out as not yet given
+    or as not needed".
+  - PR #302: `Kernel.observe`, a hook that tells the host of a branch,
+    a call, a claim and an effect, each with its place.
+  What this changes for this stream:
+  1. **The emitter can write places**, and a result can then show a
+     claim by its file and line. That is the next chunk, and it waits on
+     nothing.
+  2. **Check is to reach every claim**: it specializes with nothing
+     bound, takes both branches of a conditional whose condition is
+     unknown, and specializes every function a module binds. A claim
+     comes out decided, refuted, or waiting with what it waits for
+     named. A check has three phases: the specialization, an analysis by
+     the host, and running tests. The kernel's part, an evaluation of a
+     module that takes both branches, is the kernel stream's and is not
+     built. The launcher's check follows it.
+  3. **A phase leaves a capability out in one of two ways**, not yet
+     given or not needed, and the choice is the phase's. Nothing of it
+     is built, and the maintainer holds that it needs more analysis on
+     real cases. One point to settle with it: the decision's use case
+     has a run leave out, as not needed, a capability that check gives a
+     module. The run of PR #299 supplies `report`, so that a script's
+     messages and status are handed over.
+- **2026-11-23 — Places: the notation writes where each part was written, and a result gives a claim's place.**
+  B-196 (the rebuild's acceptance side), chunks Q5 (the first notation
+  and the bootstrap) and Q13 (check and run as configurations, and what a
+  result holds). The kernel stream's PR #301 lets a part say where it was
+  written. The bootstrap's emitter now writes that place into every
+  record, and the launcher's result copies it onto each claim. Nothing
+  printed changes. The six points, as built:
+  1. **The emitter writes a place on every node it may.** Each node of
+     kind `expression`, `function` or `structure` that a part of the
+     text gives rise to carries `at`, the kernel's `Place`. Its `source`
+     is the name the text is emitted under: the file, as the driver has
+     it, or `<text>` for a text emitted with no name (`UNNAMED` of
+     `next/bootstrap/emit.ts`, the name `describeFinding` already gave
+     such a text). `start` and `end` are the index, line and column of
+     the part's first character and of the point after its last. The
+     reader keeps offsets and the line and column of a start only, so
+     `locationAt` of `next/bootstrap/reader.ts` gives the line and
+     column of any offset; the reader's own places use it too. The
+     reader's module keeps the text it read (`Module.text`), its line
+     ends `\r\n` written `\n`, and every index counts in it. A node made
+     for what a form stands for takes the form's place: the claim, the
+     negation and the call of `is_failure` that a dropped statement
+     stands for take the statement's; the call an operator stands for
+     takes the operator expression's; `get` takes the place of `p.a`;
+     the kernel's block, its bindings and each link of its chain take
+     the block's; the module function and the structure it yields take
+     the whole text's. The emitter shared no node that now carries a
+     place, so no sharing was undone and the records have the same
+     nodes. A test loads every record of the corpus with and without its
+     places, on the kernel the environment chooses, and the identity is
+     the same.
+  2. **The driver** emits each text under its file, so an imported
+     text's parts name their own file.
+  3. **A result gives each claim's place.** `ClaimResult` gains `place`,
+     copied field by field from the first record of the claim that gives
+     `ClaimRecord.at`. The key `at` keeps its name. The comment says that
+     the kernel's record names the two the other way round.
+  4. **Nothing printed changes.** No command prints `place`, and no
+     `// end:` line changed. Showing a place is chunk Q14 (the commands).
+  5. **The corpus runner** reads `// claim at: <line>:<column> <word>`.
+     The word is `claimWord` of `next/launch/launcher.ts`, the summary's
+     rule for one claim, which `summaryOf` now reads too. It gives
+     `waiting` where the summary's rule says undecided because the claim
+     still waits. A line that names a place where no claim is written
+     fails the program. Five programs gained two lines each:
+     `claim-holds`, `claim-refuted`, `result-assumed`, `assume-undecided`
+     and `input-not-supplied`. The line names a place of the program's
+     own text only, so no line states a claim in an imported text.
+  6. **The fixture** `next/launch/fixtures/hello.json` is regenerated with
+     the emitter, since a test compares it with what the emitter writes
+     for `hello.alg`. Its places name `<text>`, as that test emits it.
+     `npm run launch -- next/launch/fixtures/hello.json` prints `hello,
+     world`.
+  - **The nodes that carry no place.** The nodes of the kinds that have
+    no `at`: bits, symbol, datum, param, kernel and primitive. The nodes
+    of Allegretto's own functions, `is_failure`, `handle`, `each` and
+    the rest: their text is kept in the emitter, not in a file the
+    program names. So a claim written inside `each` has no place in a
+    result (`streams.alg` shows one). The structure of `int`, `float`,
+    `text` or `bits`, which Allegretto binds and the emitter writes once.
+    The block around the module's own that binds the own functions a
+    text uses, which no part of the text writes.
+  - **One existing assertion changed.** The driver's test that compares
+    its record with the emitter's emits the text under the driver's file
+    name, since every place names the file.
+  - **What the kernel did.** Both variants gave every claim the place of
+    the claim's node, and the same places in every program and test.
+    Nothing was found that the interface or the forms do not say.
+  - **Measured.** `npm run test:next` runs 893 tests on the default
+    kernel and 892 with `ALLEGRO_KERNEL=reference`; all pass but one
+    marked to do on each. 15 tests are new on each. `npm run harness:next` runs 110
+    programs, and all pass on both variants. The corpus gives 124
+    records, which hold 5,360 nodes of the three kinds; 3,758 carry a
+    place.
+- **2026-11-23 — A held claim is neither refuted nor logged.**
+  The maintainer, in session, on 2026-11-23: "I worked through the
+  check phase handling of claims with the kernel session. Held claims
+  will neither be refused or logged." This closes the question this
+  stream had put, who chooses whether a held claim is refuted or
+  logged, and this stream withdraws the setting it proposed. It reads
+  the ruling with the decision "Check reaches every claim": under check
+  a claim comes out decided, refuted, or waiting, and the result names
+  what it waits for. A claim that waits stays in the result as waiting,
+  and the summary counts it as undecided, as ratified. Nothing refutes
+  it and nothing writes a message about it. A configuration may require
+  more, such as that no claim is left waiting. The word for one claim
+  in a result has `waiting` among its values since the entry above
+  (`claimWord`), which fits this.
+  One question is open with the maintainer, asked the same day: whether
+  a run supplies `report`, as PR #299 built it, or leaves it out as not
+  needed, as the use case of "A phase leaves a capability out as not
+  yet given or as not needed" has it.
+- **2026-11-23 — A result names a claim's key and its place as the kernel does.**
+  The entry "Places" above built the result with `at` for the claim's
+  key and `place` for where it was written, and said the kernel's record
+  names the two the other way round. This stream asked the maintainer
+  which names a result keeps, and recommended the kernel's. The
+  maintainer, in session, on 2026-11-23: "1-3: I agree with your
+  recommendations". So `ClaimResult` has `key`, the claim's key, and
+  `at`, the plain data of `ClaimRecord.at`. Nothing else changed: no
+  command prints either, the `// claim at:` line reads as before, and
+  no program changed. Three assertions read the fields under their new
+  names and hold what they held: the two that match a key against
+  `sha256:` and 64 hexadecimal digits, and the ones that read a place.

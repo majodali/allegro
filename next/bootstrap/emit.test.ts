@@ -791,6 +791,93 @@ test("every finding of a text is given, each at its place, and the forms it uses
   assert.deepEqual(findings("input see\nb <-\n  a = 1\nsee(b)").map((x) => x.kind), ["refused"]);
 });
 
+// ── Places ────────────────────────────────────────────────────────────
+//
+// Each node of kind expression, function or structure that a part of the
+// text gives rise to carries `at`, the kernel's place: the text's name, and
+// the index, line and column of its start and of the point after its last
+// character (next/kernel/interface.ts, `Place`).
+
+/** A node that carries a place, with the part of the text its place spans. */
+type Placed = { readonly node: SavedProgram["nodes"][number]; readonly at: NonNullable<Extract<SavedProgram["nodes"][number], { k: "expression" }>["at"]>; readonly part: string };
+function placed(doc: SavedProgram, text: string): Placed[] {
+  return doc.nodes.flatMap((node) =>
+    (node.k === "expression" || node.k === "function" || node.k === "structure") && node.at !== undefined ? [{ node, at: node.at, part: text.slice(node.at.start.index, node.at.end.index) }] : [],
+  );
+}
+/** The one node that spans the part and is what `is` says, as `[start line, start column, end line, end column]` with its source. */
+function placeOf(doc: SavedProgram, text: string, part: string, is: (n: SavedProgram["nodes"][number]) => boolean): [string, number, number, number, number] {
+  const found = placed(doc, text).filter((p) => p.part === part && is(p.node));
+  assert.equal(found.length, 1, `one node spans ${JSON.stringify(part)} and is what is asked: ${JSON.stringify(found)}`);
+  const { at } = found[0];
+  return [at.source, at.start.line, at.start.column, at.end.line, at.end.column];
+}
+const kernelNamed = (doc: SavedProgram, name: string) => (n: SavedProgram["nodes"][number]) => n.k === "expression" && doc.nodes[n.fn].k === "kernel" && (doc.nodes[n.fn] as { name: string }).name === name;
+const shippedNamed = (doc: SavedProgram, name: string) => (n: SavedProgram["nodes"][number]) =>
+  n.k === "expression" && doc.nodes[n.fn].k === "primitive" && (doc.nodes[n.fn] as { hash: string }).hash === shippedByName.get(name)?.hash;
+const callOf = (doc: SavedProgram, fqn: string) => (n: SavedProgram["nodes"][number]) => n.k === "expression" && doc.nodes[n.fn].k === "symbol" && (doc.nodes[n.fn] as { fqn: string }).fqn === fqn;
+
+const PLACES = [
+  "input see",
+  "square(n) => n * n",
+  "r = {a: 1,",
+  "  b: [2, 3]}",
+  "see(square(",
+  "  4) + 1)",
+  "claim(r.a == 1)",
+  "x <- see(2)",
+  "",
+].join("\n");
+
+test("a place on each part: a claim, a call, an operator expression, a function and a structure literal, by the line and column of each end", () => {
+  const doc = emitted(PLACES);
+  assert.deepEqual(check2(doc), []);
+  assert.deepEqual(placeOf(doc, PLACES, "claim(r.a == 1)", kernelNamed(doc, "claim")), ["<text>", 7, 1, 7, 16], "the claim");
+  assert.deepEqual(placeOf(doc, PLACES, "square(\n  4)", callOf(doc, "square")), ["<text>", 5, 5, 6, 5], "a call written over two lines");
+  assert.deepEqual(placeOf(doc, PLACES, "square(\n  4) + 1", shippedNamed(doc, "int.add")), ["<text>", 5, 5, 6, 9], "the operator expression is the call of int.add");
+  assert.deepEqual(placeOf(doc, PLACES, "r.a == 1", kernelNamed(doc, "same")), ["<text>", 7, 7, 7, 15], "== is the call of same");
+  assert.deepEqual(placeOf(doc, PLACES, "r.a", kernelNamed(doc, "get")), ["<text>", 7, 7, 7, 10], "p.a is the call of get");
+  assert.deepEqual(placeOf(doc, PLACES, "square(n) => n * n", (n) => n.k === "function"), ["<text>", 2, 1, 2, 19], "the function binding");
+  assert.deepEqual(placeOf(doc, PLACES, "n * n", shippedNamed(doc, "int.mul")), ["<text>", 2, 14, 2, 19]);
+  assert.deepEqual(placeOf(doc, PLACES, "{a: 1,\n  b: [2, 3]}", (n) => n.k === "structure" && n.entries.length === 2 && n.entries[0][0] !== null), ["<text>", 3, 5, 4, 13], "a structure literal over two lines");
+  assert.deepEqual(placeOf(doc, PLACES, "[2, 3]", (n) => n.k === "structure" && n.entries.every(([key]) => key === null)), ["<text>", 4, 6, 4, 12], "a list");
+});
+
+test("a place on what a form stands for: the claim of a dropped statement takes the statement's; x <- e's value its own; the module the whole text", () => {
+  const doc = emitted(PLACES);
+  assert.deepEqual(placeOf(doc, PLACES, "see(square(\n  4) + 1)", kernelNamed(doc, "claim")), ["<text>", 5, 1, 6, 10], "the claim a dropped statement stands for");
+  assert.deepEqual(placeOf(doc, PLACES, "see(square(\n  4) + 1)", kernelNamed(doc, "if")), ["<text>", 5, 1, 6, 10], "and the negation in it");
+  assert.deepEqual(placeOf(doc, PLACES, "see(2)", (n) => n.k === "expression" && doc.nodes[n.fn].k === "param"), ["<text>", 8, 6, 8, 12], "the value of x <- see(2)");
+  assert.deepEqual(placeOf(doc, PLACES, PLACES, (n) => n === doc.nodes[doc.module]), ["<text>", 1, 1, 9, 1], "the module function: the whole text, its end after the last line break");
+  // The index of each end counts characters from 0.
+  const claim = placed(doc, PLACES).find((p) => p.part === "claim(r.a == 1)" && kernelNamed(doc, "claim")(p.node));
+  assert.deepEqual([claim?.at.start.index, claim?.at.end.index], [PLACES.indexOf("claim("), PLACES.indexOf("claim(") + "claim(r.a == 1)".length]);
+});
+
+test("the places name the text: <text> where it is given no name, and the name it is emitted under", () => {
+  const unnamed = emitted('input see\nsee("a")\n');
+  assert.ok(placed(unnamed, "").length > 0);
+  assert.ok(placed(unnamed, "").every((p) => p.at.source === "<text>"));
+  const r = emit('input see\nsee("a")\n', new Map(), "dir/named.alg");
+  assert.ok(r.ok);
+  const named = placed(r.program, "");
+  assert.ok(named.length > 0);
+  assert.ok(named.every((p) => p.at.source === "dir/named.alg"), JSON.stringify(named.map((p) => p.at.source)));
+});
+
+test("two parts written alike in two places are two nodes, each with its place", () => {
+  const text = "input see\nsee(1)\nsee(1)\n";
+  const doc = emitted(text);
+  const calls = placed(doc, text).filter((p) => p.part === "see(1)" && p.node.k === "expression" && doc.nodes[p.node.fn].k === "param");
+  assert.deepEqual(calls.map((p) => p.at.start.line), [2, 3]);
+});
+
+test("a text with lines ended \\r\\n: each place counts in the text with its line ends written \\n", () => {
+  const doc = emitted("input see\r\nsee(1)\r\nsee(2)\r\n");
+  const text = "input see\nsee(1)\nsee(2)\n";
+  assert.deepEqual(placeOf(doc, text, "see(2)", (n) => n.k === "expression" && doc.nodes[n.fn].k === "param"), ["<text>", 3, 1, 3, 7]);
+});
+
 // ── The command ───────────────────────────────────────────────────────
 
 test("npm run emit writes the record; a text it refuses prints each finding and exits 1", () => {

@@ -12,3 +12,6 @@ output.write(foo)
 // The write of foo waits on the input when the run ends, so its claim is
 // undecided.
 // summary: undecided
+// The summary counts it undecided; by its place, the claim still waits.
+// claim at: 8:1 decided
+// claim at: 10:1 waiting
