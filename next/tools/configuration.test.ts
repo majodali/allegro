@@ -3,7 +3,7 @@
 // result holds), part 2, part 3 for the setting `phases`, and part 5 for
 // check as a check phase and for check then run; chunk Q16
 // (the capabilities the launchers ship), part 3, for the check
-// capabilities): `resolve`,
+// capabilities; chunk Q13, part 6, for the test phase): `resolve`,
 // `shapeOf`, `readProjectFile` and `readEnvironment` of
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
@@ -23,7 +23,7 @@ import { readLiteral } from "../bootstrap/literal.js";
 import { launch, type Inputs, type Plain, type SourceName } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shipped } from "../prims/index.js";
-import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
+import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, TEST_PHASE_VALUES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const text = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
@@ -302,7 +302,7 @@ test("check then run, from each source: the check phase, then run with every cap
 test("a value of phases that is not built is a finding that says what is built; inputs and later with check alone are no finding, and the check does not use them", () => {
   for (const value of [["run", "check"], ["export"], [], ["check", "check"], ["check", "run", "run"]]) {
     const r = resolve({ "command line": { phases: value }, launcher: CEILING3 });
-    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check", "check, run"`], JSON.stringify(value));
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check", "check, run", "test", "check, test"`], JSON.stringify(value));
   }
   const given = resolved(resolve({ "command line": { phases: ["check"] }, file: { inputs: { n: text("n") }, later: [{ m: text("m") }] }, launcher: CEILING3 }));
   assert.deepEqual(given.configuration, { ceiling: ["output", "timer"], phases: [{ name: "check", check: true, capabilities: [] }] });
@@ -337,4 +337,47 @@ test("check supplies the check capabilities the ceiling grants, report alone tod
   assert.deepEqual(run.configuration.ceiling, ["output", "timer", "http", "report"]);
   assert.deepEqual(shapeOf(["check"], undefined, undefined, ["report", "output"]), { ok: true, shape: { phases: [{ name: "check", check: true, capabilities: ["report"] }] } });
   assert.deepEqual(shapeOf(["check"], undefined, undefined, ["output", "http"]), { ok: true, shape: { phases: [{ name: "check", check: true, capabilities: [] }] } });
+});
+
+// ── The test phase (chunk Q13, part 6) ────────────────────────────────
+
+test("the setting phases: test is one test phase that supplies every capability of the ceiling and the inputs, and check, test is the check and then that phase", () => {
+  assert.deepEqual(TEST_PHASE_VALUES.map((v) => [...v]), [["test"], ["check", "test"]]);
+  const terminal: Settings = { ceiling: ["output", "timer", "http", "report"] };
+  const inputs = { n: text("n") };
+  for (const source of SOURCES.filter((s) => s !== "launcher")) {
+    const r = resolved(resolve({ [source]: { phases: ["test"], inputs }, launcher: terminal }));
+    assert.deepEqual(r.configuration.phases, [{ name: "test", test: true, capabilities: ["output", "timer", "http", "report"], inputs }], source);
+    assert.equal(r.configuration.inputs, undefined, "with phases the inputs are the test phase's, which go to the load");
+    assert.equal(sourceOf(r, "phases"), source);
+    assert.equal(sourceOf(r, "inputs.n"), source);
+  }
+  const both = resolved(resolve({ "command line": { phases: ["check", "test"] }, launcher: terminal }));
+  assert.deepEqual(both.configuration.phases, [
+    { name: "check", check: true, capabilities: ["report"] },
+    { name: "test", test: true, capabilities: ["output", "timer", "http", "report"] },
+  ]);
+  const narrowed = resolved(resolve({ "command line": { phases: ["test"], ceiling: ["output"] }, launcher: terminal }));
+  assert.deepEqual(narrowed.configuration.phases, [{ name: "test", test: true, capabilities: ["output"] }], "every capability of the ceiling, as narrowed");
+});
+
+test("later given with a test phase is a finding: no later phase follows the tests; an empty list of later phases is none", () => {
+  for (const phases of [["test"], ["check", "test"]]) {
+    const r = resolve({ "command line": { phases }, file: { later: [{ m: text("m") }] }, launcher: CEILING3 });
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting later is given with the phases ${JSON.stringify(phases.join(", "))}: no later phase follows the tests`]);
+  }
+  assert.deepEqual(shapeOf(["test"], undefined, [], ["output"]), { ok: true, shape: { phases: [{ name: "test", test: true, capabilities: ["output"] }] } });
+  for (const value of [["test", "run"], ["run", "test"], ["test", "check"], ["test", "test"], ["check", "run", "test"]]) {
+    const r = resolve({ "command line": { phases: value }, launcher: CEILING3 });
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting phases is ${JSON.stringify(value.join(", "))}, which is not built: the values built are "run", "check", "check, run", "test", "check, test"`], JSON.stringify(value));
+  }
+});
+
+test("the project's file sets the phases test, and a flag replaces it", () => {
+  const file = readProjectFile("dir/allegro.json", JSON.stringify({ phases: ["test"], inputs: { n: "1" } }));
+  assert.ok(file.ok);
+  const r = resolved(resolve({ file: file.settings, launcher: CEILING3 }));
+  assert.deepEqual(r.configuration.phases?.map((p) => [p.name, p.test === true]), [["test", true]]);
+  const over = resolved(resolve({ "command line": { phases: ["run"] }, file: file.settings, launcher: CEILING3 }));
+  assert.equal(over.configuration.phases, undefined);
 });

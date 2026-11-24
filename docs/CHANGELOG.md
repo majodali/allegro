@@ -1645,6 +1645,22 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The test phase, first version (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 6)
+
+B-196 (the rebuild's acceptance side). `--phases test` runs the tests of
+a test module, an ordinary text that imports what it tests. The launcher
+loads the module once, and then calls each exported function of no
+parameters, or each such function where nothing is exported, by an
+evaluation of its own, with the step budget of the launch to itself. A
+refuted test ends that test alone. Each test's outcome has its end, its
+lines and its own result. Both commands print one line for each test,
+the lines of a test that did not complete, and `tests: <n> passed, <m>
+failed`, and hand an error message with the place of each refuted test's
+claim. Under a test phase the timer moves itself and HTTP reaches
+nothing. `--phases check,test` checks the test module first. The corpus
+gains `// phases: test`, `// phases: check, test`, the line `// test:`
+and eleven programs `m3/test-*`.
+
 ### 2026-11 — The launcher's check reaches every claim, and check then run (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 5)
 
 B-196 (the rebuild's acceptance side). `--phases check` now hands the

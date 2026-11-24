@@ -87,7 +87,9 @@ with the program's inputs handed in and its imported records loaded.
 
 ## Phases
 
-`// phases: check` and `// phases: check, run` are the lines built. Each
+`// phases: check` and `// phases: check, run` are the lines built
+for a program, and `// phases: test` and `// phases: check, test` for a
+test module (see "Tests"). Each
 names the phases the launch applies, as the setting `phases` of
 `next/tools/configuration.ts` names them. A program with no such line
 runs as `run` alone, which is what the runner did before the line
@@ -296,6 +298,61 @@ over is part of what a run gives (`messages` and `status` of
 `npm run allegretto` and `npm run launch` write each message to stderr as
 that line, as it is handed over. They exit with the higher of two
 numbers: 0 for a completed run and 1 otherwise, and the highest status.
+
+## Tests
+
+`// phases: test` and `// phases: check, test` make the program a test
+module, and the launch a test phase (`Phase.test` of
+`next/launch/launcher.ts`). Nothing in the notation changes: a test
+module is an ordinary text, and it imports what it tests.
+
+The module function is called once, as a run calls it: that is the
+load. It is given the `// input:` lines, its top-level statements run
+and its claims are recorded. A test is an entry of the structure the
+module yields whose value is a function of no parameters, and its name
+is the entry's key. So in a module that marks exports the tests are the
+exported functions of no parameters, and in one that marks none every
+function of no parameters it binds. Reading an entry evaluates its
+binding, as any read does, so a binding nothing had read is evaluated
+at the load. Where the load completes, each test is called in order, by
+an evaluation of its own, with the budget of the launch to itself. A
+refuted claim ends that test and no other. Where the load does not
+complete, no test is called. Under `check, test` the check comes first,
+as under `check, run`, and a check that finds a refutation calls no
+test.
+
+```
+// test: adds: passed
+// test: subtracts: refuted: a claim that is not true
+```
+
+Each `// test: <name>: <end>` line is one test called, in order. `<end>`
+is `passed` where the test completed, and otherwise the end as an
+`// end:` line writes it. A program that states any `// test:` line must
+state exactly the tests called; one that states none is not compared on
+them. The `// end:` line is the launch's: `completed` where the load and
+every test completed, and otherwise the end of the first that did not,
+the load first. The `// expect:` lines are the lines of the load and of
+every test, in order. The `// summary:` and `// claim at:` lines hold
+for the load's result. `// reports:` and `// status:` hold for every
+message and status handed over, by the load and by the tests. The runner
+uses its own clock and transport as it does for a run, so a `// serves:`
+line serves a test too. A `// later:` line with a test phase, a
+`// test:` line with phases that are no test phase, and a line not of
+the form `test: <name>: <end>` each fail the program, and it is not
+launched.
+
+`npm run allegretto` and `npm run launch` take `--phases test` and
+`--phases check,test`. They print one line for each test, `test <name>:
+passed` or `test <name>: <the end>`, the lines a test that did not
+complete printed under it, each indented by two spaces, and a last line
+`tests: <n> passed, <m> failed`. For each test that ended refuted they
+write one message to stderr, `file:line:column: error: test <name>:
+<the reason>`, with the place of its first refuted claim. Under a test
+phase their timer is on a clock that moves itself, so a wait ends at
+once, and their HTTP reaches nothing, so every request answers
+`unreachable`. Coverage, the test modules of a project and test
+versions a project supplies are not built.
 
 ## A text of the standard language
 

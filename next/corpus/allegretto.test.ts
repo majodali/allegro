@@ -32,7 +32,9 @@
 // `// reports:` and `// status:` lines, and the programs `m3/report-*`.
 // Chunk Q13, part 5, made `// phases: check` the kernel's check, added
 // `// phases: check, run`, the `// check claim at:` line and the programs
-// `m3/check-*.alg`.
+// `m3/check-*.alg`. Chunk Q13, part 6, added `// phases: test` and
+// `// phases: check, test`, the `// test:` line and the programs
+// `m3/test-*.alg` and `m3/test-import/`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -51,10 +53,11 @@ import { createKernel } from "../kernel/create.js";
 import type { Value } from "../kernel/interface.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
+import { testLines, testMessages } from "../launch/test-output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readTestLines, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -531,7 +534,7 @@ test("a malformed phases line, a list that is not built, and two lines each fail
   const body = 'capability output\ninput a\noutput.write("launched")\n// end: completed\n';
   for (const [lines, problem] of [
     ["// phases: check run", 'the line "// phases: check run" is not of the form phases: <name>, <name>'],
-    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run"'],
+    ["// phases: run, check", 'the setting phases is "run, check", which is not built: the values built are "run", "check", "check, run", "test", "check, test"'],
     ["// phases: check\n// phases: run", "the program has two `// phases:` lines"],
   ] as const) {
     const run = await runProgram(body + lines + "\n");
@@ -711,4 +714,140 @@ test("program m3/report-place.alg hands its messages with the file, the line and
     { level: "note", text: "in this file", file: "main.alg" },
     { level: "note", text: "no file", line: 9n, column: 2n },
   ]);
+});
+
+
+// ── The test phase (chunk Q13, part 6) ────────────────────────────────
+
+test("the test lines are read as the convention states: a name and an end, passed or as an end line writes it, in order", () => {
+  const stated = "// test: first: passed\n//test:  second: refuted: a claim that is not true \n// test: third: limit: the step budget of 10 ran out\n// test: fourth: waiting: the program waits on the input(s) n, which the configuration does not supply\n";
+  assert.deepEqual(readTestLines(stated), {
+    tests: [
+      { name: "first", end: "passed" },
+      { name: "second", end: "refuted: a claim that is not true" },
+      { name: "third", end: "limit: the step budget of 10 ran out" },
+      { name: "fourth", end: "waiting: the program waits on the input(s) n, which the configuration does not supply" },
+    ],
+    problems: [],
+  });
+  assert.deepEqual(readTestLines("// expect: x\n"), { tests: undefined, problems: [] });
+  for (const bad of ["// test: first passed", "// test: first: ok", "// test: 1st: passed", "// test: first: refuted:", "// test: passed"])
+    assert.deepEqual(readTestLines(bad).problems, [`the line ${JSON.stringify(bad)} is not of the form test: <name>: <end>, the end passed or one an \`// end:\` line states`], bad);
+});
+
+test("a program under a test phase states the tests called: it passes with exactly those, in order, and fails with any other", async () => {
+  const body = 'capability output\noutput.write("load")\nexport a() => claim(1 == 1)\nexport b() =>\n  output.write("in b")\n  claim(1 == 2)\nexport c() => output.write("in c")\n// phases: test\n// expect: load\n// expect: in b\n// expect: in c\n// end: refuted: a claim that is not true\n';
+  const passes = await runProgram(body + "// test: a: passed\n// test: b: refuted: a claim that is not true\n// test: c: passed\n");
+  assert.deepEqual(passes.problems, []);
+  assert.deepEqual(passes.lines, ["load", "in b", "in c"], "the expect lines are the load's and every test's, in order");
+  assert.deepEqual(passes.tests?.tests.map((t) => t.name), ["a", "b", "c"]);
+  const called = '["a: passed","b: refuted: a claim that is not true","c: passed"]';
+  for (const [lines, expected] of [
+    ["// test: a: passed\n// test: b: passed\n// test: c: passed\n", '["a: passed","b: passed","c: passed"]'],
+    ["// test: a: passed\n// test: b: refuted: a claim that is not true\n", '["a: passed","b: refuted: a claim that is not true"]'],
+    ["// test: b: refuted: a claim that is not true\n// test: a: passed\n// test: c: passed\n", '["b: refuted: a claim that is not true","a: passed","c: passed"]'],
+    ["// test: a: passed\n// test: b: refuted: a claim that is not true\n// test: c: passed\n// test: d: passed\n", '["a: passed","b: refuted: a claim that is not true","c: passed","d: passed"]'],
+  ] as const) {
+    const run = await runProgram(body + lines);
+    assert.deepEqual(run.problems, [`the tests called are ${called}, expected ${expected}`], lines);
+  }
+  // A program that states no test line is not compared on its tests.
+  assert.deepEqual((await runProgram(body)).problems, []);
+});
+
+test("a test line with phases that are no test phase, a malformed one, a later line with a test phase, and a test line where nothing is launched each fail the program", async () => {
+  const run = await runProgram('capability output\nexport a() => claim(1 == 1)\n// end: completed\n// test: a: passed\n');
+  assert.deepEqual(run.problems, ["the program states a `// test:` line, and its phases are not test or check, test"]);
+  const checkRun = await runProgram('capability output\nexport a() => claim(1 == 1)\n// phases: check, run\n// end: completed\n// test: a: passed\n');
+  assert.deepEqual(checkRun.problems, ["the program states a `// test:` line, and its phases are not test or check, test"]);
+  const malformed = await runProgram('capability output\nexport a() => claim(1 == 1)\n// phases: test\n// end: completed\n// test: a passed\n');
+  assert.deepEqual(malformed.problems, ['the line "// test: a passed" is not of the form test: <name>: <end>, the end passed or one an `// end:` line states']);
+  assert.equal(malformed.tests, undefined, "a malformed line: the program is not launched");
+  for (const phases of ["test", "check, test"]) {
+    const later = await runProgram(`capability output\ninput n\nexport a() => claim(n == 1)\n// phases: ${phases}\n// later: n = 1\n// end: completed\n`);
+    assert.ok(later.problems.includes(`the setting later is given with the phases ${JSON.stringify(phases)}: no later phase follows the tests`), JSON.stringify(later.problems));
+  }
+  const notEmitted = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// test: a: passed\n");
+  assert.ok(notEmitted.problems.includes("nothing was launched, and the program states a `// test:` line"), JSON.stringify(notEmitted.problems));
+});
+
+test("under a test phase the input lines go to the load, the serves lines still serve a test, and the summary and claim at lines hold for the load's result", async () => {
+  const program = [
+    "capability output", "capability http", "input n",
+    "claim(n == 2)",
+    "export fetches() =>",
+    '  r <- http.request({method: "GET", url: "https://served.example/"})',
+    "  output.write(r.body)",
+    "export reads() => claim(n == 2)",
+    "// phases: test",
+    "// input: n = 2",
+    '// serves: GET https://served.example/ = 200 "served"',
+    "// expect: served",
+    "// test: fetches: passed",
+    "// test: reads: passed",
+    "// end: completed",
+    "// summary: decided",
+    "// claim at: 4:1 decided",
+    "",
+  ].join("\n");
+  const run = await runProgram(program);
+  assert.deepEqual(run.problems, []);
+  assert.deepEqual(run.requests.map((r) => r.url), ["https://served.example/"]);
+  // Under check, test the check comes first, and the tests run after it. After a check a claim's level of
+  // waiting may carry into a later evaluation (a known limit of the kernel), so neither the summary nor a claim's word is stated.
+  const checked = await runProgram(program.replace("// phases: test", "// phases: check, test").replace("// summary: decided\n// claim at: 4:1 decided\n", ""));
+  assert.deepEqual(checked.problems, []);
+  assert.ok(checked.result?.claims.some((c) => c.at?.start.line === 4 && c.decided > 0), JSON.stringify(checked.result?.claims));
+});
+
+test("the programs of the test phase are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["pass-fail", ["test"]], ["exports", ["test"]], ["open", ["test"]], ["none", ["test"]], ["load-refuted", ["test"]],
+    ["prints", ["test"]], ["timer", ["test"]], ["http", ["test"]], ["report", ["test"]], ["check", ["check", "test"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/test-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+  const imports = `${PROGRAMS_DIR}/m3/test-import/main.alg`;
+  assert.ok(FILES.includes(imports));
+  assert.ok(isImportedText(`${PROGRAMS_DIR}/m3/test-import/arith.alg`));
+  assert.deepEqual(readPhases(text(imports)).phases, ["test"]);
+  assert.deepEqual(readPins(text(imports)).realises, []);
+});
+
+test("program m3/test-pass-fail.alg: all four tests are called, and the refuted one names its claim's place, which the message for it carries", async () => {
+  const file = `${PROGRAMS_DIR}/m3/test-pass-fail.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.ok(run.tests !== undefined);
+  const wrong = run.tests.tests.find((t) => t.name === "wrong");
+  const refuted = wrong?.result.claims.find((c) => c.refuted > 0);
+  assert.deepEqual([refuted?.at?.source, refuted?.at?.start.line, refuted?.at?.start.column], [file, 13, 3]);
+  assert.deepEqual(testMessages(run.tests), [{ level: "error", text: "test wrong: a claim that is not true", file, line: 13n, column: 3n }]);
+});
+
+test("program m3/test-prints.alg: the commands show nothing of the passing test and each line of the failing one", async () => {
+  const file = `${PROGRAMS_DIR}/m3/test-prints.alg`;
+  const run = await runProgram(text(file), file);
+  assert.deepEqual(run.problems, []);
+  assert.ok(run.tests !== undefined);
+  assert.deepEqual(run.tests.load.lines, ["loading"]);
+  assert.deepEqual(testLines(run.tests), ["test quiet: passed", "test loud: refuted: a claim that is not true", "  from a failing test", "  its second line", "tests: 1 passed, 1 failed"]);
+});
+
+test("program m3/test-load-refuted.alg calls no test, and m3/test-check.alg's test passes under the test phase alone", async () => {
+  const refuted = `${PROGRAMS_DIR}/m3/test-load-refuted.alg`;
+  const loaded = await runProgram(text(refuted), refuted);
+  assert.deepEqual(loaded.problems, []);
+  assert.deepEqual(loaded.tests?.tests, []);
+  const checked = `${PROGRAMS_DIR}/m3/test-check.alg`;
+  const both = await runProgram(text(checked), checked);
+  assert.deepEqual(both.problems, []);
+  assert.equal(both.tests, undefined, "the check ends the launch before the load");
+  const alone = await runProgram(text(checked).replace("// phases: check, test\n", "// phases: test\n").replace(/\/\/ (end|claim at):.*\n/g, ""), checked);
+  assert.deepEqual(alone.tests?.tests.map((t) => [t.name, t.end.kind]), [["greets", "completed"]]);
+  assert.deepEqual(alone.lines, ["the test was called"]);
 });

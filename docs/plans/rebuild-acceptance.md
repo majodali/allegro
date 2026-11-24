@@ -3816,3 +3816,201 @@ PR #283 on 2026-11-20, for the work after milestone 3.
       `--kernel` on its commands and tells the kernel stream that the
       reading of `ALLEGRO_KERNEL` in `next/kernel/create.ts` is theirs
       to remove. The reading is put to the maintainer for confirmation.
+- **2026-11-23 — Q13, part 6: the test phase, first version.**
+  B-196 (the rebuild's acceptance side), chunk Q13 (check and run as
+  configurations, and what a result holds). The maintainer, in session on
+  2026-11-23: "The main use case for `report` is in the test phase. For
+  Allegretto programs, the test phase is at least as important as the
+  check phase. Let's implement it right away." So the launcher gains a
+  test phase. It realises "A test is a claim, and its result is the
+  claim's record", and the third phase of a check in the note of
+  2026-11-23: running tests is ordinary evaluation, and a test run may be
+  given test versions of capabilities. The names and forms are this
+  stream's proposal, for the maintainer to ratify. The twelve points, as
+  built:
+  1. **The phase.** `Phase` of `next/launch/launcher.ts` gains
+     `test?: true`. A test phase is the first phase, or the second after a
+     check, and no phase follows it. Each other place is refused before
+     anything is evaluated: "the phase <name> is a test phase after a
+     phase that is no check: a test phase is the first phase, or follows
+     a check", "the phase <name> follows the test phase <name>: no phase
+     follows the tests", and "the phase <name> is both a check and a test
+     phase". `check, test` is a check of the test module as `check, run`
+     has it, and then the test phase, in a fresh evaluation.
+  2. **A test module is an ordinary module.** The notation and the forms
+     gain no line.
+  3. **A test** is an entry of the structure the module yields, keyed by
+     a symbol, whose value is a composed function of no parameters. Its
+     name is the key. The tests are taken in the order the structure holds
+     them. The launcher reads each entry by an evaluation of the kernel's
+     `get` on the structure and the key's name as data, and tells a test
+     by `kind` and `composedFunctionOf`. `entriesOf` alone does not tell
+     it: an entry's value there is the name of its binding, a symbol, as
+     the forms' "evaluated when the entry is read" has it. An entry with
+     no key, or keyed by a key, is not read.
+  4. **How a test phase evaluates.** The module function is called once
+     with the capabilities and inputs of the phase: the load. It is
+     advanced as a run is, with no later phase. Reading the entries is
+     part of the load. Where the load does not complete, the phase ends as
+     it ended, and no test is called. Then each test is called in order,
+     in the same kernel and of the same module instance, by an evaluation
+     of its own of the function applied to nothing, under the launch's
+     budget, and advanced until its evaluation is over or nothing more is
+     due. Its claims are summed in fresh tallies. When an evaluation of
+     the phase is over, the answers it asked and has not had are not
+     filled, and what it waited on is not waited for by the next one,
+     unless the next one's own value is still a residual.
+  5. **The outcome.** `LaunchOutcome` gains `tests`: `{load, tests}`.
+     `load` is a `LoadOutcome`, `{end, lines, result}`. Each test is a
+     `TestOutcome`, a `LoadOutcome` with its `name`. `PhaseOutcome` is
+     unchanged: the test phase has one entry, named `test`, whose result
+     is the load's. The launch's `end` is `completed` where the load and
+     every test completed, with the steps of all summed. Otherwise it is
+     the end of the first that did not complete, the load first. Its
+     `lines` are the load's and then each test's, and its `result` is the
+     load's.
+  6. **Test capabilities.** The launcher takes the target as given. The
+     terminal's target for a test phase is `testTarget` of
+     `next/launch/terminal.ts`: `output` as in a run, with no line printed
+     while the tests run; `timer` on `virtualClock`; `http` on
+     `scriptedTransport` serving nothing, so every request answers
+     `unreachable` with the reason "nothing serves <method> <url>"; and
+     `report` as in a run. The virtual clock and the scripted transport
+     were already in `next/launch/` (`clock.ts`, `scripted-transport.ts`),
+     so nothing moved.
+  7. **What the commands print.** `testLines` of the new
+     `next/launch/test-output.ts`: `test <name>: passed`, or `test <name>:
+     <the end>` with the test's lines under it, each indented by two
+     spaces, and `tests: <n> passed, <m> failed`. Where the load did not
+     complete, the commands print what a run prints: the load's lines on
+     stdout and the end on stderr. Where the check before the tests ends
+     the launch, they print what a check prints.
+  8. **The exit code** is `exitCode` as before: a failing test exits 1
+     with no status handed over.
+  9. **`report` under test** acts as in a run. The terminal hands one
+     message for each test that ended refuted, through the same sink
+     (`testMessages`): level `error`, `test <name>: <the first reason>`,
+     and the place of the first claim of its result whose word is
+     `refuted` and which has one. The launcher hands no message.
+  10. **The setting.** `TEST_PHASE_VALUES` of
+      `next/tools/configuration.ts` is `test` and `check, test`;
+      `PHASE_VALUES` keeps the three values that run the program. `test`
+      is a phase `test` with `test: true`, every capability of the ceiling,
+      and the inputs, which go to the load. `later` given with a test phase
+      is a finding: "the setting later is given with the phases "<value>":
+      no later phase follows the tests". An empty list of later phases is
+      none.
+  11. **The corpus convention.** `// phases: test`, `// phases: check,
+      test`, and `// test: <name>: <end>`, with `passed` for a test that
+      completed. A program that states any `// test:` line must state
+      exactly the tests called. The `// expect:` lines are the load's and
+      every test's lines, in order. A `// test:` line with phases that are
+      no test phase fails the program. The README gains the section
+      "Tests". A run gives the outcome of the tests (`ProgramRun.tests`).
+  12. **Not built.** Coverage from the kernel's hook (`Kernel.observe`);
+      the host-side module that performs a project's own checks on what
+      `check` returns; a setting that names the test modules of a
+      project; real capabilities under test; test versions a project
+      supplies.
+  - **What the kernel did that the forms or its interface do not say.**
+    - *Reading an entry evaluates its binding.* `entriesOf` of the
+      structure a module yields gives each entry's value as a symbol, the
+      binding's name, on both variants: `capability output` and `export
+      a() => claim(1 == 1)` give the entry `` `a `` with a value of kind
+      `symbol`. So a host tells a function only by reading the entry with
+      `get`, which evaluates the binding. The forms say an entry's value
+      is evaluated when it is read; the interface's `entriesOf` says
+      nothing of it. A test of the emitter already reads an entry the same
+      way.
+    - *The reference kernel's stack holds a tail call.* `capability
+      output`, `loop(n) => if n == 0 then 0 else loop(n - 1)` and
+      `output.write(int.text(loop(500)))` print `0` on the default kernel,
+      and end at the reference kernel's own limit with no budget set. The
+      forms say a call that is the value of the function's body takes no
+      space. The interface allows the reference kernel a limit of its
+      own, its host's stack. The budget test uses `loop(200)` under a
+      budget of 200 steps, which both variants end at the budget.
+    - *Under `check, test` a claim's level of waiting carries into the
+      tests*, as the entry "Q13, part 5" found for `check, run`. The tests
+      hold a test's end and its claims' counts above zero there. No
+      carrying was found between two ordinary evaluations in one kernel:
+      two tests that reach one claim of a function both call each give it
+      a decided count and a level of zero, on both variants.
+  - **What the launcher does that the decisions do not say.** A test
+    that ends at its limit before its claim is evaluated has no record of
+    the claim, so its summary is `decided`; its end says `limit`. A test
+    whose value is a failure completes and passes: its value goes to
+    nobody, and the statement that is its body's last is not claimed.
+  - **What building showed against the points.** Point 3: a test is told
+    only by reading the entry, and reading evaluates the binding. So in a
+    module that marks no export, a binding nothing had read is evaluated
+    at the load, with its effects: `capability output` and `h =
+    output.write("bound")` print `bound` under a test phase, where a run
+    prints nothing. Point 4: an answer an earlier test asked and did not
+    get is not filled in a later test, so a later test that reads the
+    same binding of the module instance ends waiting on it. With
+    `capability timer`, `x = timer.wait(10)`, `export t1()` whose body is
+    `v <- x` and `claim(1 == 2)`, and `export t2() => claim(x == 10)`,
+    `t2` ends waiting on one cell that no capability will answer, on both
+    variants.
+  - **The existing tests changed.** The finding for a value of the setting
+    `phases` that is not built names the values built, and now lists
+    `"test"` and `"check, test"` after the three: one assertion each in
+    `next/tools/configuration.test.ts` ("a value of phases that is not
+    built"), `next/launch/launcher.test.ts` ("both commands take
+    --phases") and `next/corpus/allegretto.test.ts` ("a malformed phases
+    line"). The message for `--phases` with no list said "run, check, or
+    check,run" and says "run, check, check,run, test, or check,test"
+    (`next/launch/launcher.test.ts`, the same test).
+  - **The new programs.** Eleven, under
+    `next/corpus/allegretto/m3/`, none with a `// realises:` line: no case
+    of `next/corpus/cases.json` names a decision on tests.
+    `test-pass-fail` (three tests pass, and one is refuted at its claim's
+    place, with the next still called), `test-exports` (a function with a parameter,
+    a function not exported and a number are no tests), `test-open` (no
+    export marked: every function of no parameters), `test-none` (no
+    test), `test-load-refuted` (a false claim at the top level: no test
+    called), `test-prints` (every line collected; the commands show only
+    the failing test's), `test-timer` (a wait of a day ends at once),
+    `test-http` (the request answers `unreachable`, and the test handles
+    it), `test-report` (a message, and the highest status across the
+    load and the tests), `test-import/main.alg` (imports
+    `test-import/arith.alg` and tests its `gcd`), `test-check` (`check,
+    test`: a false claim in a function no test calls ends the launch).
+  - **Measured.** `npm run test:next` runs 969 tests on the default
+    kernel and 968 with `ALLEGRO_KERNEL=reference`; all pass but one
+    marked to do on each. 43 tests are new on each. `npm run
+    harness:next` runs 129 programs, and all pass on both variants.
+- **2026-11-24 — The nine asks of PR #313 answered: the test phase stands as built.**
+  This stream set out the nine asks of PR #313 in session, each with a
+  run of the PR's head and a recommendation. The maintainer, in session,
+  on 2026-11-24: "1-9: I agree with your recommendations." And: "On ask
+  3 - I can see some value in making (b), each test gets its own module
+  instance, an option available via configuration. Not a priority now,
+  we can revisit later if the need arises." What that settles, by ask:
+  1. *What a test is.* A function of no parameters among what a module
+     yields, named by its binding. A test passes when its evaluation
+     completes, whether or not it evaluated a claim. Flagging a test
+     that evaluates no claim is left as a later check.
+  2. *How tests are evaluated.* One load, then each test by its own
+     evaluation in the same kernel and of the same module instance, each
+     with the step budget to itself.
+  3. *An answer a finished test did not wait for* is dropped, as built.
+     A fresh module instance for each test may become an option of the
+     configuration later. It is not built and has no date.
+  4. *The test versions of capabilities* the terminal gives. Serving
+     canned answers to a project's tests through `http` is the first
+     addition named, and is not built.
+  5. *What the commands print and hand over*, the load's lines not shown
+     for a passing run and a status handed through `report` standing
+     where every test passes included.
+  6. *The setting's values* `test` and `check, test`.
+  7. *The corpus lines.*
+  8. *Finding the tests evaluates the bindings read.* Accepted: a test
+     module is written for the test phase. This stream carries to the
+     kernel session the question whether a host can tell what a binding
+     is without evaluating it.
+  9. *The terms* "test module", "the load" and "test version of a
+     capability" are ratified.
+  The same day the maintainer answered the last ask of PR #306, and
+  PR #304, PR #306 and PR #311 merged.
