@@ -63,5 +63,6 @@ jobs:
         run: |
           npm run typecheck:next
           npm run test:next
+          npm run test:next:reference
           npm run lint:decisions
           npm run lint:corpus

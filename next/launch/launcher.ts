@@ -222,8 +222,8 @@
 // `load` has the kernel make the keys, and `declares` lists only the
 // parameters after them.
 //
-// Tested by next/launch/launcher.test.ts, on the kernel that
-// next/kernel/create.ts gives.
+// Tested by next/launch/launcher.test.ts, on both kernel variants
+// (next/launch/kernel-variant.ts).
 
 import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
@@ -348,9 +348,10 @@ export interface Phase {
 
 /**
  * A source of configuration, highest first: the command line, the
- * project's file, the environment, what is built into the launcher.
+ * project's file, what is built into the launcher. No setting comes from
+ * the environment.
  */
-export type SourceName = "command line" | "file" | "environment" | "launcher";
+export type SourceName = "command line" | "file" | "launcher";
 
 /** Which source supplied one value of the configuration. `setting` is the setting's name, or `inputs.<name>` for one input. */
 export interface ConfigurationSource {

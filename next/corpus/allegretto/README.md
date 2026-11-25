@@ -135,8 +135,8 @@ A claim with a refuted evaluation is `refuted`. Else one with an
 undecided evaluation, or one that still waits when the run ends, is
 `undecided`. Else one with an assumed evaluation is `assumed`. Else one
 with a sampled evaluation is `sampled`. Else it is `decided`. A run with
-no claim is `decided`. No program here gives `sampled` yet: the notation
-does not write the kernel's `sample`.
+no claim is `decided`. `m3/sample.alg` gives `sampled`: a claim on the
+kernel's `sample`, which the emitter writes since 2026-11-25.
 
 `// summary: <word>` states the summary. A program that states one
 passes only if the run's summary is that word. A program that states

@@ -4,8 +4,8 @@
 // measured on the new kernel and against the present tree on the same
 // programs.
 //
-//   npm run bench:next
-//   npx tsx next/corpus/speed/bench.ts
+//   npm run bench:next [-- --kernel <reference|machine>]
+//   npx tsx next/corpus/speed/bench.ts [--kernel <reference|machine>]
 //
 // It gates nothing and runs in no suite: `npm run test:next` runs the
 // programs at their pinned size only (next/corpus/speed/speed.test.ts).
@@ -13,9 +13,11 @@
 // What runs, for each test and each input size:
 //   new kernel      the Allegretto program, emitted once by
 //                   next/bootstrap/emit.ts and launched in process by
-//                   next/launch/launcher.ts on the kernel next/kernel/create.ts
-//                   gives (the environment variable ALLEGRO_KERNEL chooses the
-//                   variant; the report names it), with the output
+//                   next/launch/launcher.ts on a kernel of the variant
+//                   `--kernel` names, else of the launcher's default,
+//                   `machine` (`DEFAULT_KERNEL` of
+//                   next/launch/kernel-variant.ts); the report names it.
+//                   It reads no environment. With the output
 //                   capability, the shipped primitives and no step budget. The time is the launch: kernel creation, loading
 //                   the record, evaluation. The emit time is the bootstrap's,
 //                   reported in its own column.
@@ -44,7 +46,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
-import { chosenVariant } from "../../kernel/create.js";
+import { DEFAULT_KERNEL, kernelOf, variantFinding } from "../../launch/kernel-variant.js";
 import {
   emitTimed, endWord, flatInput, lettersTo, nestedInput, read, ROOT, runNew, SPEED_DIR, squaresTo, typedLines, UNIT, withInput, withSizes,
 } from "./programs.js";
@@ -55,6 +57,11 @@ export const LONG_MS = 10_000;
 export const FRESH_MS = 60_000;
 /** Timed runs after the warm-up. */
 export const RUNS = 5;
+
+/** The kernel variant the new kernel's runs are on: `--kernel`, else the launcher's default. Set once, by `main`. */
+let variant: string = DEFAULT_KERNEL;
+/** A launch of a record on a kernel of `variant`. */
+const onNew = (program: Parameters<typeof runNew>[0]): ReturnType<typeof runNew> => runNew(program, kernelOf(variant));
 
 // ---- Running on the present tree -------------------------------------------
 
@@ -247,7 +254,7 @@ async function parserTest(p: Present, log: (line: string) => void): Promise<Row[
     async (n) => {
       const { program, ms: emitMs } = emitTimed(withInput(nextText, flatInput(n)));
       const want = `value ${79 * n}, nodes `;
-      const cell = await timed(() => runNew(program), (r) => ({
+      const cell = await timed(() => onNew(program), (r) => ({
         end: r.end.kind === "completed" ? "completed" : endWord(r.end),
         right: r.lines.length === 1 && r.lines[0].startsWith(want),
         steps: r.steps,
@@ -275,7 +282,7 @@ async function typedTest(p: Present, shape: "loop" | "halving", log: (line: stri
     async (n) => {
       const { program, ms: emitMs } = emitTimed(withSizes(nextText, sizesOf(n)));
       const want = typedLines(sizesOf(n));
-      const cell = await timed(() => runNew(program), (r) => ({
+      const cell = await timed(() => onNew(program), (r) => ({
         end: r.end.kind === "completed" ? "completed" : endWord(r.end),
         right: JSON.stringify(r.lines) === JSON.stringify(want),
         steps: r.steps,
@@ -354,7 +361,7 @@ async function ceilings(p: Present, log: (line: string) => void): Promise<string
   const nextText = read(`${SPEED_DIR}/parser.alg`), sameText = read(`${SPEED_DIR}/present/parser.alg`);
   const typedNext = read(`${SPEED_DIR}/typed.alg`), typedSame = read(`${SPEED_DIR}/present/typed.alg`);
   const onNext = async (text: string, want: (lines: string[]) => boolean): Promise<{ ok: boolean; end: string }> => {
-    const r = await runNew(emitTimed(text).program);
+    const r = await onNew(emitTimed(text).program);
     return { ok: r.end.kind === "completed" && want(r.lines), end: endWord(r.end) };
   };
   const onSame = (text: string, want: (lines: string[]) => boolean): { ok: boolean; end: string } => {
@@ -376,7 +383,7 @@ async function ceilings(p: Present, log: (line: string) => void): Promise<string
   const cases: { name: string; next: (n: number) => Promise<Probe> | Probe; same: (n: number) => Promise<Probe> | Probe }[] = [
     {
       name: "plain sum(n), each run in a fresh process",
-      next: (n) => fresh((f) => ["next/launch/allegretto.ts", f], plainNext(n), String((n * (n + 1)) / 2)),
+      next: (n) => fresh((f) => ["next/launch/allegretto.ts", f, "--kernel", variant], plainNext(n), String((n * (n + 1)) / 2)),
       same: (n) => fresh((f) => ["src/index.ts", "--base", f], plainSame(n), String((n * (n + 1)) / 2)),
     },
     {
@@ -481,7 +488,7 @@ async function whereTimeGoes(log: (line: string) => void): Promise<string[]> {
   const out: string[] = [];
   const time = async (text: string): Promise<Cell> => {
     const { program } = emitTimed(text);
-    return timed(() => runNew(program), (r) => ({ end: r.end.kind === "completed" ? "completed" : endWord(r.end), right: true, steps: r.steps }));
+    return timed(() => onNew(program), (r) => ({ end: r.end.kind === "completed" ? "completed" : endWord(r.end), right: true, steps: r.steps }));
   };
   for (const pr of probes) {
     const parts: string[] = [];
@@ -533,13 +540,26 @@ function startUp(): string {
   return `  the present tree's file runner, from start to exit, on the typed programs at size 10 (median of 3): base ${ms(base)} ms, standard ${ms(standard)} ms`;
 }
 
-async function main(): Promise<void> {
+async function main(argv: readonly string[]): Promise<void> {
+  const usage = "usage: npm run bench:next [-- --kernel <reference|machine>]";
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--kernel" || argv[i + 1] === undefined) {
+      process.stderr.write(`${usage}\n`);
+      process.exit(1);
+    }
+    const refused = variantFinding(argv[++i]);
+    if (refused !== undefined) {
+      process.stderr.write(`${refused}\n`);
+      process.exit(1);
+    }
+    variant = argv[i];
+  }
   const lines: string[] = [];
   const say = (l: string): void => { lines.push(l); };
   const progress = (l: string): void => { process.stderr.write(l + "\n"); };
   for (const l of machine()) say(l);
   say(`timing: median of ${RUNS} runs after a warm-up, in ms; a run past ${LONG_MS} ms is run once and ends its series`);
-  say(`new: the kernel variant "${chosenVariant()}", in process, launch only; emit: the bootstrap's emit of the text; present: the twin in the present tree's base language, evalSource in process (its parse included, start-up left out); native: the present tree's own engine or typed language`);
+  say(`new: the kernel variant "${variant}", in process, launch only; emit: the bootstrap's emit of the text; present: the twin in the present tree's base language, evalSource in process (its parse included, start-up left out); native: the present tree's own engine or typed language`);
   say("");
   const p = await present();
 
@@ -587,4 +607,4 @@ async function main(): Promise<void> {
   process.stdout.write(lines.join("\n") + "\n");
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) await main(process.argv.slice(2));

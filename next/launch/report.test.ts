@@ -3,8 +3,9 @@
 // ship), part 3; chunk Q13 (check and run as configurations, and what a
 // result holds), part 5, for report under check): next/launch/report.ts, through the launcher of
 // next/launch/launcher.ts on the kernel `createKernel` of
-// next/kernel/create.ts gives: the reference, or the variant that keeps its
-// own stack with `ALLEGRO_KERNEL=machine`. Run by `npm run test:next`.
+// next/launch/kernel-variant.ts gives: the variant that keeps its own
+// stack, and the reference where next/launch/reference-run.ts loads this
+// file. Run by `npm run test:next`.
 //
 // Every test here passes on both kernel variants and asserts what must be
 // present. No test pins a step count or a wall-clock duration. The two
@@ -17,7 +18,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import type { Entry, Kind, PrimitiveContext, Value } from "../kernel/interface.js";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "./kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";

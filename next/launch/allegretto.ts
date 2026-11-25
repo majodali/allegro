@@ -8,14 +8,14 @@
 // check and for `--phases check,run`;
 // chunk Q16 (the capabilities the launchers ship), part 3, for check
 // output and the exit code; chunk Q13, part 6, for `--phases test` and
-// `--phases check,test`): it emits
+// `--phases check,test`; chunk Q13, for `--kernel`): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]…
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]…
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
 //
 // It prints the lines the program writes. Where the run did not complete
 // it writes the end's reason to stderr. Each message the program hands to
@@ -36,7 +36,7 @@
 // a test phase it is the terminal's target for tests (`testTarget` of
 // next/launch/terminal.ts).
 //
-// The configuration comes from four sources, highest first, resolved by
+// The configuration comes from three sources, highest first, resolved by
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
@@ -53,19 +53,25 @@
 //     later phase that supplies it, in the order written. The value is
 //     one Allegretto literal, read by `readLiteral` of
 //     next/bootstrap/literal.ts. A value that is not a literal, or a flag
-//     with no `=`, is a usage error and exits 1;
+//     with no `=`, is a usage error and exits 1. `--kernel <name>` names
+//     the kernel variant, one of `KERNEL_VARIANTS` of
+//     next/kernel/create.ts; a name that is no variant is a finding;
 //   - the project's file, `allegro.json` in the directory of the text,
 //     where there is one (`readProjectFile` of
 //     next/tools/configuration.ts). It may set `steps`, `inputs`,
 //     `later`, each literal written as a JSON string, and `phases`, a
 //     list of names such as `["check"]`. An input it gives is
 //     replaced by an `--input` of the same name;
-//   - the environment: `ALLEGRO_STEPS`;
-//   - the launcher's own value: the ceiling that grants all four
-//     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts).
+//   - the launcher's own values: the ceiling that grants all four
+//     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts), and
+//     the kernel variant `machine` (`DEFAULT_KERNEL` of
+//     next/launch/kernel-variant.ts).
 // A finding of the file or of the resolution, a setting the file may not
 // set among them, is written to stderr, one line each, and exits 1;
-// nothing is emitted or launched.
+// nothing is emitted or launched. No setting comes from the environment.
+// The driver takes the identities of the
+// imported texts in a kernel of the variant resolved, and the run is on
+// one of that variant (`createKernelOf` of next/kernel/create.ts).
 
 import * as fs from "fs";
 import * as path from "path";
@@ -74,10 +80,11 @@ import { readLiteral } from "../bootstrap/literal.js";
 import { encode } from "../kernel/saved-program.js";
 import { PROJECT_FILE, readProjectFile, type Settings } from "../tools/configuration.js";
 import type { Inputs, Plain } from "./launcher.js";
+import { kernelOf } from "./kernel-variant.js";
 import { projectReader } from "./node-files.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]... [--later name=<literal>]...";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]... [--later name=<literal>]... [--kernel <reference|machine>]";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);
@@ -138,7 +145,7 @@ async function main(argv: readonly string[]): Promise<void> {
     process.exit(1);
   }
   // The imported texts are read in the project's directory and nowhere else.
-  const r = drive(text, file, projectReader(file));
+  const r = drive(text, file, projectReader(file), kernelOf(resolved.kernel));
   if (!r.ok) {
     for (const f of r.findings) process.stderr.write(describeDriveFinding(f) + "\n");
     process.exit(1);

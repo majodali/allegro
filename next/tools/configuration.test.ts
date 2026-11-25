@@ -4,26 +4,27 @@
 // check as a check phase and for check then run; chunk Q16
 // (the capabilities the launchers ship), part 3, for the check
 // capabilities; chunk Q13, part 6, for the test phase): `resolve`,
-// `shapeOf`, `readProjectFile` and `readEnvironment` of
+// `shapeOf` and `readProjectFile` of
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
-// next/kernel/create.ts gives: the variant that keeps its own stack, or the
-// reference with `ALLEGRO_KERNEL=reference`. The two commands end to end are
+// next/launch/kernel-variant.ts gives: the variant that keeps its own
+// stack, and the reference where next/launch/reference-run.ts loads this
+// file. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, type Inputs, type Plain, type SourceName } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shipped } from "../prims/index.js";
-import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, TEST_PHASE_VALUES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
+import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, TEST_PHASE_VALUES, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const text = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
@@ -45,8 +46,8 @@ function valueOf(setting: Setting, source: SourceName): Settings[Setting] {
     case "kernel":
       return `variant-${i}`;
     case "phases":
-      // Three values are built, so the four sources share them.
-      return [["check"], ["run"], ["check", "run"], ["run"]][i];
+      // Three values are built, one for each source.
+      return [["check"], ["run"], ["check", "run"]][i];
   }
 }
 const one = (setting: Setting, source: SourceName): Sources => ({ [source]: { [setting]: valueOf(setting, source) } });
@@ -79,7 +80,7 @@ const nameOf = (setting: Setting) => (setting === "inputs" ? "inputs.n" : settin
 
 test("the table: steps, inputs, later and phases from any source; ceiling, restore and kernel from the command line and the launcher only", () => {
   assert.deepEqual([...SETTINGS], ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases"]);
-  assert.deepEqual([...SOURCES], ["command line", "file", "environment", "launcher"]);
+  assert.deepEqual([...SOURCES], ["command line", "file", "launcher"]);
   for (const s of ["steps", "inputs", "later", "phases"] as const) assert.deepEqual([...MAY_SET[s]], [...SOURCES]);
   for (const s of ["ceiling", "restore", "kernel"] as const) assert.deepEqual([...MAY_SET[s]], ["command line", "launcher"]);
 });
@@ -105,7 +106,7 @@ test("a higher source replaces a lower one, for every pair of sources that may b
         pairs++;
       }
   }
-  assert.equal(pairs, 4 * 6 + 3 * 1);
+  assert.equal(pairs, 4 * 3 + 3 * 1);
 });
 
 test("a value missing from one source is taken from the next below it", () => {
@@ -121,19 +122,16 @@ test("inputs are merged by input name: each from the highest source that supplie
   const r = resolved(resolve({
     "command line": { inputs: { a: text("a from the command line") } },
     file: { inputs: { a: text("a from the file"), b: text("b from the file") } },
-    environment: { inputs: { c: text("c from the environment") } },
     launcher: { inputs: { b: text("b from the launcher"), d: text("d from the launcher") } },
   }));
   assert.deepEqual(r.configuration.inputs, {
     a: text("a from the command line"),
     b: text("b from the file"),
-    c: text("c from the environment"),
     d: text("d from the launcher"),
   });
   assert.deepEqual(r.sources, [
     { setting: "inputs.a", source: "command line" },
     { setting: "inputs.b", source: "file" },
-    { setting: "inputs.c", source: "environment" },
     { setting: "inputs.d", source: "launcher" },
   ]);
 });
@@ -144,14 +142,13 @@ test("a setting from a source that may not set it is refused, naming the setting
     for (const source of SOURCES.filter((s) => !MAY_SET[setting].includes(s))) {
       const r = resolve({ ...one(setting, source), launcher: { ceiling: ["output", "timer"] } });
       assert.equal(r.ok, false, `${setting} from ${source}`);
-      const phrase = source === "file" ? `the project's file ${PROJECT_FILE}` : `the ${source}`;
-      assert.deepEqual(r.ok ? [] : r.findings, [`the setting ${setting} is set by ${phrase}, which may not set it: only the command line and the launcher may`]);
+      assert.deepEqual(r.ok ? [] : r.findings, [`the setting ${setting} is set by the project's file ${PROJECT_FILE}, which may not set it: only the command line and the launcher may`]);
       pairs++;
     }
-  assert.equal(pairs, 6);
+  assert.equal(pairs, 3);
   // Beside a source that may set it, the refusal still stands.
-  const both = resolve({ "command line": { kernel: "a" }, environment: { kernel: "b" } });
-  assert.deepEqual(both.ok ? [] : both.findings, ["the setting kernel is set by the environment, which may not set it: only the command line and the launcher may"]);
+  const both = resolve({ "command line": { kernel: "a" }, file: { kernel: "b" } });
+  assert.deepEqual(both.ok ? [] : both.findings, [`the setting kernel is set by the project's file ${PROJECT_FILE}, which may not set it: only the command line and the launcher may`]);
 });
 
 test("the command line's ceiling narrows the launcher's, and a name the launcher's ceiling does not grant is refused", () => {
@@ -169,15 +166,12 @@ test("no budget where no source sets one", () => {
   const r = resolved(resolve({ file: { inputs: { n: text("x") } }, launcher: { ceiling: ["output"] } }));
   assert.equal(r.configuration.steps, undefined);
   assert.equal(sourceOf(r, "steps"), undefined);
-  const env = readEnvironment({});
-  assert.deepEqual(env, { ok: true, settings: {} });
 });
 
-test("the environment gives the step budget from ALLEGRO_STEPS, a whole number, and a value that is not one is a finding", () => {
-  assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: "250", ALLEGRO_KERNEL: "machine" }), { ok: true, settings: { steps: 250 } });
-  assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: "" }), { ok: true, settings: {} });
-  for (const bad of ["-1", "2.5", "many", "1e3"])
-    assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: bad }), { ok: false, findings: [`the environment's ALLEGRO_STEPS is not a whole number: ${JSON.stringify(bad)}`] });
+test("the environment is no source: the resolver names none, and the module exports nothing that reads it", async () => {
+  assert.ok(!(SOURCES as readonly string[]).includes("environment"));
+  const exported = Object.keys(await import("./configuration.js"));
+  assert.ok(!exported.includes("readEnvironment") && !exported.includes("STEPS_VARIABLE"), exported.join(", "));
 });
 
 test("the project's file is read: each setting by its name, inputs and later as literals written as JSON strings", () => {
@@ -229,14 +223,11 @@ function emitted(source: string): SavedProgram {
 }
 
 test("a run's result names the source of each value of its configuration: values from three sources", async () => {
-  const env = readEnvironment({ ALLEGRO_STEPS: "10000000" });
-  assert.ok(env.ok);
-  const file = readProjectFile(PROJECT_FILE, JSON.stringify({ inputs: { a: '"from the file"', b: '"replaced"' } }));
+  const file = readProjectFile(PROJECT_FILE, JSON.stringify({ steps: 10000000, inputs: { a: '"from the file"', b: '"replaced"' } }));
   assert.ok(file.ok, file.ok ? "" : file.findings.join("; "));
   const r = resolved(resolve({
     "command line": { inputs: { b: text("from the command line") } },
     file: file.settings,
-    environment: env.settings,
     launcher: { ceiling: ["output"] },
   }));
   const outcome = await launch({
@@ -249,7 +240,7 @@ test("a run's result names the source of each value of its configuration: values
   assert.deepEqual(outcome.lines, ["from the file", "from the command line"]);
   assert.equal(outcome.end.kind, "completed");
   assert.deepEqual(outcome.result?.restsOn.configuration, [
-    { setting: "steps", source: "environment" },
+    { setting: "steps", source: "file" },
     { setting: "inputs.b", source: "command line" },
     { setting: "inputs.a", source: "file" },
     { setting: "ceiling", source: "launcher" },
