@@ -2298,9 +2298,19 @@ test("npm run allegretto reads check from allegro.json, and a --check flag repla
     assert.deepEqual([merged.stdout, merged.status], ["", 1]);
     assert.match(merged.stderr, /:3:5: error: a claim of the broader analysis is refuted/);
     assert.doesNotMatch(merged.stderr, /:2:14:/);
-    // A project file that sets check, and phases that include no check: a finding, exit 1, nothing printed.
+    // A project file that sets check, and phases that include no check: the file's check is not used, and the program runs.
     const ran = command("allegretto.ts", [file, "--phases", "run"]);
-    assert.deepEqual([ran.stdout, ran.stderr, ran.status], ["", `the setting check is set by the project's file allegro.json, and the phases "run" include no check\n`, 1]);
+    assert.deepEqual([ran.stdout, ran.stderr, ran.status], ["hello\n", "", 0]);
+    const tests = path.join(dir, "tests.alg");
+    fs.writeFileSync(tests, "capability output\nexport t() => claim(1 == 1)\n");
+    const tested = command("allegretto.ts", [tests, "--phases", "test"]);
+    assert.deepEqual([tested.stdout, tested.stderr, tested.status], ["test t: passed\ntests: 1 passed, 0 failed\n", "", 0]);
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ check: { uncalled: "off", waiting: "error" } }));
+    const byDefault = command("allegretto.ts", [file]);
+    assert.deepEqual([byDefault.stdout, byDefault.stderr, byDefault.status], ["hello\n", "", 0], "with no phases the default run");
+    // The flag under run is a finding still.
+    const flagged = command("allegretto.ts", [file, "--phases", "run", "--check", "unread=on"]);
+    assert.deepEqual([flagged.stdout, flagged.stderr, flagged.status], ["", 'the setting check is set by the command line, and the phases "run" include no check\n', 1]);
     fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ phases: ["check"], check: { uncalled: 1 } }));
     const bad = command("allegretto.ts", [file]);
     assert.deepEqual([bad.stdout, bad.stderr, bad.status], ["", `${path.join(dir, "allegro.json")}: check is not an object from a check setting's name to its value, written as a JSON string\n`, 1]);

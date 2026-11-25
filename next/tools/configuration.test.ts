@@ -419,13 +419,28 @@ test("a name or a value of check that is none is a finding, naming the source", 
   }
 });
 
-test("check is read under any phases that include a check, and is a finding under phases that include none", () => {
+test("check is read under any phases that include a check; under phases that include none the command line's is a finding", () => {
   for (const phases of [["check"], ["check", "run"], ["check", "test"]])
     assert.deepEqual(resolved(resolve({ "command line": { phases, check: { waiting: "error" } } })).check, { waiting: "error" }, phases.join(", "));
   for (const [phases, value] of [[undefined, "run"], [["run"], "run"], [["test"], "test"]] as const) {
-    const r = resolve({ ...(phases === undefined ? {} : { "command line": { phases: [...phases] } }), file: { check: { unread: "on" } } });
-    assert.deepEqual(r.ok ? [] : r.findings, [`the setting check is set by the project's file ${PROJECT_FILE}, and the phases ${JSON.stringify(value)} include no check`]);
+    const r = resolve({ "command line": { ...(phases === undefined ? {} : { phases: [...phases] }), check: { unread: "on" } } });
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting check is set by the command line, and the phases ${JSON.stringify(value)} include no check`]);
   }
+});
+
+test("the project file's check is not used under phases that include no check: under run, under test and with no phases, and its sources are not listed", () => {
+  for (const phases of [undefined, ["run"], ["test"]] as const) {
+    const r = resolved(resolve({ ...(phases === undefined ? {} : { "command line": { phases: [...phases] } }), file: { check: { unread: "on", waiting: "error" } } }));
+    assert.deepEqual(r.check, {}, JSON.stringify(phases));
+    assert.ok(!r.sources.some((s) => s.setting.startsWith("check")), JSON.stringify(r.sources));
+  }
+  // Under check the file's settings are used, and the command line's wins by name.
+  const both = resolved(resolve({ "command line": { phases: ["check"], check: { unread: "off" } }, file: { check: { unread: "on", waiting: "error" } } }));
+  assert.deepEqual(both.check, { unread: "off", waiting: "error" });
+  assert.deepEqual(both.sources.filter((s) => s.setting.startsWith("check.")), [
+    { setting: "check.unread", source: "command line" },
+    { setting: "check.waiting", source: "file" },
+  ]);
 });
 
 test("the project's file reads check as an object from a setting's name to its value", () => {

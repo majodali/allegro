@@ -296,22 +296,23 @@ export function resolve(sources: Sources): Resolved {
   const phases = from("phases");
   const shape = shapeOf(phases?.value, inputSources.length === 0 ? undefined : inputs, later?.value, ceiling?.value ?? []);
   if (!shape.ok) return { ok: false, findings: shape.findings };
-  // The check settings, each by its name from the highest source that sets it, read only under phases that include a check.
+  // The check settings, each by its name from the highest source that sets it, read only under phases that
+  // include a check. Under phases that include none, the command line's are a finding; another source's are not used.
+  const names = phases?.value ?? ["run"];
+  const checking = names.includes("check");
   const check: Record<string, string> = {};
   const checkSources: ConfigurationSource[] = [];
-  for (const name of CHECK_NAMES)
-    for (const source of SOURCES) {
-      const value = sources[source]?.check?.[name];
-      if (value === undefined) continue;
-      check[name] = value;
-      checkSources.push({ setting: `check.${name}`, source });
-      break;
-    }
-  const names = phases?.value ?? ["run"];
-  if (!names.includes("check"))
-    for (const source of SOURCES)
-      if (Object.keys(sources[source]?.check ?? {}).length > 0)
-        findings.push(`the setting check is set by ${PHRASE[source]}, and the phases ${JSON.stringify(phaseList(names))} include no check`);
+  if (checking)
+    for (const name of CHECK_NAMES)
+      for (const source of SOURCES) {
+        const value = sources[source]?.check?.[name];
+        if (value === undefined) continue;
+        check[name] = value;
+        checkSources.push({ setting: `check.${name}`, source });
+        break;
+      }
+  else if (Object.keys(sources["command line"]?.check ?? {}).length > 0)
+    findings.push(`the setting check is set by ${PHRASE["command line"]}, and the phases ${JSON.stringify(phaseList(names))} include no check`);
   if (findings.length > 0) return { ok: false, findings };
   const configuration: Configuration = {
     ceiling: ceiling?.value ?? [],
