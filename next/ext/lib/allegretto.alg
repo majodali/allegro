@@ -12,7 +12,8 @@
 // tree. `shown(tree)` writes a tree as a text, for comparing two
 // readers.
 //
-// A module's tree is {headers, items}. A header is
+// A module's tree is {headers, items, at}, `at` the place of the whole
+// text. A header is
 // {k, name, pairs, without, at}, with k one of `capability, `input,
 // `key, `import and `use. An item is one of
 //
@@ -193,10 +194,10 @@ one_more(base, m) =>
   else if m.k == `dot then {k: `dot, object: base.v, name: m.v, at: {source: base.at.source, start: base.at.start, end: m.at.end}}
   else {k: `index, object: base.v, index: m.v, at: {source: base.at.source, start: base.at.start, end: m.at.end}}
 // The lines of a module: its header lines apart from its items.
-sorted(lines, i, headers, items) =>
-  if i == count(lines) then {headers: headers, items: items}
-  else if lines[i].header then sorted(lines, i + 1, put(headers, [], lines[i]), items)
-  else sorted(lines, i + 1, headers, put(items, [], lines[i]))
+sorted(lines, i, headers, items, at) =>
+  if i == count(lines) then {headers: headers, items: items, at: at}
+  else if lines[i].header then sorted(lines, i + 1, put(headers, [], lines[i]), items, at)
+  else sorted(lines, i + 1, headers, put(items, [], lines[i]), at)
 // A header line with its two lists, each clause {with, v}.
 headed(k, v, at) => {header: true, k: k, name: v[1], pairs: gathered(v[2], true, 0, []), without: gathered(v[2], false, 0, []), at: at}
 gathered(clauses, with, i, out) =>
@@ -220,7 +221,7 @@ parameters = between("(", listed(name), ")")
 
 export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof"]), o.space, true), offside.begun)
 rules = {
-  module: giving(seq([wide, opt(statements), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: []} else sorted(v[1][0], 0, [], [])),
+  module: giving(seq([wide, opt(statements), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: [], at: at} else sorted(v[1][0], 0, [], [], at)),
   line: alt([
     header_line("capability", `capability), header_line("input", `input), header_line("key", `key), module_line("import", `import), module_line("use", `use),
     giving(seq([opt(word("export")), plain_name, parameters, grammar.lit("=>"), ref(`body)]), (v, at) => {header: false, k: `function, name: v[1], params: v[2].v, body: v[4], exported: count(v[0]) == 1, at: at}),

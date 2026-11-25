@@ -574,6 +574,23 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-29 — What a tree of Allegretto means, written in Allegretto
+  (chunk E7 of the book pass, second part).** `next/ext/lib/meaning.alg`
+  takes the tree the engine reads and gives the description of the
+  module's function, its declarations and its count of keys; the kernel
+  builds the function. `next/ext/modules.ts` compares the module with
+  the bootstrap's for every `.alg` under `next/`: 182 texts, 172 the
+  same module by identity and with the same places, 10 refused by both
+  (4 in the same words), none different, in 120,236,989 steps. Among
+  the 172 are the engine's own modules and the meaning rules
+  themselves. A description gains one form, `keyed`, for an entry keyed
+  by a module's key, and keeps a symbol key as it is: a structure with
+  a named entry, described and built again, had another identity. The
+  refusals the bootstrap's reader makes after it has parsed are ported:
+  a header line or `export` in a block, and a statement above `x <- e`
+  that needs `x`. 34 deliberate faults: 27 failed a test at once, and a
+  test was added for each of the other 7. The suite compares a part of
+  24 texts and 26 small ones, in about 25 seconds.
 - **2026-11-29 — The comparison of the two readers reads every text in
   one launch.** `next/ext/readers.ts`: the grammar is prepared once and
   one kernel reads all the texts. 180 texts, 178 the same tree, 2

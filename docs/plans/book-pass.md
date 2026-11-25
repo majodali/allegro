@@ -605,7 +605,7 @@ are:
 | E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
-| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Open: what a tree means, compared by identity; and the speed target, missed with the whole grammar (§7) |
+| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Second part done 2026-11-29: `next/ext/lib/meaning.alg` gives the description, the declarations and the count of keys, and for all 172 texts the bootstrap emits the module is the bootstrap's by identity, with the same places (`next/ext/modules.ts`). Open: the speed target, missed with the whole grammar (§7); the imported modules and the shipped primitives are handed to the rules, until the loader of E9 |
 | E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
 | E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
@@ -2329,6 +2329,59 @@ its approval.
     bootstrap refuses are Allegretto; the target of a minute is for
     the library modules' own tests, about 45 seconds today, and the
     comparison of the corpus is a command with no place in the suite.
+- **2026-11-29 — chunk E7, second part: what a tree means** (the
+  review session). `next/ext/lib/meaning.alg`, about 420 lines of
+  Allegretto, is the bootstrap emitter's rules: `module_of(tree, given)`
+  gives `{description, declares, keys}`, or the findings.
+  - *Compared by identity.* `next/ext/modules.ts` reads each text with
+    the engine, hands the tree to the rules, has the kernel build the
+    function from the description, and compares the module's identity
+    with the one the bootstrap's driver gives. Every `.alg` under
+    `next/`: 182 texts, 172 the same identity, 10 refused by both, none
+    different; 120,236,989 steps, about nine minutes. The 172 hold the
+    engine's own modules and `meaning.alg` itself.
+  - *Places are compared beside it.* A place is no part of a module's
+    identity, which a deliberate fault showed: rules that wrote no
+    place gave every identity right. So the places of each module's
+    parts are compared too, the bootstrap's counted again in bytes.
+  - *What the rules are handed.* The names and hashes of the shipped
+    primitives; the declarations and identity of each imported module,
+    which the bootstrap's driver emits first; and the tree of the
+    functions Allegretto writes for itself, read by the engine from the
+    acceptance stream's text. A loader in Allegretto is E9.
+  - *One form more in a description: `keyed`.* A structure's entry
+    keyed by a module's key had no written form: a description's own
+    keys are symbols, and Allegretto makes no structure keyed by a
+    structure. Such an entry is written with no key, as a structure of
+    the form `keyed` with a `key` and a `value`; `build` reads it and `describe`
+    writes it, where `describe` threw for a parameter. Built ahead of
+    its ruling, which the PR asks for: the comparison could not pass
+    without it. The inventory's entry "A description is plain data in a
+    fixed set of forms" still says thirteen forms until it is ruled.
+  - *A fault found in the kernel.* `describe` quoted a symbol that keys
+    an entry, so a structure with a named entry, described and built
+    again, was another structure and its module had another identity.
+    A description now keeps the symbol. Two tests hold both, on both
+    kernel variants.
+  - *Refusals.* The emitter's findings have the bootstrap's words: a
+    name bound nowhere or twice, a block with no statement, an import
+    that does not fit. What the bootstrap's reader refuses after it has
+    parsed is ported, in its words: a header line or `export` in a
+    block, and a statement above `x <- e` that needs `x`, itself or
+    through a binding or an import. Three forms the bootstrap names in
+    a refusal of its own (`and`, `or`, a number in binary) the engine
+    does not read, and says where it stopped. `use` the engine reads
+    and the rules refuse, until E8.
+  - *Faults.* 34 deliberate faults in the rules, four at a time on
+    copies, with an unchanged copy as control. 27 failed a test at
+    once. 7 passed: four in forms the suite's part did not hold, one in
+    places, two in the ported refusals. A text or a case was added for
+    each, and all 34 fail now.
+  - *The suite* compares 24 texts of the corpus and 26 small texts, in
+    about 25 seconds; `ALLEGRO_MODULES=all` or the command compares
+    everything. 1,089 tests pass on the machine kernel; the reference
+    kernel, run since a file of the kernel changed, passes 999 and
+    leaves out 89 that run an Allegretto module.
 
 ## 8. Sessions
 
