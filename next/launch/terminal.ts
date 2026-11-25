@@ -126,6 +126,7 @@ import { fetchTransport, http } from "./http.js";
 import { scriptedTransport } from "./scripted-transport.js";
 import { collector, messageLine, report, type ReportMessage, type ReportSink } from "./report.js";
 import { testLines, testMessages } from "./test-output.js";
+import { shippedChecks } from "./checks.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
 export const KERNEL_MODULE = "next/kernel/create.ts";
@@ -272,6 +273,7 @@ export async function runOnTerminal(program: unknown, resolved: TerminalConfigur
     configuration: resolved.configuration,
     sources: resolved.sources,
     target: testing ? testTarget(reported.sink) : runTarget(reported.sink),
+    checks: shippedChecks(),
     ...(testing ? {} : { onLine: print }),
   });
   if (testing && outcome.tests !== undefined && outcome.tests.load.end.kind === "completed") {
