@@ -18,12 +18,14 @@
 // (next/corpus/speed/programs.ts). It makes a kernel of the variant in
 // use, `DEFAULT_KERNEL` until `useVariant` names another. A test that
 // spawns a command passes `--kernel` with `usedVariant()`.
-// next/launch/reference.test.ts calls `useVariant("reference")` and loads
-// this stream's test files that make a kernel, so `npm run test:next`
-// runs them on both variants. The node test runner gives each test file a
+// next/launch/reference-run.ts calls `useVariant("reference")` and loads
+// this stream's test files that make a kernel. `npm run
+// test:next:reference` runs it, as a command of its own after `npm run
+// test:next`: run beside the other tests it slowed them, and the kernel
+// stream's tests hold a time. The node test runner gives each test file a
 // process of its own, so the switch reaches no other file's run.
 //
-// Tested by next/launch/launcher.test.ts and next/launch/reference.test.ts.
+// Tested by next/launch/launcher.test.ts and next/launch/reference-run.ts.
 
 import { KERNEL_VARIANTS, createKernelOf } from "../kernel/create.js";
 import type { CreateKernel } from "../kernel/interface.js";

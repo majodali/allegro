@@ -11,6 +11,13 @@
 // gives each test file a process of its own, so the machine's run of the
 // same files is not touched.
 //
+// Run by `npm run test:next:reference`, a command of its own, and by no
+// glob of `npm run test:next`: its name does not end in `.test.ts` on
+// purpose. Run beside the other tests it doubled the load on the machine,
+// and a test of the kernel stream that holds a time (a module of 200 lines
+// read in under 10 seconds) took 9.2 s in CI where it takes 4.1 s on main,
+// and then 12.5 s. CI runs the two commands one after the other.
+//
 // The files loaded are those of next/launch/, next/corpus/,
 // next/bootstrap/ and next/tools/ that make a kernel, directly or through
 // the code they call. The kernel stream's own tests run on the reference

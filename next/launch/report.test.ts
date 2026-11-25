@@ -4,7 +4,7 @@
 // result holds), part 5, for report under check): next/launch/report.ts, through the launcher of
 // next/launch/launcher.ts on the kernel `createKernel` of
 // next/launch/kernel-variant.ts gives: the variant that keeps its own
-// stack, and the reference where next/launch/reference.test.ts loads this
+// stack, and the reference where next/launch/reference-run.ts loads this
 // file. Run by `npm run test:next`.
 //
 // Every test here passes on both kernel variants and asserts what must be

@@ -8,7 +8,7 @@
 // minute. The mode `--next` is tested on a report built from stub runs,
 // then over the committed Allegretto programs on the kernel `createKernel`
 // of next/launch/kernel-variant.ts gives: the machine, and the reference
-// where next/launch/reference.test.ts loads this file. The command's
+// where next/launch/reference-run.ts loads this file. The command's
 // `--kernel` is tested by spawning it.
 
 import { test } from "node:test";

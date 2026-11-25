@@ -4,7 +4,7 @@
 // and the output capability next/launch/output.ts, on the kernel
 // `createKernel` of next/launch/kernel-variant.ts gives: the variant that
 // keeps its own stack, and the reference kernel where
-// next/launch/reference.test.ts loads this file. Run by
+// next/launch/reference-run.ts loads this file. Run by
 // `npm run test:next`. A test that spawns a command passes it `--kernel`
 // with the variant in use. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of

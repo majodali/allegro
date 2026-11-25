@@ -3,7 +3,7 @@
 // capability), part 5): next/launch/timer.ts and next/launch/clock.ts,
 // through the launcher of next/launch/launcher.ts on the kernel
 // `createKernel` of next/launch/kernel-variant.ts gives: the machine, and
-// the reference where next/launch/reference.test.ts loads this file. Run
+// the reference where next/launch/reference-run.ts loads this file. Run
 // by `npm run test:next`.
 //
 // No test here pins a step count or a wall-clock duration. A clock that

@@ -6,7 +6,7 @@
 // for tests has (`testTarget` of next/launch/terminal.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
 // next/launch/kernel-variant.ts gives: the machine, and the reference
-// where next/launch/reference.test.ts loads this file. The two commands end to end are tested in
+// where next/launch/reference-run.ts loads this file. The two commands end to end are tested in
 // next/launch/launcher.test.ts.
 
 import { test } from "node:test";

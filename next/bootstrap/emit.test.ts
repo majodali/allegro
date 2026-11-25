@@ -1,7 +1,7 @@
 // Tests of the emitter of Allegretto (next/bootstrap/emit.ts). Each form
 // is emitted, its record passes `check2`, and the record is loaded into
 // a kernel (`createKernel` of next/launch/kernel-variant.ts: the machine,
-// and the reference where next/launch/reference.test.ts loads this file), with the
+// and the reference where next/launch/reference-run.ts loads this file), with the
 // shipped primitives its `needs` names, and evaluated through the kernel's
 // interface. What the emitter refuses gives its finding and no record.
 // Run by `npm run test:next`.

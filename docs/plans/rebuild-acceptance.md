@@ -4053,13 +4053,20 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      `next/launch/kernel-variant.ts` gives the tests their kernel
      factory, `createKernel`, of the variant in use, and the driver,
      `runProgram`, `yieldedKeys` and `runNew` take a factory with it as
-     the default. `next/launch/reference.test.ts` switches it to the
+     the default. `next/launch/reference-run.ts` switches it to the
      reference with `useVariant` and loads this stream's thirteen test
      files that make a kernel. A test that spawns a command passes
      `--kernel`. `npm run test:next` took 70.9 s for 1,035 tests before,
      on the machine alone, and 21.8 s more for the run on the reference
-     with the variable. After, it takes 72.6 s for 1,540 tests, both
-     variants in one command.
+     with the variable. With both variants in one command it took 72.6 s
+     for 1,540 tests on this stream's machine. In CI that load slowed a
+     test of the kernel stream that holds a time, a module of 200 lines
+     read in under 10 seconds: 4.1 s on main, 9.2 s with this change, and
+     12.5 s, a failure, with the next chunk's tests added. So the run on
+     the reference is a command of its own, `npm run
+     test:next:reference`, which CI runs after `npm run test:next`. The
+     file's name does not end in `.test.ts`, so the first command's glob
+     leaves it out.
 
   The assertions removed are those of the environment source, in
   `next/tools/configuration.test.ts` and `next/launch/launcher.test.ts`:

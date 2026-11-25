@@ -3,7 +3,7 @@
 // ship), part 1): next/launch/http.ts and next/launch/scripted-transport.ts,
 // through the launcher of next/launch/launcher.ts on the kernel
 // `createKernel` of next/launch/kernel-variant.ts gives: the machine, and
-// the reference where next/launch/reference.test.ts loads this file. Run
+// the reference where next/launch/reference-run.ts loads this file. Run
 // by `npm run test:next`.
 //
 // No test here reaches a network. Every request goes to a transport the
