@@ -129,9 +129,9 @@ of them runs the present tree's suite. CI runs the four marked below as
 one step, beside the present tree's gate.
 
 ```bash
-npm run typecheck:next              # typecheck of next/ (five projects) — IN CI
+npm run typecheck:next              # typecheck of next/ (six projects) — IN CI
 npm run test:next                   # every next/**/*.test.ts, on the default kernel
-                                    #   variant (~15s) — IN CI
+                                    #   variant (~70s) — IN CI
                                     #   and on the reference: next/launch/reference.test.ts
                                     #   and next/kernel/reference.test.ts load the tests
                                     #   again on it; a change passes on both variants
