@@ -4078,3 +4078,210 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   `next/ext/ext.test.ts`, `next/ext/readers.test.ts` and
   `next/ext/readers.ts` depend on it. Of `next/kernel/create.ts` this
   stream's code uses `createKernelOf` and `KERNEL_VARIANTS` alone.
+- **2026-11-25 — Q13, part 7: a check on ordinary evaluation, and the checks a project chooses.**
+  B-196 (the rebuild's acceptance side), chunk Q13 (check and run as
+  configurations, and what a result holds). The kernel stream's PR #318
+  gives `evaluate` the limit `speculative` and the result's list
+  `untouched`. Its record (`docs/plans/book-pass.md` §7, the entry "a
+  check as an ordinary evaluation") has the maintainer's rulings: a
+  check has two purposes. "The first is the program as written: every
+  path a run can take, with the arguments given. The second is a broader
+  analysis: functions for every argument, and what nothing calls or
+  reads." The result lists what an evaluation left untouched, and the
+  caller evaluates what it chooses. The choice is made in the phase. The
+  kernel has no default that differs by language. A binding nothing reads
+  is told, and skipped unless chosen. The maintainer to this stream, on
+  2026-11-23: "The `check` method only performs some of the work of a
+  full check phase, the rest is performed by the launcher on information
+  passed from the `check` operation and via the host-side hook. As you
+  say, the goal is to keep the launcher simple, so the actual checks are
+  performed by a host-side module configured for a project's specific
+  requirements. In the long term this host-side module will be
+  implemented in Allegro, but for now you can implement it in host code
+  to test the process." And on 2026-11-25: "Let's work on the module that
+  performs a project's checks next." In session on 2026-11-25 the
+  maintainer agreed to the four defaults, to a result that keeps the two
+  lists of claims apart, and to no setting that names host code to load:
+  "1-3: I agree with your recommendations." Every other name and form
+  here is this stream's proposal, for the maintainer to ratify. The nine
+  points, as built:
+  1. **A check is evaluations the launcher makes**, each by `evaluate`
+     with `speculative` (`Phase.check` of `next/launch/launcher.ts`). The
+     first is the module function applied as before: a capability the
+     phase names is handed as not needed, every other capability and
+     every input as an unfilled cell. Then the launcher asks the checks
+     about each thing an evaluation left untouched that has not been gone
+     into before, by its handle, and goes into what they choose: a
+     function by a call with an unfilled cell for each parameter,
+     anything else by its value. What that leaves untouched is asked
+     about in turn, in the order told, until nothing chosen is left. The
+     module's own function is never gone into again. A thing told again
+     after the checks declined it is asked again. Nothing in lane Q
+     calls `Kernel.check`.
+  2. **What a check's result holds** (`LaunchResult`): `claims` and
+     `summary` of the first evaluation; `broader`, `{claims, summary}`,
+     of every evaluation after it; `refutations` of all of them, each
+     once; and `untouched` (`UntouchedData`), each thing told and not
+     gone into, once, with its kind, for a function its count of
+     parameters and whether a call opened it, and its place where it has
+     one. The module's own function is left out. The launcher adds one
+     rule of its own here: a part gone into that comes out refuted as a
+     whole, with no refuted claim in that evaluation, is a refutation at
+     the part's place. A binding `x = 1 / 0` with unread on is refuted so;
+     the kernel lists nothing for it in `refutations`. A check ends
+     `refuted` where the whole is refuted, either list has a refuted
+     claim, or a refutation is listed; `limit` where an evaluation's
+     budget ran out and nothing was refuted. Each evaluation has the
+     launch's step budget to itself, or `Number.MAX_SAFE_INTEGER` where
+     none is set.
+  3. **The checks**, `Checks` of the new `next/launch/checks.ts`,
+     host-neutral: `into(item)`, asked with plain data and no handle, and
+     `findings(result)`, given the check's result as plain data, which
+     answers messages of the form `report` takes (`ReportMessage`). The
+     launcher is handed them in `Launch.checks`. With none, a check goes
+     into nothing beyond the program as written and has no findings.
+  4. **The shipped checks**, `shippedChecks(settings)`: `arguments`,
+     `uncalled` and `unread`, each `on` or `off`, and `waiting`, one of
+     `pass`, `note`, `warning` and `error`; the defaults on, on, off and
+     pass (`CHECK_DEFAULTS`). The findings, in order: one `error` for each
+     refuted claim of either list and for each refutation, then one of
+     the level `waiting` names for each claim of either list that waits.
+     A claim in both lists, told apart by its key and its place, is
+     reported once. The texts are "a claim of the program as written is
+     refuted: <reasons>", "a claim of the broader analysis is refuted:
+     <reasons>", "a part is refuted: <reason>", "a claim of the program
+     as written waits: the check could not decide it" and "a claim of the
+     broader analysis waits: the check could not decide it".
+  5. **How findings end a check.** The check's result holds them
+     (`findings`). Where one has the level `error` and the check was
+     neither refuted nor at its limit, the launch ends with the new end
+     `findings`, "the check's findings hold <n> error(s)", and no run or
+     test follows. The commands exit 1.
+  6. **The terminal** hands the check's findings to `report`'s sink after
+     the launch, as it hands the messages of failing tests. Each is
+     written to stderr before the end. The launcher hands no message.
+  7. **The setting** `check` of `next/tools/configuration.ts`, from
+     `--check name=value`, which may be given several times, and from the
+     project's file, `"check": {"unread": "on"}`. Each of the four is
+     resolved by itself, and its source is named `check.<name>`. A name or
+     a value that is none is a finding, and so is the setting under phases
+     that include no check. A `--check` with no `=`, or one that names a
+     setting given before, is a usage error.
+  8. **The corpus convention** gains `// check: <name> = <value>`,
+     `// broader claim at: <line>:<column> <word>` and `// untouched:
+     <kind> <line>:<column>`, each where the phases begin with a check.
+     The runner hands the launcher the shipped checks those lines set,
+     and the check's findings to the sink of `report` after the launch, so
+     the `// reports:` lines compare them. The README gains the section
+     "Check".
+  9. **Not built.** A project's own checks: a setting that named a file of
+     host code would run that code with the full rights of whoever runs
+     the command, so no setting names one, and a project's own checks
+     wait for the form in Allegro. A choice by module or by function,
+     which `into` allows, since it is given the place. Coverage, and the
+     analysis of what cannot be reached, from the kernel's hook. Showing a
+     result to a person, which is chunk Q14 (the commands).
+  - **What the kernel did that its interface does not say.** Both
+    variants agree on each.
+    - *A part one speculative evaluation went into stays evaluated for
+      the next.* With `capability output`, `x = claim(1 == 2)` and
+      `output.write("hello")`, the binding and the module's entry for x
+      are both told. Whichever is evaluated first records the claim,
+      refuted. The second comes out refuted as a whole and records no
+      claim. The interface says nothing of a speculative evaluation
+      stays in the kernel. With unread on, the launcher's rule of point
+      2 then adds a refutation with no place: `m3/checks-unread-on.alg`
+      hands two errors, the claim's and "a part is refuted: a claim that
+      is not true". The program states no `// reports:` line for them.
+    - *A function a call opens inside a function gone into is not told.*
+      With `f(n) => g(n)` and `g(n) => claim(n == 1)`, evaluating f with
+      an unfilled cell reaches g's claim, and `untouched` tells f alone.
+      In the first evaluation a function a call opens is told, called.
+      So with uncalled off and arguments on, g is never gone into.
+  - **What building showed against the points.** Point 3: a finding's
+    line and column are bigints, as `ReportMessage` has them, so a check's
+    result with a finding that has a place no longer passes
+    `JSON.stringify`, which `LaunchResult` promised. Point 7: a project's
+    file that sets `check` makes every launch whose phases include no
+    check a finding, `--phases run` among them. Point 6: under `check,
+    run` the check's findings come after the run's messages on stderr.
+    Point 2: `summary` is the program as written's, so a check that ends
+    refuted in the broader analysis can have the summary `undecided`.
+  - **The new programs**, under `next/corpus/allegretto/m3/`, none with a
+    `// realises:` line: `checks-decided-waiting` (decided as written,
+    waiting in the broader analysis, completes), `checks-arguments-off`
+    (no broader record; the function told as untouched),
+    `checks-uncalled` (refuted by default, with the finding's place),
+    `checks-uncalled-off` (completes; the function told as untouched),
+    `checks-unread` (completes; the binding told as untouched),
+    `checks-unread-on` (refuted), `checks-list` (the list's binding told
+    as untouched; its function never told), `checks-list-unread` (the
+    function in the list is reached and refuted), `checks-waiting-note`,
+    `checks-waiting-warning` and `checks-waiting-error` (the messages at
+    each level; with error the end `findings` and no run under `check,
+    run`), `checks-not-needed` (the claim of a dropped `report.message`
+    decided as written) and `checks-import/main.alg` with
+    `checks-import/lib.alg` (the finding names `lib.alg`, its line and
+    its column).
+  - **The existing program lines changed.** In `m3/check-uncalled.alg`
+    the header's five lines say the shipped checks go into a function
+    nothing calls; `// claim at: 7:14 refuted` is `// broader claim at:
+    7:14 refuted`, since the claim is the broader analysis's; and
+    `// summary: refuted` is `// summary: undecided`, the program as
+    written's, where the write's claim waits. In
+    `m3/check-unknown-condition.alg` the header's four lines say nothing
+    reads x; `// check: unread = on` is added, since nothing goes into
+    an unread binding by default and the program's point is kept only so;
+    `// claim at: 7:23 refuted` is `// broader claim at: 7:23 refuted`;
+    and `// summary: refuted` is `// summary: undecided`. In
+    `m3/test-check.alg` the header's first three lines say the shipped
+    checks go into the function, and `// claim at: 6:14 refuted` is
+    `// broader claim at: 6:14 refuted`. In `m3/check-dropped-write.alg`
+    and `m3/phase-check-prints.alg` one comment line says "the check"
+    where it said "the kernel's check".
+  - **The existing assertions changed.** In
+    `next/launch/launcher.test.ts`: "under a check no part of any
+    capability's implementation is called" held one call of the kernel's
+    `check` and holds one of `evaluate`, with no checks handed. "a check
+    reaches a false claim in a function nothing calls and one under a
+    condition on an unknown input" is handed the shipped checks, with
+    unread on for the condition, since x is read by nothing, and reads
+    both words in the broader analysis. "a check's result gives the
+    refutations found in parts that do not refute the whole" is handed
+    the shipped checks, and its test of plain data leaves out the
+    findings, whose line is a bigint; it holds the finding's level, file
+    and line. "check then run, on one kernel" is handed the shipped
+    checks, held the calls `check, evaluate` and holds no call of `check`
+    and three evaluations or more, and reads the uncalled function's
+    claim in the broader analysis. "check then test" held the calls
+    `check, evaluate` and holds no call of `check`; its helper `tested`
+    hands the shipped checks. Three tests end to end held
+    "refuted: a claim that is not true" alone on stderr, and hold the
+    finding's line before it: "npm run allegretto under --phases check",
+    "both commands under --phases check and --phases check,run" (each
+    expectation is now a function of the text's name) and "both commands
+    under --phases check,test". "npm run allegretto refuses a project
+    file with a finding" and, in `next/tools/configuration.test.ts`, "the
+    project file's findings" list the settings with `check` last. In
+    `next/tools/configuration.test.ts` "the table" lists `check` among
+    `SETTINGS` and the settings any source sets; "each setting is taken
+    from each source" and "a higher source replaces a lower one" give
+    check with the phases check from the same source, and count 5 × 3 + 3
+    pairs where they counted 4 × 3 + 3. In
+    `next/corpus/allegretto.test.ts`: "a check claim at line states a word
+    of the check's result under check, run" read the uncalled function's
+    claim by `// check claim at: 6:14` and reads it by `// broader claim
+    at: 6:14`; "program m3/test-load-refuted.alg calls no test, and
+    m3/test-check.alg's test passes under the test phase alone" also
+    strips the `// broader claim at:` line when it runs the test phase
+    alone.
+  - **Measured**, on both variants, under `--phases check` with the
+    runner's capabilities: `m3/calls.alg`, the largest program of the
+    corpus, makes 1 evaluation with no checks, 19 by default and 65 with
+    arguments, uncalled and unread on, and a launch takes about 40 ms in
+    each case, on either variant. `m3/multiline.alg` makes 1, 7 and 46.
+    `npm run test:next` runs 1,623 tests, all passing, where it ran
+    1,540 before: 83 are new, seven of them run once and 38 on each
+    variant.
+    `npm run harness:next` runs 145 programs, and all pass on both
+    variants.

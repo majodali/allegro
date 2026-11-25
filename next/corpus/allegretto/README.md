@@ -35,6 +35,9 @@ Each statement is a comment line of its own:
 | `// later: name = <literal>` | a later phase supplies this input; one phase per line, in order |
 | `// check claim at: <line>:<column> <word>` | as `// claim at:`, for the check's result, where the phases are `check, run` (see "Phases") |
 | `// phases: check` | the launch applies check alone, or with `// phases: check, run` check and then run; at most one line (see "Phases") |
+| `// check: <name> = <value>` | sets one of the four settings of the shipped checks for this program; one line per setting (see "Check") |
+| `// broader claim at: <line>:<column> <word>` | as `// claim at:`, for the check's broader analysis (see "Check") |
+| `// untouched: <kind> <line>:<column>` | the check's result tells this thing as not gone into (see "Check") |
 | `// serves: <METHOD> <url> = <status> <literal>` | the network answers this request; one line per request served (see "Requests") |
 | `// reports: <level>: <text>` | a message the program hands to `report.message`; one line per message, in order (see "Messages and status") |
 | `// status: <n>` | the highest status the program hands to `report.status`; at most one line (see "Messages and status") |
@@ -95,18 +98,19 @@ names the phases the launch applies, as the setting `phases` of
 runs as `run` alone, which is what the runner did before the line
 existed.
 
-Check is the kernel's check (`Phase.check` of
-`next/launch/launcher.ts`). The launcher hands the module to the
-kernel's `check` once, and nothing is performed. Every input is unknown,
-so the `// input:` lines are not used. The check capabilities of the
-ceiling, `report` alone today (`CHECK_CAPABILITIES` of
+Check is evaluations the launcher makes (`Phase.check` of
+`next/launch/launcher.ts`), and nothing is performed (see "Check").
+Every input is unknown, so the `// input:` lines are not used. The
+check capabilities of the ceiling, `report` alone today
+(`CHECK_CAPABILITIES` of
 `next/tools/configuration.ts`), are not needed: a call on a part
 performs nothing and answers the empty structure, so no message and no
 status is handed over (see "Messages and status"). Every other declared
 capability is not yet given: a call on it waits, and nothing is printed.
 The check ends the launch refuted where it finds a refuted claim or any
-other refutation, and at its limit where its budget runs out.
-Otherwise it is over, and check alone completes. A `// later:` line
+other refutation, at its limit where its budget runs out, and at the end
+`findings` where its findings hold an error. Otherwise it is over, and
+check alone completes. A `// later:` line
 with check alone is never applied, so it fails the program.
 
 Under `check, run` the run follows a check that found nothing. It is an
@@ -123,6 +127,67 @@ it is read as `// claim at:` is (see "A claim by its place"). Such a
 line with other phases, a line not of the form `phases: <name>, <name>`,
 a list that is not built, and two lines each fail the program, and it is
 not launched.
+
+## Check
+
+A check is evaluations the launcher makes, each with `speculative`. The
+first is the module function applied: the program as written. Then the
+launcher asks the checks (`next/launch/checks.ts`) about each thing an
+evaluation left untouched, and goes into what they choose: a function
+for every argument, anything else by its value. What that leaves
+untouched is asked about in turn. The module's own function is never
+gone into again. The runner hands the launcher the shipped checks
+(`shippedChecks`), configured by four settings:
+
+| Setting | Values | Default | What it chooses |
+|---|---|---|---|
+| `arguments` | `on`, `off` | `on` | a function a call opened is evaluated again for every argument |
+| `uncalled` | `on`, `off` | `on` | a function nothing calls is evaluated for every argument |
+| `unread` | `on`, `off` | `off` | a binding nothing reads, an argument nothing needed and an entry nothing read are evaluated |
+| `waiting` | `pass`, `note`, `warning`, `error` | `pass` | how a claim that waits is reported |
+
+```
+// check: unread = on
+// check: waiting = warning
+```
+
+Each `// check: <name> = <value>` line sets one of them for the
+program. A setting no line sets has its default. A name or a value that
+is none, two lines for one name, and the line in a program whose phases
+do not begin with a check each fail the program, and it is not
+launched.
+
+The check's result keeps two lists of claims apart. `// claim at:` and
+`// summary:` are about the program as written, the first evaluation.
+`// broader claim at: <line>:<column> <word>` states a claim's word in
+the broader analysis: every evaluation after the first. It is read as
+`// claim at:` is (see "A claim by its place"). A claim reached by both
+is in both, and may have a different word in each: a claim decided on
+every call the program makes waits for every argument.
+
+`// untouched: <kind> <line>:<column>` states that the check's result
+tells a thing of that kind, written at that place of the program's own
+text, as not gone into. The kinds are `function`, `binding`, `argument`
+and `entry`. A binding's place is that of its value. What else the
+result tells is not compared, since the kernel may tell more.
+
+The shipped checks' findings are messages of the form `report` takes:
+an `error` for each refuted claim of either list and for each
+refutation, then, unless `waiting` is `pass`, one of that level for each
+claim that waits, each with its place. A claim in both lists is reported
+once. The runner hands them to the same sink as the program's messages,
+after the launch, so the `// reports:` lines compare them (see "Messages
+and status"):
+
+```
+// reports: next/corpus/allegretto/m3/checks-uncalled.alg:6:14: error: a claim of the broader analysis is refuted: a claim that is not true
+```
+
+A finding of level `error` ends the launch at the end `findings`, where
+the check was not refuted and did not end at its limit, and no run
+follows it: `// end: findings: the check's findings hold 2 error(s)`.
+So `waiting = error` is how a program requires that no claim is left
+waiting.
 
 ## The summary
 
