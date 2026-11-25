@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
-import { CHECK_DEFAULTS, CHECK_NAMES, CHECK_SETTINGS, checkFinding, shippedChecks } from "./checks.js";
+import { CHECK_DEFAULTS, CHECK_NAMES, CHECK_SETTINGS, checkFinding, findingMessage, shippedChecks } from "./checks.js";
 import type { ClaimResult, LaunchResult, UntouchedData } from "./launcher.js";
 import { messageLine } from "./report.js";
 
@@ -32,7 +32,7 @@ function result(claims: ClaimResult[], broader: ClaimResult[] = [], refutations:
   };
 }
 
-const lines = (r: LaunchResult, settings = {}) => shippedChecks(settings).findings(r).map(messageLine);
+const lines = (r: LaunchResult, settings = {}) => shippedChecks(settings).findings(r).map((f) => messageLine(findingMessage(f)));
 
 test("the four settings, their values and their defaults", () => {
   assert.deepEqual(CHECK_NAMES, ["arguments", "uncalled", "unread", "waiting"]);
@@ -66,7 +66,10 @@ test("the findings: an error for each refuted claim of either list and each refu
     "error: a part is refuted: no place",
   ]);
   const [first] = shippedChecks().findings(r);
-  assert.deepEqual([first.file, first.line, first.column], ["m.alg", 3n, 5n], "the place as report's messages carry it");
+  assert.deepEqual([first.file, first.line, first.column], ["m.alg", 3, 5], "the place as plain data, numbers");
+  assert.deepEqual(JSON.parse(JSON.stringify(first)), first, "a finding survives JSON");
+  assert.deepEqual(findingMessage(first), { level: "error", text: first.text, file: "m.alg", line: 3n, column: 5n }, "the message of report it is handed as");
+  assert.deepEqual(findingMessage({ level: "note", text: "no place" }), { level: "note", text: "no place" });
   // A refuted claim with no reason: the text says which it is, and gives none.
   assert.deepEqual(lines(result([claim("refuted", 2)])), ["m.alg:2:1: error: a claim of the program as written is refuted"]);
 });

@@ -139,7 +139,7 @@ import { fetchTransport, http } from "./http.js";
 import { scriptedTransport } from "./scripted-transport.js";
 import { collector, messageLine, report, type ReportMessage, type ReportSink } from "./report.js";
 import { testLines, testMessages } from "./test-output.js";
-import { shippedChecks } from "./checks.js";
+import { findingMessage, shippedChecks } from "./checks.js";
 
 /** Where the kernel stream provides the kernel factory, relative to the repository root. */
 export const KERNEL_MODULE = "next/kernel/create.ts";
@@ -311,7 +311,7 @@ export async function runOnTerminal(program: unknown, resolved: TerminalConfigur
     ...(testing ? {} : { onLine: print }),
   });
   // The check's findings, where the first phase is one: to the sink, after the launch, as the messages of failing tests.
-  if (resolved.configuration.phases?.[0]?.check === true) for (const m of outcome.phases?.[0]?.result.findings ?? []) reported.sink.message(m);
+  if (resolved.configuration.phases?.[0]?.check === true) for (const f of outcome.phases?.[0]?.result.findings ?? []) reported.sink.message(findingMessage(f));
   if (testing && outcome.tests !== undefined && outcome.tests.load.end.kind === "completed") {
     for (const m of testMessages(outcome.tests)) reported.sink.message(m);
     for (const line of testLines(outcome.tests)) print(line);

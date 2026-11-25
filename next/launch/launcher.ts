@@ -253,8 +253,7 @@
 import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Untouched, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
-import type { Checks } from "./checks.js";
-import type { ReportMessage } from "./report.js";
+import type { Checks, Finding } from "./checks.js";
 
 /** A capability's definition: its name and the names of its parts. */
 export interface CapabilityDefinition {
@@ -555,9 +554,7 @@ export interface RunRestsOn {
 /**
  * What a run found: its claims, its summary and what it rests on. It is
  * plain data a tool reads: every field is a string, a number, or a list
- * or record of those, and no handle of the kernel is in it. The one
- * exception is the line and column of a finding, which are bigints, as a
- * message of `report` has them (`ReportMessage` of next/launch/report.ts).
+ * or record of those, and no handle of the kernel is in it.
  */
 export interface LaunchResult {
   /** One entry for each claim as written, in the order the run first reported it. */
@@ -586,7 +583,7 @@ export interface LaunchResult {
    */
   readonly untouched?: readonly UntouchedData[];
   /** A check's only: what the checks found (`Checks.findings`), as they answered it. */
-  readonly findings?: readonly ReportMessage[];
+  readonly findings?: readonly Finding[];
 }
 
 /**

@@ -189,7 +189,7 @@ import { boundedReader } from "../launch/files.js";
 import { nodeFiles } from "../launch/node-files.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { CLAIM_WORDS, claimWord, launch, plainValue, STRENGTHS, type ClaimWord, type Inputs, type LaunchEnd, type LaunchOutcome, type LaunchResult, type Plain, type Strength, type UntouchedData } from "../launch/launcher.js";
-import { checkFinding, shippedChecks, type CheckSettings } from "../launch/checks.js";
+import { checkFinding, findingMessage, shippedChecks, type CheckSettings } from "../launch/checks.js";
 import { shapeOf } from "../tools/configuration.js";
 import { output, outputWrite } from "../launch/output.js";
 import { timer } from "../launch/timer.js";
@@ -721,7 +721,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   });
   // The check's result, where the first phase is one; its findings go through the same sink as the program's messages, after the launch.
   const checked = checking ? outcome.phases?.[0]?.result : undefined;
-  for (const f of checked?.findings ?? []) reported.sink.message(f);
+  for (const f of checked?.findings ?? []) reported.sink.message(findingMessage(f));
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
     problems.push(`printed ${JSON.stringify(outcome.lines)}, expected ${JSON.stringify(pins.lines)}`);

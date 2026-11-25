@@ -30,8 +30,8 @@ import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, 
 import { timer } from "./timer.js";
 import { virtualClock } from "./clock.js";
 import { OUTPUT, output } from "./output.js";
-import { shippedChecks, type Checks } from "./checks.js";
-import { collector, messageLine, report, type ReportMessage } from "./report.js";
+import { findingMessage, shippedChecks, type Checks, type Finding } from "./checks.js";
+import { collector, messageLine, report } from "./report.js";
 import { shipped } from "../prims/index.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -1678,10 +1678,8 @@ test("a check's result gives the refutations found in parts that do not refute t
   assert.ok(found !== undefined, JSON.stringify(result.refutations));
   assert.deepEqual([found.at?.source, found.at?.start.line], ["free.alg", 2]);
   assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
-  // A finding's line and column are bigints, as a message of report has them; the rest survives JSON.
-  const { findings, ...rest } = result;
-  assert.deepEqual(JSON.parse(JSON.stringify(rest)), rest, "the result is plain data");
-  assert.ok(findings !== undefined && findings.some((f) => f.level === "error" && f.file === "free.alg" && f.line === 2n), JSON.stringify(findings, (_, v) => (typeof v === "bigint" ? String(v) : v)));
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
+  assert.ok(result.findings?.some((f) => f.level === "error" && f.file === "free.alg" && f.line === 2), JSON.stringify(result.findings));
   // A run gives none: the function is never called.
   const ran = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.equal(ran.end.kind, "completed");
@@ -2044,7 +2042,7 @@ function speculating(): { createKernel: () => Kernel; kernel: () => Kernel; eval
 }
 
 /** Checks that answer as `answer` does and record what they were asked, and the result `findings` was given. */
-function askingChecks(answer: (item: UntouchedData) => boolean, found: (r: LaunchResult) => ReportMessage[] = () => []): { checks: Checks; asked: UntouchedData[]; given: LaunchResult[] } {
+function askingChecks(answer: (item: UntouchedData) => boolean, found: (r: LaunchResult) => Finding[] = () => []): { checks: Checks; asked: UntouchedData[]; given: LaunchResult[] } {
   const asked: UntouchedData[] = [];
   const given: LaunchResult[] = [];
   return {
@@ -2167,7 +2165,7 @@ test("a check ends refuted where either list has a refuted claim or a refutation
   const result = resultOf(outcome);
   assert.equal(wordAt(result, 2, 14), undefined, "the program as written does not reach it");
   assert.equal(broaderWordAt(result, 2, 14), "refuted");
-  assert.deepEqual(result.findings?.map(messageLine), ["<text>:2:14: error: a claim of the broader analysis is refuted: a claim that is not true"]);
+  assert.deepEqual(result.findings?.map((f) => messageLine(findingMessage(f))), ["<text>:2:14: error: a claim of the broader analysis is refuted: a claim that is not true"]);
   // With uncalled off the function is told as untouched, and the check completes.
   const off = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ uncalled: "off" }) });
   assert.equal(off.end.kind, "completed");
@@ -2185,7 +2183,7 @@ test("a finding of level error ends the launch at the end findings, with the cou
   assert.equal(describe(failed.end), "findings: the check's findings hold 2 error(s)");
   assert.deepEqual(failed.lines, [], "no run after it");
   assert.deepEqual(failed.phases?.map((p) => p.name), ["check"]);
-  assert.deepEqual(resultOf(failed).findings?.map(messageLine), [
+  assert.deepEqual(resultOf(failed).findings?.map((f) => messageLine(findingMessage(f))), [
     "<text>:3:1: error: a claim of the program as written waits: the check could not decide it",
     "<text>:4:1: error: a claim of the program as written waits: the check could not decide it",
   ]);
@@ -2228,7 +2226,7 @@ test("a part gone into that comes out refuted as a whole, with no refuted claim,
   const found = resultOf(outcome).refutations.find((r) => r.at?.start.line === 2 && r.at.start.column === 5);
   assert.ok(found !== undefined, JSON.stringify(resultOf(outcome).refutations));
   assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
-  assert.ok(resultOf(outcome).findings?.some((f) => f.level === "error" && f.line === 2n && f.column === 5n && f.text === `a part is refuted: ${found.reason}`));
+  assert.ok(resultOf(outcome).findings?.some((f) => f.level === "error" && f.line === 2 && f.column === 5 && f.text === `a part is refuted: ${found.reason}`));
   // By default nothing reads x and nothing goes into it.
   const skipped = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
   assert.equal(skipped.end.kind, "completed");

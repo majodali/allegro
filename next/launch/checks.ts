@@ -63,12 +63,37 @@
 import { claimWord, type ClaimResult, type LaunchResult, type UntouchedData } from "./launcher.js";
 import type { Level, ReportMessage } from "./report.js";
 
+/**
+ * A finding: what a check found, as plain data. Its level and text are
+ * those of a message of `report`; its file, line and column, where there
+ * is a place, are a string and two numbers, so a result that holds it
+ * survives JSON. `findingMessage` makes the message of `report` of it.
+ */
+export interface Finding {
+  readonly level: Level;
+  readonly text: string;
+  readonly file?: string;
+  readonly line?: number;
+  readonly column?: number;
+}
+
+/** The message of `report` a finding is handed to a sink as: the same fields, its line and column as whole numbers of 64 bits. */
+export function findingMessage(f: Finding): ReportMessage {
+  return {
+    level: f.level,
+    text: f.text,
+    ...(f.file === undefined ? {} : { file: f.file }),
+    ...(f.line === undefined ? {} : { line: BigInt(f.line) }),
+    ...(f.column === undefined ? {} : { column: BigInt(f.column) }),
+  };
+}
+
 /** What the launcher is handed to choose what a check goes into, and to say what it found. */
 export interface Checks {
   /** Whether to go into one thing an evaluation of the check left untouched, given as plain data. */
   into(item: UntouchedData): boolean;
-  /** The findings of a check, given its result as plain data: messages of the form `report` takes. */
-  findings(result: LaunchResult): readonly ReportMessage[];
+  /** The findings of a check, given its result as plain data. */
+  findings(result: LaunchResult): readonly Finding[];
 }
 
 /** The four settings of the shipped checks, and the values each takes, in order. */
@@ -109,8 +134,8 @@ export function checkFinding(name: string, value: string, where: string): string
 const identity = (c: ClaimResult): string => JSON.stringify([c.key ?? null, c.at ?? null]);
 
 /** A finding of this level and text, with the place where there is one. */
-function finding(level: Level, text: string, at: ClaimResult["at"]): ReportMessage {
-  return at === undefined ? { level, text } : { level, text, file: at.source, line: BigInt(at.start.line), column: BigInt(at.start.column) };
+function finding(level: Level, text: string, at: ClaimResult["at"]): Finding {
+  return at === undefined ? { level, text } : { level, text, file: at.source, line: at.start.line, column: at.start.column };
 }
 
 /** The reasons of a claim or a refutation, as the text of a finding ends with them. */
@@ -125,7 +150,7 @@ export function shippedChecks(settings: CheckSettings = {}): Checks {
       return s.unread === "on";
     },
     findings(result) {
-      const out: ReportMessage[] = [];
+      const out: Finding[] = [];
       const written = result.claims.map((c) => ["program as written", c] as const);
       const broader = (result.broader?.claims ?? []).map((c) => ["broader analysis", c] as const);
       const reported = new Set<string>();
