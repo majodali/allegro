@@ -8,14 +8,15 @@
 // check and for `--phases check,run`;
 // chunk Q16 (the capabilities the launchers ship), part 3, for check
 // output and the exit code; chunk Q13, part 6, for `--phases test` and
-// `--phases check,test`; chunk Q13, for `--kernel`): it emits
+// `--phases check,test`; chunk Q13, for `--kernel`; chunk Q13, part 7,
+// for `--check` and the setting `check` of the project's file): it emits
 // the text and the texts it imports with the bootstrap's driver
 // (next/bootstrap/driver.ts) and launches the records with
 // next/launch/terminal.ts, in one step: the imported records are loaded
 // first, in the order the driver gives, and the text's own is run.
 //
-//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
-//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
+//   npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]… [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
+//   npx tsx next/launch/allegretto.ts <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]… [--input name=<literal>]… [--later name=<literal>]… [--kernel <reference|machine>]
 //
 // It prints the lines the program writes. Where the run did not complete
 // it writes the end's reason to stderr. Each message the program hands to
@@ -41,9 +42,14 @@
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
 //     narrows the ceiling. `--phases` sets the phases: `run`, `check` or
-//     `check,run`. Check hands the module to the kernel's `check`: it
-//     performs nothing, leaves every input unknown, and hands the check
+//     `check,run`. Check is evaluations with `speculative`, the program
+//     as written and what the shipped checks choose: it performs
+//     nothing, leaves every input unknown, and hands the check
 //     capabilities of the ceiling, `report` alone today, as not needed.
+//     Each `--check <name>=<value>` sets one of the four settings of the
+//     shipped checks, `arguments`, `uncalled`, `unread` and `waiting`
+//     (next/launch/checks.ts); the check's findings are written to stderr
+//     as next/launch/terminal.ts says.
 //     Run supplies every capability of the ceiling and the inputs.
 //     `check,run` is the check and, where it finds nothing, the run, whose
 //     lines and end are the command's. `test` runs the tests of the text,
@@ -59,9 +65,12 @@
 //   - the project's file, `allegro.json` in the directory of the text,
 //     where there is one (`readProjectFile` of
 //     next/tools/configuration.ts). It may set `steps`, `inputs`,
-//     `later`, each literal written as a JSON string, and `phases`, a
-//     list of names such as `["check"]`. An input it gives is
-//     replaced by an `--input` of the same name;
+//     `later`, each literal written as a JSON string, `phases`, a
+//     list of names such as `["check"]`, and `check`, an object from a
+//     setting of the shipped checks to its value, such as
+//     `{"unread": "on"}`. An input it gives is replaced by an `--input` of
+//     the same name, and a setting of `check` by a `--check` of the same
+//     name;
 //   - the launcher's own values: the ceiling that grants all four
 //     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts), and
 //     the kernel variant `machine` (`DEFAULT_KERNEL` of
@@ -84,7 +93,7 @@ import { kernelOf } from "./kernel-variant.js";
 import { projectReader } from "./node-files.js";
 import { failFindings, resolveOnTerminal, runOnTerminal, terminalArguments } from "./terminal.js";
 
-const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--input name=<literal>]... [--later name=<literal>]... [--kernel <reference|machine>]";
+const USAGE = "usage: npm run allegretto -- <file.alg> [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]... [--input name=<literal>]... [--later name=<literal>]... [--kernel <reference|machine>]";
 
 function usageError(message: string): never {
   process.stderr.write(`${message}\n${USAGE}\n`);

@@ -4,8 +4,9 @@
 // `phases`, and part 5, for check as a check phase and for check then run;
 // chunk Q16 (the capabilities the launchers ship), part 3, for the check
 // capabilities; chunk Q13, part 6, for the test phase; chunk Q13, for the
-// environment removed as a source). It closes B-059 (the project root
-// file) as far as this part goes.
+// environment removed as a source; chunk Q13, part 7, for the setting
+// `check`). It closes B-059 (the project root file) as far as this part
+// goes.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Configuration is all the information that determines an execution",
@@ -23,8 +24,10 @@
 //    too (`CHECK_CAPABILITIES`), which the check hands as not needed. The
 //    decision's wording is the kernel stream's to amend
 //   "Check reaches every claim": check is a check phase (`Phase.check` of
-//    next/launch/launcher.ts), which the launcher hands to the kernel's
-//    `check`, and which leaves every input unknown. Running tests, the
+//    next/launch/launcher.ts), evaluations the launcher makes with
+//    `speculative`, which leaves every input unknown. "The phase chooses
+//    which of those are evaluated too, by the project's configuration":
+//    the setting `check`. Running tests, the
 //    third of the phases of a check by the note of 2026-11-23, is the test
 //    phase (`Phase.test`): `test` alone, or `check, test`
 //    (`TEST_PHASE_VALUES`)
@@ -56,7 +59,19 @@
 //            capability of the ceiling, and the inputs, which go to the
 //            load of the test module. `check, test` is the check and then
 //            the test phase. With a test phase `later` is a finding: no
-//            later phase follows the tests.
+//            later phase follows the tests;
+//   check    the settings of the shipped checks (`shippedChecks` of
+//            next/launch/checks.ts), a record from a name to its value:
+//            `arguments`, `uncalled` and `unread`, each `on` or `off`, and
+//            `waiting`, one of `pass`, `note`, `warning` and `error`.
+//            Each of the four is resolved by itself, as an input is: from
+//            the highest source that sets it, and its source is named
+//            `check.<name>`. A name or a value that is none is a finding
+//            (`checkFinding`). It is read under any phases that include a
+//            check, and is a finding under phases that include none. A
+//            setting no source sets has the shipped checks' default. No
+//            setting names a file of host code: a project's own checks
+//            wait for the form in Allegro.
 //
 // The sources, highest first (`SOURCES`): the command line, the project's
 // file, what is built into the launcher. No setting comes from the
@@ -75,7 +90,8 @@
 // of the text being run: a JSON object whose keys are setting names.
 // `inputs` and `later` hold each value as an Allegretto literal written as
 // a JSON string, read by `readLiteral` of next/bootstrap/literal.ts
-// (`readProjectFile`).
+// (`readProjectFile`). `check` is an object from a name to its value, each
+// a JSON string.
 //
 // It is host-neutral: it reads no file, no environment and no argument
 // list. The terminal's entries (next/launch/terminal.ts and
@@ -87,9 +103,10 @@
 
 import { readLiteral } from "../bootstrap/literal.js";
 import type { Configuration, ConfigurationSource, Inputs, Phase, Plain, SourceName } from "../launch/launcher.js";
+import { CHECK_NAMES, checkFinding, type CheckSettings } from "../launch/checks.js";
 
 /** The settings, in the order a result lists them. */
-export const SETTINGS = ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases"] as const;
+export const SETTINGS = ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases", "check"] as const;
 export type Setting = (typeof SETTINGS)[number];
 
 /** The sources, highest first. */
@@ -104,6 +121,7 @@ export const MAY_SET: Readonly<Record<Setting, readonly SourceName[]>> = {
   restore: ["command line", "launcher"],
   kernel: ["command line", "launcher"],
   phases: SOURCES,
+  check: SOURCES,
 };
 
 /** The shipped phases, by the name the setting `phases` uses. */
@@ -143,6 +161,8 @@ export interface Settings {
   readonly kernel?: string;
   /** The phases to apply, by name, in order. */
   readonly phases?: readonly string[];
+  /** The settings of the shipped checks, by name, each value as written (`CHECK_SETTINGS` of next/launch/checks.ts). */
+  readonly check?: Readonly<Record<string, string>>;
 }
 
 /** The three sources, as data, by name. A source that sets nothing may be left out. */
@@ -155,6 +175,8 @@ export type Resolved =
       readonly configuration: Configuration;
       /** The kernel variant's name, where a source sets it. The launcher's `Configuration` has no place for it. */
       readonly kernel?: string;
+      /** The settings of the shipped checks that a source sets, each from the highest source that sets it. The launcher is handed the checks, not these. */
+      readonly check: CheckSettings;
       /** For each setting that has a value, the source that supplied it, in the order of `SETTINGS`; `inputs` gives one entry for each input, `inputs.<name>`. */
       readonly sources: readonly ConfigurationSource[];
     }
@@ -242,6 +264,12 @@ export function resolve(sources: Sources): Resolved {
         if (!launcherCeiling.includes(name))
           findings.push(`the ceiling of ${PHRASE[source]} grants ${name}, which the launcher's ceiling does not grant: a ceiling may only narrow the launcher's`);
     }
+  // Each check setting a source sets: one of the four names, and one of its values.
+  for (const source of SOURCES)
+    for (const [name, value] of Object.entries(sources[source]?.check ?? {})) {
+      const found = checkFinding(name, value, PHRASE[source]);
+      if (found !== undefined) findings.push(found);
+    }
   if (findings.length > 0) return { ok: false, findings };
 
   // Each setting from the highest source that sets it; `inputs` by input name.
@@ -268,6 +296,23 @@ export function resolve(sources: Sources): Resolved {
   const phases = from("phases");
   const shape = shapeOf(phases?.value, inputSources.length === 0 ? undefined : inputs, later?.value, ceiling?.value ?? []);
   if (!shape.ok) return { ok: false, findings: shape.findings };
+  // The check settings, each by its name from the highest source that sets it, read only under phases that include a check.
+  const check: Record<string, string> = {};
+  const checkSources: ConfigurationSource[] = [];
+  for (const name of CHECK_NAMES)
+    for (const source of SOURCES) {
+      const value = sources[source]?.check?.[name];
+      if (value === undefined) continue;
+      check[name] = value;
+      checkSources.push({ setting: `check.${name}`, source });
+      break;
+    }
+  const names = phases?.value ?? ["run"];
+  if (!names.includes("check"))
+    for (const source of SOURCES)
+      if (Object.keys(sources[source]?.check ?? {}).length > 0)
+        findings.push(`the setting check is set by ${PHRASE[source]}, and the phases ${JSON.stringify(phaseList(names))} include no check`);
+  if (findings.length > 0) return { ok: false, findings };
   const configuration: Configuration = {
     ceiling: ceiling?.value ?? [],
     ...(steps === undefined ? {} : { steps: steps.value }),
@@ -279,6 +324,7 @@ export function resolve(sources: Sources): Resolved {
     ok: true,
     configuration,
     ...(kernel === undefined ? {} : { kernel: kernel.value }),
+    check: check as CheckSettings,
     sources: [
       ...entry("steps", steps),
       ...inputSources,
@@ -287,6 +333,7 @@ export function resolve(sources: Sources): Resolved {
       ...entry("restore", restore),
       ...entry("kernel", kernel),
       ...entry("phases", phases),
+      ...checkSources,
     ],
   };
 }
@@ -353,6 +400,10 @@ export function readProjectFile(file: string, text: string): SourceRead {
       case "phases":
         if (Array.isArray(v) && v.every((n) => typeof n === "string")) settings.phases = v as string[];
         else findings.push(`${file}: phases is not a list of phase names`);
+        break;
+      case "check":
+        if (isRecord(v) && Object.values(v).every((x) => typeof x === "string")) settings.check = v as Record<string, string>;
+        else findings.push(`${file}: check is not an object from a check setting's name to its value, written as a JSON string`);
         break;
       case "restore":
       case "kernel":

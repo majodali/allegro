@@ -5,12 +5,13 @@
 // `--phases check` as the kernel's check and for `--phases check,run`;
 // chunk Q16 (the capabilities the launchers ship), part 3, for check
 // output and the exit code; chunk Q13, part 6, for `--phases test` and
-// `--phases check,test`; chunk Q13, for `--kernel`). The only
+// `--phases check,test`; chunk Q13, for `--kernel`; chunk Q13, part 7,
+// for `--check` and the check's findings). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]... [--kernel <reference|machine>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]... [--kernel <reference|machine>]
 //
 // Each `--import` names the saved program of a module the program
 // imports, directly or through another, in the order they are loaded: a
@@ -54,10 +55,15 @@
 //     `--phases` the phases: `run`, `check`, `check,run`, `test` or
 //     `check,test` (the
 //     setting `phases` of next/tools/configuration.ts), and
-//     `--kernel <name>` the kernel variant, one of `KERNEL_VARIANTS` of
-//     next/kernel/create.ts. A name the terminal does not supply, a list
-//     of phases that is not built, and a name that is no kernel variant
-//     (`variantFinding` of next/launch/kernel-variant.ts) are findings;
+//     each `--check <name>=<value>` one setting of the shipped checks
+//     (the setting `check`), and `--kernel <name>` the kernel variant, one
+//     of `KERNEL_VARIANTS` of next/kernel/create.ts. A name the terminal
+//     does not supply, a list of phases that is not built, a check
+//     setting's name or value that is none, a check setting under phases
+//     that include no check, and a name that is no kernel variant
+//     (`variantFinding` of next/launch/kernel-variant.ts) are findings. A
+//     `--check` with no `=`, or one that names a setting given before, is
+//     a usage error;
 //   - what is built into the launcher: the ceiling that grants every
 //     capability the terminal supplies (`TERMINAL_CEILING`), and the
 //     kernel variant `machine` (`DEFAULT_KERNEL` of
@@ -68,17 +74,23 @@
 // line each, and the entry exits 1; nothing is launched. The run's result
 // names the source of each value (`restsOn.configuration` of
 // next/launch/launcher.ts), and nothing printed for a run changes. Under
-// `--phases check` the launcher hands the module to the kernel's `check`
-// (`Phase.check` of next/launch/launcher.ts). Nothing is performed: no
-// line is printed, no request is made, and a call on `report` hands no
-// message and no status, since the check hands the check capabilities
-// (`CHECK_CAPABILITIES` of next/tools/configuration.ts) as not needed. A
-// check that finds a refutation writes the end's reason and exits 1; one
-// that finds none completes and exits 0. Under `--phases check,run` the
-// check comes first, and where it finds nothing the lines, the messages,
-// the end and the exit code are the run's. The exit code follows the end
-// and the status as for any run. What else check shows is chunk Q14 (the
-// commands).
+// `--phases check` the launcher makes the check's evaluations, with the
+// shipped checks configured by the setting `check` (`shippedChecks` of
+// next/launch/checks.ts; `Phase.check` of next/launch/launcher.ts).
+// Nothing is performed: no line is printed, no request is made, and a
+// call on `report` hands no message and no status, since the check hands
+// the check capabilities (`CHECK_CAPABILITIES` of
+// next/tools/configuration.ts) as not needed. After the launch the
+// terminal hands each finding of the check's result to `report`'s sink,
+// as it hands the messages of failing tests, so each is written to stderr
+// as one line, before the end. The launcher hands no message. A check
+// that finds a refutation writes the end's reason and exits 1; one whose
+// findings hold an error ends `findings` and exits 1; otherwise it
+// completes and exits 0. Under `--phases check,run` the check comes first,
+// and where it ends nothing the lines, the messages, the end and the exit
+// code are the run's, and the check's findings follow the run's messages.
+// The exit code follows the end and the status as for any run. What else
+// check shows is chunk Q14 (the commands).
 //
 // Under `--phases test` the program is a test module, and the launcher
 // loads it and calls each of its tests (`Phase.test` of
@@ -117,6 +129,7 @@ import { pathToFileURL } from "url";
 import type { CreateKernel } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
 import { resolve, type Settings } from "../tools/configuration.js";
+import type { CheckSettings } from "./checks.js";
 import { DEFAULT_KERNEL, variantFinding } from "./kernel-variant.js";
 import { describe, launch, type Configuration, type ConfigurationSource, type LaunchEnd, type Target } from "./launcher.js";
 import { output } from "./output.js";
@@ -151,15 +164,18 @@ async function kernelFactory(variant: string): Promise<CreateKernel> {
 
 /**
  * Reads the arguments every terminal entry takes: one file, `--steps <n>`,
- * `--ceiling a,b`, `--phases a,b` and `--kernel <name>`. Gives the file and
- * what the command line sets.
+ * `--ceiling a,b`, `--phases a,b`, each `--check name=value` and
+ * `--kernel <name>`. Gives the file and what the command line sets. A
+ * `--check` with no `=`, or one that names a setting given before, is a
+ * usage error.
  */
-export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[]; phases?: readonly string[]; kernel?: string } } {
+export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[]; phases?: readonly string[]; kernel?: string; check?: Readonly<Record<string, string>> } } {
   let file: string | undefined;
   let steps: number | undefined;
   let ceiling: string[] | undefined;
   let phases: string[] | undefined;
   let kernel: string | undefined;
+  let check: Record<string, string> | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--steps") {
       steps = Number(argv[++i]);
@@ -172,6 +188,14 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
       const names = argv[++i];
       if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run, check, check,run, test, or check,test\n${usage}`);
       phases = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
+    } else if (argv[i] === "--check") {
+      // One setting of the shipped checks: name=value. Whether the name and the value are any is the resolver's to say.
+      const setting = argv[++i];
+      const eq = setting === undefined ? -1 : setting.indexOf("=");
+      if (setting === undefined || eq < 0) fail(`--check takes name=value, the name one of arguments, uncalled, unread and waiting\n${usage}`);
+      const name = setting.slice(0, eq).trim();
+      if (check !== undefined && Object.hasOwn(check, name)) fail(`--check ${name} is given twice`);
+      (check ??= {})[name] = setting.slice(eq + 1).trim();
     } else if (argv[i] === "--kernel") {
       kernel = argv[++i];
       if (kernel === undefined) fail(`--kernel takes the name of a kernel variant: reference or machine\n${usage}`);
@@ -179,7 +203,10 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
     else fail(`unexpected argument ${argv[i]}`);
   }
   if (file === undefined) fail(usage);
-  return { file, commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }), ...(phases === undefined ? {} : { phases }), ...(kernel === undefined ? {} : { kernel }) } };
+  return {
+    file,
+    commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }), ...(phases === undefined ? {} : { phases }), ...(kernel === undefined ? {} : { kernel }), ...(check === undefined ? {} : { check }) },
+  };
 }
 
 /** Writes each finding to stderr, one line each, and exits 1. */
@@ -197,6 +224,8 @@ export interface TerminalConfiguration {
   readonly sources: readonly ConfigurationSource[];
   /** The kernel variant's name: the command line's, else the launcher's default. */
   readonly kernel: string;
+  /** The settings of the shipped checks the sources set (`shippedChecks` of next/launch/checks.ts). */
+  readonly check: CheckSettings;
 }
 
 /**
@@ -212,7 +241,7 @@ export function resolveOnTerminal(commandLine: Settings, file?: Settings): Termi
   const kernel = r.kernel ?? DEFAULT_KERNEL;
   const finding = variantFinding(kernel);
   if (finding !== undefined) failFindings([finding]);
-  return { configuration: r.configuration, sources: r.sources, kernel };
+  return { configuration: r.configuration, sources: r.sources, kernel, check: r.check };
 }
 
 /**
@@ -260,6 +289,11 @@ export function testTarget(sink: ReportSink): Target {
  * prints the test lines (`testLines`) and exits with `exitCode`. Where the
  * load did not complete, it prints what a run prints: the load's lines, and
  * the end on stderr.
+ *
+ * Under a check (`Phase.check`) the launcher is handed the shipped checks
+ * of the setting `check` (`shippedChecks`), and after the launch each
+ * finding of the check's result goes to the sink, before the test
+ * messages and the end.
  */
 export async function runOnTerminal(program: unknown, resolved: TerminalConfiguration, imports: readonly unknown[] = []): Promise<void> {
   const createKernel = await kernelFactory(resolved.kernel);
@@ -273,9 +307,11 @@ export async function runOnTerminal(program: unknown, resolved: TerminalConfigur
     configuration: resolved.configuration,
     sources: resolved.sources,
     target: testing ? testTarget(reported.sink) : runTarget(reported.sink),
-    checks: shippedChecks(),
+    checks: shippedChecks(resolved.check),
     ...(testing ? {} : { onLine: print }),
   });
+  // The check's findings, where the first phase is one: to the sink, after the launch, as the messages of failing tests.
+  if (resolved.configuration.phases?.[0]?.check === true) for (const m of outcome.phases?.[0]?.result.findings ?? []) reported.sink.message(m);
   if (testing && outcome.tests !== undefined && outcome.tests.load.end.kind === "completed") {
     for (const m of testMessages(outcome.tests)) reported.sink.message(m);
     for (const line of testLines(outcome.tests)) print(line);
@@ -298,7 +334,7 @@ function readRecord(file: string): unknown {
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]";
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--check <name>=<value>]... [--kernel <reference|machine>]";
   const rest: string[] = [];
   const imported: string[] = [];
   for (let i = 0; i < argv.length; i++) {
