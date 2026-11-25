@@ -2232,6 +2232,29 @@ test("a part gone into that comes out refuted as a whole, with no refuted claim,
   assert.equal(skipped.end.kind, "completed");
 });
 
+test("a check's findings are handed to onFindings once, when the check is over: before the run begins, and where the check ends the launch", async () => {
+  const order: string[] = [];
+  const text = 'capability output\ninput n\nclaim(n == 1)\noutput.write("ran")\n';
+  const outcome = await launch({
+    createKernel, program: emitted(text), configuration: checkThen({ ...RUN_AFTER, inputs: { n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 1), bitLength: 64 } } }), target: SHIPPED_TARGET,
+    checks: shippedChecks({ waiting: "note" }), onLine: (line) => order.push(`line ${line}`), onFindings: (found) => order.push(`findings ${found.map((f) => f.line).join(",")}`),
+  });
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(order, ["findings 3,4", "line ran"]);
+  // Where the check ends the launch, and where it finds nothing.
+  const ended: Array<readonly unknown[]> = [];
+  await launch({ createKernel, program: emitted('capability output\nclaim(1 == 2)\n'), configuration: checkThen(RUN_AFTER), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS, onFindings: (found) => ended.push(found) });
+  assert.equal(ended.length, 1);
+  assert.equal(ended[0].length, 1);
+  const none: Array<readonly unknown[]> = [];
+  await launch({ createKernel, program: emitted("capability output\nclaim(1 == 1)\n"), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS, onFindings: (found) => none.push(found) });
+  assert.deepEqual(none, [[]]);
+  // A launch with no check calls it never.
+  let called = 0;
+  await launch({ createKernel, program: HELLO, configuration: ONLY_OUTPUT, target: TERMINAL, onFindings: () => called++ });
+  assert.equal(called, 0);
+});
+
 // ── The checks on both commands (chunk Q13, part 7) ───────────────────
 //
 // Both commands end to end: the setting check from the command line and
@@ -2334,6 +2357,24 @@ test("both commands refuse a --check that names no setting, gives a value that i
     const noValue = command(entry, [arg, "--phases", "check", "--check", "unread"]);
     assert.equal(noValue.status, 1);
     assert.match(noValue.stderr, /^--check takes name=value, the name one of arguments, uncalled, unread and waiting\nusage: npm run /);
+  }
+});
+
+test("both commands hand a check's findings when the check is over: under check,run and check,test before the run's or the tests' own messages", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "checks-order-"));
+  try {
+    // Under the check output is not yet given, so the write's claim waits; report is not needed, so the program hands nothing then.
+    const run = writeBoth(dir, "run", 'capability output\ncapability report\noutput.write("ran")\nreport.message("from the run")\n');
+    const tests = writeBoth(dir, "tests", 'capability output\ncapability report\noutput.write("loaded")\nexport t() => report.message("from the test")\n');
+    const finding = (file: string) => `${file}:3:1: warning: a claim of the program as written waits: the check could not decide it\n`;
+    for (const [entry, which] of [["allegretto.ts", "file"], ["terminal.ts", "record"]] as const) {
+      const ran = command(entry, [run[which], "--phases", "check,run", "--check", "waiting=warning"]);
+      assert.deepEqual([ran.stdout, ran.stderr, ran.status], ["ran\n", `${finding(run.file)}note: from the run\n`, 0], entry);
+      const tested = command(entry, [tests[which], "--phases", "check,test", "--check", "waiting=warning"]);
+      assert.deepEqual([tested.stdout, tested.stderr, tested.status], ["test t: passed\ntests: 1 passed, 0 failed\n", `${finding(tests.file)}note: from the test\n`, 0], entry);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

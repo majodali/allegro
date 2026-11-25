@@ -409,6 +409,12 @@ export interface Launch {
   /** Called with each line as it is printed, besides collecting it. */
   readonly onLine?: (line: string) => void;
   /**
+   * Called once with a check's findings when the check phase is over,
+   * whether the launch then ends or goes on, and so before a run or the
+   * tests after it begin. Besides putting them in the check's result.
+   */
+  readonly onFindings?: (findings: readonly Finding[]) => void;
+  /**
    * What a check goes into beyond the program as written, and what it
    * found (next/launch/checks.ts). None: a check goes into nothing beyond
    * the program as written and has no findings.
@@ -1112,6 +1118,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
       checkFields = { broader: { claims: broaderClaims, summary: summaryOf(broaderClaims) }, untouched: [...told.values()] };
       const found = request.checks?.findings(result()) ?? [];
       checkFields = { ...checkFields, findings: [...found] };
+      // The check phase is over: its findings go to whoever asked, before anything after it begins.
+      request.onFindings?.(found.map((f) => ({ ...f })));
       // Refuted where the whole is, where a claim of either list is, or where a part is: each reason once, in the order found.
       const refutedClaims = [...tallies.claims(), ...broaderClaims].filter((c) => c.refuted > 0);
       if (checked.refuted || refutedClaims.length > 0 || refutations.length > 0) {

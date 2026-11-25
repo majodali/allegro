@@ -896,10 +896,10 @@ test("a program under check is run with the shipped checks its check lines set; 
   ]);
 });
 
-test("the findings go through the same sink as the program's messages, after the launch, and are compared by the reports lines", async () => {
+test("the findings go through the same sink as the program's messages, when the check is over, and are compared by the reports lines", async () => {
   const program = "capability output\ncapability report\ninput n\nreport.message(\"from the program\")\nclaim(n == 1)\n// phases: check, run\n// input: n = 1\n// check: waiting = warning\n";
-  // The run's message is handed while it runs; the check's finding after the launch. Under the check report is not needed, so the program hands nothing then.
-  const run = await runProgram(program + "// end: completed\n// reports: note: from the program\n// reports: <text>:5:1: warning: a claim of the program as written waits: the check could not decide it\n");
+  // The check's finding is handed when the check is over; the run's message while the run goes on, after it. Under the check report is not needed, so the program hands nothing then.
+  const run = await runProgram(program + "// end: completed\n// reports: <text>:5:1: warning: a claim of the program as written waits: the check could not decide it\n// reports: note: from the program\n");
   assert.deepEqual(run.problems, []);
   const unstated = await runProgram(program + "// end: completed\n// reports: note: from the program\n");
   assert.ok(unstated.problems.some((p) => p.startsWith("reported [")), JSON.stringify(unstated.problems));

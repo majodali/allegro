@@ -308,10 +308,12 @@ export async function runOnTerminal(program: unknown, resolved: TerminalConfigur
     sources: resolved.sources,
     target: testing ? testTarget(reported.sink) : runTarget(reported.sink),
     checks: shippedChecks(resolved.check),
+    // The check's findings, to the sink when the check is over, before a run's or the tests' own messages.
+    onFindings: (findings) => {
+      for (const f of findings) reported.sink.message(findingMessage(f));
+    },
     ...(testing ? {} : { onLine: print }),
   });
-  // The check's findings, where the first phase is one: to the sink, after the launch, as the messages of failing tests.
-  if (resolved.configuration.phases?.[0]?.check === true) for (const f of outcome.phases?.[0]?.result.findings ?? []) reported.sink.message(findingMessage(f));
   if (testing && outcome.tests !== undefined && outcome.tests.load.end.kind === "completed") {
     for (const m of testMessages(outcome.tests)) reported.sink.message(m);
     for (const line of testLines(outcome.tests)) print(line);

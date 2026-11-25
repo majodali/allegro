@@ -718,10 +718,13 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
     configuration: { ceiling: CEILING, steps: STEPS, ...(shape !== undefined && shape.ok ? shape.shape : {}) },
     target: { capabilities: [output, timer(virtualClock().clock), http(transport.transport), report(reported.sink)], primitives: shipped },
     checks: shippedChecks(checkLines.settings),
+    // The check's findings go through the same sink as the program's messages, when the check is over.
+    onFindings: (findings) => {
+      for (const f of findings) reported.sink.message(findingMessage(f));
+    },
   });
-  // The check's result, where the first phase is one; its findings go through the same sink as the program's messages, after the launch.
+  // The check's result, where the first phase is one.
   const checked = checking ? outcome.phases?.[0]?.result : undefined;
-  for (const f of checked?.findings ?? []) reported.sink.message(findingMessage(f));
   const end = endText(outcome.end);
   if (JSON.stringify(outcome.lines) !== JSON.stringify(pins.lines))
     problems.push(`printed ${JSON.stringify(outcome.lines)}, expected ${JSON.stringify(pins.lines)}`);
