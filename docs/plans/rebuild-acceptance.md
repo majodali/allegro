@@ -4300,8 +4300,8 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     corpus, makes 1 evaluation with no checks, 19 by default and 65 with
     arguments, uncalled and unread on, and a launch takes about 40 ms in
     each case, on either variant. `m3/multiline.alg` makes 1, 7 and 46.
-    `npm run test:next` runs 1,629 tests, all passing, where it ran
-    1,540 before: 89 are new, seven of them run once and 41 on each
-    variant.
+    `npm run test:next` runs 1,094 tests and `npm run
+    test:next:reference` 535, all passing, where they ran 1,046 and 494
+    before: 89 are new, seven of them run once and 41 on each variant.
     `npm run harness:next` runs 145 programs, and all pass on both
     variants.
