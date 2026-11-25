@@ -9,7 +9,7 @@
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
 // next/launch/kernel-variant.ts gives: the variant that keeps its own
-// stack, and the reference where next/launch/reference.test.ts loads this
+// stack, and the reference where next/launch/reference-run.ts loads this
 // file. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 

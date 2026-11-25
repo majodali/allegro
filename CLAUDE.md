@@ -132,9 +132,9 @@ one step, beside the present tree's gate.
 npm run typecheck:next              # typecheck of next/ (six projects) — IN CI
 npm run test:next                   # every next/**/*.test.ts, on the default kernel
                                     #   variant (~70s) — IN CI
-                                    #   and on the reference: next/launch/reference.test.ts
-                                    #   and next/kernel/reference.test.ts load the tests
-                                    #   again on it; a change passes on both variants
+npm run test:next:reference         # this stream's tests again on the reference kernel
+                                    #   (next/launch/reference-run.ts loads them); a change
+                                    #   passes on both variants — IN CI
 npm run lint:decisions              # next/decisions.json against the inventory's
                                     #   decisions — IN CI
 npm run lint:corpus                 # next/corpus/cases.json is consistent — IN CI

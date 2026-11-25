@@ -31,6 +31,7 @@
     "lint:decisions": "tsx next/tools/decision-map.ts --check",
     "lint:corpus": "tsx next/tools/corpus.ts --check",
     "test:next": "node --import tsx --test \"next/**/*.test.ts\"",
+    "test:next:reference": "node --import tsx --test next/launch/reference-run.ts",
     "typecheck:next": "tsx next/tools/typecheck.ts",
     "harness:present": "tsx next/corpus/harness.ts --present",
     "harness:next": "tsx next/corpus/harness.ts --next",

@@ -1679,9 +1679,9 @@ command line alone chooses. `npm run launch`, `npm run allegretto`,
 and make their kernel by `createKernelOf`; with no flag the variant is
 the launcher's default, `machine`. A name that is no variant is refused
 before anything is evaluated. No setting comes from the environment:
-`ALLEGRO_STEPS` is removed as a source. `npm run test:next` runs this
-stream's tests on both variants, through `next/launch/reference.test.ts`,
-with no variable. The emitter writes `text.byte`, `text.span`,
+`ALLEGRO_STEPS` is removed as a source. `npm run test:next:reference`
+runs this stream's tests on the reference, through
+`next/launch/reference-run.ts`, with no variable. The emitter writes `text.byte`, `text.span`,
 `text.starts`, `text.until`, `specialize` and `sample` by their names,
 and `next/corpus/allegretto/m3/sample.alg` is the first program to state
 `// summary: sampled`.
