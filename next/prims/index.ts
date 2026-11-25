@@ -128,12 +128,49 @@ export const shipped: readonly Pure[] = [
   primitive("int.neg", 1, "a 64-bit integer negated, wrapping", (a, c) => fromInt(-int("int.neg", a[0], c), c)),
   int2("int.sub", "the difference of two 64-bit integers, wrapping", (a, b) => a - b),
   primitive("int.text", 1, "a signed 64-bit integer as UTF-8 text: decimal digits, with a leading minus where negative", (a, c) => text(int("int.text", a[0], c).toString(), c)),
+  // text.byte, text.span, text.starts and text.until are what a parser's terminals stand on
+  // (docs/plans/book-pass.md section 10.3): each reads a text from a byte position, in one step. A position is a count of bytes from the start of the text.
+  primitive("text.byte", 2, "the byte of a text at a position, as a signed 64-bit integer; minus one at the end of the text; refused for a position before the start or beyond the end", (a, c) => {
+    const [t, at] = [bytesOf("text.byte", a[0], c, "a text"), int("text.byte", a[1], c)];
+    if (at < 0n || at > BigInt(t.length)) throw new Refusal(`text.byte: the position ${at} is outside a text of ${t.length} byte(s)`);
+    return fromInt(at === BigInt(t.length) ? -1n : BigInt(t[Number(at)]), c);
+  }),
   primitive("text.int", 1, "the signed 64-bit integer a UTF-8 text writes in decimal digits, with an optional leading minus; refused for any other text or a number that does not fit", (a, c) => {
     const t = new TextDecoder().decode(bytesOf("text.int", a[0], c, "a text"));
     if (!/^-?[0-9]+$/.test(t)) throw new Refusal(`text.int: "${t}" is not a whole number`);
     const n = BigInt(t);
     if (n < MIN || n > MAX) throw new Refusal(`text.int: ${t} is outside the signed 64-bit range`);
     return fromInt(n, c);
+  }),
+  primitive("text.span", 3, "the count of bytes of a text, from a position on, that belong to a class, as a signed 64-bit integer; a class is a text of pairs of bytes, each pair the lowest and the highest byte of a range, and a byte belongs where it is in a range; refused for a position before the start or beyond the end, or a class that is not pairs", (a, c) => {
+    const [t, at, ranges] = [bytesOf("text.span", a[0], c, "a text"), int("text.span", a[1], c), bytesOf("text.span", a[2], c, "a class")];
+    if (at < 0n || at > BigInt(t.length)) throw new Refusal(`text.span: the position ${at} is outside a text of ${t.length} byte(s)`);
+    if (ranges.length % 2 !== 0) throw new Refusal(`text.span: a class is pairs of bytes, and this one has ${ranges.length} byte(s)`);
+    const member = new Uint8Array(256);
+    for (let r = 0; r < ranges.length; r += 2) for (let b = ranges[r]; b <= ranges[r + 1]; b++) member[b] = 1;
+    let end = Number(at);
+    while (end < t.length && member[t[end]] === 1) end++;
+    return fromInt(BigInt(end) - at, c);
+  }),
+  primitive("text.starts", 3, "true where a text, from a position on, begins with a second text; refused for a position before the start or beyond the end", (a, c) => {
+    const [t, at, lit] = [bytesOf("text.starts", a[0], c, "a text"), int("text.starts", a[1], c), bytesOf("text.starts", a[2], c, "a text")];
+    if (at < 0n || at > BigInt(t.length)) throw new Refusal(`text.starts: the position ${at} is outside a text of ${t.length} byte(s)`);
+    const from = Number(at);
+    if (from + lit.length > t.length) return truth(false, c);
+    for (let i = 0; i < lit.length; i++) if (t[from + i] !== lit[i]) return truth(false, c);
+    return truth(true, c);
+  }),
+  primitive("text.until", 3, "the count of bytes of a text, from a position on, before the next place a second text begins, or to the end of the text where it begins nowhere, as a signed 64-bit integer; refused for a position before the start or beyond the end, or a second text that is empty", (a, c) => {
+    const [t, at, lit] = [bytesOf("text.until", a[0], c, "a text"), int("text.until", a[1], c), bytesOf("text.until", a[2], c, "a text")];
+    if (at < 0n || at > BigInt(t.length)) throw new Refusal(`text.until: the position ${at} is outside a text of ${t.length} byte(s)`);
+    if (lit.length === 0) throw new Refusal("text.until: the text to stop at is empty");
+    let end = Number(at);
+    scan: for (; end < t.length; end++) {
+      if (end + lit.length > t.length) { end = t.length; break; }
+      for (let i = 0; i < lit.length; i++) if (t[end + i] !== lit[i]) continue scan;
+      break;
+    }
+    return fromInt(BigInt(end) - at, c);
   }),
 ];
 

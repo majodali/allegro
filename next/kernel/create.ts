@@ -27,4 +27,14 @@ export function chosenVariant(): (typeof KERNEL_VARIANTS)[number] {
   throw new Error(`ALLEGRO_KERNEL names no kernel variant: "${name}". The variants are ${KERNEL_VARIANTS.join(" and ")}.`);
 }
 
-export const createKernel: CreateKernel = () => (chosenVariant() === "machine" ? createMachine() : createReference());
+/**
+ * A kernel of the variant named. A command that takes the variant as an
+ * argument uses this, and reads no environment.
+ */
+export function createKernelOf(variant: string): ReturnType<CreateKernel> {
+  if (variant === "machine") return createMachine();
+  if (variant === "reference") return createReference();
+  throw new Error(`"${variant}" names no kernel variant. The variants are ${KERNEL_VARIANTS.join(" and ")}.`);
+}
+
+export const createKernel: CreateKernel = () => createKernelOf(chosenVariant());

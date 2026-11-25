@@ -25,5 +25,9 @@ export const HASHES: Readonly<Record<string, string>> = {
   "int.neg": "sha256:d73bd01b9d4d98f179606c3da425f93d1ec8b922a2c92e5e6b01509551302541",
   "int.sub": "sha256:3805a3af3afd04641ac3f61edbf872c22c3e3c5e14257c30434985a325f280cb",
   "int.text": "sha256:60247f33c2332f545a5b7ce51365a0a759aae6ff16537d07d263590d5cfbcbd2",
+  "text.byte": "sha256:c39e3bd417d6015e0eeff27ade49c787a571e64fbd98bec6a458a75f69471b7c",
   "text.int": "sha256:64e032bf049d414d79db9a468d184d0cf56f2ec8c224ed80214eee32a4928b46",
+  "text.span": "sha256:66672f9134feea636c31d9b4d468c62bdfd94edc8063e0c2bfdd4a1cb6fd14db",
+  "text.starts": "sha256:077f0991901439a7c9e64ba383bc4211f75f4f939e23ed8332bc5cbe65c01dd8",
+  "text.until": "sha256:74ba9e5c3fc8b758ea0218e417e5459de2cd39c3aba0e643da10974328a4002a",
 };

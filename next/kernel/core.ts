@@ -189,7 +189,9 @@ export const createCore = () => {
   const bitsOf = (v: V) => {
     const s = seen(v);
     if (!(s instanceof Bits)) return wrong("bitsOf", v);
-    // The length is known at once. The bytes of a value made by joining are laid out when they are read.
+    // The length is known at once. Bytes that are laid out are handed over as they are.
+    if (s.laidOut) return { bytes: s.bytes, bitLength: s.bitLength };
+    // The bytes of a value made by joining are laid out when they are read.
     return {
       get bytes(): Uint8Array {
         return s.bytes;
@@ -368,13 +370,41 @@ export const createCore = () => {
     return new Bits(bytes, bits.length);
   };
   /** A count as the kernel answers one: 64 bits, most significant first. */
-  const count64 = (n: number): V => packed(Array.from({ length: 64 }, (_, i) => (i < 11 ? 0 : Math.floor(n / 2 ** (63 - i)) % 2)));
+  const count64 = (n: number): V => {
+    const bytes = new Uint8Array(8);
+    for (let i = 7, rest = n; i >= 0 && rest > 0; i--, rest = Math.floor(rest / 256)) bytes[i] = rest % 256;
+    return new Bits(bytes, 64);
+  };
   /** A whole number read from bits, or undefined where the value is not bits or is too large to count with. */
   const countOf = (v: V): number | undefined => {
     const b = seen(v);
     if (!(b instanceof Bits)) return undefined;
+    // Whole bytes are read a byte at a time: a count is read at every part taken and every entry read by its place.
+    if (b.whole) {
+      let n = 0;
+      for (const byte of b.bytes) n = n * 256 + byte;
+      return Number.isSafeInteger(n) ? n : undefined;
+    }
     const n = bitList(b).reduce((acc, bit) => acc * 2 + bit, 0);
     return Number.isSafeInteger(n) ? n : undefined;
+  };
+  /** The bit of a value at a place, from 0: its bits are the last `bitLength` bits of its bytes. */
+  const bitAt = (b: Bits, bytes: Uint8Array, place: number): number => {
+    const i = bytes.length * 8 - b.bitLength + place;
+    return (bytes[i >> 3] >> (7 - (i & 7))) & 1;
+  };
+  /** `n` bits of a value from a place, as a value of its own, with no list of its bits made. */
+  const partOf = (b: Bits, from: number, n: number): V => {
+    const [source, bytes] = [b.bytes, new Uint8Array(Math.ceil(n / 8))];
+    const pad = bytes.length * 8 - n;
+    for (let j = 0; j < n; j++) if (bitAt(b, source, from + j)) bytes[(j + pad) >> 3] |= 128 >> ((j + pad) & 7);
+    return new Bits(bytes, n);
+  };
+  /** True where two values of one length have the same bits. */
+  const sameBits = (a: Bits, b: Bits): boolean => {
+    const [x, y] = [a.bytes, b.bytes];
+    for (let j = 0; j < a.bitLength; j++) if (bitAt(a, x, j) !== bitAt(b, y, j)) return false;
+    return true;
   };
   const textOf = (b: Bits): string => new TextDecoder().decode(b.bytes);
   /** A structure of plain data whose first entry is a symbol naming its form. */
@@ -548,15 +578,28 @@ export const createCore = () => {
   const assumptionNumbers = new WeakMap<object, number>();
   let assumptionCount = 0;
   /** The key within one kernel: it tells two assumptions of one module apart, which the stored key does not. */
+  /** The key of a rest that is not an assumption at a place, kept: the same record is noted at every step that rests on it. */
+  const keyOfRest = new WeakMap<Rest, string>();
   const localKey = (r: Rest): string => {
-    if (r.kind !== "assumption" || r.at === undefined) return restKey(r);
+    if (r.kind !== "assumption" || r.at === undefined) {
+      let key = keyOfRest.get(r);
+      if (key === undefined) keyOfRest.set(r, (key = restKey(r)));
+      return key;
+    }
     let n = assumptionNumbers.get(r.at as object);
     if (n === undefined) assumptionNumbers.set(r.at as object, (n = ++assumptionCount));
     return `${restKey(r)} #${n}`;
   };
 
   /** A copy keeps the mark of what it was copied from: a part is its writer's wherever it goes. */
+  /**
+   * The function as written that a function was made from, by copying or by closing: two
+   * that come from one are the same function to whoever asks which functions were called.
+   */
+  const writtenFrom = new WeakMap<Fn, Fn>();
+  const writtenOf = (f: Fn): Fn => writtenFrom.get(f) ?? f;
   const keep = (from: V, to: V): V => {
+    if (to !== from && from instanceof Fn && to instanceof Fn) writtenFrom.set(to, writtenOf(from));
     if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
       to.owner = from.owner;
     // And the place it was written at: what a copy or an evaluation leaves of a part is still that part.
@@ -1194,8 +1237,8 @@ export const createCore = () => {
     restKey, TRUE, FALSE, out, isV, into, through, seen, bindingOf, known, hidden, knownInFull,
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
-    numberOf, bitList, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    numberOf, bitList, partOf, sameBits, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
+    restored, thenGroups, localKey, keep, writtenOf, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,

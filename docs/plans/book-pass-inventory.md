@@ -1741,8 +1741,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### A parser records where each expression came from in its text
-- Decides: the position of an expression in its source text is a metadata field the parser's extension registers and writes. The kernel does not know about it. The parse tree stays internal to the parser.
-- Status: open; ruled 2026-11-12 (DR3)
+- Decides: the place of an expression in its source text is an entry of its description, `at`, which the parser writes: the text's name, and where the part starts and ends, each a location of index, line and column. The kernel keeps a place on what is built from a description and gives it no meaning. The parse tree stays internal to the parser.
+- Status: open (the present tree has none; the rebuild's engine writes places, `next/ext/lib/engine.alg`); ruled 2026-11-12 (DR3); reworded 2026-11-26 to the maintainer's ruling of 2026-11-22
 - Type: capability
 - Rationale kind: technical
 - Depends on: Parsing is evaluation; An extension registers its own fields; A value's origin is a description
@@ -1750,7 +1750,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Label: swappable — a parser may record more or less
 - Options recorded: the kernel recording source positions in its own origin field (rejected: "Source attachment is not a promise the kernel needs to know about")
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
-- Notes: new, by ruling. Two fields: the kernel's origin field holds the expression an expression came from; the parser's field holds a parsed expression's source information. Following the origin chain to its end reaches an expression that carries the parser's field.
+- Notes: new, by ruling. Was "a metadata field the parser's extension registers and writes", with the kernel knowing nothing of it. The ruling of 2026-11-22 made a place an entry of a part's description, kept by the kernel on what it builds and told to a host with a claim's record; the maintainer confirmed on PR #305 that this entry follows the later ruling. The origin field is unchanged: it holds the expression an expression came from.
 - Chapter: Parsing
 
 #### Scannerless parsing
@@ -1782,8 +1782,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Parsing
 
 #### Offside rule through stateful indent terminals
-- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of offset and indent stack. `NEWLINE` matches only when the next content is at or below the block's indent, so a continuation line needs no construct of its own.
-- Status: partly built
+- Decides: indentation is expressed by four terminals, `NEWLINE`, `INDENT`, `DEDENT` and `SAMELINE`, over a parser state of the columns of the blocks being read. `NEWLINE` matches only when the next content is at the block's column; a line less deep is `DEDENT`'s alone, and a line deeper carries on the line before it, so a continuation line needs no construct of its own. A tab counts as one column, like a space.
+- Status: partly built; reworded 2026-11-25 by the maintainer's ruling on PR #309
 - Type: capability — grammar authors name the indent terminals in their rules
 - Rationale kind: technical
 - Depends on: A terminal is a function, so a grammar can define its own; Scannerless parsing
@@ -1792,7 +1792,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Units: grammar-formalism
 - Options recorded: a dedicated continuation construct (rejected); tab handling proposals (tabs forbidden by default, `tab_width` opt-in)
 - Sources: docs/book/grammar-formalism.md §5.1–§5.5; docs/book/extension/grammar.md §3
-- Notes: `SAMELINE` is not implemented (`src/grammar2/engine.ts:712`); the tab and empty-stack questions of docs/book/grammar-formalism.md §5.4 are "Proposed", not recorded as decided.
+- Notes: `SAMELINE` is not implemented in the present tree (`src/grammar2/engine.ts:712`); the rebuild's `next/ext/lib/offside.alg` has all four. Was "at or below the block's indent": with every reading of a text kept, a `NEWLINE` that held below the block's column too would read the outer block's next statement as the inner block's as well. The tab question of docs/book/grammar-formalism.md §5.4 is ruled as above; the empty-stack question does not arise, since the outermost block has no `DEDENT`.
 - Chapter: Parsing
 
 #### Guards and reserved words separate keywords from identifiers
@@ -4073,8 +4073,8 @@ They came together over years of exploration into most of what Allegro is today.
 - Chapter: Tools
 
 #### Check reaches every claim
-- Decides: an early phase such as check does not have a program's inputs or the answers of its effects. A claim it evaluates comes out one of three ways: decided, because it did not depend on what is unknown or is true whatever that is; refuted, because it is false whatever that is; or it waits, and the result names what it waits for. A claim is never passed over. So that every claim is reached, check evaluates speculatively: it takes both branches of a conditional whose condition is unknown, and it specializes every function a module binds, called or not, and every branch. A claim says the program is right, and a refuted claim halts; a value a right program must cope with, such as bad input, is failure data that the program handles, and not a claim. A test is a claim, and its result is the claim's record. A configuration may require more, such as that no claim is left waiting.
-- Status: partly built (the kernel's `check` call evaluates so, on both variants; the launcher's check still runs a module with its inputs unknown and takes no branch whose condition is unknown); ruled 2026-11-22
+- Decides: an early phase such as check does not have a program's inputs or the answers of its effects. A claim it evaluates comes out one of three ways: decided, because it did not depend on what is unknown or is true whatever that is; refuted, because it is false whatever that is; or it waits, and the result names what it waits for. Check evaluates speculatively: it performs nothing, and takes both branches of a conditional whose condition is unknown. So it reaches every claim a run could reach. What it does not go into is told, and not passed over in silence: a function with its parameters unknown, called or not, a binding nothing reads, an argument nothing needs, an entry nothing reads. The phase chooses which of those are evaluated too, by the project's configuration; the kernel has no default for it. A claim says the program is right, and a refuted claim halts; a value a right program must cope with, such as bad input, is failure data that the program handles, and not a claim. A test is a claim, and its result is the claim's record. A configuration may require more, such as that no claim is left waiting.
+- Status: partly built (the kernel evaluates so, on both variants: `evaluate` with `speculative`, and the list `untouched` of its result; the launcher's check still uses the kernel's `check` call, which goes into everything); ruled 2026-11-22; reworded 2026-11-29
 - Type: capability — a guarantee to the user
 - Rationale kind: technical
 - Depends on: A function can be specialized with its parameters unknown; A tool reads a phase's result and adds no analysis of its own; Every result says how strongly it holds
@@ -4083,6 +4083,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a claim on an unknown value is skipped (rejected: silently); check runs tests only (rejected: a claim in a function no test calls is never seen)
 - Sources: the maintainer's rulings of 2026-11-22 (the discussion of inputs and capabilities a phase does not have)
 - Use case: a module claims `n > 0` under `if mode == \`strict`. Check does not know `mode` or `n`. The claim is reached and reported as waiting for the input `n`.
+- Notes (2026-11-29): was "A claim is never passed over ... it specializes every function a module binds, called or not, and every branch". The acceptance stream found that going over a function a second time, with its parameters unknown, made a claim decided as called read as waiting, and that what a phase handed for a capability was not there the second time. The maintainer: the main purpose of a check is the paths a run can take; the broader analysis is a choice, made in the phase and down to the function, and the kernel does not know whether it evaluates Allegretto or the standard language. So the second pass is no longer the kernel's to make: it tells what it left untouched, and the phase evaluates what it chooses. A binding nothing reads is first of all a fact to tell.
 - Notes: new, by ruling. In the standard language most claims are about types and are decided before a run though values are unknown; in Allegretto the checks are claims written in the code, and this says what becomes of them. What check does beyond tests is analysis of the program, run as code inside the phase: coverage, a branch wrong on every path, code that cannot be reached, a binding never read, every assumption. Which of these ship is decided with the check-time capabilities.
 - Notes (2026-11-23, the phases of a check): ruled in a second discussion. A check has three phases. The first is the specialization with nothing bound, which is where every claim is reached. The second is an analysis of the specialized program, by the host: it reads the description of what `specialize` returns, or listens to the kernel's hook while the program is specialized. The hook may be the only way to tell that a branch cannot be reached, since specialization leaves such a branch out of what it returns. The third is running tests, which is ordinary evaluation and not speculative: the tests' entry points are not the program's, so a test run is in effect another program, it may be given test versions of capabilities, and the host reads coverage from the hook. Which analyses the second phase makes is not yet defined, and is to be worked out before export, since it handles what the first phase leaves.
 - Notes (2026-11-23, the kernel's part built): `check` on the kernel's interface. It evaluates ahead of what is done, with both branches of an unknown conditional. It then goes over what that left untouched (a binding nothing read, an argument nothing needed, an entry nothing read) and evaluates the body of every function it met with the parameters unknown, also one a call opened with known values. A function is opened once while it goes over, so a recursion ends; one whose argument changes with known values still runs to the budget. A branch a known condition does not take is not reached and has no record. The result lists, beside the claims, the refutations found in parts that do not refute the whole, such as a name bound by nothing in a function nothing calls.

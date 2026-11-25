@@ -574,6 +574,120 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-29 — A check is an ordinary evaluation, asked two things.**
+  `Kernel.evaluate` takes `speculative`: nothing is performed, and both
+  branches of what cannot be decided are evaluated. Its result lists
+  what it did not go into, `untouched`: each function met, called or
+  not, a binding nothing read, an argument nothing needed, an entry
+  nothing read, each with its place. Whoever asked evaluates what it
+  chooses of them. Nothing of such an evaluation stays in the kernel.
+  `Kernel.check` is that evaluation followed by all it left untouched,
+  and is to be retired when the launcher has moved. "Check reaches every
+  claim" is reworded: every claim a run could reach, and what is not
+  reached is told.
+- **2026-11-28 — Three faults of the kernel's check, found by the
+  acceptance stream, fixed on both variants.** A check opens a call a
+  run would make, a function that calls itself among them, so a claim
+  that rests on one is decided or refuted; a call stays a call only
+  under a condition the check could not decide. What a check leaves
+  waiting does not outlast it. A function nothing binds by name, written
+  as an entry or handed to a function that does not call it, is opened.
+  `createKernelOf(variant)` gives a kernel of a variant by name.
+- **2026-11-28 — Allegretto read by the engine: the same tree as the
+  bootstrap's.** `next/ext/lib/allegretto.alg`, new: Allegretto's whole
+  grammar as a value, blocks by indentation among it, giving the tree
+  of a text with the place of each part. `next/ext/readers.ts` writes
+  the bootstrap's tree and the engine's in one form and compares them:
+  of the 167 `.alg` texts under `next/`, 165 give the same tree, places
+  among them, and 2 are refused by both. The engine's own text is one
+  of the 165. A place's line is found in a table of where lines begin.
+  With the whole grammar a module of 252 lines takes 3,954,627 steps
+  and about 13 seconds, over the target of 10. What a tree means, its
+  function's description, is not built yet.
+- **2026-11-27 — Rows open to new signs, conflicts settled by the text,
+  and errors refused before a text is read.** A row of signs keeps what
+  it was made from: `change.level` adds a level to it and
+  `change.signs` adds signs to a level it has, and a level may say what
+  its own signs give. `change.changed_by` takes the using text's own
+  change: where it replaces or removes a rule, what other changes do to
+  that rule is set aside. Preparing a grammar, and changing one, refuse
+  a rule or a reserved set named that the grammar has not; a rule
+  nothing reaches is still only reported.
+- **2026-11-27 — Grammars changed and combined.** `next/ext/lib/change.alg`,
+  new: a change is operations on rules by name: add, append, replace,
+  remove, wrap, and reserve for a set of words. `changed` makes a list
+  of changes in whatever order, or refuses a conflict before any text
+  is read. `used` is for a notation a text brings in: it refuses one
+  that changes a rule it did not add, adds to a rule a guard in force
+  tests cannot be read, reserves a word in a set in force, or brings a
+  terminal that touches the state, unless the text names what is
+  changed. `analysis.faults` gives what is wrong with a grammar: a rule
+  or a reserved set named that it has not, and a rule nothing reaches.
+- **2026-11-26 — What a parse gives.** In `next/ext/lib/engine.alg` a
+  reading gives a value and no longer a tree: a terminal the text it
+  read, a sequence and a repetition what their items give, and a form
+  made with `grammar.giving` what its function makes of that, with the
+  place it read: `{source, start, end}`, each end an index, a line and
+  a column. `engine.parse` gives the one reading and claims there is
+  one; a text that reads two ways refutes the claim. A rule a grammar
+  marks settled is claimed to have one result at most wherever it is
+  read. `next/ext/lib/levels.alg`, new: levels of binding by name, each
+  placed by the levels it names, and a row of signs grouped by them.
+  `flat.alg` groups its rows by Allegretto's eight levels. "A parser
+  records where each expression came from in its text" is reworded to
+  the ruling of 2026-11-22.
+- **2026-11-26 — A rule that begins with itself costs in line with its
+  text.** A turn reads on only from the results the turn before added:
+  a row of 80 operands through `sum = sum "+" one | one` takes 62,129
+  steps, where it took 711,225. Rulings recorded: a state is a bits
+  value; `newline` holds only at the block's column, and "Offside rule
+  through stateful indent terminals" is reworded; a tab counts as one
+  column.
+- **2026-11-25 — The engine reads rules that begin with themselves, and
+  carries a state.** In `next/ext/lib/engine.alg` a rule that can begin
+  with itself is read in turns at a position until a turn adds no
+  result, so `sum = sum "+" one | one` reads "1+2+3" as (1+2)+3. A
+  result carries a state, a bits value; a terminal made with `stepper`
+  reads it and may change it. A grammar has a function for space, read
+  after a terminal made `spaced`, and sets of reserved words by name,
+  to which a grammar adds. `next/ext/lib/offside.alg` gives blocks by
+  indentation as terminals over a state of columns: `newline`,
+  `indent`, `dedent`, `sameline`. A rule that touches the state is not
+  remembered. A module of 226 lines is read in 2,113,919 steps and
+  about 7 seconds.
+- **2026-11-25 — A parser engine written in Allegretto, and the speed
+  target met.** Five modules under `next/ext/lib/`, each with a test
+  module. `class.alg`: a class of bytes as 256 bits. `grammar.alg`: a
+  grammar as a value in seven rule forms, and terminals as functions
+  of a text and a position. `analysis.alg`: which rules can read no
+  byte, the bytes each item can begin with, and the rules worth
+  remembering. `engine.alg`: every reading of a text, with no meaning
+  given to the order of alternatives, or the farthest position where
+  no reading goes on. `flat.alg`: a grammar for Allegretto written
+  with no indented block. The engine reads a module of 207 lines of
+  Allegretto in 2,280,434 steps and about 7 seconds; the target is 10.
+  The kernel's `specialize` makes the engine over a grammar 6 to 20
+  percent cheaper on small grammars and does not finish on this one.
+  Not yet: a rule that begins with itself, a state beside the
+  position, and trees as descriptions.
+- **2026-11-24 — What the parser engine stands on.** Allegretto modules
+  under `next/ext/` now have tests: a module `<name>.test.alg` beside
+  what it tests, its claims the assertions, run by
+  `next/ext/ext.test.ts`. `next/ext/lib/map.alg` is a map from whole
+  numbers to values, a tree that shares all but the path to a key;
+  `next/ext/lib/set.alg` is a set on it. Four shipped primitives read a
+  text from a byte position: `text.byte`, `text.span`, `text.starts`
+  and `text.until`. An Allegretto text cannot name them until the
+  emitter lists them. The kernel no longer builds a key and a record
+  for every call of a primitive, nor a list of 64 numbers for every
+  count: a map of 10,000 entries is built and read in 4,652,564 steps
+  and about 12 seconds, where it took 18. The tests that run a module
+  are left out on the reference kernel, whose depth the modules
+  outgrow.
+- **2026-11-24 — A plan for the parser engine and the module loader.**
+  `docs/plans/book-pass.md` §10 and eleven chunks in its §5: an engine
+  and a loader written in Allegretto under `next/ext/`, ending with the
+  bootstrap deleted. No code yet.
 - **2026-11-23 — A check that reaches every claim, in the kernel.**
   `Kernel.check` evaluates an expression ahead of what is done: nothing
   is performed, both branches of an unknown conditional are evaluated,

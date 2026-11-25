@@ -10,7 +10,7 @@ oracle:
   - npx tsx scripts/doc-ref-lint.ts
   - npm run lint:streams
   - npm test
-chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
+chunks: [P0, P1, P1b, P2, F1, DR1, DR2, DR3, DR4, DR5, DR6, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, CH0, CH1, CH2, CH3, CH4, CH5, CH6, CH7, CH8, CH9, CH10, CH11, CH12, CH13, CH14, CH15, CH16, CH17, CH18, CH19, CH20, CH21, CH22, CH23, CH24, CH25, CH26, CH27, CH28, CH29, CH30, CH31, CH32, CH33]
 reserves: [B-184, B-186]
 boundary:
   - docs/book/**
@@ -599,6 +599,17 @@ are:
 | K13 (the first of two) | rebuild | `first(a, b)` and cancelling | done 2026-11-20: a 23rd kernel primitive on both variants, eight tests. The machine cancels what lost and keeps the answer of a named value in a list of its own, `kept`; the reference keeps nothing of what lost, and the tests say so |
 | K14 (sharing) | rebuild | structures and bits that share what an operation does not change | done 2026-11-20 on the machine: a list of 160,000 entries is built in 4.3 s and 800,005 steps, where steps and time grow with the size. Six tests. Found and fixed with it: every record of what an evaluation rests on was written at every depth of the stack |
 | K15 (specialization, and the switch) | rebuild | a waiting task read back as an expression; `specialize`; `sample`; `create.ts` gives the machine | `specialize` and `sample` done 2026-11-21 on both variants, as the 24th and 25th kernel primitives. Reading a waiting task back as an expression is dropped by ruling: specialization did not need it, and nothing else reads one. The switch done 2026-11-21: `next/kernel/create.ts` gives the machine, and `ALLEGRO_KERNEL=reference` gives the reference, which the kernel's tests still run on |
+| E1 (the plan of the engine and the loader) | rebuild | §10 of this plan | the maintainer's ruling on it |
+| E2 (what the engine stands on) | rebuild | a test runner for Allegretto modules under `next/ext/`; a map and a set written in Allegretto; shipped primitives for terminals, the first of them one that measures a run of characters of a class | done 2026-11-24: the runner `next/ext/ext.test.ts`, `next/ext/lib/map.alg` and `set.alg` with their test modules, and the primitives `text.byte`, `text.span`, `text.starts`, `text.until`; a map of 10,000 entries is built and read in 4,652,564 steps, 4.75 times the steps of one of 2,500 |
+| E3 (the engine: every parse) | rebuild | a grammar as a value in the seven rule forms; terminals as functions; every parse of a text, with no meaning given to the order of alternatives; the farthest point where no parse goes on; an analysis of the grammar for the characters each alternative can start with and for the rules worth remembering; the engine specialized over a grammar | done 2026-11-25: `class.alg`, `grammar.alg`, `analysis.alg`, `engine.alg` and `flat.alg` under `next/ext/lib/`, each with a test module; **the speed target is met: a module of 207 lines is read in 2,280,434 steps and about 7 seconds**; the engine specialized over a grammar is measured and gains little (§7) |
+| E4 (the engine: left recursion and state) | rebuild | rules that recurse on the left; a state carried beside the position; guards and reserved words; the offside rule as terminals that read the state | done 2026-11-25: in `engine.alg`, `analysis.alg` and `grammar.alg`, and the new `next/ext/lib/offside.alg`, with their test modules; a module of 226 lines is read in 2,113,919 steps and about 7 seconds |
+| E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
+| E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
+| E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Open: what a tree means, compared by identity; and the speed target, missed with the whole grammar (§7) |
+| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
+| E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
+| E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
+| E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
 | CH0 (the tour) | 2 | Ten choices that define Allegro | the tour, after phase 1, from the ruled decisions and the maintainer's motivations |
 | CH1 to CH33 (the chapters) | 2 | each chapter of the contents, in order | IR, prose and code changes under §2.7 |
 
@@ -1753,6 +1764,532 @@ its approval.
   not take is not evaluated; the second phase's analyses are Allegro
   code that the launcher hands a check's result to; a refutation is
   told to a host under the name `refutation`.
+- **2026-11-24 — a plan for the parser engine and the module loader**
+  (the review session): §10, and eleven chunks E1 to E11 added to §5
+  by amendment. No code. Ruled the same day: the algorithm; the order
+  of the chunks; a place written as `at`; recovery after a failed
+  parse waits; this stream runs its tests on the acceptance stream's
+  reader and launcher; a speed target that E3 must meet or stop at;
+  terminals may be shipped primitives.
+- **2026-11-24 — chunk E2, what the engine stands on** (the review
+  session). Built: the runner of Allegretto test modules
+  `next/ext/ext.test.ts`; the map `next/ext/lib/map.alg` and the set
+  `next/ext/lib/set.alg`, each with a test module; the shipped
+  primitives `text.byte`, `text.span`, `text.starts` and `text.until`.
+  Measured: a map of 10,000 entries built and read takes 4,652,564
+  steps, 4.75 times the steps of one of 2,500, so the work grows with
+  the size and with the depth of a key. The first measurement took 18
+  seconds, about 250,000 steps a second. A profile showed three costs
+  that were not evaluation: a key built from a primitive's hash at
+  every call, a list of 64 numbers built for every count, and an
+  object made for every read of bits by a primitive. All three are
+  removed; the same run takes about 12 seconds, about 390,000 steps a
+  second. What is left is spread
+  over substitution into function bodies (about a fifth), the
+  collector of the host (a tenth) and the integer primitives' use of
+  the host's large integers (a tenth). No shared form for a map in the
+  kernel is asked for (§10.7 item 2): the map's cost is the kernel's
+  cost for each step, not copying. Deliberate faults: 7 of 7 in the
+  map, 1 of 1 in the set, 6 of 6 in the primitives, with two more
+  changes there that change no result. For the research goal: nothing
+  is specialized yet, so nothing is reported as left undone. The
+  reference kernel evaluates on the host's stack and ends a map of
+  fifty entries as out of budget, so the tests that run a module are
+  left out there and say so; the machine runs them all. Open for
+  lane Q: the emitter's lists name none of the four primitives, nor
+  `specialize` and `sample`, so no Allegretto text can use them yet.
+- **2026-11-25 — chunk E3, the engine: every parse** (the review
+  session). Built, each with a test module beside it:
+  `next/ext/lib/class.alg`, a class of bytes as 256 bits;
+  `grammar.alg`, the seven rule forms and the terminals `lit`, `run`,
+  `many`, `one`, `until` and `end`; `analysis.alg`; `engine.alg`;
+  `flat.alg`, a grammar for Allegretto written with no indented block.
+  - *The engine.* What a form gives at a position is every result it
+    has there. A sequence carries on from each result of an item; an
+    `alt` gives the results of all its items; a `star` gives a result
+    for every count. Its answer is `{trees}` or
+    ``{failure: `no_parse, at}``. A tree has an entry `kind`; this
+    shape lasts until E5 gives descriptions.
+  - *What cannot match is not tried.* The analysis gives each item of
+    an `alt`, and the item of a `star` and of an `opt`, the class of
+    bytes it can begin with. The engine tests one byte. A terminal says
+    what it can start with, since the analysis cannot look inside a
+    function.
+  - *Only what pays is remembered.* A rule is remembered where two
+    items of one `alt` can both begin with it. What is remembered is a
+    table with a row for each position, whose entries are worked out
+    when first read and once: the kernel's own rule for an entry of a
+    structure. So the engine threads no table through its functions,
+    and the map of E2 is used by the analysis only.
+  - *Space.* A terminal that reads a word or a sign reads the space
+    after it, so what a rule begins with is never a space.
+  - *Operators are read as one row*: an operand, then a sign and an
+    operand any number of times. With a rule for each of the eight
+    levels of binding the same module took 3,884,041 steps and 15
+    seconds, and missed the target. The row is to be grouped by the
+    order of binding when a tree becomes a description, in E5, which
+    builds the precedence levels. The maintainer is asked to confirm.
+  - *Measured.* `analysis.alg` and `class.alg` as one text, 207 lines
+    and 10,189 bytes: one reading, 2,280,434 steps, 7.1 seconds alone
+    and 8.2 inside the test file. Twice the text takes about twice the
+    steps. The engine's tests take about 32 seconds in all.
+  - *The kernel, again.* A count was read from a list of its 64 bits;
+    a part of a value not of whole bytes, and a comparison of two,
+    listed every bit of the whole value. Each now reads what it needs.
+    The 207 lines went from 8.8 to 7.1 seconds.
+  - *For the research goal: what specialization left undone.* The
+    kernel's `specialize` was applied to the engine with its grammar
+    given and the text unknown. Three small grammars: 341 steps to 281,
+    823 to 771, 456 to 367 for a reading. The saving is a fixed number
+    of steps for a reading and does not grow with the text. The cause:
+    a function being opened is not opened again inside itself, and the
+    engine is one function, `parse`, entered again for each form of the
+    grammar. So only the first form's choice is removed, and every
+    other is left as a call of the general `parse`. What would remove
+    them: opening a function again where its known arguments differ,
+    and keeping one specialized function for each pair of a function
+    and its known arguments, so that a rule that names itself closes a
+    loop. On the grammar of `flat.alg` the specialization did not
+    finish in 30,000,000 steps and 67 seconds. Why is not established.
+  - *Deliberate faults*: 41 made in the five modules. 31 were caught
+    at first. Of the 10 that were not, 2 change no result, and one of
+    them was an optimization in `flat.alg` that saved no step and is
+    removed. The other 8 showed tests that were missing: an item that
+    can read no byte, the farthest position across items, a remembered
+    rule at the end of a text, a rule met twice by one item, a tab, a
+    first line that begins with a space, and a name that begins as a
+    word does. Each has a test now and is caught. In the kernel's new
+    reading of bits, 5 made: 3 caught at first, and 2 after two tests
+    were added to `next/kernel/kernel.test.ts`.
+  - *Open for lane Q*: the reader refuses a name that begins with
+    `true`, such as `trues`, and a brace inside a text; the six names
+    of E2's hand-off are still not listed, so terminals read bytes with
+    `bits.slice` and `bits.int`, about 39,000 calls for the 207 lines.
+- **2026-11-25 — chunk E4, the engine: left recursion and state** (the
+  review session). The maintainer confirmed E3's asks: operators as one
+  row, a terminal that says what it can start with, and space read
+  after a terminal.
+  - *A rule that begins with itself.* The analysis marks it: its own
+    number is among the rules its body can begin with. The engine reads
+    such a rule in turns at a position. The first turn gives the rule
+    nothing where it meets itself there; each turn after gives it what
+    the turn before gave; a turn that adds no result ends it. This
+    holds for two rules that begin with each other and for a rule that
+    begins with itself after an item that can read no byte. A rule that
+    reads itself and no byte between has no end of readings and is
+    refused, when more turns have added results than bytes are left.
+    While a rule is read in turns at a position the table is not read
+    there, since what a rule gives there is not settled. Each turn
+    reads the body again for every result so far, so a row of n
+    operands read this way costs about n times n: 55,275 steps for 20
+    operands, 191,125 for 40, 711,225 for 80. `flat.alg` reads its
+    operators with a repetition and is not affected. Reading on from
+    the new results of a turn alone would make it grow with n; it is
+    not built.
+  - *A state.* A result is `{end, state, tree}`. A state is a bits
+    value, so that two can be compared: the ruling "a rule entered
+    again at the same position with a changed state is refused" needs
+    it. A terminal made with `stepper` gives `{read, state}`. The
+    maintainer is asked to confirm that a state is bits.
+  - *What is remembered, with a state.* The table has a row for a
+    position, not for a position and a state. So a rule is remembered
+    only where it neither reads nor changes the state, itself or
+    through another rule; what the table holds is then right for every
+    state, and whoever reads an entry puts its own state on the
+    results. In a grammar with blocks by indentation the space after
+    every word reads the state, so nothing is remembered there. Whether
+    that costs is to be measured on Allegretto's whole grammar, in E7.
+  - *Space and reserved words are the grammar's.* `with_space` gives a
+    grammar its function for space; a terminal made `spaced` reads it
+    after what it reads, and a tree keeps where the terminal itself
+    ended. `with_reserved` adds words to a set by name; a terminal made
+    with `unless` and a set's name reads none of them. `flat.alg` uses
+    both and holds no code of its own for either.
+  - *Blocks by indentation.* `offside.alg`: the state is the columns
+    of the blocks being read. `newline` holds where the next line is at
+    the block's column. The entry "Offside rule through stateful indent
+    terminals" says at or below; here a line below the block's column
+    is `dedent`'s alone, since with every reading kept a `newline` that
+    held there too would read the outer block's statement as the inner
+    one's. `indent` reads nothing and holds at the first thing on a
+    line deeper than the block, because the space after the word
+    before it has already carried on to that line. `sameline`, which
+    the present tree never built, is here. A tab counts as one column;
+    the entry leaves tabs open. The maintainer is asked to confirm.
+  - *Measured.* `grammar.alg`, `class.alg` and `map.alg` as one text,
+    226 lines and 12,069 bytes: 2,113,919 steps, 6.7 seconds.
+    `analysis.alg` now holds an indented block, so it is no longer a
+    text `flat.alg` reads.
+  - *Tests changed by this chunk.* `analysis.test.alg`: an entry of
+    `kept` is `{name, grows}` and no longer a name, so two claims read
+    `.name`. The speed test reads three other modules, for the reason
+    above.
+  - *Deliberate faults*: 30 made in the four modules, 27 caught at
+    first. The 3 missed showed missing tests: a remembered rule inside
+    a rule read in turns, the state compared where a rule is met
+    again, and the state after a guard. Each has a test now and is
+    caught.
+  - *For the research goal.* Nothing new: the three small grammars of
+    E3's finding take 389 to 313, 925 to 862 and 511 to 404 steps.
+- **2026-11-25 — rulings on PR #309, and turns that read on from new
+  results only** (the review session). The maintainer confirmed E4's
+  asks. A state is a bits value. `newline` holds only at the block's
+  column, and the entry "Offside rule through stateful indent
+  terminals" is reworded so. A tab counts as one column. A rule is
+  remembered only where it neither reads nor changes the state, to be
+  measured on Allegretto's whole grammar in E7. And on the cost of a
+  rule that begins with itself: "go ahead and fix the cost of that
+  scenario."
+  - *Built.* In `next/ext/lib/engine.alg` a result carries a mark,
+    `via`: true where it was read through a result marked new. A turn
+    is given the results the turn before added, marked new, and keeps
+    of what it reads only what came through them. The older results
+    that read no byte are given too, unmarked, since a new result may
+    follow one of them at the same position. A rule met while another
+    is read in turns at the same position is read as before, each turn
+    given every result so far, and the marks pass through it.
+  - *Measured.* A row of n operands through `sum = sum "+" one | one`:
+    17,206 steps for 20 operands, 32,169 for 40, 62,129 for 80, where
+    it took 55,275, 191,125 and 711,225. The 226 lines of the speed
+    test are unchanged in kind: the mark is an entry nothing reads
+    outside a turn.
+  - *A fault found by the earlier method.* The first version gave a
+    turn the new results that read no byte twice, marked and unmarked,
+    and counted three readings where there is one. A new test holds a
+    grammar where the rule is met twice at one position; the same
+    claims were run with every rule read the earlier way, and agree.
+  - *Deliberate faults*: 12 made, 9 caught at first. Of the 3 missed,
+    one is caught by the new test of growth in `next/ext/ext.test.ts`,
+    and two showed missing tests: a rule that begins with itself
+    inside an option, and inside a repetition. Both have tests now.
+- **2026-11-26 — chunk E5, the engine: what a parse gives** (the
+  review session). The maintainer confirmed the rewording of "Offside
+  rule through stateful indent terminals" on PR #310.
+  - *A reading gives a value.* The trees of E3, each with an entry
+    `kind`, are gone, as E3's record said they would be. A terminal
+    gives the text it read; a rule and an `alt` what their form gives;
+    a `seq` and a `star` a structure with no keys of what their items
+    give; an `opt` `[]` or one thing in a structure; a `guard` `[]`.
+    The answer of `parses` is `{readings}`.
+  - *A form is given a function.* `grammar.giving(form, f)`: the form
+    gives `f(value, at)`. Any of the seven forms may have one, and the
+    count of forms stays seven: it is an entry of a form, `gives`. A
+    function is called when what it gives is read, so a reading that
+    is dropped calls none. The names in a function mean what they
+    meant where it was written, since it is a function; "Every
+    notation stands for an expression" asks for that.
+  - *Places.* `at` is `{source, start, end}`, each end `{index, line,
+    column}`: the index in bytes from 0, the line and the column from
+    1, the column in bytes. A place ends where what was read ends, the
+    space after it not counted: a result carries `stop` beside `end`
+    for that. A line is counted from the beginning of the text when a
+    place is read, so a place nothing reads costs nothing and one that
+    is read costs its distance from the beginning. The entry "A parser
+    records where each expression came from in its text" is reworded
+    to the ruling of 2026-11-22, as confirmed on PR #305.
+  - *Ambiguity is a claim.* `engine.parse(p, text)` gives the one
+    reading, or the failure `no_parse`. It claims the text reads one
+    way; two readings refute it. `engine.parses` gives every reading
+    and claims nothing.
+  - *The mark `unambiguous`.* `grammar.with_settled(g, names)` marks
+    rules. A marked rule is claimed to have one result at most
+    wherever it is read. The entry says a marked production's reading
+    must be "the only reading of the text so far"; that holds here
+    where the rules around a marked rule are read one after another,
+    as the lines of a module are. A marked rule must end at a definite
+    place: one that ends with a repetition has a result for every
+    count, and refutes its own mark. The maintainer is asked to
+    confirm this reading of the mark; E8 is what uses it.
+  - *Levels.* `levels.alg`: a level is `{name, signs, side, after,
+    before}`, `after` naming levels it binds tighter than and `before`
+    levels it binds looser than, as the present book has them.
+    `row(operand, levels, sign, make)` is an ordinary form, a sequence
+    with a function; the engine knows nothing of levels. Two levels
+    with no order between them may both be in a grammar, and a text
+    that writes their signs side by side is refused; so is a text
+    where two levels each bind tighter than the other. A level whose
+    signs do not group at all is not built: no ruled notation has one.
+  - *Measured.* `grammar.alg`, `class.alg` and `map.alg`, now 250
+    lines and 13,832 bytes: 2,389,175 steps, 7.6 seconds; 173 steps a
+    byte, where E4 had 175. The measurement counts the readings and
+    reads no value; E7 measures with descriptions read.
+  - *Tests changed by this chunk.* The 18 claims that compared a tree
+    as a text compare what the reading gives; `.trees` is `.readings`.
+  - *A claim refuted inside an attempt is on the run's record.* So a
+    test module that tests one has the summary `refuted`. Those tests
+    are in `refuted_claims.test.alg`, which says so; the runner holds
+    every other module to `decided`, and lets no module say `refuted`
+    that is not named for it. The runner's condition changed: it was
+    "every claim is decided" for every module.
+  - *Deliberate faults*: 26 made in the five modules, 26 caught.
+- **2026-11-27 — chunk E6, grammars changed and combined** (the review
+  session). The maintainer confirmed E5's asks: the mark `unambiguous`
+  as one result at most where a marked rule is read; a place counts
+  bytes; the rewording of "A parser records where each expression came
+  from in its text"; what is refused for levels; the runner's
+  condition.
+  - *A change.* `change.alg`: a change is a structure of operations on
+    rules by name, the five of "Every production can be extended" and
+    `reserve` for a set of words. `changed(g, changes)` gives a new
+    grammar; the one it is given is untouched.
+  - *Any order, or a conflict.* The operations of every change are
+    taken together and each rule is judged by how many operations of
+    each kind are on it. Two changes may append to one rule, since the
+    order of the items of an `alt` has no meaning to the engine; that
+    is what the held finding of 2026-11-12 on appended alternatives
+    asked for. A rule added twice, changed where the grammar has none,
+    replaced or wrapped twice, or replaced, wrapped or removed and
+    changed besides, is a conflict. `changed` refuses the first with
+    its text; `conflicts` lists all.
+  - *A notation can only add.* `used(g, change, named)`, with `named`
+    the rules and the words the using text names. Of the decision's
+    three rules:
+    - "Neither longest match nor precedence prefers between an
+      alternative in force and an added one" needs no check. The
+      engine tries every item and keeps every result, so an added item
+      can only add a reading. A test holds it: a text that read one
+      way reads two, and its first reading is still there.
+    - "Nothing is added to what a rule in force tests negatively" is
+      two checks: no item appended to a rule that can be reached from
+      the item of a guard whose `holds` is false, through whatever
+      rules; and no word reserved in a set that a terminal in force
+      names.
+    - "An added terminal writes only the part of the parser's state
+      that its own grammar declares" is built more strictly than it is
+      worded: a notation brings no terminal made with `stepper` at
+      all, unless the using text names its rule. A state here is one
+      bits value with no parts, so a terminal cannot be held to a part
+      of it. Parts would be a change to `grammar.with_state`; no
+      notation yet needs a state of its own. The maintainer is asked
+      to confirm.
+  - *What is wrong with a grammar.* `analysis.faults(g)`: a rule named
+    that the grammar has not, the start among them; a rule nothing
+    reaches; a reserved set named that the grammar has not. Preparing a
+    grammar does not call it. A repetition of an item that can read no
+    byte is no fault here: the engine drops a reading that reads none.
+  - *Not here.* The notation of a change in a text, and where a change
+    ends, are E8's.
+  - *Deliberate faults*: 24 made in `change.alg`, `analysis.alg` and
+    `grammar.alg`, 24 caught.
+- **2026-11-27 — rulings on PR #314, and what they asked built** (the
+  review session). The maintainer asked for each of E6's four asks in
+  more detail. Going through them showed three places where the
+  proposal was changed, and the maintainer confirmed the four as then
+  put: "I confirm all asks."
+  - *Ask 1, a notation and the state.* Ruled: the state gets named
+    parts, each a bits value, when `use` is built in E8; a terminal
+    then says which part it reads and writes, and a notation's
+    terminal is held to a part its own change declares. Until then a
+    notation brings no terminal that touches the state unless the text
+    names its rule. The discussion proposed to let through a terminal
+    that is already in the grammar in force. That is not built:
+    nothing can tell that a terminal a notation holds is the one in
+    force, since two functions are not compared, and a name can be
+    copied. What serves instead needs no code: a notation names the
+    grammar's rule, with `ref`, and a grammar gives a rule to each
+    terminal it means others to use.
+  - *Ask 2, operators.* Ruled: a notation may add an operator. Built:
+    a row keeps what it was made from. `change.level(rule, level)`
+    adds a level and `change.signs(rule, level, signs)` adds signs to
+    a level the row has. `levels.making` gives a level a function of
+    its own for what its signs give, so an added level says what it
+    means. A level or signs added count as an item appended: two
+    changes may each add a level to one row, in either order. A level
+    added to a rule that is no row, signs for a level the row has not,
+    and a level of a name the row has or another change adds, are
+    conflicts. The operations on a rule are made in a fixed order,
+    whatever order they are listed in: what replaces, then levels and
+    signs, then what wraps, then what is appended.
+  - *Ask 3, settling a conflict.* Ruled: the using text settles it.
+    Built: `changed_by(g, changes, own)`. Where `own`, the text's own
+    change, replaces or removes a rule, what the other changes do to
+    that rule is set aside, and `own` is then judged with the rest. Two
+    notations that both wrap `number` are used together by a text that
+    replaces `number` with the form it means.
+  - *Ask 4, when faults are looked for.* Ruled: split. Built:
+    `analysis.errors(g)` is what no grammar means, a rule or a
+    reserved set named that the grammar has not, the start among them.
+    `prepared` refuses the first, and so does `changed`: a change that
+    removes a rule another still names is refused with no text read,
+    which E6 did not catch. A rule nothing reaches stays in `faults`
+    alone, for a tool to show.
+  - *Measured.* The 252 lines of the speed test take 2,426,852 steps,
+    where they took 2,422,140: looking a grammar over for errors when
+    it is prepared costs under 5,000 steps.
+  - *Deliberate faults*: 19 made, 18 caught at first; the one missed
+    showed a missing test, of words reserved in a set that has a
+    replaced rule's name, which is added.
+- **2026-11-28 — chunk E7, first part: the tree of a text** (the
+  review session). The maintainer confirmed the reading of the rulings
+  on PR #315: yes to operators added by a notation and to a conflict
+  settled by the using text; and what was built for the state stands
+  until E8.
+  - *Two parts.* The row of E7 asks that a module's text give its
+    function's description, its declarations and the number of its
+    keys, the same as the bootstrap's by identity. The bootstrap does
+    that in two steps: a reader, which gives a tree of what is written,
+    and an emitter, which gives the tree a meaning. This part is the
+    first step. The second is the emitter's 991 lines of host code
+    written in Allegretto. The maintainer is asked to take them as two
+    chunks.
+  - *The grammar.* `allegretto.alg`: 20 rules. It is the bootstrap's
+    grammar read off `src/grammar2/base-grammar.ts` and
+    `next/bootstrap/allegretto-grammar.ts`, where the first item that
+    matches wins, written for an engine that tries every item. Four
+    places needed care, each a text the engine could read two ways:
+    - a body on the line after `=>` is a block where one can be read,
+      and an expression carried on otherwise: the expression's item
+      has a guard that no block can be read there;
+    - `x <- e` could be `x < -e`: the statement's item has a guard;
+    - a function and a conditional take all that follows them, so
+      `x => x + 1` is not `(x => x) + 1`: among signs they stand last,
+      by `levels.row_ending`, new, or not at all;
+    - a minus before a fraction written out is part of the number.
+  - *The same tree.* `next/ext/readers.ts` writes each reader's tree
+    as one text in one form, with every place, and compares.
+    `npx tsx next/ext/readers.ts` reads every `.alg` under `next/`:
+    167 texts, 165 the same, 2 refused by both, in 116,209,098 steps
+    and about seven minutes. The suite compares a part of 14 texts and
+    7 small ones, in about 30 seconds. The first comparison differed in
+    one thing: a block's place begins at the end of the line before
+    it, and with `sync` straight after the sign. `offside.indent_from`
+    is for that.
+  - *The engine reads itself.* `engine.alg`, `analysis.alg`,
+    `grammar.alg` and `allegretto.alg` are among the 165: the engine
+    reads its own text into the tree the bootstrap gives it.
+  - *Where the two readers are known to differ, outside the corpus.*
+    The engine reads a little more: a word or a sign reads the space
+    after it, so `x` on one line and `= 1` on a deeper one is read
+    where the bootstrap wants them on one line. The bootstrap parses
+    `and`, `or` and `0b101` and then refuses them; the engine does not
+    read them. A line that holds only a comment has no column here;
+    in the bootstrap its column can end a block. A tab is one column
+    here, as ruled, and up to four there.
+  - *Places.* A line was counted from the beginning of the text for
+    every place: the first comparison took six times the steps it
+    takes now. The engine keeps the positions at which lines begin,
+    made once for a text when a line is first asked for, and finds a
+    line by halving.
+  - *Speed, with the whole grammar.* The 252 lines of the speed test:
+    3,954,627 steps and about 13 seconds, where `flat.alg` takes
+    2,426,852 and 8. The target of 10 seconds is missed. The plan says
+    it stops for a ruling where the target is missed; this is that
+    stop. What was measured: the guard on a body costs 7 to 11 percent
+    of the steps, and the functions of the forms 6 percent, so most of
+    the difference is the grammar itself: nine kinds of line, each
+    tried from a name, and space that reads the state at every word.
+    What may help, none of it built: the four text primitives, once an
+    Allegretto text can name them; one reading shared by a body's
+    block and its guard; rules remembered under a state; a faster
+    kernel.
+  - *Deliberate faults*: 18 made in the grammar, the line table and
+    the row's ending, judged by the comparison with the bootstrap and
+    the grammar's own tests. 17 caught at first; the one missed, hex
+    digits in small letters, has a test now.
+  - *The engine's tests in under a minute* is missed too: the two test
+    files take about 45 and 30 seconds.
+- **2026-11-28 — the acceptance stream's findings on `Kernel.check`**
+  (the review session), carried by the maintainer in a note of
+  2026-11-23. The maintainer ruled on PR #316 meanwhile: speed work is
+  held to what later chunks will not undo and what makes their tests
+  run faster; E7 is two chunks; the three layouts the engine reads and
+  the bootstrap refuses are Allegretto; the target of a minute is for
+  the library modules' own tests, and the comparison of the corpus is a
+  command with a budget of its own; the acceptance stream adds the six
+  names to its emitter.
+  - *Finding i, a fault, fixed.* Ahead of what is done, a function
+    being opened was not opened again, whatever it was given, so a
+    claim through a function that calls itself was left waiting and a
+    false one was not found. That rule is for evaluation ahead inside
+    a run, which has no budget of its own. A check has one, and must
+    find what a run finds. Under a check a call now stays a call only
+    under a condition the check could not decide. A program that runs
+    for ever by design then uses up a check's budget, as it would a
+    run's; a loop whose end rests on an effect's answer does not, since
+    the answer is unknown and the call is under an undecided condition.
+  - *Finding ii, a fault, fixed.* A check's count of claims waiting was
+    left in the kernel. It is put back to what it was when the check
+    ends.
+  - *Finding iii, a fault, fixed.* A function written as an argument or
+    as an entry was handed on as it was written and never met. It is
+    now gone over as every function met is.
+  - *Finding iv, open.* A check goes over the function it was handed
+    with its parameters unknown, as it does every function. So what a
+    host handed for a capability is not there the second time, and "not
+    needed" reads as "not yet given". Proposed: the function at the
+    head of the expression a check is handed is the one function not
+    gone over again; the host has said what each of its parameters is.
+    That is an exception to the ruling that an opened function is
+    checked again with its parameters unknown, so it is the
+    maintainer's to rule.
+  - *The count of two.* A claim at a module's top level is counted
+    twice under a check for the same reason, and the proposal for
+    finding iv ends that. A claim inside a function that is called is
+    still counted for the call and again for the function gone over
+    with its parameter unknown, where it may wait though every call
+    made decides it. A record cannot tell the two apart. Proposed: a
+    record counts apart what was found with a function's parameters
+    unknown.
+  - *The three other asks.* `createKernelOf(variant)` is built, in
+    `next/kernel/create.ts`. Whether a host can tell what a binding is
+    without evaluating it: not today; a read of a function's count of
+    parameters, for a name a block binds to a function as written, is
+    proposed. Another name for the method `check`: `speculate` is
+    proposed.
+  - *Deliberate faults*: 5 made in each variant's fix. 4 caught in
+    each; the fifth, the counts not put back after a check, changes
+    nothing a test could be made to see, and the line is kept.
+- **2026-11-29 — a check as an ordinary evaluation** (the review
+  session). The maintainer went through the asks of PR #317 in three
+  rounds and ruled.
+  - *What the maintainer saw.* A check has two purposes that had been
+    built as one. The first is the program as written: every path a
+    run can take, with the arguments given. The second is a broader
+    analysis: functions for every argument, and what nothing calls or
+    reads. In Allegretto the second mostly leaves claims waiting, and
+    tests decide them; in the standard language it is where most
+    claims are decided. So it is a choice, down to the module and the
+    function, and the kernel is not where a project's choices are.
+  - *Ruled.* (1) The kernel's `evaluate` takes two things asked
+    together, to perform nothing and to take both branches; (2) its
+    result lists what it left untouched, and the caller evaluates what
+    it chooses, which the maintainer preferred to a hook that answers
+    back; (3) the choice is made in the phase; (4) the kernel has no
+    default that differs by language; (5) a binding nothing reads is
+    told, skipped unless chosen; (6) `check` is retired once the
+    acceptance stream's launcher has moved; (7) this before the speed
+    work. The proposals of PR #317 to leave out the function a check is
+    handed, and to count apart what was found in general, are
+    withdrawn: neither is needed.
+  - *Built, on both variants.* `Limits.speculative`. `Result.untouched`:
+    a function with its count of parameters and whether a call opened
+    it; a binding, an argument, an entry; each with a handle to
+    evaluate and its place. A function for every argument is a call of
+    it with unfilled cells, which a host could already write. `check`
+    is the same code, with all of it gone into.
+  - *Nothing stays.* What a speculative evaluation leaves waiting is
+    dropped, as for finding ii. And a module's instance: the kernel
+    makes one for each set of arguments, so a run after a speculative
+    evaluation of a module with the same arguments found the instance
+    already evaluated and evaluated nothing. Instances made ahead are
+    dropped when the evaluation ends. This held for `check` too, and is
+    fixed for both.
+  - *What is one function.* A function is closed anew wherever it is
+    named, and copied for each call of a function it is written in. The
+    list has it once, and called where any of those was: the kernel
+    keeps which function as written each came from.
+  - *What is not listed.* What is left of `then`, `also` and `first`
+    where the first part is not yet known: it was looked at ahead
+    already, and evaluating it again would count its claims twice.
+  - *The four findings.* i, ii and iii are fixed in PR #317. iv and
+    the count of two do not arise for a speculative evaluation: the
+    function it is handed is not gone over a second time. They remain
+    for `check` until it is retired.
+  - *Deliberate faults*: 10 made in each variant and 2 in the shared
+    part. 8 caught at first in each variant; the 2 missed showed
+    missing tests, a function listed once and a binding that was read,
+    which are added. Of the 2 in the shared part, one is caught now;
+    the other was a line that did nothing, and is removed.
 
 ## 8. Sessions
 
@@ -1972,4 +2509,188 @@ split.
 Metadata fields and their rules; the module loader and the parser
 engine in Allegretto; capabilities that offer streams; the standard
 language. They follow, on the machine.
+
+## 10. The parser engine and the module loader
+
+This section is the plan of the eleven chunks E1 to E11 of §5's table.
+It is self-contained for a reader who knows the decision inventory.
+
+### 10.1 Outcome
+
+A parser engine and a module loader written in Allegretto, under
+`next/ext/`. A program's texts are then read, loaded and run with no
+code of the present tree: the bootstrap in `next/bootstrap/`, which
+reads Allegretto with the present tree's engine, is deleted. That is
+milestone 8 of `docs/plans/rebuild.md`.
+
+### 10.2 What the rulings ask
+
+Each line names the decision that asks.
+
+| It must | Decision |
+|---|---|
+| Be written in Allegretto, test first and in small steps, on nothing of the standard language | "The parser engine and the module loader are written in Allegretto" |
+| Take a grammar as a value, in seven rule forms | "Grammars are values" |
+| Accept left recursion; give the order of alternatives no meaning; report every parse; settle the parse up to each change of grammar; carry a state beside the position | "Any parsing algorithm will do that meets five conditions" |
+| Read characters, with no scanner before it | "Scannerless parsing" |
+| Take a terminal as a function of the position and the state | "A terminal is a function, so a grammar can define its own" |
+| Answer a description, with the place of each part | "Parsing is evaluation"; "A description is plain data in a fixed set of forms" |
+| Answer a failure as data for a text that does not parse | "Parsing is evaluation" |
+| Treat two parses of a text as a refutation, and hold a production marked `unambiguous` to one reading at its end | "Ambiguity is a claim" |
+| Change the grammar in the middle of a text, from a production so marked, by a capability | "A text can change the grammar it is read in" |
+| Check that a notation only adds, on the grammar, with no text parsed | "A notation a text uses can only add" |
+| Combine grammars the same in either order, or refuse | "Grammars combine without regard to order" |
+| Find a text through a capability, and never fetch a value | "The loader reaches files through a capability"; "A module is an extension that arrives as a file" |
+| Ship already built, as expressions | "The platform's parser engine ships already built" |
+
+### 10.3 What exists
+
+- **A toy engine**, `next/corpus/speed/parser.alg`, the acceptance
+  stream's speed test: 156 lines, five rule forms, first match wins, no
+  left recursion. It shows the notation is enough to write an engine
+  in. It meets one of the five conditions.
+- **The bootstrap**, `next/bootstrap/`, the acceptance stream's:
+  Allegretto's grammar for the present tree's engine, a reader of that
+  engine's parse tree, and an emitter of saved programs. It refuses
+  `use`.
+- **The kernel's side**: `describe` and `build`, with descriptions
+  keyed by name and places; `module`, which takes a function, the
+  number of its keys and its declarations; `specialize`.
+- **The present tree's engine**, `src/grammar2/`, 7,266 lines of host
+  code. It meets two of the five conditions: left recursion and a
+  state. It gives the order of alternatives a meaning. It is read for
+  what a grammar needs, and nothing of it is carried over.
+
+### 10.4 The design proposed
+
+**The algorithm.** A descent that keeps what it has tried, where what
+a rule gives at a position and a state is the set of all its results:
+each an end position, a state, and what was matched. The order of
+alternatives then has no meaning, since every alternative is tried and
+every result kept, and every parse is reported. A rule that recurses on
+the left is met again at the same position while it is being tried; it
+is then given the results found so far, and tried again until a turn
+adds no result. A rule entered again at the same position with a
+changed state is refused, as ruled.
+
+This is simpler to write test first than the algorithm the present
+book names, and it meets the five conditions. It is of the family of
+Earley's algorithm: a table of what was tried at each position, every
+parse reported, cubic at worst on an ambiguous grammar. It works from
+the top down over whole rules, where Earley's works from the bottom up
+over a rule with a mark in it, so it can carry a state and call a
+terminal that is a function. Its cost for a grammar without ambiguity
+is close to the size of the text times the number of rules tried at
+each position. Ruled on 2026-11-24.
+
+**Made to be fast from the start.** The algorithm is not what makes an
+engine on the kernel slow; the work at each character is. Four things
+are in the design from the first chunk that has an engine:
+
+- *What cannot match is not tried.* An analysis of the grammar gives
+  the characters each alternative can start with, and the engine tests
+  one character before it tries an alternative.
+- *A terminal does its work in one step.* A terminal is a function, and
+  a shipped primitive is one: such as a primitive that measures a run
+  of characters of a class. The maintainer: these "can be built on an
+  optimal tokenizer that is configured from grammar productions", with
+  no need to build that at once.
+- *Only what pays is remembered*: the results of a rule that recurses
+  on the left or is reached by more than one path.
+- *The engine is specialized over its grammar*, which removes the
+  looking up of rules.
+
+**A research goal this serves.** The maintainer, on 2026-11-24: "I
+have a research goal to demonstrate that highly sophisticated PE
+specialization can optimize an Earley parser into an optimally
+efficient parser with performance equal to GLL. That makes me more
+interested in starting with the algorithm you've described, and using
+it to find improvements for the Allegro PE algorithm." So where the
+engine is slow, each chunk reports what specialization left undone, as
+a finding for the kernel.
+
+**What it stands on.** Allegretto has structures, and no table that is
+changed in place. What the engine has tried is kept in a map written
+in Allegretto, as a tree, where putting an entry makes a few small
+structures and copies nothing else. Chunk E2 builds it and measures
+it, since the engine's speed rests on it.
+
+**Places.** "A parser records where each expression came from in its
+text" says a place is a metadata field that the parser's extension
+registers. The ruling of 2026-11-22 made a place an entry of a part's
+description, `at`. The engine follows the later ruling: it writes `at`.
+The earlier entry is to be reworded when the chunk that builds it is
+recorded; the maintainer is asked to confirm.
+
+**What a parse of a module gives.** Three things, as ruled: the
+description of the module's function, its declarations in order, and
+the number of its keys. The loader builds the function from the
+description and hands the kernel the three.
+
+**A text that changes its grammar.** The engine settles the parse at a
+production marked `unambiguous`. The form there stands for an
+expression that calls `parser.extend`; the engine has it evaluated,
+takes the new grammar, and reads on. So the engine is called with the
+capability to evaluate what it read, and parsing and evaluation take
+turns.
+
+**Shipped built.** The engine and the loader are a saved program,
+emitted once by the bootstrap while it exists and by the engine itself
+after. A parser for one grammar is the engine specialized over that
+grammar, with the kernel's `specialize`.
+
+### 10.5 How it is known to be right
+
+- **Test first.** Each chunk's tests are written before its code, as
+  Allegretto modules whose claims are the assertions. A test passes
+  where every claim is decided.
+- **The corpus.** The acceptance stream's corpus holds 61 cases of the
+  parser engine, due at milestone 8. Each chunk names the cases it
+  makes pass.
+- **Two readers.** From E7 the engine and the bootstrap both read every
+  program of the corpus, and the two results must be the same module,
+  by identity. The acceptance stream's chunk that retires the
+  bootstrap holds this until the bootstrap goes.
+- **The engine reads itself** (E10): its own text, read by the engine,
+  gives a module of the same identity as the one that read it.
+- **Deliberate faults**, as in every chunk so far.
+- **Speed**, measured at E3 and at E10 and reported. No condition is
+  set on it here; the acceptance stream's speed tests are theirs.
+
+### 10.6 What can go wrong
+
+1. **Speed.** On the machine the toy engine reads 64 terms in 2.2
+   seconds: about 33 milliseconds a term, for five rules and nothing
+   remembered. An engine that tried every alternative of Allegretto's
+   grammar at every character, with no more thought, would take
+   minutes for a module and about an hour for the corpus. The four
+   things of §10.4 are meant to prevent that, and how far they do is
+   not known. **The target, ruled on 2026-11-24: a module of 200 lines
+   of Allegretto is read in under 10 seconds, and the engine's own
+   tests take under a minute in all.** E3 measures it. Where it is
+   missed the plan stops for a ruling. The ways on from there are a
+   faster kernel for what specialization leaves, which the rebuild's
+   plan has as a later track, or a comparison over the corpus that
+   runs apart from the gate.
+2. **The map.** If a map written in Allegretto is too slow, the kernel
+   needs one more shared form: a structure where an entry is put in
+   place of another without copying the rest. That would be a chunk of
+   its own, asked for when E2's measurement shows it.
+3. **Reading Allegretto before the engine exists.** The engine's own
+   text is Allegretto, read by the bootstrap until E10. So the engine
+   may use no form the bootstrap does not read, `use` among them.
+4. **Running tests in this lane.** The tests need a text read and a
+   module run. Both are the acceptance stream's code today. This stream
+   calls it and does not edit it; where it lacks something, the need
+   goes to them through a pull request's hand-off.
+5. **Recovery after a parse fails.** "Parse failure reporting and
+   recovery" asks for error productions and recovery points. The plan
+   has the farthest point in E3 and nothing more. Recovery is left
+   until a tool needs it; the maintainer is asked to confirm.
+
+### 10.7 What is not in it
+
+The grammar of the standard language, and its `grammar { … }` block;
+metadata fields; a session at a prompt; the analyses of a check's
+second phase, which wait for this engine to show which are of use.
 
