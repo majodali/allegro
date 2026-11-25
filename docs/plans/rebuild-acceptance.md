@@ -4014,3 +4014,67 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      capability" are ratified.
   The same day the maintainer answered the last ask of PR #306, and
   PR #304, PR #306 and PR #311 merged.
+- **2026-11-25 — The command line alone chooses, and six names the emitter writes.**
+  The maintainer, 2026-11-23: "Let's standardize on command line only."
+  And on 2026-11-25: ""command line only" means `ALLEGRO_STEPS` should
+  be removed." On the kernel stream's PR #316, as that stream's record
+  has it (`docs/plans/book-pass.md` §7, the entry of 2026-11-28): "the
+  acceptance stream adds the six names to its emitter." What is built:
+  1. *Six names.* The emitter writes the shipped primitives
+     `text.byte`, `text.span`, `text.starts` and `text.until` by their
+     names, as it writes `text.int` (`SHIPPED_NAMES` of
+     `next/bootstrap/emit.ts`), and the kernel primitives `specialize`
+     and `sample` as it writes its other kernel names (`KERNEL_NAMES`
+     and `KERNEL_WRITTEN`). The emitter's test of what waits against
+     the kernel passes with no todo. Two tests beside it hold each of
+     the six by its name and by what the record holds. Three programs
+     under `next/corpus/allegretto/m3/` use them: `text-terminals.alg`,
+     `specialize.alg` and `sample.alg`, the first program of the corpus
+     that states `// summary: sampled`. `next/ext/allegretto/forms.md`
+     does not state the six; that file is the kernel stream's.
+  2. *`--kernel <name>`* on `npm run launch`, `npm run allegretto`,
+     `npm run harness:next` and `npm run bench:next`. The name is one of
+     `KERNEL_VARIANTS` of `next/kernel/create.ts`, and each command
+     makes its kernel by `createKernelOf`. With no flag the variant is
+     the launcher's default, `machine`, stated once as `DEFAULT_KERNEL`
+     of `next/launch/kernel-variant.ts`. The two terminal commands
+     resolve it as the setting `kernel`: the command line's value, else
+     the launcher's, so the result's `restsOn` names the variant and the
+     source of the setting. A project file that sets it is a finding. A
+     name that is no variant is refused before anything is evaluated,
+     with the variants listed, exit 1. The bench names the variant it
+     ran from the flag.
+  3. *No setting comes from the environment.* `readEnvironment`,
+     `STEPS_VARIABLE` and the source `"environment"` are removed. The
+     sources are the command line, the project's file and the launcher.
+     A test end to end holds that with `ALLEGRO_STEPS` set each command
+     runs as it does without it.
+  4. *This stream's tests on both variants, with no environment.*
+     `next/launch/kernel-variant.ts` gives the tests their kernel
+     factory, `createKernel`, of the variant in use, and the driver,
+     `runProgram`, `yieldedKeys` and `runNew` take a factory with it as
+     the default. `next/launch/reference.test.ts` switches it to the
+     reference with `useVariant` and loads this stream's thirteen test
+     files that make a kernel. A test that spawns a command passes
+     `--kernel`. `npm run test:next` took 70.9 s for 1,035 tests before,
+     on the machine alone, and 21.8 s more for the run on the reference
+     with the variable. After, it takes 72.6 s for 1,540 tests, both
+     variants in one command.
+
+  The assertions removed are those of the environment source, in
+  `next/tools/configuration.test.ts` and `next/launch/launcher.test.ts`:
+  the test that the environment gives the step budget from
+  `ALLEGRO_STEPS`, whole; the check that `readEnvironment` of no
+  variable sets nothing; the environment's budget under and over a flag
+  in the test of `allegro.json`; and the environment's budget and its
+  finding in the test of how `npm run launch` resolves. The tests that
+  counted four sources count three.
+
+  The kernel stream's files still read the variable, for their own
+  tests: `next/kernel/create.ts` reads it in `chosenVariant` and
+  `createKernel`, and `next/kernel/reference.test.ts` sets it. Through
+  those two, `next/kernel/kernel.test.ts`,
+  `next/kernel/saved-program.test.ts`, `next/prims/prims.test.ts`,
+  `next/ext/ext.test.ts`, `next/ext/readers.test.ts` and
+  `next/ext/readers.ts` depend on it. Of `next/kernel/create.ts` this
+  stream's code uses `createKernelOf` and `KERNEL_VARIANTS` alone.
