@@ -116,8 +116,9 @@
 //                             on it.
 // A program is emitted with the texts it imports by the bootstrap's driver
 // (next/bootstrap/driver.ts), and its records run by the launcher of
-// next/launch/launcher.ts on the kernel next/kernel/create.ts gives, the imported ones
-// loaded first, with the output capability, the timer capability, the
+// next/launch/launcher.ts on a kernel of the variant the caller gives,
+// by default the variant in use (`createKernel` of
+// next/launch/kernel-variant.ts), the imported ones loaded first, with the output capability, the timer capability, the
 // HTTP capability, the check-output capability, the shipped primitives and
 // its inputs. It passes when its lines, its end, the lines printed before
 // each later phase and, where stated, its yielded keys, its summary, the
@@ -153,8 +154,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
-import type { Cell } from "../kernel/interface.js";
+import type { Cell, CreateKernel } from "../kernel/interface.js";
+import { createKernel as variantInUse } from "../launch/kernel-variant.js";
 import { encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { describeDriveFinding, drive, type ReadText } from "../bootstrap/driver.js";
 import { boundedReader } from "../launch/files.js";
@@ -465,8 +466,8 @@ export function endText(end: LaunchEnd): string {
  * the order they are loaded, as JSON round-trips them; or the driver's
  * findings, each as a person reads it and as its message alone.
  */
-export function emitted(text: string, file = "<text>", readText: ReadText = readUnder(ROOT)): { program: SavedProgram; imports: SavedProgram[] } | { findings: string[]; messages: string[] } {
-  const r = drive(text, file, readText);
+export function emitted(text: string, file = "<text>", readText: ReadText = readUnder(ROOT), createKernel: CreateKernel = variantInUse): { program: SavedProgram; imports: SavedProgram[] } | { findings: string[]; messages: string[] } {
+  const r = drive(text, file, readText, createKernel);
   if (!r.ok) return { findings: r.findings.map(describeDriveFinding), messages: r.findings.map((f) => f.message) };
   const records = r.records.map((x) => JSON.parse(encode(x.program)) as SavedProgram);
   return { program: records[records.length - 1], imports: records.slice(0, -1) };
@@ -484,6 +485,7 @@ export function yieldedKeys(
   program: SavedProgram,
   given: { inputs: Inputs; later: Inputs[] } = { inputs: {}, later: [] },
   imports: readonly SavedProgram[] = [],
+  createKernel: CreateKernel = variantInUse,
 ): { keys: (string | null)[] } | { problem: string } {
   const k = createKernel();
   const byHash = new Map([...shippedByName.values()].map((p) => [p.hash, p] as const));
@@ -549,16 +551,17 @@ export interface ProgramRun {
  * default, files relative to the repository root. A text the driver
  * refuses is launched not at all: it passes where its `// end: refused:`
  * line states the message of one of the findings, or the part of one
- * before a colon, and it states no line.
+ * before a colon, and it states no line. `createKernel` makes the kernel
+ * of the drive, of the run and of reading the yield.
  */
-export async function runProgram(text: string, file = "<text>", readText: ReadText = readUnder(ROOT)): Promise<ProgramRun> {
+export async function runProgram(text: string, file = "<text>", readText: ReadText = readUnder(ROOT), createKernel: CreateKernel = variantInUse): Promise<ProgramRun> {
   const pins = readPins(text);
   const problems: string[] = [];
   if (pins.end === undefined) problems.push("the program states no `// end:` line");
   const summaryLine = readSummary(text);
   const claimLines = readClaimLines(text);
   const checkClaimLines = readClaimLines(text, "check claim at");
-  const e = emitted(text, file, readText);
+  const e = emitted(text, file, readText, createKernel);
   if ("findings" in e) {
     const stated = pins.end !== undefined && pins.end.startsWith("refused: ") ? pins.end.slice("refused: ".length) : undefined;
     // The message itself, or its part before a colon: a failed parse is stated as `not Allegretto`, without the engine's own words.
@@ -647,7 +650,7 @@ export async function runProgram(text: string, file = "<text>", readText: ReadTe
   }
   let yields: (string | null)[] | undefined;
   if (pins.yields !== undefined) {
-    const y = yieldedKeys(e.program, given, e.imports);
+    const y = yieldedKeys(e.program, given, e.imports, createKernel);
     if ("problem" in y) problems.push(y.problem);
     else {
       yields = y.keys;

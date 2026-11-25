@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
+import { usedVariant } from "./kernel-variant.js";
 import { drive } from "../bootstrap/driver.js";
 import { boundedReader, inside, type FileHost } from "./files.js";
 import { nodeFiles, projectReader } from "./node-files.js";
@@ -112,7 +113,7 @@ test("over a terminal's file system: a text beside the main text is read, and a 
     });
     // The command, end to end: the import of the link is refused, nothing is launched, and the exit code is 1.
     fs.writeFileSync(main, 'capability output\nimport leak\noutput.write("never")\n');
-    const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     assert.equal(run.stdout, "");
     assert.equal(
       run.stderr,

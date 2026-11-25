@@ -1,8 +1,10 @@
 // Tests of the HTTP capability and its scripted transport (B-196 (the
 // rebuild's acceptance side), chunk Q16 (the capabilities the launchers
 // ship), part 1): next/launch/http.ts and next/launch/scripted-transport.ts,
-// through the launcher of next/launch/launcher.ts on the reference kernel,
-// `createKernel` of next/kernel/create.ts. Run by `npm run test:next`.
+// through the launcher of next/launch/launcher.ts on the kernel
+// `createKernel` of next/launch/kernel-variant.ts gives: the machine, and
+// the reference where next/launch/reference.test.ts loads this file. Run
+// by `npm run test:next`.
 //
 // No test here reaches a network. Every request goes to a transport the
 // test makes: the scripted one, or one that answers only when the test
@@ -16,7 +18,7 @@ import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, usedVariant } from "./kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { shipped } from "../prims/index.js";
@@ -291,7 +293,7 @@ test("npm run allegretto grants http: a program that declares it and asks nothin
   try {
     const file = path.join(dir, "declares.alg");
     fs.writeFileSync(file, 'capability output\ncapability http\nask(u) => http.request({method: "GET", url: u})\noutput.write("granted")\n');
-    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     assert.equal(r.stderr, "");
     assert.equal(r.stdout, "granted\n");
     assert.equal(r.status, 0);

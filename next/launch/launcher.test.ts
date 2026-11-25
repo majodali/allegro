@@ -2,9 +2,11 @@
 // chunk Q7 (the minimal launcher), parts 1 to 3, and chunk Q5 (the first
 // notation and the bootstrap), part 3): next/launch/launcher.ts
 // and the output capability next/launch/output.ts, on the kernel
-// `createKernel` of next/kernel/create.ts gives: the variant that keeps
-// its own stack, or the reference kernel with `ALLEGRO_KERNEL=reference`. Run
-// by `npm run test:next`. The tests of what a result holds are chunk Q13
+// `createKernel` of next/launch/kernel-variant.ts gives: the variant that
+// keeps its own stack, and the reference kernel where
+// next/launch/reference.test.ts loads this file. Run by
+// `npm run test:next`. A test that spawns a command passes it `--kernel`
+// with the variant in use. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of
 // the configuration's sources, part 2; of phases, part 3; of a check, and
 // check then run, part 5; of the test phase, part 6. The tests of the
@@ -18,7 +20,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import type { Cell, Kernel, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, kernelOf, usedVariant } from "./kernel-variant.js";
+import { resolveOnTerminal, runTarget, terminalReport } from "./terminal.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
@@ -529,7 +532,7 @@ test("output's part refuses what is not UTF-8 text: a refutation with the part's
 });
 
 test("the terminal entry runs the committed fixture: it prints the line and exits 0", () => {
-  const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), FIXTURE], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), "--kernel", usedVariant(), FIXTURE], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   assert.equal(run.stderr, "");
   assert.equal(run.stdout, "hello, world\n");
   assert.equal(run.status, 0);
@@ -724,7 +727,7 @@ test("the launcher does not import the bootstrap", () => {
 });
 
 test("npm run allegretto takes --input and --later: each later phase in the order written; a value that is not a literal, or a flag with no =, exits 1", () => {
-  const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-inputs-"));
   try {
     const file = path.join(dir, "inputs.alg");
@@ -852,7 +855,7 @@ test("npm run launch takes the imported records by --import, in load order", () 
     const [lib, main] = drivenRecords("capability output\nimport lib\noutput.write(lib.t)\n", { lib: 'export t = "from lib"\n' });
     fs.writeFileSync(path.join(dir, "lib.json"), encode(lib));
     fs.writeFileSync(path.join(dir, "main.json"), encode(main));
-    const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     const ok = run(path.join(dir, "main.json"), "--import", path.join(dir, "lib.json"));
     assert.equal(ok.stderr, "");
     assert.equal(ok.stdout, "from lib\n");
@@ -871,7 +874,7 @@ test("npm run allegretto runs a text that imports: the imported texts are found 
     const main = path.join(dir, "main.alg");
     fs.writeFileSync(main, 'capability output\nimport greeter with name: "world"\ngreeter.greet()\n');
     fs.writeFileSync(path.join(dir, "greeter.alg"), 'capability output\ninput name\nexport greet() => output.write("hello, " ++ name)\n');
-    const run = () => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const run = () => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     const ok = run();
     assert.equal(ok.stderr, "");
     assert.equal(ok.stdout, "hello, world\n");
@@ -1147,7 +1150,7 @@ test("the word for one claim is the summary's rule, with waiting kept apart from
 /** Runs one of the two commands with the environment given, beside this process's own with no ALLEGRO_STEPS. */
 function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: { readonly [name: string]: string } = {}) {
   const { ALLEGRO_STEPS: _, ...inherited } = process.env;
-  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
+  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
 }
 
 test("npm run allegretto reads allegro.json beside its text: its inputs, an input a flag replaces, and the environment's budget under the flag's", () => {
@@ -1226,6 +1229,72 @@ test("npm run launch resolves from its flags, the environment and the launcher: 
   const notWhole = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "many" });
   assert.equal(notWhole.stderr, 'the environment\'s ALLEGRO_STEPS is not a whole number: "many"\n');
   assert.equal(notWhole.status, 1);
+});
+
+
+// ── The kernel variant from the command line (chunk Q13) ──────────────
+//
+// By the maintainer's ruling of 2026-11-23 the command line alone chooses
+// the kernel variant: `--kernel <name>`, else the launcher's default,
+// `machine` (`DEFAULT_KERNEL` of next/launch/kernel-variant.ts).
+
+/** Runs a command with exactly these arguments, and no `--kernel` but the ones given. */
+const bare = (entry: string, args: readonly string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(ROOT, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+
+test("--kernel names the variant, the result's restsOn shows it, and its source is the command line; with no flag it is the launcher's machine", async () => {
+  for (const [commandLine, variant, source] of [[{ kernel: "reference" }, "reference", "command line"], [{ kernel: "machine" }, "machine", "command line"], [{}, "machine", "launcher"]] as const) {
+    const resolved = resolveOnTerminal(commandLine);
+    assert.equal(resolved.kernel, variant);
+    const outcome = await launch({ createKernel: kernelOf(resolved.kernel), program: JSON.parse(fs.readFileSync(FIXTURE, "utf8")), configuration: resolved.configuration, sources: resolved.sources, target: runTarget(terminalReport(() => {}).sink) });
+    assert.deepEqual(outcome.lines, ["hello, world"]);
+    assert.match(outcome.result?.restsOn.kernel ?? "", new RegExp(`^${variant}-`), JSON.stringify(commandLine));
+    assert.ok(outcome.result?.restsOn.configuration?.some((s) => s.setting === "kernel" && s.source === source), JSON.stringify(commandLine));
+  }
+});
+
+test("each command runs with --kernel reference and --kernel machine, and refuses a name that is no variant before anything is evaluated: exit 1, the variants listed", () => {
+  const refusal = 'the setting kernel is "neither", which names no kernel variant: the variants are reference and machine\n';
+  for (const [entry, file] of [["next/launch/terminal.ts", FIXTURE], ["next/launch/allegretto.ts", FIXTURE_TEXT]] as const) {
+    for (const variant of ["reference", "machine"]) {
+      const ran = bare(entry, [file, "--kernel", variant]);
+      assert.equal(ran.stdout, "hello, world\n", `${entry} --kernel ${variant}`);
+      assert.equal(ran.stderr, "");
+      assert.equal(ran.status, 0);
+    }
+    const refused = bare(entry, [file, "--kernel", "neither"]);
+    assert.equal(refused.stdout, "", entry);
+    assert.equal(refused.stderr, refusal, entry);
+    assert.equal(refused.status, 1, entry);
+    const noName = bare(entry, [file, "--kernel"]);
+    assert.match(noName.stderr, /^--kernel takes the name of a kernel variant: reference or machine\nusage: npm run /, entry);
+    assert.equal(noName.status, 1, entry);
+  }
+  // A text the driver would refuse is not read: the name is refused first.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-kernel-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, "capability output\noutput.write(\n");
+    const first = bare("next/launch/allegretto.ts", [file, "--kernel", "neither"]);
+    assert.equal(first.stderr, refusal);
+    assert.equal(first.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the project's file may not set the kernel: a finding, exit 1, nothing printed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-kernel-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, 'capability output\noutput.write("ran")\n');
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ kernel: "reference" }));
+    const r = command("allegretto.ts", [file]);
+    assert.equal(r.stdout, "");
+    assert.equal(r.stderr, "the setting kernel is set by the project's file allegro.json, which may not set it: only the command line and the launcher may\n");
+    assert.equal(r.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 

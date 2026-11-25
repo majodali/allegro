@@ -1,8 +1,10 @@
 // Tests of the timer capability and its clocks (B-196 (the rebuild's
 // acceptance side), chunk Q7 (the minimal launcher and the output
 // capability), part 5): next/launch/timer.ts and next/launch/clock.ts,
-// through the launcher of next/launch/launcher.ts on the reference kernel,
-// `createKernel` of next/kernel/create.ts. Run by `npm run test:next`.
+// through the launcher of next/launch/launcher.ts on the kernel
+// `createKernel` of next/launch/kernel-variant.ts gives: the machine, and
+// the reference where next/launch/reference.test.ts loads this file. Run
+// by `npm run test:next`.
 //
 // No test here pins a step count or a wall-clock duration. A clock that
 // answers when the test says (`heldClock`) shows what is printed before
@@ -14,7 +16,7 @@ import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, usedVariant } from "./kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { shipped } from "../prims/index.js";
@@ -173,7 +175,7 @@ test("npm run allegretto grants timer on the host's real timer: a program that w
   try {
     const file = path.join(dir, "waits.alg");
     fs.writeFileSync(file, 'capability output\ncapability timer\nslow <- output.write("slow " ++ int.text(timer.wait(40)))\nfast <- output.write("fast " ++ int.text(timer.wait(2)))\noutput.write("started")\n');
-    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     assert.equal(r.stderr, "");
     assert.equal(r.stdout, "started\nfast 2\nslow 40\n");
     assert.equal(r.status, 0);
@@ -187,7 +189,7 @@ test("npm run launch grants timer too: a record that declares timer runs on the 
   try {
     const file = path.join(dir, "waits.json");
     fs.writeFileSync(file, encode(ONE_WAIT));
-    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const r = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), "--kernel", usedVariant(), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     assert.equal(r.stderr, "");
     assert.equal(r.stdout, "started\nx is 7\n");
     assert.equal(r.status, 0);

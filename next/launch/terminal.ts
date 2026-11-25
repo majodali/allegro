@@ -5,12 +5,12 @@
 // `--phases check` as the kernel's check and for `--phases check,run`;
 // chunk Q16 (the capabilities the launchers ship), part 3, for check
 // output and the exit code; chunk Q13, part 6, for `--phases test` and
-// `--phases check,test`). The only
+// `--phases check,test`; chunk Q13, for `--kernel`). The only
 // file of next/launch/ that touches process and fs, with
 // next/launch/allegretto.ts.
 //
-//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>]
-//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>]
+//   npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]
+//   npx tsx next/launch/terminal.ts <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]
 //
 // Each `--import` names the saved program of a module the program
 // imports, directly or through another, in the order they are loaded: a
@@ -50,15 +50,19 @@
 // first:
 //   - the command line: `--steps <n>` sets the step budget,
 //     `--ceiling a,b` the ceiling, which may only narrow the terminal's,
-//     and `--phases` the phases: `run`, `check`, `check,run`, `test` or
+//     `--phases` the phases: `run`, `check`, `check,run`, `test` or
 //     `check,test` (the
-//     setting `phases` of next/tools/configuration.ts). A name the
-//     terminal does not supply, and a list of phases that is not built,
-//     are findings;
+//     setting `phases` of next/tools/configuration.ts), and
+//     `--kernel <name>` the kernel variant, one of `KERNEL_VARIANTS` of
+//     next/kernel/create.ts. A name the terminal does not supply, a list
+//     of phases that is not built, and a name that is no kernel variant
+//     (`variantFinding` of next/launch/kernel-variant.ts) are findings;
 //   - the environment: `ALLEGRO_STEPS`, a whole number, sets the step
 //     budget;
 //   - what is built into the launcher: the ceiling that grants every
-//     capability the terminal supplies (`TERMINAL_CEILING`). Nothing else.
+//     capability the terminal supplies (`TERMINAL_CEILING`), and the
+//     kernel variant `machine` (`DEFAULT_KERNEL` of
+//     next/launch/kernel-variant.ts). Nothing else.
 // No source sets a step budget by default: where none does, there is
 // none. `npm run allegretto` adds the project's file, `allegro.json`
 // beside its text. A finding of the sources is written to stderr, one
@@ -97,15 +101,16 @@
 // The exit code is `exitCode`, so a failing test exits 1 with no status
 // handed over. `--phases check,test` is a check of the test module and
 // then the test phase, as `check,run` is a check and then the run.
-// `--restore <builder>` and `--kernel <name>` are reserved to the command
-// line by the decision and are not built. The environment variable
-// `ALLEGRO_KERNEL` is read by next/kernel/create.ts, not here.
+// `--restore <builder>` is reserved to the command line by the decision
+// and is not built.
 //
 // The kernel. The kernel stream provides the factory at KERNEL_MODULE,
-// exporting `createKernel` of type `CreateKernel`
-// (next/kernel/interface.ts). Until that file exists the entry prints
-// one line saying so and exits 2. It never loads the stand-in kernel of
-// the launcher's tests.
+// exporting `createKernelOf`, which makes a kernel of the variant named
+// (next/kernel/interface.ts gives its type, `CreateKernel`). The entry
+// makes its kernel by `createKernelOf` with the variant resolved, which
+// the result names (`restsOn.kernel`). Until that file exists the entry
+// prints one line saying so and exits 2. It never loads the stand-in
+// kernel of the launcher's tests.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -113,6 +118,7 @@ import { pathToFileURL } from "url";
 import type { CreateKernel } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
 import { readEnvironment, resolve, type Settings } from "../tools/configuration.js";
+import { DEFAULT_KERNEL, variantFinding } from "./kernel-variant.js";
 import { describe, launch, type Configuration, type ConfigurationSource, type LaunchEnd, type Target } from "./launcher.js";
 import { output } from "./output.js";
 import { realClock, virtualClock } from "./clock.js";
@@ -133,24 +139,27 @@ function fail(message: string, code = 1): never {
   process.exit(code);
 }
 
-async function kernelFactory(): Promise<CreateKernel> {
+/** The kernel factory of the variant named: `createKernelOf` of KERNEL_MODULE, applied to it. */
+async function kernelFactory(variant: string): Promise<CreateKernel> {
   const file = path.join(root, KERNEL_MODULE);
   if (!fs.existsSync(file)) fail(`no kernel is built yet: ${KERNEL_MODULE} does not exist`, 2);
-  const mod = (await import(pathToFileURL(file).href)) as { createKernel?: unknown };
-  if (typeof mod.createKernel !== "function") fail(`${KERNEL_MODULE} does not export a function createKernel`);
-  return mod.createKernel as CreateKernel;
+  const mod = (await import(pathToFileURL(file).href)) as { createKernelOf?: unknown };
+  if (typeof mod.createKernelOf !== "function") fail(`${KERNEL_MODULE} does not export a function createKernelOf`);
+  const createKernelOf = mod.createKernelOf as (variant: string) => ReturnType<CreateKernel>;
+  return () => createKernelOf(variant);
 }
 
 /**
  * Reads the arguments every terminal entry takes: one file, `--steps <n>`,
- * `--ceiling a,b` and `--phases a,b`. Gives the file and what the command
- * line sets.
+ * `--ceiling a,b`, `--phases a,b` and `--kernel <name>`. Gives the file and
+ * what the command line sets.
  */
-export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[]; phases?: readonly string[] } } {
+export function terminalArguments(argv: readonly string[], usage: string): { file: string; commandLine: { steps?: number; ceiling?: readonly string[]; phases?: readonly string[]; kernel?: string } } {
   let file: string | undefined;
   let steps: number | undefined;
   let ceiling: string[] | undefined;
   let phases: string[] | undefined;
+  let kernel: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--steps") {
       steps = Number(argv[++i]);
@@ -163,11 +172,14 @@ export function terminalArguments(argv: readonly string[], usage: string): { fil
       const names = argv[++i];
       if (names === undefined) fail(`--phases takes the names of phases, separated by commas: run, check, check,run, test, or check,test\n${usage}`);
       phases = names.split(",").map((n) => n.trim()).filter((n) => n !== "");
+    } else if (argv[i] === "--kernel") {
+      kernel = argv[++i];
+      if (kernel === undefined) fail(`--kernel takes the name of a kernel variant: reference or machine\n${usage}`);
     } else if (file === undefined) file = argv[i];
     else fail(`unexpected argument ${argv[i]}`);
   }
   if (file === undefined) fail(usage);
-  return { file, commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }), ...(phases === undefined ? {} : { phases }) } };
+  return { file, commandLine: { ...(steps === undefined ? {} : { steps }), ...(ceiling === undefined ? {} : { ceiling }), ...(phases === undefined ? {} : { phases }), ...(kernel === undefined ? {} : { kernel }) } };
 }
 
 /** Writes each finding to stderr, one line each, and exits 1. */
@@ -179,23 +191,30 @@ export function failFindings(findings: readonly string[]): never {
 /** The ceiling of both terminal commands: every capability the terminal supplies. It is the launcher's own value, and the command line may narrow it. */
 export const TERMINAL_CEILING: readonly string[] = ["output", "timer", "http", "report"];
 
-/** A configuration resolved from its sources, and the source of each value. */
+/** A configuration resolved from its sources, the source of each value, and the kernel variant. */
 export interface TerminalConfiguration {
   readonly configuration: Configuration;
   readonly sources: readonly ConfigurationSource[];
+  /** The kernel variant's name: the command line's, else the launcher's default. */
+  readonly kernel: string;
 }
 
 /**
  * Resolves the configuration from the command line, the project's file
- * where there is one, the environment of this process, and the launcher's
- * own values. On a finding writes each to stderr and exits 1.
+ * where there is one, the environment of this process, and the launcher's own values: the terminal's
+ * ceiling and the default kernel variant. A kernel variant's name that is
+ * no variant is a finding. On a finding writes each to stderr and exits 1,
+ * before anything is evaluated.
  */
 export function resolveOnTerminal(commandLine: Settings, file?: Settings): TerminalConfiguration {
   const environment = readEnvironment(process.env);
   if (!environment.ok) failFindings(environment.findings);
-  const r = resolve({ "command line": commandLine, ...(file === undefined ? {} : { file }), environment: environment.settings, launcher: { ceiling: TERMINAL_CEILING } });
+  const r = resolve({ "command line": commandLine, ...(file === undefined ? {} : { file }), environment: environment.settings, launcher: { ceiling: TERMINAL_CEILING, kernel: DEFAULT_KERNEL } });
   if (!r.ok) failFindings(r.findings);
-  return { configuration: r.configuration, sources: r.sources };
+  const kernel = r.kernel ?? DEFAULT_KERNEL;
+  const finding = variantFinding(kernel);
+  if (finding !== undefined) failFindings([finding]);
+  return { configuration: r.configuration, sources: r.sources, kernel };
 }
 
 /**
@@ -231,9 +250,9 @@ export function testTarget(sink: ReportSink): Target {
 }
 
 /**
- * Runs a saved program, as parsed JSON, on the kernel stream's kernel, with
- * the configuration resolved and the source of each value, and the
- * terminal's target. Writes each line to stdout and each message of
+ * Runs a saved program, as parsed JSON, on the kernel stream's kernel of
+ * the variant resolved, with the configuration resolved and the source of
+ * each value, and the terminal's target. Writes each line to stdout and each message of
  * `report` to stderr; on any end but completed, writes the reason to
  * stderr. Exits with `exitCode`.
  *
@@ -245,7 +264,7 @@ export function testTarget(sink: ReportSink): Target {
  * the end on stderr.
  */
 export async function runOnTerminal(program: unknown, resolved: TerminalConfiguration, imports: readonly unknown[] = []): Promise<void> {
-  const createKernel = await kernelFactory();
+  const createKernel = await kernelFactory(resolved.kernel);
   const reported = terminalReport();
   const testing = resolved.configuration.phases?.some((p) => p.test === true) === true;
   const print = (line: string): void => void process.stdout.write(line + "\n");
@@ -280,7 +299,7 @@ function readRecord(file: string): unknown {
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>]";
+  const usage = "usage: npm run launch -- <saved-program.json> [--import <record.json>]... [--steps <n>] [--ceiling <a,b>] [--phases <run|check|check,run|test|check,test>] [--kernel <reference|machine>]";
   const rest: string[] = [];
   const imported: string[] = [];
   for (let i = 0; i < argv.length; i++) {

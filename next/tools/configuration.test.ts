@@ -8,15 +8,16 @@
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
-// next/kernel/create.ts gives: the variant that keeps its own stack, or the
-// reference with `ALLEGRO_KERNEL=reference`. The two commands end to end are
+// next/launch/kernel-variant.ts gives: the variant that keeps its own
+// stack, and the reference where next/launch/reference.test.ts loads this
+// file. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { readLiteral } from "../bootstrap/literal.js";

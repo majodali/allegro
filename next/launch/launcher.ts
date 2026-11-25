@@ -222,8 +222,8 @@
 // `load` has the kernel make the keys, and `declares` lists only the
 // parameters after them.
 //
-// Tested by next/launch/launcher.test.ts, on the kernel that
-// next/kernel/create.ts gives.
+// Tested by next/launch/launcher.test.ts, on both kernel variants
+// (next/launch/kernel-variant.ts).
 
 import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";

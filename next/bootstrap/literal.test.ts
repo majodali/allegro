@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { launch, type Configuration, type Plain } from "../launch/launcher.js";
 import { output } from "../launch/output.js";

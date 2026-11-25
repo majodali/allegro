@@ -49,7 +49,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, usedVariant } from "../launch/kernel-variant.js";
 import type { Value } from "../kernel/interface.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
@@ -380,7 +380,7 @@ test("every record of the programs and their imported texts checks, carries plac
 });
 
 test("npm run allegretto emits and launches in one step: it prints the lines, and exits 0 on completed and 1 otherwise", () => {
-  const run = (file: string) => spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = (file: string) => spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", "--kernel", usedVariant(), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   const hello = run("next/launch/fixtures/hello.alg");
   assert.equal(hello.stderr, "");
   assert.equal(hello.stdout, "hello, world\n");
@@ -389,7 +389,7 @@ test("npm run allegretto emits and launches in one step: it prints the lines, an
   assert.equal(refuted.stdout, "before the claim\n");
   assert.equal(refuted.stderr, "refuted: a claim that is not true\n");
   assert.equal(refuted.status, 1);
-  const budget = spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", `${PROGRAMS_DIR}/m3/factorial.alg`, "--steps", "3"], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const budget = spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", "--kernel", usedVariant(), `${PROGRAMS_DIR}/m3/factorial.alg`, "--steps", "3"], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   assert.equal(budget.stderr, "limit: the step budget of 3 ran out\n");
   assert.equal(budget.status, 1);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-run-"));

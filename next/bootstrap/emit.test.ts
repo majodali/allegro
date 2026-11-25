@@ -1,6 +1,7 @@
 // Tests of the emitter of Allegretto (next/bootstrap/emit.ts). Each form
 // is emitted, its record passes `check2`, and the record is loaded into
-// the reference kernel (`createKernel` of next/kernel/create.ts), with the
+// a kernel (`createKernel` of next/launch/kernel-variant.ts: the machine,
+// and the reference where next/launch/reference.test.ts loads this file), with the
 // shipped primitives its `needs` names, and evaluated through the kernel's
 // interface. What the emitter refuses gives its finding and no record.
 // Run by `npm run test:next`.
@@ -21,7 +22,7 @@ import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
 import type { Cell, Kernel, Value } from "../kernel/interface.js";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
