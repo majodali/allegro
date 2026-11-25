@@ -2290,6 +2290,45 @@ its approval.
     missing tests, a function listed once and a binding that was read,
     which are added. Of the 2 in the shared part, one is caught now;
     the other was a line that did nothing, and is removed.
+- **2026-11-29 — the speed work the maintainer asked for before E7's
+  second part** (the review session). Ruled on PR #316: only what
+  later chunks will not undo, and what makes their tests run faster;
+  not days.
+  - *How this session verifies*, which was the largest share of the
+    waiting. The reference kernel is run only when a file of the
+    kernel changes: it leaves out every test that runs an Allegretto
+    module, so it says nothing about the engine. Deliberate faults are
+    run several at a time on copies. No change to the tree.
+  - *One launch for all texts.* `next/ext/readers.ts` handed the engine
+    one text for each launch, and a launch spent about 85,000 steps on
+    starting: a fifth of the time for 167 texts, most of them short.
+    It now hands all the texts as one input; the grammar is prepared
+    once. 180 texts take 105,563,911 steps, where 167 took 116,209,098.
+    The suite's part takes about 15 seconds, where it took 30. The
+    whole comparison still takes about seven minutes on the day
+    measured: the time for a step was a tenth higher that day, and one
+    kernel that holds every result spends more on memory.
+  - *The kernel's host code: nothing found.* A profile of the engine
+    reading with the whole grammar: putting arguments in place of
+    parameters 15 percent, the host's collector 12, tying names 9, the
+    record of what a result rests on 6. Four changes were tried
+    together: no record of shared parts where a function's body shares
+    none; no array made where no argument changes; the last record a
+    collector was handed, remembered; a function's parameters bound
+    with no pairs made. The time for the processor over four runs each
+    way was 9.5 to 10.7 seconds before and 10.1 to 10.6 after. Nothing
+    that could be measured, so all four are taken out again. What
+    costs is how the kernel evaluates a call: it copies the function's
+    body for each one. That is the kernel's later track, and not a
+    small change.
+  - *The text primitives* wait on the acceptance stream, which the
+    maintainer asked to add the six names. They are the one large gain
+    in sight for the engine's steps: reading a byte is its busiest
+    function.
+  - *Recorded with this*: the three layouts the engine reads and the
+    bootstrap refuses are Allegretto; the target of a minute is for
+    the library modules' own tests, about 45 seconds today, and the
+    comparison of the corpus is a command with no place in the suite.
 
 ## 8. Sessions
 
@@ -2667,7 +2706,9 @@ grammar, with the kernel's `specialize`.
    things of §10.4 are meant to prevent that, and how far they do is
    not known. **The target, ruled on 2026-11-24: a module of 200 lines
    of Allegretto is read in under 10 seconds, and the engine's own
-   tests take under a minute in all.** E3 measures it. Where it is
+   tests take under a minute in all.** (Restated by the maintainer on
+   2026-11-29: the minute is for the library modules' own tests; the
+   comparison of the corpus is a command of its own.) E3 measures it. Where it is
    missed the plan stops for a ruling. The ways on from there are a
    faster kernel for what specialization leaves, which the rebuild's
    plan has as a later track, or a comparison over the corpus that
