@@ -4305,3 +4305,30 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     before: 89 are new, seven of them run once and 41 on each variant.
     `npm run harness:next` runs 145 programs, and all pass on both
     variants.
+- **2026-11-25 — The nine asks of PR #321 ratified: the checks stand as built.**
+  The maintainer, on PR #321, on 2026-11-25: "All asks ratified. Will
+  take note to kernel stream." What that settles:
+  1. The four settings of the shipped checks, by name and value:
+     `arguments`, `uncalled`, `unread` and `waiting`.
+  2. How they are set: `--check name=value` on the command line and
+     `check` in the project's file, each of the four resolved by itself.
+  3. The end `findings`, where a check's findings include an error.
+  4. What a check's result holds: the program as written, the broader
+     analysis, the refutations, what was left untouched, and the
+     findings.
+  5. The texts of the findings.
+  6. With claims that wait reported, the claim a dropped statement on a
+     run's capability stands for is reported, since that capability is
+     not yet given at check. It is left so. What a missing capability's
+     part answers stays open with the kernel stream.
+  7. The corpus lines `// check:`, `// broader claim at:` and
+     `// untouched:`.
+  8. The terms "the checks", "the shipped checks" and "a finding".
+  9. The kernel stream's test that holds a time, which this stream's
+     tests slow in CI from 4.1 s to 8.2 s against a limit of 10 s: the
+     maintainer carries it to the kernel stream. This stream changes
+     nothing for it.
+  PR #320 merged the same day, so the command line alone chooses on
+  main, and the kernel stream may remove its reading of
+  `ALLEGRO_KERNEL`. When PR #321 has merged it may remove
+  `Kernel.check`.
