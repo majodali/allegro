@@ -574,6 +574,13 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-29 — The comparison of the two readers reads every text in
+  one launch.** `next/ext/readers.ts`: the grammar is prepared once and
+  one kernel reads all the texts. 180 texts, 178 the same tree, 2
+  refused by both, in 105,563,911 steps. The part the suite compares
+  takes about 15 seconds, where it took 30. A pass over the kernel's
+  host code for speed found nothing that could be measured, and
+  changed nothing.
 - **2026-11-29 — A check is an ordinary evaluation, asked two things.**
   `Kernel.evaluate` takes `speculative`: nothing is performed, and both
   branches of what cannot be decided are evaluated. Its result lists
