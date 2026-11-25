@@ -556,6 +556,55 @@ test("refuse, assume and undecided are the kernel's primitives of those names", 
   assert.equal(w.refuted, false);
 });
 
+// ── Six names ruled on 2026-11-25 ─────────────────────────────────────
+//
+// The maintainer ruled that the emitter writes the shipped primitives
+// text.byte, text.span, text.starts and text.until, and the kernel
+// primitives specialize and sample. forms.md does not state them yet.
+
+test("text.byte, text.span, text.starts and text.until are the shipped primitives of those names: the record needs each by its hash and applies it", () => {
+  const names = ["text.byte", "text.span", "text.starts", "text.until"];
+  const text = [
+    "input see",
+    'see(text.byte("ab", 0))', 'see(text.byte("ab", 2))',
+    'see(text.span("abc1", 0, "az"))',
+    'see(text.until("key=value", 0, "="))', 'see(text.until("key", 1, "="))',
+    'see(text.starts("hello", 1, "ell"))', 'see(text.starts("hello", 1, "elk"))',
+  ].join("\n");
+  const doc = emitted(text);
+  assert.deepEqual(doc.needs.map((n) => n.name).filter((n) => names.includes(n)).sort(), [...names].sort());
+  for (const name of names) {
+    assert.ok(doc.needs.some((n) => n.name === name && n.hash === shippedByName.get(name)?.hash), `the record needs ${name} by the hash shippedByName gives`);
+    assert.ok(doc.nodes.some(shippedNamed(doc, name)), `the record applies the primitive ${name}`);
+  }
+  const r = run(text);
+  assert.equal(r.refuted, false);
+  assert.deepEqual(seen(r).slice(0, 5).map((v) => intOf(r.k, v)), [97n, -1n, 3n, 3n, 2n]);
+  assert.deepEqual(seen(r).slice(5).map((v) => bitsOf(r.k, v)), ["1:01", "1:00"]);
+  // They are entries of the structure text, as text.int is.
+  assert.deepEqual(seenInts(run('input see\nt = text\nsee(t.byte("A", 0))\nsee(t.span(" x", 0, "  "))')), [65n, 1n]);
+  // Outside its domain each is a refutation.
+  assert.equal(run('input see\nsee(text.byte("ab", 3))').refuted, true);
+});
+
+test("specialize and sample are the kernel's primitives of those names: the record applies each, and the kernel evaluates it", () => {
+  const text = "input see\ndouble(n) => n * 2\nfast = specialize(double, 1000)\nsee(fast(21))\nclaim(sample(n => n + 0 == n, [1, 2, 3]))\nsee(\"after the sample\")";
+  const doc = emitted(text);
+  for (const name of ["specialize", "sample"]) {
+    assert.ok(doc.nodes.some((n) => n.k === "kernel" && n.name === name), `the record names the kernel primitive ${name}`);
+    assert.ok(doc.nodes.some(kernelNamed(doc, name)), `the record applies ${name}`);
+  }
+  const r = run(text);
+  assert.equal(r.refuted, false);
+  assert.deepEqual(seen(r).map((v, i) => (i === 0 ? String(intOf(r.k, v)) : textOf(r.k, v))), ["42", "after the sample"]);
+  // A case the claim is not true of refutes the sample, and the statements after the claim do not happen.
+  const wrong = run('input see\nclaim(sample(n => n == 1, [1, 2]))\nsee("never")');
+  assert.equal(wrong.refuted, true);
+  assert.deepEqual(seenTexts(wrong), []);
+  // Only a function is specialized.
+  assert.equal(run("input see\nsee(specialize(1, 10))").refuted, true);
+});
+
 test("a computed key in a structure literal is put: {a: e, [k]: f} is put({a: e}, k, f), and an entry after it is put too", () => {
   const text = 'input see\nk = symbol("z")\ns = {a: 1, [k]: 2, b: 3}\nsee(s.z)\nsee(s.b)\nsee(spelling(key(s, 1)))\nsee(count(s))';
   const doc = emitted(text);

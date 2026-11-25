@@ -69,6 +69,14 @@
 // writes. No node with a place is shared: two parts written alike are two
 // nodes. A place is no part of a module's identity.
 //
+// Six names were added on 2026-11-25 (chunk Q13 (check and run as
+// configurations, and what a result holds)), by the maintainer's ruling on
+// the kernel stream's PR #316: the shipped primitives `text.byte`,
+// `text.span`, `text.starts` and `text.until`, written as `text.int` is
+// (`SHIPPED_NAMES`), and the kernel primitives `specialize` and `sample`,
+// written as the other kernel names are (`KERNEL_NAMES`). forms.md does
+// not state the six yet.
+//
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Allegretto is a small language for the kernel and nothing else"
 //   "A saved program is a recorded sequence of interface calls": the
@@ -213,12 +221,12 @@ export const FORMS: Readonly<Record<FormId, FormInfo>> = {
   "&& || !": { standsFor: "the kernel's conditional" },
   "claim": { standsFor: "the kernel's claim" },
   "kernel name": {
-    standsFor: "a kernel primitive Allegretto binds a name to: then, also, first, attempt, describe, build, refuse, assume, undecided, get, count, put, key, kind, symbol, spelling",
+    standsFor: "a kernel primitive Allegretto binds a name to: then, also, first, attempt, describe, build, refuse, assume, undecided, get, count, put, key, kind, symbol, spelling, specialize, sample",
   },
   "integer operator": { standsFor: "a shipped primitive on signed 64-bit integers: int.add and its kin" },
   "== !=": { standsFor: "same(a, b), and if(same(a, b), false, true)" },
   "++": { standsFor: "join(a, b)" },
-  "shipped name": { standsFor: "a shipped pure primitive, by its name in forms.md §3" },
+  "shipped name": { standsFor: "a shipped pure primitive, by its name in forms.md §3, or text.byte, text.span, text.starts or text.until" },
   "bits name": { standsFor: "a kernel primitive on bits: bits.join, bits.length, bits.slice" },
   "binding": { standsFor: "a binding in the enclosing block of bindings" },
   "function binding": { standsFor: "the binding f = (x, y) => e" },
@@ -239,24 +247,37 @@ export const FORMS: Readonly<Record<FormId, FormInfo>> = {
   "export": { standsFor: "a binding marked to be yielded by the module" },
 };
 
-/** The names of forms.md §3. Each stands for the shipped primitive of that name. */
+/**
+ * The names of forms.md §3, and the four shipped primitives a parser's
+ * terminals stand on: `text.byte`, `text.span`, `text.starts` and
+ * `text.until`. The maintainer ruled the emitter writes those four by
+ * their names; forms.md does not state them yet. Each name stands for the
+ * shipped primitive of that name.
+ */
 export const SHIPPED_NAMES: readonly string[] = [
   "int.add", "int.sub", "int.mul", "int.neg", "int.div", "int.mod", "int.lt", "int.gt", "int.le", "int.ge", "int.text", "text.int",
   "float.add", "float.sub", "float.mul", "float.div", "float.neg", "float.lt", "float.le", "float.text", "int.float", "float.int",
   "float.gt", "float.ge", "float.eq", "bits.int",
+  "text.byte", "text.span", "text.starts", "text.until",
 ];
 /** The names Allegretto binds to the kernel's primitives on bits (forms.md §4 item 2). */
 const BITS_NAMES: Readonly<Record<string, string>> = { "bits.join": "join", "bits.length": "length", "bits.slice": "slice" };
 /** The four structures Allegretto binds, whose entries are the primitives (forms.md §2, "Names, functions and application"). */
 const NAMESPACES: readonly string[] = ["int", "float", "text", "bits"];
-/** The kernel primitives Allegretto binds a name to (forms.md §2, "Control and claims", and `get` and `count` of §4 item 3). */
+/**
+ * The kernel primitives Allegretto binds a name to (forms.md §2, "Control
+ * and claims", and `get` and `count` of §4 item 3), and `specialize` and
+ * `sample`, which the maintainer ruled the emitter writes by their names;
+ * forms.md does not state those two yet.
+ */
 export const KERNEL_NAMES: readonly string[] = [
   "then", "also", "first", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling",
+  "specialize", "sample",
 ];
 /** Every kernel primitive a record of this emitter may name. */
 export const KERNEL_WRITTEN: readonly string[] = [
   "also", "assume", "attempt", "block", "build", "claim", "count", "describe", "first", "get", "if", "join", "key", "kind", "length", "put", "refuse", "same",
-  "slice", "spelling", "symbol", "then", "undecided",
+  "sample", "slice", "specialize", "spelling", "symbol", "then", "undecided",
 ];
 /** The operators of forms.md §2 that stand for a shipped primitive, with its name. */
 const INT_OPERATORS: Readonly<Record<string, string>> = {
