@@ -36,7 +36,8 @@
 // `// phases: check, test`, the `// test:` line and the programs
 // `m3/test-*.alg` and `m3/test-import/`. Chunk Q13, part 7, made a check
 // the launcher's evaluations with the shipped checks, and added the
-// `// check:`, `// broader claim at:` and `// untouched:` lines.
+// `// check:`, `// broader claim at:` and `// untouched:` lines and the
+// programs `m3/checks-*.alg` and `m3/checks-import/`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -919,4 +920,29 @@ test("a check, broader claim at or untouched line with phases that include no ch
   }
   const notLaunched = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// check: unread = on\n");
   assert.ok(notLaunched.problems.includes("nothing was launched, and the program states a `// check:`, `// broader claim at:` or `// untouched:` line"), JSON.stringify(notLaunched.problems));
+});
+
+test("the programs of the checks are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["decided-waiting", ["check"]], ["arguments-off", ["check"]], ["uncalled", ["check"]], ["uncalled-off", ["check"]], ["unread", ["check"]], ["unread-on", ["check"]],
+    ["list", ["check"]], ["list-unread", ["check"]], ["waiting-note", ["check", "run"]], ["waiting-warning", ["check", "run"]], ["waiting-error", ["check", "run"]],
+    ["not-needed", ["check"]], ["import/main", ["check"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/checks-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+  assert.ok(isImportedText(`${PROGRAMS_DIR}/m3/checks-import/lib.alg`));
+});
+
+test("program m3/checks-waiting-error.alg ends at its findings and runs nothing; with waiting at pass the run follows", async () => {
+  const file = `${PROGRAMS_DIR}/m3/checks-waiting-error.alg`;
+  const failed = await runProgram(text(file), file);
+  assert.deepEqual(failed.problems, []);
+  assert.deepEqual(failed.lines, []);
+  const passed = await runProgram(text(file).replace("// check: waiting = error\n", "").replace(/\/\/ (end|reports|summary):.*\n/g, "") + "// expect: ran\n// end: completed\n", file);
+  assert.deepEqual(passed.problems, []);
+  assert.deepEqual(passed.messages, [], "a claim that waits is passed by default");
 });
