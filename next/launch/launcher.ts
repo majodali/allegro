@@ -348,9 +348,10 @@ export interface Phase {
 
 /**
  * A source of configuration, highest first: the command line, the
- * project's file, the environment, what is built into the launcher.
+ * project's file, what is built into the launcher. No setting comes from
+ * the environment.
  */
-export type SourceName = "command line" | "file" | "environment" | "launcher";
+export type SourceName = "command line" | "file" | "launcher";
 
 /** Which source supplied one value of the configuration. `setting` is the setting's name, or `inputs.<name>` for one input. */
 export interface ConfigurationSource {

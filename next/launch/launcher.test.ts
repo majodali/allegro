@@ -1147,13 +1147,12 @@ test("the word for one claim is the summary's rule, with waiting kept apart from
 // codes only. The resolver's rules are tested in
 // next/tools/configuration.test.ts.
 
-/** Runs one of the two commands with the environment given, beside this process's own with no ALLEGRO_STEPS. */
+/** Runs one of the two commands with the environment given, beside this process's own. */
 function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: { readonly [name: string]: string } = {}) {
-  const { ALLEGRO_STEPS: _, ...inherited } = process.env;
-  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
+  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...process.env, ...env } });
 }
 
-test("npm run allegretto reads allegro.json beside its text: its inputs, an input a flag replaces, and the environment's budget under the flag's", () => {
+test("npm run allegretto reads allegro.json beside its text: its inputs, and an input a flag replaces", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-project-"));
   try {
     const file = path.join(dir, "main.alg");
@@ -1166,12 +1165,6 @@ test("npm run allegretto reads allegro.json beside its text: its inputs, an inpu
     const replaced = command("allegretto.ts", [file, "--input", 'b="b from the flag"']);
     assert.equal(replaced.stdout, "a from the file\nb from the flag\n");
     assert.equal(replaced.status, 0);
-    const spent = command("allegretto.ts", [file], { ALLEGRO_STEPS: "0" });
-    assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
-    assert.equal(spent.status, 1);
-    const flagOver = command("allegretto.ts", [file, "--steps", "10000000"], { ALLEGRO_STEPS: "0" });
-    assert.equal(flagOver.stdout, "a from the file\nb from the file\n");
-    assert.equal(flagOver.status, 0);
     fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ steps: 0, later: [{ a: '"late a"' }, { b: '"late b"' }] }));
     const fileSteps = command("allegretto.ts", [file]);
     assert.equal(fileSteps.stderr, "limit: the step budget of 0 ran out\n");
@@ -1212,7 +1205,7 @@ test("npm run allegretto refuses a project file with a finding: a setting it may
   }
 });
 
-test("npm run launch resolves from its flags, the environment and the launcher: --ceiling narrows, and a name the terminal does not supply is refused", () => {
+test("npm run launch resolves from its flags and the launcher: --ceiling narrows, and a name the terminal does not supply is refused", () => {
   const ok = command("terminal.ts", [FIXTURE, "--ceiling", "output"]);
   assert.equal(ok.stdout, "hello, world\n");
   assert.equal(ok.status, 0);
@@ -1223,12 +1216,21 @@ test("npm run launch resolves from its flags, the environment and the launcher: 
   const wider = command("terminal.ts", [FIXTURE, "--ceiling", "output,files"]);
   assert.equal(wider.stderr, "the ceiling of the command line grants files, which the launcher's ceiling does not grant: a ceiling may only narrow the launcher's\n");
   assert.equal(wider.status, 1);
-  const spent = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "0" });
-  assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
-  assert.equal(spent.status, 1);
-  const notWhole = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "many" });
-  assert.equal(notWhole.stderr, 'the environment\'s ALLEGRO_STEPS is not a whole number: "many"\n');
-  assert.equal(notWhole.status, 1);
+});
+
+test("no setting comes from the environment: with ALLEGRO_STEPS set, each command runs as it does without it", () => {
+  // The maintainer, 2026-11-25: "command line only" means ALLEGRO_STEPS should be removed.
+  for (const value of ["0", "many"]) {
+    for (const [entry, file] of [["terminal.ts", FIXTURE], ["allegretto.ts", FIXTURE_TEXT]] as const) {
+      const r = command(entry, [file], { ALLEGRO_STEPS: value });
+      assert.equal(r.stderr, "", `${entry} with ALLEGRO_STEPS=${value}`);
+      assert.equal(r.stdout, "hello, world\n");
+      assert.equal(r.status, 0);
+    }
+  }
+  const budget = command("terminal.ts", [FIXTURE, "--steps", "0"], { ALLEGRO_STEPS: "10000000" });
+  assert.equal(budget.stderr, "limit: the step budget of 0 ran out\n", "the budget is the command line's");
+  assert.equal(budget.status, 1);
 });
 
 

@@ -45,9 +45,10 @@
 //
 // The configuration is resolved from its sources by `resolve` of
 // next/tools/configuration.ts, which reads nothing itself; this file reads
-// the sources and hands them in (`resolveOnTerminal`). `npm run launch`
-// takes a saved program and no project, so it has three sources, highest
-// first:
+// the sources and hands them in (`resolveOnTerminal`). No setting comes
+// from the environment (the maintainer, 2026-11-23 and 2026-11-25).
+// `npm run launch` takes a saved program and no project, so it has two
+// sources, highest first:
 //   - the command line: `--steps <n>` sets the step budget,
 //     `--ceiling a,b` the ceiling, which may only narrow the terminal's,
 //     `--phases` the phases: `run`, `check`, `check,run`, `test` or
@@ -57,8 +58,6 @@
 //     next/kernel/create.ts. A name the terminal does not supply, a list
 //     of phases that is not built, and a name that is no kernel variant
 //     (`variantFinding` of next/launch/kernel-variant.ts) are findings;
-//   - the environment: `ALLEGRO_STEPS`, a whole number, sets the step
-//     budget;
 //   - what is built into the launcher: the ceiling that grants every
 //     capability the terminal supplies (`TERMINAL_CEILING`), and the
 //     kernel variant `machine` (`DEFAULT_KERNEL` of
@@ -117,7 +116,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import type { CreateKernel } from "../kernel/interface.js";
 import { shipped } from "../prims/index.js";
-import { readEnvironment, resolve, type Settings } from "../tools/configuration.js";
+import { resolve, type Settings } from "../tools/configuration.js";
 import { DEFAULT_KERNEL, variantFinding } from "./kernel-variant.js";
 import { describe, launch, type Configuration, type ConfigurationSource, type LaunchEnd, type Target } from "./launcher.js";
 import { output } from "./output.js";
@@ -201,15 +200,13 @@ export interface TerminalConfiguration {
 
 /**
  * Resolves the configuration from the command line, the project's file
- * where there is one, the environment of this process, and the launcher's own values: the terminal's
+ * where there is one, and the launcher's own values: the terminal's
  * ceiling and the default kernel variant. A kernel variant's name that is
  * no variant is a finding. On a finding writes each to stderr and exits 1,
  * before anything is evaluated.
  */
 export function resolveOnTerminal(commandLine: Settings, file?: Settings): TerminalConfiguration {
-  const environment = readEnvironment(process.env);
-  if (!environment.ok) failFindings(environment.findings);
-  const r = resolve({ "command line": commandLine, ...(file === undefined ? {} : { file }), environment: environment.settings, launcher: { ceiling: TERMINAL_CEILING, kernel: DEFAULT_KERNEL } });
+  const r = resolve({ "command line": commandLine, ...(file === undefined ? {} : { file }), launcher: { ceiling: TERMINAL_CEILING, kernel: DEFAULT_KERNEL } });
   if (!r.ok) failFindings(r.findings);
   const kernel = r.kernel ?? DEFAULT_KERNEL;
   const finding = variantFinding(kernel);

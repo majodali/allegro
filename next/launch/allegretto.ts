@@ -36,7 +36,7 @@
 // a test phase it is the terminal's target for tests (`testTarget` of
 // next/launch/terminal.ts).
 //
-// The configuration comes from four sources, highest first, resolved by
+// The configuration comes from three sources, highest first, resolved by
 // `resolve` of next/tools/configuration.ts (`resolveOnTerminal` of
 // next/launch/terminal.ts):
 //   - the command line. `--steps` sets a step budget. `--ceiling a,b`
@@ -62,14 +62,14 @@
 //     `later`, each literal written as a JSON string, and `phases`, a
 //     list of names such as `["check"]`. An input it gives is
 //     replaced by an `--input` of the same name;
-//   - the environment: `ALLEGRO_STEPS`;
 //   - the launcher's own values: the ceiling that grants all four
 //     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts), and
 //     the kernel variant `machine` (`DEFAULT_KERNEL` of
 //     next/launch/kernel-variant.ts).
 // A finding of the file or of the resolution, a setting the file may not
 // set among them, is written to stderr, one line each, and exits 1;
-// nothing is emitted or launched. The driver takes the identities of the
+// nothing is emitted or launched. No setting comes from the environment.
+// The driver takes the identities of the
 // imported texts in a kernel of the variant resolved, and the run is on
 // one of that variant (`createKernelOf` of next/kernel/create.ts).
 
