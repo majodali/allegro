@@ -70,7 +70,8 @@
 //     setting of the shipped checks to its value, such as
 //     `{"unread": "on"}`. An input it gives is replaced by an `--input` of
 //     the same name, and a setting of `check` by a `--check` of the same
-//     name;
+//     name. Its `check` is used only under phases that include a check;
+//     under any other it is no finding and is not used;
 //   - the launcher's own values: the ceiling that grants all four
 //     capabilities (`TERMINAL_CEILING` of next/launch/terminal.ts), and
 //     the kernel variant `machine` (`DEFAULT_KERNEL` of

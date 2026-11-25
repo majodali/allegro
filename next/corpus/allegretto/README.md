@@ -171,13 +171,14 @@ text, as not gone into. The kinds are `function`, `binding`, `argument`
 and `entry`. A binding's place is that of its value. What else the
 result tells is not compared, since the kernel may tell more.
 
-The shipped checks' findings are messages of the form `report` takes:
-an `error` for each refuted claim of either list and for each
-refutation, then, unless `waiting` is `pass`, one of that level for each
-claim that waits, each with its place. A claim in both lists is reported
-once. The runner hands them to the same sink as the program's messages,
-after the launch, so the `// reports:` lines compare them (see "Messages
-and status"):
+The shipped checks' findings are plain data with the level and text of
+a message of `report`: an `error` for each refuted claim of either list
+and for each refutation, then, unless `waiting` is `pass`, one of that
+level for each claim that waits, each with its place. A claim in both
+lists is reported once. The runner hands each, as a message, to the same
+sink as the program's messages when the check is over, before the
+messages of a run or of tests after it, so the `// reports:` lines
+compare them in that order (see "Messages and status"):
 
 ```
 // reports: next/corpus/allegretto/m3/checks-uncalled.alg:6:14: error: a claim of the broader analysis is refuted: a claim that is not true

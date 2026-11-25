@@ -24,7 +24,11 @@
 // plain data (`UntouchedData`), and goes into it where `into` answers
 // true. When nothing chosen is left, it hands the check's result, as plain
 // data, to `findings`, and puts what that answers in the result. A finding
-// of level `error` ends the launch (the end `findings`), where nothing
+// (`Finding`) is plain data: a level, a text, and a file, line and column
+// where there is a place, the line and column numbers, so a result that
+// holds findings survives JSON. Whoever hands a finding to `report`'s sink
+// makes a message of it (`findingMessage`). A finding of level `error`
+// ends the launch (the end `findings`), where nothing
 // else did. The launcher has no rule of its own for either: with no checks
 // handed, a check goes into nothing beyond the program as written and has
 // no findings.

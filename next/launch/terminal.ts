@@ -59,7 +59,7 @@
 //     (the setting `check`), and `--kernel <name>` the kernel variant, one
 //     of `KERNEL_VARIANTS` of next/kernel/create.ts. A name the terminal
 //     does not supply, a list of phases that is not built, a check
-//     setting's name or value that is none, a check setting under phases
+//     setting's name or value that is none, a `--check` under phases
 //     that include no check, and a name that is no kernel variant
 //     (`variantFinding` of next/launch/kernel-variant.ts) are findings. A
 //     `--check` with no `=`, or one that names a setting given before, is
@@ -80,15 +80,17 @@
 // Nothing is performed: no line is printed, no request is made, and a
 // call on `report` hands no message and no status, since the check hands
 // the check capabilities (`CHECK_CAPABILITIES` of
-// next/tools/configuration.ts) as not needed. After the launch the
-// terminal hands each finding of the check's result to `report`'s sink,
-// as it hands the messages of failing tests, so each is written to stderr
-// as one line, before the end. The launcher hands no message. A check
+// next/tools/configuration.ts) as not needed. When the check is over
+// the launcher hands its findings to the terminal (`Launch.onFindings`),
+// which hands each, as a message (`findingMessage` of
+// next/launch/checks.ts), to `report`'s sink, so each is written to
+// stderr as one line, before the end. The launcher hands no message. A check
 // that finds a refutation writes the end's reason and exits 1; one whose
 // findings hold an error ends `findings` and exits 1; otherwise it
 // completes and exits 0. Under `--phases check,run` the check comes first,
 // and where it ends nothing the lines, the messages, the end and the exit
-// code are the run's, and the check's findings follow the run's messages.
+// code are the run's, and the check's findings come before the run's
+// messages. Under `--phases check,test` they come before the tests'.
 // The exit code follows the end and the status as for any run. What else
 // check shows is chunk Q14 (the commands).
 //
@@ -291,9 +293,9 @@ export function testTarget(sink: ReportSink): Target {
  * the end on stderr.
  *
  * Under a check (`Phase.check`) the launcher is handed the shipped checks
- * of the setting `check` (`shippedChecks`), and after the launch each
- * finding of the check's result goes to the sink, before the test
- * messages and the end.
+ * of the setting `check` (`shippedChecks`), and each finding of the check
+ * goes to the sink when the check is over (`Launch.onFindings`), before
+ * the run's or the tests' messages and the end.
  */
 export async function runOnTerminal(program: unknown, resolved: TerminalConfiguration, imports: readonly unknown[] = []): Promise<void> {
   const createKernel = await kernelFactory(resolved.kernel);

@@ -68,7 +68,10 @@
 //            the highest source that sets it, and its source is named
 //            `check.<name>`. A name or a value that is none is a finding
 //            (`checkFinding`). It is read under any phases that include a
-//            check, and is a finding under phases that include none. A
+//            check. Under phases that include none, the command line's is
+//            a finding, and the project's file's is not used and its
+//            sources are not listed, so a project that keeps its check
+//            settings in its file still runs and tests. A
 //            setting no source sets has the shipped checks' default. No
 //            setting names a file of host code: a project's own checks
 //            wait for the form in Allegro.

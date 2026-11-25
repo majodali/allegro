@@ -4137,8 +4137,11 @@ PR #283 on 2026-11-20, for the work after milestone 3.
   3. **The checks**, `Checks` of the new `next/launch/checks.ts`,
      host-neutral: `into(item)`, asked with plain data and no handle, and
      `findings(result)`, given the check's result as plain data, which
-     answers messages of the form `report` takes (`ReportMessage`). The
-     launcher is handed them in `Launch.checks`. With none, a check goes
+     answers findings (`Finding`): a level and a text, as a message of
+     `report` has them, and a file, line and column where there is a
+     place, the line and column numbers. So a check's result survives
+     JSON unchanged. `findingMessage` makes the message of `report` of a
+     finding. The launcher is handed the checks in `Launch.checks`. With none, a check goes
      into nothing beyond the program as written and has no findings.
   4. **The shipped checks**, `shippedChecks(settings)`: `arguments`,
      `uncalled` and `unread`, each `on` or `off`, and `waiting`, one of
@@ -4157,22 +4160,30 @@ PR #283 on 2026-11-20, for the work after milestone 3.
      neither refuted nor at its limit, the launch ends with the new end
      `findings`, "the check's findings hold <n> error(s)", and no run or
      test follows. The commands exit 1.
-  6. **The terminal** hands the check's findings to `report`'s sink after
-     the launch, as it hands the messages of failing tests. Each is
-     written to stderr before the end. The launcher hands no message.
+  6. **The terminal** hands the check's findings to `report`'s sink when
+     the check is over: the launcher calls `Launch.onFindings`, beside
+     `onLine`, once with a check's findings when the check phase is over,
+     whether the launch then ends or goes on. So under `check, run` and
+     `check, test` the check's messages come before the run's or the
+     tests' own. Each is written to stderr before the end. The launcher
+     hands no message.
   7. **The setting** `check` of `next/tools/configuration.ts`, from
      `--check name=value`, which may be given several times, and from the
      project's file, `"check": {"unread": "on"}`. Each of the four is
      resolved by itself, and its source is named `check.<name>`. A name or
-     a value that is none is a finding, and so is the setting under phases
-     that include no check. A `--check` with no `=`, or one that names a
-     setting given before, is a usage error.
+     a value that is none is a finding. Under phases that include no
+     check, a `--check` is a finding, and the project's file's `check` is
+     not used and its sources are not listed, so a project that keeps its
+     check settings in `allegro.json` runs with `--phases run`, with
+     `--phases test` and with no flag. A `--check` with no `=`, or one
+     that names a setting given before, is a usage error.
   8. **The corpus convention** gains `// check: <name> = <value>`,
      `// broader claim at: <line>:<column> <word>` and `// untouched:
      <kind> <line>:<column>`, each where the phases begin with a check.
      The runner hands the launcher the shipped checks those lines set,
-     and the check's findings to the sink of `report` after the launch, so
-     the `// reports:` lines compare them. The README gains the section
+     and hands the check's findings to the sink of `report` when the
+     check is over, by `onFindings`, so the `// reports:` lines compare
+     them, before the messages of a run or tests after the check. The README gains the section
      "Check".
   9. **Not built.** A project's own checks: a setting that named a file of
      host code would run that code with the full rights of whoever runs
@@ -4198,15 +4209,17 @@ PR #283 on 2026-11-20, for the work after milestone 3.
       an unfilled cell reaches g's claim, and `untouched` tells f alone.
       In the first evaluation a function a call opens is told, called.
       So with uncalled off and arguments on, g is never gone into.
-  - **What building showed against the points.** Point 3: a finding's
-    line and column are bigints, as `ReportMessage` has them, so a check's
-    result with a finding that has a place no longer passes
-    `JSON.stringify`, which `LaunchResult` promised. Point 7: a project's
-    file that sets `check` makes every launch whose phases include no
-    check a finding, `--phases run` among them. Point 6: under `check,
-    run` the check's findings come after the run's messages on stderr.
-    Point 2: `summary` is the program as written's, so a check that ends
-    refuted in the broader analysis can have the summary `undecided`.
+  - **What building showed against the points**, and what the review of
+    the chunk ruled on three of them. Point 3: a finding is plain data,
+    with its line and column numbers, so a check's result survives JSON
+    as `LaunchResult` promises; the terminal and the runner make a message
+    of `report` of each finding when they hand it to the sink. Point 7:
+    the project's file's `check` is no finding under phases that include
+    no check, and is not used there. Point 6: a check's findings are
+    handed over when the check ends, before a run or the tests begin.
+    Point 2, which stands: `summary` is the program as written's, so a
+    check that ends refuted in the broader analysis can have the summary
+    `undecided`.
   - **The new programs**, under `next/corpus/allegretto/m3/`, none with a
     `// realises:` line: `checks-decided-waiting` (decided as written,
     waiting in the broader analysis, completes), `checks-arguments-off`
@@ -4248,9 +4261,9 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     unread on for the condition, since x is read by nothing, and reads
     both words in the broader analysis. "a check's result gives the
     refutations found in parts that do not refute the whole" is handed
-    the shipped checks, and its test of plain data leaves out the
-    findings, whose line is a bigint; it holds the finding's level, file
-    and line. "check then run, on one kernel" is handed the shipped
+    the shipped checks, and also holds the finding's level, file and
+    line; its test of plain data is of the whole result, findings
+    included, as before. "check then run, on one kernel" is handed the shipped
     checks, held the calls `check, evaluate` and holds no call of `check`
     and three evaluations or more, and reads the uncalled function's
     claim in the broader analysis. "check then test" held the calls
@@ -4280,8 +4293,8 @@ PR #283 on 2026-11-20, for the work after milestone 3.
     corpus, makes 1 evaluation with no checks, 19 by default and 65 with
     arguments, uncalled and unread on, and a launch takes about 40 ms in
     each case, on either variant. `m3/multiline.alg` makes 1, 7 and 46.
-    `npm run test:next` runs 1,623 tests, all passing, where it ran
-    1,540 before: 83 are new, seven of them run once and 38 on each
+    `npm run test:next` runs 1,629 tests, all passing, where it ran
+    1,540 before: 89 are new, seven of them run once and 41 on each
     variant.
     `npm run harness:next` runs 145 programs, and all pass on both
     variants.

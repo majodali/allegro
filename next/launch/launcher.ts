@@ -128,7 +128,9 @@
 //      whole with no refuted claim, at the part's place; and what was told
 //      and not gone into (`untouched`), each once. Then the checks are
 //      handed that result and answer the findings (`Checks.findings`),
-//      which the result holds (`findings`). The check ends the launch
+//      which the result holds (`findings`), and which the launcher hands
+//      to `Launch.onFindings` once, when the check phase is over, whether
+//      the launch then ends or goes on. The check ends the launch
 //      `refuted` where the whole is refuted, a claim of either list has a
 //      refuted evaluation, or a refutation is listed; `limit` where an
 //      evaluation's budget ran out and nothing was refuted; `findings`

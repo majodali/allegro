@@ -134,8 +134,10 @@
 //                             no such line is not compared on its
 //                             messages; one that states any must hand over
 //                             exactly those. Under a check, the check's
-//                             findings are handed to the same sink after
-//                             the launch, so these lines compare them too;
+//                             findings are handed to the same sink when
+//                             the check is over, before the messages of
+//                             a run or of tests after it, so these lines
+//                             compare them too;
 //   // status: <n>           the highest status the program hands to
 //                             `report.status`, 0 where it hands none: a
 //                             whole number from 0 to 255. At most one line.
