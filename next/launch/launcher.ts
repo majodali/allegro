@@ -228,6 +228,7 @@
 import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
+import type { ReportMessage } from "./report.js";
 
 /** A capability's definition: its name and the names of its parts. */
 export interface CapabilityDefinition {
@@ -515,7 +516,9 @@ export interface RunRestsOn {
 /**
  * What a run found: its claims, its summary and what it rests on. It is
  * plain data a tool reads: every field is a string, a number, or a list
- * or record of those, and no handle of the kernel is in it.
+ * or record of those, and no handle of the kernel is in it. The one
+ * exception is the line and column of a finding, which are bigints, as a
+ * message of `report` has them (`ReportMessage` of next/launch/report.ts).
  */
 export interface LaunchResult {
   /** One entry for each claim as written, in the order the run first reported it. */
@@ -531,7 +534,31 @@ export interface LaunchResult {
    * a check gives any; it is empty for a phase that is no check.
    */
   readonly refutations: readonly RefutationData[];
+  /**
+   * A check's only: the claims of every evaluation after the first, the
+   * broader analysis, summed apart from `claims`, and their summary. A
+   * claim reached by both is in both.
+   */
+  readonly broader?: { readonly claims: readonly ClaimResult[]; readonly summary: Strength };
+  /**
+   * A check's only: what its evaluations told as not gone into, and the
+   * check did not go into, each once, in the order first told. The module's
+   * own function is left out.
+   */
+  readonly untouched?: readonly UntouchedData[];
+  /** A check's only: what the checks found (`Checks.findings` of next/launch/checks.ts), as they answered it. */
+  readonly findings?: readonly ReportMessage[];
 }
+
+/**
+ * One thing an evaluation of a check told as not gone into, as plain
+ * data: the kernel's `Untouched` with its handle left out. For a function,
+ * the count of its parameters and whether a call opened it, in any
+ * evaluation that told it. Its place where it has one.
+ */
+export type UntouchedData =
+  | { readonly kind: "function"; readonly parameters: number; readonly called: boolean; readonly at?: Place }
+  | { readonly kind: "binding" | "argument" | "entry"; readonly at?: Place };
 
 /** One refutation found in a part that does not refute the whole, as plain data. */
 export interface RefutationData {
