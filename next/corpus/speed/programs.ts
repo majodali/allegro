@@ -6,9 +6,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { createKernel } from "../../kernel/create.js";
+import type { CreateKernel } from "../../kernel/interface.js";
 import { encode, type SavedProgram } from "../../kernel/saved-program.js";
 import { describeFinding, emit } from "../../bootstrap/emit.js";
+import { createKernel as variantInUse } from "../../launch/kernel-variant.js";
 import { launch, type LaunchEnd } from "../../launch/launcher.js";
 import { output } from "../../launch/output.js";
 import { shipped } from "../../prims/index.js";
@@ -72,8 +73,8 @@ export function emitTimed(text: string): { program: SavedProgram; ms: number } {
   return { program, ms: performance.now() - t0 };
 }
 
-/** Launches a record on the kernel `next/kernel/create.ts` gives, with no step budget. */
-export async function runNew(program: SavedProgram): Promise<NewRun> {
+/** Launches a record on a kernel `createKernel` makes, by default of the variant in use (next/launch/kernel-variant.ts), with no step budget. */
+export async function runNew(program: SavedProgram, createKernel: CreateKernel = variantInUse): Promise<NewRun> {
   const t0 = performance.now();
   const o = await launch({
     createKernel,

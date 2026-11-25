@@ -3,14 +3,15 @@
 // part 2, docs/plans/rebuild-acceptance.md §5; part 3, for the setting
 // `phases`, and part 5, for check as a check phase and for check then run;
 // chunk Q16 (the capabilities the launchers ship), part 3, for the check
-// capabilities; chunk Q13, part 6, for the test phase). It closes B-059
-// (the project root file) as far as this part goes.
+// capabilities; chunk Q13, part 6, for the test phase; chunk Q13, for the
+// environment removed as a source). It closes B-059 (the project root
+// file) as far as this part goes.
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Configuration is all the information that determines an execution",
 //    as far as the settings below go
 //   "Configuration sources have a priority, and a result says which
-//    supplied each value": the four sources in their order, the rules of
+//    supplied each value": the three sources in their order, the rules of
 //    which source may set what, and the source of each value
 //   "A result names everything it rests on": the configuration and its
 //    sources, which the launcher puts in the result
@@ -37,7 +38,9 @@
 //   later    a list of such records, one for each later phase;
 //   ceiling  the names of the capabilities granted;
 //   restore  the builder whose stored outcomes are accepted;
-//   kernel   the kernel variant's name;
+//   kernel   the kernel variant's name, one of `KERNEL_VARIANTS` of
+//            next/kernel/create.ts, which the commands check
+//            (`variantFinding` of next/launch/kernel-variant.ts);
 //   phases   the shipped phases to apply, in order (`PHASE_VALUES` and
 //            `TEST_PHASE_VALUES`): `run` alone, `check` alone, `check,
 //            run`, `test` alone, or `check, test`. Check is a check
@@ -56,7 +59,10 @@
 //            later phase follows the tests.
 //
 // The sources, highest first (`SOURCES`): the command line, the project's
-// file, the environment, what is built into the launcher. A setting is
+// file, what is built into the launcher. No setting comes from the
+// environment: the maintainer ruled on 2026-11-23 "Let's standardize on
+// command line only", and on 2026-11-25 that this removes the variable of
+// the environment that set the step budget. A setting is
 // taken whole from the highest source that sets it. `inputs` is merged by
 // input name: each input comes from the highest source that supplies it.
 // Which source may set what is one table (`MAY_SET`). A setting found in a
@@ -69,9 +75,7 @@
 // of the text being run: a JSON object whose keys are setting names.
 // `inputs` and `later` hold each value as an Allegretto literal written as
 // a JSON string, read by `readLiteral` of next/bootstrap/literal.ts
-// (`readProjectFile`). The environment gives one setting:
-// `ALLEGRO_STEPS`, a whole number (`readEnvironment`). The variable
-// `ALLEGRO_KERNEL` is read by next/kernel/create.ts and not here.
+// (`readProjectFile`).
 //
 // It is host-neutral: it reads no file, no environment and no argument
 // list. The terminal's entries (next/launch/terminal.ts and
@@ -89,7 +93,7 @@ export const SETTINGS = ["steps", "inputs", "later", "ceiling", "restore", "kern
 export type Setting = (typeof SETTINGS)[number];
 
 /** The sources, highest first. */
-export const SOURCES: readonly SourceName[] = ["command line", "file", "environment", "launcher"];
+export const SOURCES: readonly SourceName[] = ["command line", "file", "launcher"];
 
 /** Which sources may set each setting: the one table the resolver holds. */
 export const MAY_SET: Readonly<Record<Setting, readonly SourceName[]>> = {
@@ -141,7 +145,7 @@ export interface Settings {
   readonly phases?: readonly string[];
 }
 
-/** The four sources, as data, by name. A source that sets nothing may be left out. */
+/** The three sources, as data, by name. A source that sets nothing may be left out. */
 export type Sources = Partial<Readonly<Record<SourceName, Settings>>>;
 
 export type Resolved =
@@ -160,7 +164,6 @@ export type Resolved =
 const PHRASE: Readonly<Record<SourceName, string>> = {
   "command line": "the command line",
   file: `the project's file ${PROJECT_FILE}`,
-  environment: "the environment",
   launcher: "the launcher",
 };
 
@@ -219,7 +222,7 @@ export function shapeOf(
 const or = (names: readonly string[]): string => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 /**
- * Resolves the configuration from its four sources, or gives the findings.
+ * Resolves the configuration from its three sources, or gives the findings.
  * It reads nothing itself: each source is handed in as data.
  */
 export function resolve(sources: Sources): Resolved {
@@ -361,19 +364,4 @@ export function readProjectFile(file: string, text: string): SourceRead {
     }
   }
   return findings.length > 0 ? { ok: false, findings } : { ok: true, settings };
-}
-
-/** The variable of the environment that sets the step budget. */
-export const STEPS_VARIABLE = "ALLEGRO_STEPS";
-
-/**
- * Reads the environment's settings from its variables, handed in as data.
- * It reads one: `ALLEGRO_STEPS`, a whole number. An empty variable is
- * unset. A value that is not a whole number is a finding.
- */
-export function readEnvironment(variables: Readonly<Record<string, string | undefined>>): SourceRead {
-  const steps = variables[STEPS_VARIABLE];
-  if (steps === undefined || steps === "") return { ok: true, settings: {} };
-  if (!/^[0-9]+$/.test(steps) || !Number.isSafeInteger(Number(steps))) return { ok: false, findings: [`the environment's ${STEPS_VARIABLE} is not a whole number: ${JSON.stringify(steps)}`] };
-  return { ok: true, settings: { steps: Number(steps) } };
 }

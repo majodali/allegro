@@ -129,27 +129,28 @@ of them runs the present tree's suite. CI runs the four marked below as
 one step, beside the present tree's gate.
 
 ```bash
-npm run typecheck:next              # typecheck of next/ (five projects) — IN CI
+npm run typecheck:next              # typecheck of next/ (six projects) — IN CI
 npm run test:next                   # every next/**/*.test.ts, on the default kernel
-                                    #   variant (~15s) — IN CI
-ALLEGRO_KERNEL=reference npm run test:next  # the same on the reference kernel; a
-                                    #   change under next/ passes on both variants
+                                    #   variant (~70s) — IN CI
+npm run test:next:reference         # this stream's tests again on the reference kernel
+                                    #   (next/launch/reference-run.ts loads them); a change
+                                    #   passes on both variants — IN CI
 npm run lint:decisions              # next/decisions.json against the inventory's
                                     #   decisions — IN CI
 npm run lint:corpus                 # next/corpus/cases.json is consistent — IN CI
 npm run harness:next                # the Allegretto programs of next/corpus/allegretto/
                                     #   on the new kernel, by milestone
-                                    #   (--milestone N, --file <program>)
+                                    #   (--milestone N, --file <program>, --kernel <name>)
 npm run harness:present             # the calibration: every pinned program of
                                     #   next/corpus/cases.json on the present tree
 npm run emit -- f.alg [-o out.json] # the bootstrap: a text in the first notation
                                     #   to a saved program
 npm run launch -- program.json      # run a saved program (--import, --steps,
-                                    #   --ceiling, --phases; the usage line lists them)
+                                    #   --ceiling, --phases, --kernel; the usage line lists them)
 npm run allegretto -- f.alg         # emit and run a text and what it imports
-                                    #   (--input, --later and the flags of launch)
+                                    #   (--input, --later and the flags of launch, --kernel too)
 npm run bench:next                  # the speed tests on the new kernel and against
-                                    #   the present tree; gates nothing (minutes)
+                                    #   the present tree; gates nothing (minutes; --kernel <name>)
 ```
 
 The first notation is `next/ext/allegretto/forms.md`. The lines a

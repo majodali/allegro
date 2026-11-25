@@ -1671,6 +1671,21 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — The command line alone chooses, and six names the emitter writes (B-196)
+
+B-196 (the rebuild's acceptance side). By the maintainer's rulings, the
+command line alone chooses. `npm run launch`, `npm run allegretto`,
+`npm run harness:next` and `npm run bench:next` take `--kernel <name>`
+and make their kernel by `createKernelOf`; with no flag the variant is
+the launcher's default, `machine`. A name that is no variant is refused
+before anything is evaluated. No setting comes from the environment:
+`ALLEGRO_STEPS` is removed as a source. `npm run test:next:reference`
+runs this stream's tests on the reference, through
+`next/launch/reference-run.ts`, with no variable. The emitter writes `text.byte`, `text.span`,
+`text.starts`, `text.until`, `specialize` and `sample` by their names,
+and `next/corpus/allegretto/m3/sample.alg` is the first program to state
+`// summary: sampled`.
+
 ### 2026-11 — The test phase, first version (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 6)
 
 B-196 (the rebuild's acceptance side). `--phases test` runs the tests of
