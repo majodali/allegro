@@ -3,8 +3,8 @@
 // Whose: the kernel stream (lane R). Chunk E7 of docs/plans/book-pass.md
 // section 10. The comparison is next/ext/readers.ts.
 //
-// Every `.alg` under next/ is about 250,000 bytes, and the engine reads
-// them in about seven minutes: too long for every run of the suite. So
+// Every `.alg` under next/ is about 270,000 bytes, and the engine reads
+// them in some minutes: too long for every run of the suite. So
 // the suite compares a part: the first milestone's programs, and one
 // text for each form of layout that differs between a block and a line
 // carried on. The whole is compared by
@@ -17,7 +17,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { chosenVariant } from "../kernel/create.js";
-import { bootstrapTree, compared, engineTree, firstDifference, texts } from "./readers.js";
+import { bootstrapTree, compared, comparedAll, engineTree, firstDifference, texts } from "./readers.js";
 
 // The reference kernel evaluates on the host's stack, which the engine outgrows (ext.test.ts).
 const DEPTH = chosenVariant() === "reference" ? { skip: "the reference kernel evaluates on the host's stack, which the engine outgrows" } : {};
@@ -34,11 +34,17 @@ const PART = [
   "next/ext/lib/set.alg",
 ];
 
-for (const file of ALL ? texts("next") : PART)
+// The engine reads all the texts in one launch, once, and each test looks at its own.
+const FILES = ALL ? texts("next") : PART;
+let read: ReturnType<typeof comparedAll> | undefined;
+const all = (): ReturnType<typeof comparedAll> => (read ??= comparedAll(FILES.map((f) => fs.readFileSync(f, "utf8"))));
+
+FILES.forEach((file, i) =>
   test(`${file}: the bootstrap and the engine give the same tree, or both refuse the text`, DEPTH, async () => {
-    const c = await compared(fs.readFileSync(file, "utf8"));
+    const c = (await all()).each[i];
     assert.ok(c.same, c.same ? "" : firstDifference(c.bootstrap, c.engine));
-  });
+  }),
+);
 
 test("the part compared holds a text both readers refuse, and texts with a block, a line carried on, and an import with a list", () => {
   const read = (f: string) => bootstrapTree(fs.readFileSync(f, "utf8"));
