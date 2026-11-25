@@ -156,7 +156,39 @@ export interface Limits {
   readonly steps?: number;
   /** A slice: the call returns after about this many steps, and what it was doing is paused. */
   readonly slice?: number;
+  /**
+   * Evaluate ahead of what is done. Nothing is performed, and where a
+   * condition cannot be decided both branches are evaluated: the two go
+   * together, since a run that took both branches would perform both.
+   * What is left is what the expression means, as far as it could be
+   * worked out. Nothing of it stays in the kernel: nothing waits for it
+   * afterwards and nothing is paused, so `slice` is not read. It should
+   * have a budget, since a call a run would make is opened, and a
+   * program that runs for ever goes on until the steps are spent. The
+   * result lists what the evaluation did not go into (`untouched`), so
+   * that whoever asked can evaluate what it chooses of it.
+   */
+  readonly speculative?: boolean;
 }
+
+/**
+ * One thing a speculative evaluation met and did not go into.
+ *
+ *   "function"  a function, called or not: a call evaluates its body with
+ *               what the call hands it, and never with its parameters
+ *               unknown. `called` says whether a call opened it.
+ *               Evaluating a call of `value` with as many unfilled cells
+ *               as `parameters` goes over its body for every argument.
+ *   "binding"   a binding of a block that nothing read.
+ *   "argument"  an argument that the function it was handed to did not need.
+ *   "entry"     an entry of a structure that nothing read.
+ *
+ * For the last three, evaluating `value` evaluates the part, where it
+ * was written. Each with its place where it has one.
+ */
+export type Untouched =
+  | { readonly kind: "function"; readonly value: Value; readonly parameters: number; readonly called: boolean; readonly at?: Place }
+  | { readonly kind: "binding" | "argument" | "entry"; readonly value: Value; readonly at?: Place };
 
 /**
  * How strongly a claim holds, as the kernel recorded it. It says how the
@@ -246,11 +278,13 @@ export interface Result {
    */
   readonly cutShort?: true;
   /**
-   * From `check` only: the refutations found in parts that do not refute
+   * From a speculative evaluation and from `check`: the refutations found in parts that do not refute
    * the whole, each with the place of the part where it has one. A
    * refuted claim is not repeated here: it is among `claims`.
    */
   readonly refutations?: ReadonlyArray<{ readonly reason: string; readonly at?: Place }>;
+  /** From a speculative evaluation only: what it met and did not go into, in the order met. */
+  readonly untouched?: readonly Untouched[];
 }
 
 /**
@@ -587,6 +621,13 @@ export interface Kernel {
    * is refuted whatever is unknown. A check is given a budget, since a
    * recursion whose argument changes runs to it; a spent budget ends the
    * check at "limit", with the records so far.
+   *
+   * To be retired. By the maintainer's ruling of 2026-11-29 a check is
+   * no call of the kernel's: it is `evaluate` with `speculative`, and
+   * whoever asks chooses what else is gone into from the result's
+   * `untouched`. This call is that evaluation followed by everything it
+   * left untouched, each function with its parameters unknown, with no
+   * choice. It stays until the launcher has moved.
    */
   check(expression: Value, limits?: Limits): Result;
   /**

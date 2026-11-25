@@ -2239,6 +2239,57 @@ its approval.
   - *Deliberate faults*: 5 made in each variant's fix. 4 caught in
     each; the fifth, the counts not put back after a check, changes
     nothing a test could be made to see, and the line is kept.
+- **2026-11-29 — a check as an ordinary evaluation** (the review
+  session). The maintainer went through the asks of PR #317 in three
+  rounds and ruled.
+  - *What the maintainer saw.* A check has two purposes that had been
+    built as one. The first is the program as written: every path a
+    run can take, with the arguments given. The second is a broader
+    analysis: functions for every argument, and what nothing calls or
+    reads. In Allegretto the second mostly leaves claims waiting, and
+    tests decide them; in the standard language it is where most
+    claims are decided. So it is a choice, down to the module and the
+    function, and the kernel is not where a project's choices are.
+  - *Ruled.* (1) The kernel's `evaluate` takes two things asked
+    together, to perform nothing and to take both branches; (2) its
+    result lists what it left untouched, and the caller evaluates what
+    it chooses, which the maintainer preferred to a hook that answers
+    back; (3) the choice is made in the phase; (4) the kernel has no
+    default that differs by language; (5) a binding nothing reads is
+    told, skipped unless chosen; (6) `check` is retired once the
+    acceptance stream's launcher has moved; (7) this before the speed
+    work. The proposals of PR #317 to leave out the function a check is
+    handed, and to count apart what was found in general, are
+    withdrawn: neither is needed.
+  - *Built, on both variants.* `Limits.speculative`. `Result.untouched`:
+    a function with its count of parameters and whether a call opened
+    it; a binding, an argument, an entry; each with a handle to
+    evaluate and its place. A function for every argument is a call of
+    it with unfilled cells, which a host could already write. `check`
+    is the same code, with all of it gone into.
+  - *Nothing stays.* What a speculative evaluation leaves waiting is
+    dropped, as for finding ii. And a module's instance: the kernel
+    makes one for each set of arguments, so a run after a speculative
+    evaluation of a module with the same arguments found the instance
+    already evaluated and evaluated nothing. Instances made ahead are
+    dropped when the evaluation ends. This held for `check` too, and is
+    fixed for both.
+  - *What is one function.* A function is closed anew wherever it is
+    named, and copied for each call of a function it is written in. The
+    list has it once, and called where any of those was: the kernel
+    keeps which function as written each came from.
+  - *What is not listed.* What is left of `then`, `also` and `first`
+    where the first part is not yet known: it was looked at ahead
+    already, and evaluating it again would count its claims twice.
+  - *The four findings.* i, ii and iii are fixed in PR #317. iv and
+    the count of two do not arise for a speculative evaluation: the
+    function it is handed is not gone over a second time. They remain
+    for `check` until it is retired.
+  - *Deliberate faults*: 10 made in each variant and 2 in the shared
+    part. 8 caught at first in each variant; the 2 missed showed
+    missing tests, a function listed once and a binding that was read,
+    which are added. Of the 2 in the shared part, one is caught now;
+    the other was a line that did nothing, and is removed.
 
 ## 8. Sessions
 

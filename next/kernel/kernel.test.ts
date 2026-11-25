@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
+import type { Untouched, Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { chosenVariant, createKernel } from "./create.js";
 import { InterfaceError, LimitFailure } from "./interface.js";
 import { Refusal } from "./interface.js";
@@ -3513,4 +3513,148 @@ test("a check opens a function nothing binds by name: one written as an entry, a
   assert.deepEqual(handed.claims.map((c) => c.refuted), [1]);
   // A run of either finds nothing: the claim is never reached.
   assert.deepEqual(k.evaluate(call(k.composedFunction([f], byte(k, 0)), falseClaim())).claims, []);
+});
+
+// ---- An evaluation ahead of what is done, and what it leaves untouched (2026-11-29) -------
+//
+// By the maintainer's ruling: a check is an ordinary evaluation with two things asked of it,
+// to perform nothing and to take both branches, and whoever asks chooses what else is gone
+// into, from a list of what the evaluation did not touch.
+
+/** The same program as the check's first test: lines 2 and 3 in f, 5 in g, 6 in a binding nothing reads, 8 and 9 under an unknown condition. */
+function untouchedProgram() {
+  const base = sayer();
+  const { k, isZero, call, kp, say } = base;
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const claimAt = (n: number, of: Value) => k.expression(kp("claim"), [of], line(n));
+  const [f, g, unread, x, y, n] = [k.symbol("t.f"), k.symbol("t.g"), k.symbol("t.unread"), k.param("x"), k.param("y"), k.param("n")];
+  const fFn = k.composedFunction([x], k.expression(kp("if"), [call(isZero, x), claimAt(2, call(isZero, byte(k, 1))), claimAt(3, call(isZero, x))]), line(1));
+  const gFn = k.composedFunction([y], claimAt(5, call(isZero, byte(k, 0))), line(4));
+  // then(say(9), also(g(0), if isZero(n) then claim(isZero(0)) else claim(isZero(n))))
+  const program = within(k, [[f, fFn], [g, gFn], [unread, claimAt(6, call(isZero, byte(k, 0)))]], call(kp("then"), call(say, byte(k, 9)), call(kp("also"), call(g, byte(k, 0)), k.expression(kp("if"), [call(isZero, n), claimAt(8, call(isZero, byte(k, 0))), claimAt(9, call(isZero, n))]))));
+  return { ...base, program };
+}
+
+test("a speculative evaluation performs nothing and takes both branches, and goes into nothing a run would not reach", () => {
+  const { k, said, program } = untouchedProgram();
+  const r = k.evaluate(program, { steps: 10_000, speculative: true });
+  assert.equal(r.ended, "complete");
+  assert.equal(r.refuted, false);
+  assert.deepEqual(said, [], "nothing is performed");
+  // The claim in g, which is called, and both branches of the condition on n. Not f, which nothing calls, nor the binding nothing reads.
+  assert.deepEqual(recordsOf(r), ["5: 1 0 0", "8: 1 0 0", "9: 0 0 1"]);
+  assert.equal(k.kind(r.value), "expression", "what is left is given");
+});
+
+test("it lists what it did not go into: each function, called or not, and a binding nothing read, each with its place", () => {
+  const { k, program } = untouchedProgram();
+  const r = k.evaluate(program, { steps: 10_000, speculative: true });
+  const shown = (r.untouched ?? []).map((u) => `${u.kind}${u.kind === "function" ? ` of ${u.parameters}${u.called ? ", called" : ""}` : ""} at ${u.at?.start.line ?? "?"}`).sort();
+  assert.deepEqual(shown, ["binding at 6", "function of 1 at 1", "function of 1, called at 4"]);
+  // An ordinary evaluation lists nothing.
+  assert.equal(k.evaluate(byte(k, 1)).untouched, undefined);
+});
+
+test("whoever asked evaluates what it chooses of the list: a binding nothing read, and a function for every argument", () => {
+  const { k, call, said, program } = untouchedProgram();
+  const r = k.evaluate(program, { steps: 10_000, speculative: true });
+  const of = (kind: string, line: number) => (r.untouched ?? []).find((u) => u.kind === kind && u.at?.start.line === line)!;
+  // The binding nothing read: its claim is decided.
+  const binding = k.evaluate(of("binding", 6).value, { steps: 10_000, speculative: true });
+  assert.deepEqual(recordsOf(binding), ["6: 1 0 0"]);
+  // f for every argument: an unfilled cell for its one parameter. One branch is refuted whatever x is; the other waits on x.
+  const f = of("function", 1);
+  assert.ok(f.kind === "function" && !f.called && f.parameters === 1);
+  const general = k.evaluate(call(f.value, k.cell()), { steps: 10_000, speculative: true });
+  assert.deepEqual(recordsOf(general), ["2: 0 1 0", "3: 0 0 1"]);
+  assert.equal(general.refuted, false, "a branch is refuted, and the function is not");
+  // g for every argument, though a call decided its claim already: the same claim, decided again, in a record of its own evaluation.
+  const g = of("function", 4);
+  assert.ok(g.kind === "function" && g.called);
+  assert.deepEqual(recordsOf(k.evaluate(call(g.value, k.cell()), { steps: 10_000, speculative: true })), ["5: 1 0 0"]);
+  assert.deepEqual(said, [], "nothing was performed by any of them");
+});
+
+test("an argument a function did not need and an entry nothing read are listed, and a function written as one of them", () => {
+  const { k, isZero, call, kp } = setup();
+  const [x, ignores] = [k.param("x"), k.param("ignored")];
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const falseClaim = (n: number) => k.expression(kp("claim"), [call(isZero, byte(k, 1))], line(n));
+  // (ignored => 0)(claim at line 1): the argument is never needed.
+  const argument = k.evaluate(call(k.composedFunction([ignores], byte(k, 0)), falseClaim(1)), { steps: 1_000, speculative: true });
+  assert.deepEqual(argument.claims, []);
+  const left = (argument.untouched ?? []).filter((u) => u.kind === "argument");
+  assert.equal(left.length, 1);
+  assert.deepEqual(recordsOf(k.evaluate(left[0].value, { steps: 1_000, speculative: true })), ["1: 0 1 0"]);
+  // [claim at line 2, x => claim at line 3]: the entries are never read, and the function is never called.
+  const entries = k.evaluate(k.structure([[null, falseClaim(2)], [null, k.composedFunction([x], falseClaim(3), line(3))]]), { steps: 1_000, speculative: true });
+  assert.deepEqual(entries.claims, []);
+  const kinds = (entries.untouched ?? []).map((u) => `${u.kind}${u.kind === "function" && u.called ? ", called" : ""}`).sort();
+  assert.deepEqual(kinds, ["entry", "function"]);
+});
+
+test("nothing of a speculative evaluation stays in the kernel: no claim waits after it, and a module it instantiated is instantiated again by a run", () => {
+  const { k, add, call, kp } = setup();
+  const x = k.param("x");
+  const f = k.composedFunction([x], call(kp("claim"), x));
+  const ahead = k.evaluate(call(f, k.cell()), { steps: 1_000, speculative: true });
+  assert.deepEqual(ahead.claims.map((c) => [c.decided, c.waiting]), [[0, 1]], "the evaluation itself says the claim waits");
+  assert.deepEqual(k.waiting(), []);
+  assert.deepEqual(k.evaluate(call(f, k.bits(Uint8Array.of(1), 1))).claims.map((c) => [c.decided, c.waiting]), [[1, 0]]);
+  // A module of no parameters: an instance is made once for each set of arguments, so a run would
+  // find the one a speculative evaluation made, already evaluated, and evaluate nothing.
+  const m = k.module(k.composedFunction([], call(kp("then"), call(kp("claim"), k.bits(Uint8Array.of(1), 1)), call(add, byte(k, 1), byte(k, 1)))), 0);
+  assert.equal(k.evaluate(call(m), { steps: 1_000, speculative: true }).claims.length, 1);
+  assert.equal(k.evaluate(call(m)).claims.length, 1, "the run makes its own instance and its claim is counted");
+  // The same holds after a check.
+  const m2 = k.module(k.composedFunction([], call(kp("then"), call(kp("claim"), k.bits(Uint8Array.of(1), 1)), call(add, byte(k, 2), byte(k, 1)))), 0);
+  k.check(call(m2), { steps: 1_000 });
+  assert.equal(k.evaluate(call(m2)).claims.length, 1);
+});
+
+test("a module's function is a function called, and a speculative evaluation has a budget", () => {
+  const { k, dec, isZero, call, kp } = setup();
+  const m = k.module(k.composedFunction([], byte(k, 3)), 0);
+  const r = k.evaluate(call(m), { steps: 1_000, speculative: true });
+  assert.deepEqual((r.untouched ?? []).map((u) => [u.kind, u.kind === "function" && u.called]), [["function", true]]);
+  // A function that calls itself for ever is opened as a run would open it, until the steps are spent.
+  const [loop, n] = [k.symbol("t.loop"), k.param("n")];
+  const forever = within(k, [[loop, k.composedFunction([n], k.expression(kp("if"), [call(isZero, byte(k, 1)), n, call(loop, call(dec, n))]))]], call(loop, byte(k, 0)));
+  assert.equal(k.evaluate(forever, { steps: 500, speculative: true }).ended, "limit");
+});
+
+test("a check is a speculative evaluation and then all it left untouched: the two find the same claims", () => {
+  const { k, call, program } = untouchedProgram();
+  const checked = recordsOf(k.check(program, { steps: 10_000 })).map((r) => r.split(":")[0]);
+  // By hand: the evaluation, then every binding, argument and entry, and every function with unfilled cells, until nothing is left.
+  const lines = new Set<string>();
+  const todo: Value[] = [program];
+  const gone = new Set<Value>();
+  while (todo.length > 0) {
+    const r = k.evaluate(todo.pop()!, { steps: 10_000, speculative: true });
+    recordsOf(r).forEach((x) => lines.add(x.split(":")[0]));
+    for (const u of r.untouched ?? []) {
+      if (gone.has(u.value)) continue;
+      gone.add(u.value);
+      todo.push(u.kind === "function" ? call(u.value, ...Array.from({ length: u.parameters }, () => k.cell())) : u.value);
+    }
+  }
+  assert.deepEqual([...lines].sort(), [...new Set(checked)].sort());
+  assert.deepEqual([...lines].sort(), ["2", "3", "5", "6", "8", "9"]);
+});
+
+test("the list has a function once, however often it was closed or copied, and no binding that was read", () => {
+  const { k, add, isZero, call, kp } = setup();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  const [g, read, unread, inner, y, x, z] = [k.symbol("t.g"), k.symbol("t.read"), k.symbol("t.unread"), k.symbol("t.inner"), k.param("y"), k.param("x"), k.param("z")];
+  const shown = (r: { untouched?: readonly Untouched[] }) => (r.untouched ?? []).map((u) => `${u.kind}${u.kind === "function" && u.called ? ", called" : ""} at ${u.at?.start.line ?? "?"}`).sort();
+  // g is bound in the outer block and called twice from an inner one, where it is closed anew.
+  const gFn = k.composedFunction([y], call(add, y, byte(k, 1)), line(1));
+  const twice = within(k, [[g, gFn], [read, k.expression(add, [byte(k, 1), byte(k, 2)], line(2))], [unread, k.expression(add, [byte(k, 3), byte(k, 4)], line(3))]],
+    within(k, [[inner, byte(k, 0)]], call(add, call(g, read), call(g, byte(k, 5)))));
+  assert.deepEqual(shown(k.evaluate(twice, { steps: 1_000, speculative: true })), ["binding at 3", "function, called at 1"]);
+  // A function written inside another's body, which reads the outer one's parameter, is copied for each call of the outer one: it is one function.
+  const outer = k.composedFunction([x], call(k.composedFunction([z], k.expression(kp("claim"), [call(isZero, call(add, z, x))]), line(5)), x), line(4));
+  const copied = k.evaluate(within(k, [[g, outer]], call(kp("also"), call(g, byte(k, 0)), call(g, byte(k, 0)))), { steps: 1_000, speculative: true });
+  assert.deepEqual(shown(copied), ["function, called at 4", "function, called at 5"]);
 });

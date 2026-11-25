@@ -592,7 +592,14 @@ export const createCore = () => {
   };
 
   /** A copy keeps the mark of what it was copied from: a part is its writer's wherever it goes. */
+  /**
+   * The function as written that a function was made from, by copying or by closing: two
+   * that come from one are the same function to whoever asks which functions were called.
+   */
+  const writtenFrom = new WeakMap<Fn, Fn>();
+  const writtenOf = (f: Fn): Fn => writtenFrom.get(f) ?? f;
   const keep = (from: V, to: V): V => {
+    if (to !== from && from instanceof Fn && to instanceof Fn) writtenFrom.set(to, writtenOf(from));
     if (to !== from && (to instanceof Expr || to instanceof Struct || to instanceof Fn) && to.owner === undefined && (from instanceof Expr || from instanceof Struct || from instanceof Fn))
       to.owner = from.owner;
     // And the place it was written at: what a copy or an evaluation leaves of a part is still that part.
@@ -1231,7 +1238,7 @@ export const createCore = () => {
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
     numberOf, bitList, partOf, sameBits, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    restored, thenGroups, localKey, keep, writtenOf, asBody, tell, observed, aheadIs, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites,
     shared,

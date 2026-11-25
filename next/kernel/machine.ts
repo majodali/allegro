@@ -59,7 +59,7 @@
 // and gives a function whose body is what is left. `sample` evaluates a
 // claim on the cases it is given, and records it as sampled.
 
-import type { Advance, Cell, CreateKernel, Kernel, Limits, Place, PrimitiveContext, Rest, Result, Value } from "./interface.js";
+import type { Advance, Cell, CreateKernel, Kernel, Limits, Place, PrimitiveContext, Rest, Result, Untouched, Value } from "./interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault, LimitFailure, Refusal } from "./interface.js";
 import { createCore } from "./core.js";
 import { Bits, CellV, Decided, Expr, Fn, INSPECT, KernelPrim, Key, Lazy, LimitReached, NameRef, Param, Prim, Quoted, Refuted, ScopeV, Struct, Sym } from "./values.js";
@@ -193,7 +193,7 @@ export const createMachine: CreateKernel = () => {
     asData, blockNames, freeNames, utf8, intern, kindOf, wrong, bitsOf, symbolName, entriesOf, hex,
     contentOf, enclosing, markAll, identityOf, declarationsFor, closedFor, claimKey, text, number,
     numberOf, bitList, partOf, sameBits, whole, packed, count64, countOf, textOf, data, failure, list, build, closed,
-    restored, thenGroups, localKey, keep, tallies, waitingAt, waitingClaims, counted, tallyOf,
+    restored, thenGroups, localKey, keep, writtenOf, tallies, waitingAt, waitingClaims, counted, tallyOf,
     tallied, claimRecords, supply, tie, close, substitute, heldByClaim, oneStep, sameInformation,
     truthOf, describe, closedTo, boundValue, describeWhole, withdrawnModules, withdrawnSites, asBody, tell, observed, aheadIs,
     shared,
@@ -255,7 +255,7 @@ export const createMachine: CreateKernel = () => {
    * to be evaluated before the check is over, the functions it met, each to have its body
    * evaluated, and the refutations found in parts that do not refute the whole.
    */
-  interface Reaching { readonly lazies: Lazy[]; readonly fns: Fn[]; readonly opened: Set<Fn>; readonly found: { reason: string; at?: Place }[]; readonly noted: Set<Refuted>; draining: boolean }
+  interface Reaching { readonly lazies: Lazy[]; readonly why: Map<Lazy, Untouched["kind"]>; readonly instances: { fn: Fn; instance: { args: readonly V[]; value: Lazy } }[]; readonly fns: Fn[]; readonly opened: Set<Fn>; readonly found: { reason: string; at?: Place }[]; readonly noted: Set<Refuted>; draining: boolean }
   let reaching: Reaching | undefined;
   /** A part came out refuted that the whole is not refuted by. A refuted claim is in the claims' records already. */
   const found = (r: V, part: V): void => {
@@ -1131,7 +1131,7 @@ export const createMachine: CreateKernel = () => {
       // A structure does not need its entries. Each is kept as written, tied to this scope,
       // and is evaluated when something reads it, at most once.
       if (settled.has(v) || built.has(v)) return v;
-      const r = new Struct(v.entries.map(([k, e]) => [k, later(e, scope)] as const));
+      const r = new Struct(v.entries.map(([k, e]) => [k, later(e, scope, "entry")] as const));
       built.add(r);
       return r;
     }
@@ -1220,9 +1220,16 @@ export const createMachine: CreateKernel = () => {
           if (!(name instanceof Sym)) return new Refuted("each binding of a block is keyed by a symbol", undefined);
           if (inner.bindings.has(name)) return new Refuted(`the name ${name.fqn} is bound twice in one block`, undefined);
           const bound = e instanceof Fn || !(e instanceof Expr || e instanceof Sym || e instanceof Struct) ? e : new Lazy(e, inner);
-          if (bound instanceof Lazy) reaching?.lazies.push(bound);
+          if (bound instanceof Lazy && reaching !== undefined) {
+            reaching.lazies.push(bound);
+            reaching.why.set(bound, "binding");
+          }
           // A function bound by a block is a function met, whether or not anything reads the name.
-          else if (bound instanceof Fn && reaching !== undefined) reaching.lazies.push(new Lazy(new NameRef(inner, name), inner));
+          else if (bound instanceof Fn && reaching !== undefined) {
+            const met = new Lazy(new NameRef(inner, name), inner);
+            reaching.lazies.push(met);
+            reaching.why.set(met, "function");
+          }
           inner.bindings.set(name, { value: bound, memo: undefined, rests: [] });
         }
         return evaluate(v.args[1], inner);
@@ -1240,7 +1247,7 @@ export const createMachine: CreateKernel = () => {
             const key = seen(k);
             const none = key instanceof Struct && key.entries.length === 0;
             if (!none && !(key instanceof Sym) && !(key instanceof Key)) return new Refuted("an entry's key is a symbol, a key, or the empty structure for none", k);
-            const value = later(v.args[2], scope);
+            const value = later(v.args[2], scope, "entry");
             const { items, length } = viewOf(s);
             const at = none ? -1 : placeOfKey(items, length, key);
             let made: Struct;
@@ -1363,7 +1370,11 @@ export const createMachine: CreateKernel = () => {
         if (instance === undefined) {
           instance = { args, value: new Lazy(substitute(fn.body, new Map(fn.params.map((p, i) => [p, args[i]] as const)), new Map()), scope) };
           instancesOf.set(fn, [...all, instance]);
+          // An instance made ahead of what is done is not one a run may find: it is dropped when that evaluation ends.
+          reaching?.instances.push({ fn, instance });
         }
+        // A module's function is a function called.
+        reaching?.opened.add(fn);
         return evaluate(instance.value, scope);
       }
       if (fn.params.length !== v.args.length)
@@ -1522,7 +1533,7 @@ export const createMachine: CreateKernel = () => {
       }
     }
     if (second instanceof Refuted) return second;
-    const left = new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+    const left = new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope, "kept")]);
     groupOf.set(left, group);
     return left;
   };
@@ -1585,7 +1596,7 @@ export const createMachine: CreateKernel = () => {
     }
     if (second instanceof Refuted) return second;
     if (!held && !ahead && known(second)) return second;
-    return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope)]);
+    return new Expr(fn, [first, second instanceof Lazy || !(second instanceof Expr || second instanceof NameRef) ? second : later(second, scope, "kept")]);
   };
   /**
    * A function's body evaluated with its parameters unknown, under a budget. Nothing is
@@ -1699,7 +1710,7 @@ export const createMachine: CreateKernel = () => {
     }
     // Neither will be known: what is left is an expression.
     ctl.holds = ctl.either = undefined;
-    return new Expr(fn, values.map((x) => (x instanceof Lazy || !(x instanceof Expr || x instanceof NameRef) ? x : later(x, scope))));
+    return new Expr(fn, values.map((x) => (x instanceof Lazy || !(x instanceof Expr || x instanceof NameRef) ? x : later(x, scope, "kept"))));
   };
   const attemptGen = function* (v: Expr, fn: KernelPrim, steps: V, allowed: number, scope: ScopeV): Gen {
     let r: V;
@@ -1910,15 +1921,25 @@ export const createMachine: CreateKernel = () => {
     return refutation;
   };
 
-  const later = (a: V, scope: ScopeV): V => {
+  // `why` says what the part is, for the list of what a speculative evaluation left untouched.
+  // "kept" is a part of what is left of `then`, `also` or `first`: it was looked at ahead
+  // already, and is not listed.
+  const later = (a: V, scope: ScopeV, why: "argument" | "entry" | "kept" = "argument"): V => {
     const tied = tie(a, scope, new Map());
     if (!(tied instanceof Expr || tied instanceof NameRef || (tied instanceof Struct && !settled.has(tied) && !built.has(tied)))) {
       // A function written as an argument or an entry is a function met, though nothing may call it or read it.
-      if (tied instanceof Fn) reaching?.lazies.push(new Lazy(tied, scope));
+      if (tied instanceof Fn && reaching !== undefined) {
+        const met = new Lazy(tied, scope);
+        reaching.lazies.push(met);
+        reaching.why.set(met, "function");
+      }
       return tied;
     }
     const made = new Lazy(tied, scope);
-    reaching?.lazies.push(made);
+    if (reaching !== undefined) {
+      reaching.lazies.push(made);
+      if (why !== "kept") reaching.why.set(made, why);
+    }
     return made;
   };
 
@@ -1951,6 +1972,103 @@ export const createMachine: CreateKernel = () => {
     return found;
   };
 
+  /**
+   * What a speculative evaluation met and did not go into. A function a block binds, or one
+   * written where a value is handed on, is closed here so that it can be called; its body
+   * is not evaluated.
+   */
+  const leftBy = (reach: Reaching): Untouched[] => {
+    for (const l of [...reach.lazies]) if (reach.why.get(l) === "function" && !l.done && !l.busy) found(run(evaluate(l, l.scope)), l.value);
+    const list: Untouched[] = [];
+    // A function is one function however often it was closed or copied: it is listed once, and
+    // it was called where any of those was.
+    const called = new Set<Fn>([...reach.opened].map(writtenOf));
+    const listed = new Set<Fn>();
+    for (const f of reach.fns) {
+      const written = writtenOf(f);
+      if (listed.has(written)) continue;
+      listed.add(written);
+      list.push({ kind: "function", value: out(f), parameters: f.params.length, called: called.has(written), ...(f.at === undefined ? {} : { at: f.at }) });
+    }
+    for (const l of reach.lazies) {
+      const why = reach.why.get(l);
+      if (why === undefined || why === "function" || l.done || l.busy) continue;
+      const written = l.value;
+      const at = written instanceof Expr || written instanceof Struct ? written.at : undefined;
+      list.push({ kind: why, value: out(l), ...(at === undefined ? {} : { at }) });
+    }
+    return list;
+  };
+  /**
+   * An evaluation ahead of what is done: nothing performed, both branches of what cannot be
+   * decided. With `drain`, what it left untouched is evaluated too, and every function met
+   * gone over with its parameters unknown: that is `check`. Without, what it left untouched
+   * is listed, for whoever asked to choose from.
+   */
+  const speculated = (expression: Value, limits: Limits | undefined, drain: boolean): Result => {
+      const e = into(expression, "the expression");
+      tallies.clear();
+      cut = false;
+      const reach: Reaching = { lazies: [], why: new Map(), instances: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>(), draining: false };
+      reaching = reach;
+      let untouched: Untouched[] | undefined;
+      unsure = 0;
+      // A check performs nothing and what it evaluated is dropped when it ends, so a claim it
+      // left waiting waits for nothing afterwards: the count of waiting claims is put back.
+      const waitingBefore = new Map(waitingAt);
+      const [wasAhead, wasSpeculative] = [ahead, speculative];
+      ahead = true;
+      speculative = true;
+      collectors = [];
+      groups = [];
+      account = { left: limits?.steps ?? Infinity, dead: false, handle: undefined };
+      pauseAt = Infinity;
+      try {
+        const r = within(limits, (): V => {
+          const scope = new ScopeV(undefined);
+          const value = run(evaluate(e, scope));
+          // What the evaluation left untouched is evaluated too, and the body of every
+          // function it met, each with its parameters unknown. What that leaves untouched
+          // in turn is gone over as well, until nothing is left.
+          if (!drain) {
+            untouched = leftBy(reach);
+            return value;
+          }
+          reach.draining = true;
+          const reached = new Set<Fn>();
+          while (reach.lazies.length > 0 || reach.fns.length > 0) {
+            const l = reach.lazies.pop();
+            if (l !== undefined) {
+              if (!l.done && !l.busy) found(run(evaluate(l, l.scope)), l.value);
+              continue;
+            }
+            const f = reach.fns.pop() as Fn;
+            // Every function is specialized, one a call has opened with known values too.
+            if (reached.has(f)) continue;
+            reached.add(f);
+            reach.opened.add(f);
+            const params = f.params.map((p) => new Param(p.name));
+            opening.push(f);
+            try {
+              found(run(evaluate(substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map()), scope)), f);
+            } finally {
+              opening.pop();
+            }
+          }
+          return value;
+        });
+        const value = r.value ?? e;
+        return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), refutations: reach.found, ...(untouched === undefined ? {} : { untouched }), ...(cut ? { cutShort: true as const } : {}) };
+      } finally {
+        ahead = wasAhead;
+        speculative = wasSpeculative;
+        reaching = undefined;
+        unsure = 0;
+        waitingAt.clear();
+        for (const [site, n] of waitingBefore) waitingAt.set(site, n);
+        for (const { fn, instance } of reach.instances) instancesOf.set(fn, (instancesOf.get(fn) ?? []).filter((x) => x !== instance));
+      }
+      };
   const kernel: Kernel = {
     interfaceVersion: INTERFACE_VERSION,
     variant: VARIANT,
@@ -1983,6 +2101,7 @@ export const createMachine: CreateKernel = () => {
     },
 
     evaluate: (expression, limits): Result => {
+      if (limits?.speculative === true) return speculated(expression, limits, false);
       const e = into(expression, "the expression");
       const s = new ScopeV(undefined);
       tallies.clear();
@@ -2070,64 +2189,7 @@ export const createMachine: CreateKernel = () => {
         ...(limited.length > 0 ? { limited } : {}),
       };
     },
-    check: (expression, limits): Result => {
-      const e = into(expression, "the expression");
-      tallies.clear();
-      cut = false;
-      const reach: Reaching = { lazies: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>(), draining: false };
-      reaching = reach;
-      unsure = 0;
-      // A check performs nothing and what it evaluated is dropped when it ends, so a claim it
-      // left waiting waits for nothing afterwards: the count of waiting claims is put back.
-      const waitingBefore = new Map(waitingAt);
-      const [wasAhead, wasSpeculative] = [ahead, speculative];
-      ahead = true;
-      speculative = true;
-      collectors = [];
-      groups = [];
-      account = { left: limits?.steps ?? Infinity, dead: false, handle: undefined };
-      pauseAt = Infinity;
-      try {
-        const r = within(limits, (): V => {
-          const scope = new ScopeV(undefined);
-          const value = run(evaluate(e, scope));
-          // What the evaluation left untouched is evaluated too, and the body of every
-          // function it met, each with its parameters unknown. What that leaves untouched
-          // in turn is gone over as well, until nothing is left.
-          reach.draining = true;
-          const reached = new Set<Fn>();
-          while (reach.lazies.length > 0 || reach.fns.length > 0) {
-            const l = reach.lazies.pop();
-            if (l !== undefined) {
-              if (!l.done && !l.busy) found(run(evaluate(l, l.scope)), l.value);
-              continue;
-            }
-            const f = reach.fns.pop() as Fn;
-            // Every function is specialized, one a call has opened with known values too.
-            if (reached.has(f)) continue;
-            reached.add(f);
-            reach.opened.add(f);
-            const params = f.params.map((p) => new Param(p.name));
-            opening.push(f);
-            try {
-              found(run(evaluate(substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map()), scope)), f);
-            } finally {
-              opening.pop();
-            }
-          }
-          return value;
-        });
-        const value = r.value ?? e;
-        return { value: out(value), ended: r.ended, steps: r.steps, refuted: value instanceof Refuted, claims: claimRecords(), refutations: reach.found, ...(cut ? { cutShort: true as const } : {}) };
-      } finally {
-        ahead = wasAhead;
-        speculative = wasSpeculative;
-        reaching = undefined;
-        unsure = 0;
-        waitingAt.clear();
-        for (const [site, n] of waitingBefore) waitingAt.set(site, n);
-      }
-    },
+    check: (expression, limits): Result => speculated(expression, limits, true),
     current: (value) => {
       const v = into(value, "the value");
       if (v instanceof Lazy && taskOf.has(v)) return value;

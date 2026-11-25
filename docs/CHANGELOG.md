@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-29 — A check is an ordinary evaluation, asked two things.**
+  `Kernel.evaluate` takes `speculative`: nothing is performed, and both
+  branches of what cannot be decided are evaluated. Its result lists
+  what it did not go into, `untouched`: each function met, called or
+  not, a binding nothing read, an argument nothing needed, an entry
+  nothing read, each with its place. Whoever asked evaluates what it
+  chooses of them. Nothing of such an evaluation stays in the kernel.
+  `Kernel.check` is that evaluation followed by all it left untouched,
+  and is to be retired when the launcher has moved. "Check reaches every
+  claim" is reworded: every claim a run could reach, and what is not
+  reached is told.
 - **2026-11-28 — Three faults of the kernel's check, found by the
   acceptance stream, fixed on both variants.** A check opens a call a
   run would make, a function that calls itself among them, so a claim
