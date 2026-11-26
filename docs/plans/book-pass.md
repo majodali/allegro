@@ -2355,9 +2355,8 @@ its approval.
     structure. Such an entry is written with no key, as a structure of
     the form `keyed` with a `key` and a `value`; `build` reads it and `describe`
     writes it, where `describe` threw for a parameter. Built ahead of
-    its ruling, which the PR asks for: the comparison could not pass
-    without it. The inventory's entry "A description is plain data in a
-    fixed set of forms" still says thirteen forms until it is ruled.
+    its ruling, which the PR asked for: the comparison could not pass
+    without it.
   - *A fault found in the kernel.* `describe` quoted a symbol that keys
     an entry, so a structure with a named entry, described and built
     again, was another structure and its module had another identity.
@@ -2382,6 +2381,18 @@ its approval.
     everything. 1,089 tests pass on the machine kernel; the reference
     kernel, run since a file of the kernel changed, passes 999 and
     leaves out 89 that run an Allegretto module.
+- **2026-11-30 — rulings on PR #322 (chunk E7, second part)** (the
+  review session). All four asks confirmed.
+  - The form `keyed` is a form of description. The inventory's entry
+    "A description is plain data in a fixed set of forms" is reworded:
+    fourteen forms, and a symbol that keys an entry is written as it
+    is.
+  - Until the loader of E9 the meaning rules are handed the shipped
+    primitives' names and hashes, each imported module's declarations
+    and identity, and the tree of Allegretto's own functions.
+  - `and`, `or` and a number in binary keep the engine's refusal, which
+    says where the reading stopped; `use` is refused by the rules until
+    E8.
 
 ## 8. Sessions
 
