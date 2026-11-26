@@ -574,6 +574,11 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-11-30 — The form `keyed` is ratified.** Ruled on PR #322: a
+  description writes a structure's entry keyed by a module's key as the
+  form `keyed`, with no key. The inventory's entry "A description is
+  plain data in a fixed set of forms" says so, with fourteen forms.
+  Records only.
 - **2026-11-29 — What a tree of Allegretto means, written in Allegretto
   (chunk E7 of the book pass, second part).** `next/ext/lib/meaning.alg`
   takes the tree the engine reads and gives the description of the
