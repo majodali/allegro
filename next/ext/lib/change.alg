@@ -203,6 +203,8 @@ breach(g, change, named, tested_names, i, out) =>
   else breach(g, change, named, tested_names, i + 1, weighed(g, change, named, tested_names, change[i], out))
 weighed(g, change, named, tested_names, o, out) =>
   if o.op == `reserve then barred_words(g, o.name, o.form, named.words, 0, out)
+  // No naming allows this one: the right to change the grammar is not a notation's.
+  else if (o.op == `add || o.op == `append || o.op == `replace) && changes_grammar(o.form) then put(out, [], "the notation brings lines that change the grammar, in the rule " ++ spelling(o.name) ++ ": that right is the grammar's a reading began with")
   else if has(named.rules, o.name, 0) then out
   else if (o.op == `replace || o.op == `remove || o.op == `wrap) && how_many(change, `add, o.name, 0, 0) == 0 then put(out, [], "the notation changes the rule " ++ spelling(o.name) ++ ", which it did not add and the text does not name")
   else if (o.op == `append || o.op == `level || o.op == `signs) && has(tested_names, o.name, 0) then put(out, [], "the notation adds to the rule " ++ spelling(o.name) ++ ", which a rule in force tests cannot be read")
@@ -215,14 +217,23 @@ barred_words(g, set, words, named_words, i, out) =>
   else barred_words(g, set, words, named_words, i + 1, put(out, [], "the notation reserves the word " ++ words[i] ++ ", which the text does not name"))
 keeps_out(rules, set, i) => i < count(rules) && (form_keeps_out(get(rules, i), set) || keeps_out(rules, set, i + 1))
 form_keeps_out(f, set) =>
-  if f.op == `term then kind(f.unless) == `symbol && f.unless == set
+  if f.op == `turns then form_keeps_out(grammar.spelled(f), set)
+  else if f.op == `term then kind(f.unless) == `symbol && f.unless == set
   else if f.op == `ref then false
   else if f.op == `seq || f.op == `alt then any_keeps_out(f.items, set, 0)
   else form_keeps_out(f.item, set)
 any_keeps_out(items, set, i) => i < count(items) && (form_keeps_out(items[i], set) || any_keeps_out(items, set, i + 1))
+// True where a form holds lines read in turns with the grammar.
+changes_grammar(f) =>
+  if f.op == `turns then true
+  else if f.op == `term || f.op == `ref then false
+  else if f.op == `seq || f.op == `alt then any_changes(f.items, 0)
+  else changes_grammar(f.item)
+any_changes(items, i) => i < count(items) && (changes_grammar(items[i]) || any_changes(items, i + 1))
 // True where a form holds a terminal that reads or changes the state.
 touches(f) =>
-  if f.op == `term then f.stateful
+  if f.op == `turns then touches(grammar.spelled(f))
+  else if f.op == `term then f.stateful
   else if f.op == `ref then false
   else if f.op == `seq || f.op == `alt then any_touches(f.items, 0)
   else touches(f.item)
@@ -234,7 +245,8 @@ any_touches(items, i) => i < count(items) && (touches(items[i]) || any_touches(i
 tested(rules, i, out) => if i == count(rules) then out else tested(rules, i + 1, tested_in(rules, get(rules, i), false, out))
 // `under` is true inside such a guard: there every rule named is noted, and followed once.
 tested_in(rules, f, under, out) =>
-  if f.op == `term then out
+  if f.op == `turns then tested_in(rules, grammar.spelled(f), under, out)
+  else if f.op == `term then out
   else if f.op == `ref then (if under && !has(out, f.name, 0) && has_key(rules, f.name, 0) then tested_in(rules, get(rules, f.name), true, put(out, [], f.name)) else out)
   else if f.op == `seq || f.op == `alt then tested_items(rules, f.items, under, 0, out)
   else if f.op == `guard then tested_in(rules, f.item, under || !f.holds, out)

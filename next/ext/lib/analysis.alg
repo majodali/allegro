@@ -67,7 +67,8 @@ how_many(table, i, n) => if i == count(table) then n else how_many(table, i + 1,
 // ---- Which rules read the state or change it ----
 
 touches(g, table, space_reads) =>
-  if g.op == `term then g.stateful || (g.spaced && space_reads)
+  if g.op == `turns then touches(grammar.spelled(g), table, space_reads)
+  else if g.op == `term then g.stateful || (g.spaced && space_reads)
   else if g.op == `ref then get(table, g.name)
   else if g.op == `seq || g.op == `alt then any_touches(g.items, 0, table, space_reads)
   else touches(g.item, table, space_reads)
@@ -83,7 +84,8 @@ growing(x, i, out) =>
 
 // True where the form g can read no byte, by a table of the rules.
 export can_be_empty(g, table) =>
-  if g.op == `term then g.empty
+  if g.op == `turns then can_be_empty(g.item, table)
+  else if g.op == `term then g.empty
   else if g.op == `ref then get(table, g.name)
   else if g.op == `seq then all_empty(g.items, 0, table)
   else if g.op == `alt then any_empty(g.items, 0, table)
@@ -101,7 +103,8 @@ nothing_yet = {seen: set.empty, met: [], ranges: class.no_ranges, any: false}
 // What the form g can begin with, added to what is gathered in a. A
 // rule is followed once: what it begins with is already gathered.
 begins(a, g, x) =>
-  if g.op == `term then begins_term(a, g)
+  if g.op == `turns then begins(a, grammar.spelled(g), x)
+  else if g.op == `term then begins_term(a, g)
   else if g.op == `ref then begins_rule(a, g.name, get(x.numbers, g.name), x)
   else if g.op == `seq then begins_seq(a, g.items, 0, x)
   else if g.op == `alt then begins_each(a, g.items, 0, x)
@@ -129,7 +132,8 @@ remembered_rules(x, i, kept) =>
   if i == count(x.rules) then kept
   else remembered_rules(x, i + 1, remembered_in(get(x.rules, i), x, kept))
 remembered_in(g, x, kept) =>
-  if g.op == `term || g.op == `ref then kept
+  if g.op == `turns then remembered_in(grammar.spelled(g), x, kept)
+  else if g.op == `term || g.op == `ref then kept
   else if g.op == `seq then remembered_items(g.items, 0, x, kept)
   else if g.op == `alt then remembered_items(g.items, 0, x, shared(g.items, 0, x, set.empty, kept))
   else remembered_in(g.item, x, kept)
@@ -165,8 +169,11 @@ ready(g, x) =>
   else if g.op == `seq then {op: `seq, acts: kind(g.gives) == `function, gives: g.gives, items: ready_items(g.items, 0, x, [])}
   else if g.op == `alt then {op: `alt, acts: kind(g.gives) == `function, gives: g.gives, items: ready_choices(g.items, 0, x, [])}
   else if g.op == `guard then {op: `guard, acts: kind(g.gives) == `function, gives: g.gives, item: ready(g.item, x), holds: g.holds}
+  else if g.op == `turns then in_turns(g, begins(nothing_yet, grammar.seq([g.between, g.item]), x), x)
   else gated(g, begins(nothing_yet, g.item, x), x)
 gated(g, b, x) => {op: g.op, acts: kind(g.gives) == `function, gives: g.gives, item: ready(g.item, x), set: class.made(b.ranges), open: b.any || can_be_empty(g.item, x.empties)}
+// Lines read in turns: `more` is a line after the first, and `set` and `open` say how one begins.
+in_turns(g, b, x) => {op: `turns, acts: kind(g.gives) == `function, gives: g.gives, rule: g.rule, asks: g.asks, item: ready(g.item, x), more: ready(grammar.giving(grammar.seq([g.between, g.item]), (v, at) => v[1]), x), set: class.made(b.ranges), open: b.any || (can_be_empty(g.between, x.empties) && can_be_empty(g.item, x.empties))}
 is_among(names, name, i) => i < count(names) && (names[i] == name || is_among(names, name, i + 1))
 ready_items(items, i, x, out) =>
   if i == count(items) then out
@@ -206,7 +213,8 @@ listed(l, x, i) => i < count(l) && (l[i] == x || listed(l, x, i + 1))
 // Every name a form holds that is no rule, and every set that is none.
 unknown(g, i, out) => if i == count(g.rules) then out else unknown(g, i + 1, unknown_in(g, key(g.rules, i), get(g.rules, i), out))
 unknown_in(g, rule, f, out) =>
-  if f.op == `term then (if kind(f.unless) == `symbol && !has_rule(g.reserved, f.unless, 0) then put(out, [], "the rule " ++ spelling(rule) ++ " names the reserved set " ++ spelling(f.unless) ++ ", which the grammar has not") else out)
+  if f.op == `turns then unknown_in(g, rule, f.between, unknown_in(g, rule, f.item, out))
+  else if f.op == `term then (if kind(f.unless) == `symbol && !has_rule(g.reserved, f.unless, 0) then put(out, [], "the rule " ++ spelling(rule) ++ " names the reserved set " ++ spelling(f.unless) ++ ", which the grammar has not") else out)
   else if f.op == `ref then (if has_rule(g.rules, f.name, 0) then out else put(out, [], "the rule " ++ spelling(rule) ++ " names the rule " ++ spelling(f.name) ++ ", which the grammar has not"))
   else if f.op == `seq || f.op == `alt then unknown_items(g, rule, f.items, 0, out)
   else unknown_in(g, rule, f.item, out)
@@ -214,7 +222,8 @@ unknown_items(g, rule, items, i, out) => if i == count(items) then out else unkn
 reached(g, has_start, out) => if has_start then {faults: out, names: reach(g.rules, grammar.ref(g.start), [])} else {faults: put(out, [], "the grammar begins with the rule " ++ spelling(g.start) ++ ", which it has not"), names: []}
 // The names of the rules a form reaches, through whatever rules.
 reach(rules, f, out) =>
-  if f.op == `term then out
+  if f.op == `turns then reach(rules, grammar.spelled(f), out)
+  else if f.op == `term then out
   else if f.op == `ref then (if listed(out, f.name, 0) || !has_rule(rules, f.name, 0) then out else reach(rules, get(rules, f.name), put(out, [], f.name)))
   else if f.op == `seq || f.op == `alt then reach_items(rules, f.items, 0, out)
   else reach(rules, f.item, out)

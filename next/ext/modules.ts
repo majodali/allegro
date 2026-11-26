@@ -75,6 +75,9 @@ const text = (t: string): Plain => ({ bits: encoder.encode(t) });
 const record = (o: Record<string, Plain>): Plain => ({ entries: Object.entries(o).map(([key, v]) => [{ symbol: key }, v] as const) });
 const list = (xs: readonly Plain[]): Plain => ({ entries: xs.map((x) => [null, x] as const) });
 
+/** What a call into the Allegretto modules refused with. */
+class Refusal extends Error {}
+
 /** A kernel holding the engine, Allegretto's grammar and the meaning rules, with the calls into them. */
 function emitter(): { k: Kernel; call: (name: string, ...args: Value[]) => Value; shipped: Value; own: Value; steps: () => number } {
   const e = emitted(HOST, "next/ext/lib/host.alg");
@@ -93,6 +96,8 @@ function emitter(): { k: Kernel; call: (name: string, ...args: Value[]) => Value
   const call = (name: string, ...args: Value[]): Value => {
     const r = k.evaluate(k.expression(entry(name), args), { steps: 2_000_000_000 });
     steps += r.steps;
+    // A reading or a rule that refuses: told as the engine's refusal of the text.
+    if (r.refuted) throw new Refusal(k.reasonOf(r.value) ?? "refused");
     return r.value;
   };
   const shipped = plainValue(k, list(SHIPPED_NAMES.filter((n) => shippedByName.has(n)).map((n) => record({ name: text(n), hash: text(shippedByName.get(n)!.hash) }))));
@@ -160,7 +165,7 @@ export function comparedModules(files: readonly { file: string; text: string }[]
       ? { identity: driven.records[driven.records.length - 1].identity }
       : { refused: driven.findings.filter((f) => f.file === file).map((f) => f.message).sort() };
     let described: Value | undefined;
-    const engine = ((): Emitted => {
+    const emittedByEngine = (): Emitted => {
       const parsed = call("tree_of", k.bits(encoder.encode(source)), k.bits(encoder.encode(file)));
       const how = said(call("reading", parsed));
       if (how !== "read") return { refused: [how] };
@@ -202,6 +207,14 @@ export function comparedModules(files: readonly { file: string; text: string }[]
         return { identity: k.moduleOf(k.module(k.current(built.value), keys, declares)) ?? "no identity" };
       } catch (x) {
         return { refused: [`the kernel makes no module of it: ${x instanceof Error ? x.message : String(x)}`] };
+      }
+    };
+    const engine = ((): Emitted => {
+      try {
+        return emittedByEngine();
+      } catch (x) {
+        if (x instanceof Refusal) return { refused: [x.message] };
+        throw x;
       }
     })();
     const both = "refused" in bootstrap && "refused" in engine;

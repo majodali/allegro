@@ -606,7 +606,7 @@ are:
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Second part done 2026-11-29: `next/ext/lib/meaning.alg` gives the description, the declarations and the count of keys, and for all 172 texts the bootstrap emits the module is the bootstrap's by identity, with the same places (`next/ext/modules.ts`). Open: the speed target, missed with the whole grammar (§7); the imported modules and the shipped primitives are handed to the rules, until the loader of E9 |
-| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream |
+| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream. First part done 2026-12-01: `use m.a` read in turns with the grammar, in a block too; a notation's part reads its module whatever the text binds (`next/ext/use.test.ts`). Open: the named parts of the parser's state; the right to change the grammar as a capability of the launcher |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
 | E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
 | E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
@@ -2393,6 +2393,93 @@ its approval.
   - `and`, `or` and a number in binary keep the engine's refusal, which
     says where the reading stopped; `use` is refused by the rules until
     E8.
+- **2026-12-01 — rulings on the proposal for chunk E8** (the review
+  session). The proposal was put in the session and no PR; the
+  maintainer ruled each ask.
+  - *What a notation is.* Six mechanisms were weighed (the inventory's
+    entry "A grammar change reaches to the end of its block" lists
+    them). Ruled: `use` takes a value by its path, `use ratio.fractions`,
+    and brings no bindings; a module exports as many notations as it
+    likes. A declaration form in the module may be added later, and
+    with it the question whether `use` takes `with` and `without`
+    again.
+  - *`changing`.* `use m.a changing rule, rule` names the rules a
+    notation may do more to than add.
+  - *`use` in a block*, as the way to give a notation a scope.
+  - *The right to change the grammar* is held by the grammar a reading
+    begins with, for now; a capability of the launcher may take its
+    place later.
+  - *How a notation's part reads its module.* The hidden second
+    binding. A finding where the text binds the module's name again
+    was proposed and not taken: a local binding may hide one from a
+    scope around it, here as everywhere. The using text need not
+    import the notation's module.
+  - *Until the loader of E9*, the reader is handed the texts by name.
+- **2026-12-01 — chunk E8, first part: a text that changes its
+  grammar** (the review session).
+  - *Lines read in turns.* `grammar.turns(rule, item, between, asks)`
+    is a repetition whose lines may ask for a change. The engine hands
+    what a line asks to whoever began the reading
+    (`engine.parses_with`), and reads the lines after it in the
+    prepared grammar it is given back. A result not yet tried further
+    carries the context its next line is read in, so the change ends
+    where the lines end and nothing outside them sees it. A text with
+    no such line pays one call for each line: Allegretto's whole
+    grammar reads 266 lines in 4,183,662 steps, under the test's
+    4,300,000.
+  - *The only reading so far.* A line that asks is claimed to be the
+    one reading of the line that ends where it ends. A reading that
+    ends elsewhere has read another text and goes on in the grammar as
+    it was. So a line that asks must end at one place: Allegretto's
+    `use` line guards each of its repetitions.
+  - *A change is made when its line is read*, also on the last line: a
+    `use` that is refused refuses the text wherever it stands.
+  - *The reader*, `next/ext/lib/reader.alg`. At `use m.a` it reads the
+    text of `m` with the engine (which may use notations in turn),
+    has the meaning rules write its function, builds it with the
+    kernel's `build`, and applies it with every capability and input
+    withheld. `m.a` of that is the notation. A module that uses
+    itself is refused. Two limits, both the loader's to lift: a module
+    with a key cannot be used, since only the kernel makes a key; and
+    the engine's own modules that a used text imports are handed over
+    as the reader holds them, not read again.
+  - *The meaning rules.* A node `from` reads the notation's module
+    through a binding named `use m`, which no text can write, in a
+    block around the module's own. The module is declared as an
+    import is. `meaning.needed(tree)` names what a text needs emitted
+    first.
+  - *The runner*, `next/ext/run.ts`: the acceptance stream's runner
+    reads with the bootstrap, which refuses `use`. This one stands in
+    for the loader: texts by name, each needed module emitted first.
+  - *Allegretto's grammar.* Its lines are the rule `lines`, its row of
+    signs the rule `operators`, and the rules a notation may name are
+    listed at the head of `allegretto.alg`.
+  - *A consequence the maintainer is asked about.* "A notation a text
+    uses can only add" forbids adding to a rule that a rule in force
+    tests cannot be read. In Allegretto the body of a binding is an
+    expression only where no block begins there, and a block reaches
+    every rule. So every notation that adds to a rule Allegretto has
+    needs that rule after `changing`.
+  - *The kernel's names.* The acceptance stream added `specialize` and
+    `sample` to the names a text may write, and the four text
+    primitives to those shipped. The meaning rules' list had to be
+    given the two by hand: two corpus texts differed until it was. The
+    list should be handed to the rules as the shipped primitives are.
+  - *Compared again*, since the grammar was regrouped: the two readers
+    give the same tree for 198 of 200 texts and both refuse 2; the two
+    emitters give the same module, by identity and places, for 190 and
+    both refuse 10.
+  - *Cost.* A text of three lines takes 43,811 steps; with a `use` of
+    a notation from a module of ten lines, 601,209.
+  - *Faults.* 28 deliberate faults in the engine, the analysis, the
+    changes, the meaning rules, the reader and the grammar, three at a
+    time on copies with a control. 23 failed a test at once; a test
+    was added for each of 4 more; the last showed a step in the engine
+    that did nothing, which is taken out. The harness had scored a run
+    that never ended as a pass; it now scores it as a failure.
+  - *Not in this part*: the named parts of the parser's state, ruled
+    for E8 on PR #314. Until then a notation brings no terminal that
+    reads or changes the state, as before.
 
 ## 8. Sessions
 

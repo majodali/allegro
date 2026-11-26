@@ -56,6 +56,27 @@ claim(!is_failure(g) && count(g.declares) == 2 && g.declares[1].role == "module"
 // The same import where this module holds no `output` is refused.
 claim(is_failure(meaning.module_of(tree("import lib\nlib.f()\n"), {shipped: [], modules: [lib], own: own})))
 
+// ---- What a notation's parts read ----
+// A part a notation made reads a binding of its module with a node `from`. The module is declared, though the text
+// imports nothing, and is bound a second time under a name no text can write.
+nowhere = {source: "", start: {index: 0, line: 1, column: 1}, end: {index: 0, line: 1, column: 1}}
+reads_f = {headers: [], items: [{header: false, k: `statement, expr: {k: `from, module: "m", name: "f", at: nowhere}, at: nowhere}], at: nowhere}
+supplied = {shipped: [], modules: [{name: "m", declares: [], identity: "sha256:11"}], own: own}
+w = meaning.module_of(reads_f, supplied)
+claim(count(meaning.needed(reads_f)) == 1 && meaning.needed(reads_f)[0] == "m")
+claim(!is_failure(w) && w.description.parameters == 1 && count(w.declares) == 1 && w.declares[0].role == "module" && w.declares[0].name == "m" && w.declares[0].identity == "sha256:11")
+// The block around the module's own binds the name: "use m".
+claim(w.description.body.form == `apply && spelling(key(w.description.body.arguments[0].entries, 0)) == "use m")
+// Not supplied, the module is a finding, as an import's is.
+claim(is_failure(meaning.module_of(reads_f, nothing)))
+// A text that imports the module too declares it once.
+imports_m = {headers: [{header: true, k: `import, name: {name: "m", at: nowhere}, pairs: [], without: [], at: nowhere}], items: reads_f.items, at: nowhere}
+both = meaning.module_of(imports_m, supplied)
+claim(!is_failure(both) && both.description.parameters == 1 && count(both.declares) == 1 && count(meaning.needed(imports_m)) == 1)
+// A line `use` is passed over: whoever read the text has made its change.
+uses = {headers: [{header: true, k: `use, name: {name: "m", at: nowhere}, path: [], changing: [], pairs: [], without: [], at: nowhere}], items: tree("1\n").items, at: nowhere}
+claim(!is_failure(meaning.module_of(uses, nothing)) && meaning.module_of(uses, nothing).description.parameters == 0 && count(meaning.needed(uses)) == 0)
+
 output.write("done")
 // expect: done
 // end: completed

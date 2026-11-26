@@ -17,6 +17,8 @@
 //   {op: `alt, gives, items}        any one of the items
 //   {op: `star, gives, item}        the item, zero times or more
 //   {op: `opt, gives, item}         the item, or nothing
+//   {op: `turns, gives, rule, item, between, asks}
+//                                   lines, between which the grammar may change
 //   {op: `guard, gives, item, holds} nothing, where the item can be read
 //                                   here (`holds` true) or cannot (false)
 //
@@ -93,6 +95,17 @@ export alt(items) => {op: `alt, gives: [], items: items}
 export star(item) => {op: `star, gives: [], item: item}
 export opt(item) => {op: `opt, gives: [], item: item}
 export guard(item, holds) => {op: `guard, gives: [], item: item, holds: holds}
+// Lines read in turns with the grammar: the item, then the item again
+// after `between`, as often as there is one. It gives what the item
+// gave each time, as a structure with no keys. `asks(value)` is [] or
+// [what is asked]: where a line asks, whoever began the reading is
+// handed what is asked and gives the grammar the lines after it are
+// read in (engine.alg). The change ends with the lines. `rule` is the
+// name of the rule this form is, by which it is found in that grammar.
+export turns(rule, item, between, asks) => {op: `turns, gives: [], rule: rule, item: item, between: between, asks: asks}
+// The form with its lines written as a sequence and a repetition: what
+// it reads, for whatever asks what a form can begin with, name or reach.
+export spelled(g) => if g.op == `turns then seq([g.item, star(seq([g.between, g.item]))]) else g
 
 // The form g, giving what the function f makes of what it gave before:
 // f(value, at), with `at` the place the form read. A form given a
@@ -104,6 +117,7 @@ given(g, f) =>
   else if g.op == `ref then {op: `ref, gives: f, name: g.name}
   else if g.op == `seq || g.op == `alt then {op: g.op, gives: f, items: g.items}
   else if g.op == `guard then {op: `guard, gives: f, item: g.item, holds: g.holds}
+  else if g.op == `turns then {op: `turns, gives: f, rule: g.rule, item: g.item, between: g.between, asks: g.asks}
   else {op: g.op, gives: f, item: g.item}
 
 // The byte of a text at a byte position, or -1 at its end.

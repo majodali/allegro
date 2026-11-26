@@ -574,6 +574,24 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-01 — A text changes the grammar it is read in (chunk E8 of
+  the book pass, first part).** `use m.a` brings a notation: a list of
+  changes a module exports, named by its path. The engine reads a
+  text's lines in turns with the grammar (`grammar.turns`): at a `use`
+  the reader (`next/ext/lib/reader.alg`) reads the used module's text,
+  builds it, takes the notation from an instance with no capability and
+  no input, and the lines after, to the end of the block, are read in
+  the grammar changed. A notation's part of the tree reads its module
+  through a binding no text can write, so the text may bind the
+  module's name and need not import it. A notation only adds, unless
+  the line names rules after `changing`; none changes the grammar
+  again. `next/ext/run.ts` reads with the engine and runs through the
+  kernel; 23 tests in `next/ext/use.test.ts`. The two readers give the
+  same tree for 198 of 200 texts and both refuse 2; the two emitters
+  give the same module for 190 and both refuse 10. 28 deliberate
+  faults: 23 failed a test at once, a test was added for each of 4
+  more, and one showed a step that did nothing, now taken out. Not in this part: the named parts of the parser's
+  state.
 - **2026-11-30 — The form `keyed` is ratified.** Ruled on PR #322: a
   description writes a structure's entry keyed by a module's key as the
   form `keyed`, with no key. The inventory's entry "A description is

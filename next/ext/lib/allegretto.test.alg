@@ -67,6 +67,22 @@ claim(count(lists.pairs) == 2 && lists.pairs[1].name.name == "b" && lists.pairs[
 // A tree as a text.
 claim(allegretto.shown(tree("x = 1 + 2\n")) == "(module () ((binding x@0-1:1:1 false (binary + (int 1 @4-5:1:5) (int 2 @8-9:1:9) @4-9:1:5) @0-9:1:1)))")
 
+// ---- A line `use` ----
+// It asks for a change of the grammar, so it is read with someone to take one: here one who changes nothing.
+unchanged = (held, asked) => {held: held, prepared: p}
+u = engine.parses_with(p, "use a.b.c changing x, y\nf() =>\n  use d.e\n  1\n", "", [], unchanged).readings.h
+// The path as names, and the rules named after `changing`.
+claim(count(u.headers) == 1 && u.headers[0].k == `use && count(u.headers[0].path) == 3 && u.headers[0].path[2].name == "c" && u.headers[0].name.name == "a")
+claim(count(u.headers[0].changing) == 2 && u.headers[0].changing[0].name == "x" && u.headers[0].changing[1].name == "y")
+// In a block it is a line of the block, in its place.
+claim(count(u.items[0].body.items) == 2 && u.items[0].body.items[0].k == `use && u.items[0].body.items[0].header && count(u.items[0].body.items[0].changing) == 0)
+// Read with no one to take a change, the text is refused.
+claim(attempt(tree("use a.b\n"), 1000000).reason == "a line asks for a change of the grammar, and whoever began the reading takes none")
+// The line ends at one place: a path or a list cut short is no reading of it.
+claim(is_failure(engine.parses_with(p, "use a. \n", "", [], unchanged)) && is_failure(engine.parses_with(p, "use a changing\n", "", [], unchanged)))
+// The lines of a module and of a block are one rule, and the operators are a rule a notation can add a level to.
+claim(allegretto.language.rules.lines.op == `turns && kind(allegretto.language.rules.operators) == `structure)
+
 output.write("allegretto: ok")
 // expect: allegretto: ok
 // end: completed

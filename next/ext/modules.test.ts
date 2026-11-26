@@ -132,12 +132,14 @@ test("a binding above `x <- e` that uses x is no finding: both emitters give the
 });
 
 // Texts the bootstrap's reader refuses in words of its own, for a form that is not Allegretto's. The engine reads no
-// such form, and says where its reading stopped; `use` it reads, and the meaning rules refuse it until a module's notation is read.
+// such form, and says where its reading stopped. `use` it reads as a line that asks for a change of the grammar,
+// and this comparison begins its readings with no one to take a change. (Until chunk E8 the meaning rules refused `use`
+// with words of their own, and this test held those words; `use` is tested where it is read, next/ext/use.test.ts.)
 const UNREAD: readonly (readonly [string, string, RegExp, RegExp])[] = [
   ["`and` for `&&`", "x = true and false\nx\n", /the keyword and is not a form of Allegretto/, /^no reading at 9$/],
   ["`or` for `||`", "x = true or false\nx\n", /the keyword or is not a form of Allegretto/, /^no reading at 9$/],
   ["a number in binary", "x = 0b101\nx\n", /the binary number 0b101 is not a form of Allegretto/, /^no reading at 5$/],
-  ["`use`", "use thing\n1\n", /use thing brings a module's notation/, /^use thing brings a module's notation, which is not read yet$/],
+  ["`use`", "use thing\n1\n", /use thing brings a module's notation/, /^a line asks for a change of the grammar, and whoever began the reading takes none$/],
 ];
 let unread: ComparedModule[] | undefined;
 UNREAD.forEach(([what, , theirs, mine], i) =>
