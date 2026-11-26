@@ -411,12 +411,13 @@ export const createCore = () => {
   /**
    * The entries of each form of description, in the order they are written. Every
    * description is a structure keyed by symbols: `form` first, then these, then `at`
-   * where the part has a place.
+   * where the part has a place. `keyed` is no part by itself: it writes one entry of a
+   * `structure` whose key is a key or a parameter, since a description's keys are symbols.
    */
   const FORMS: Record<string, readonly string[]> = {
     bits: ["value"], symbol: ["value"], name: ["name"], param: ["function", "index"], apply: ["function", "arguments"],
     function: ["parameters", "body"], structure: ["entries"], kernel: ["name"], primitive: ["hash"],
-    capability: ["capability", "part"], key: ["module", "slot"], opaque: ["mentions"], unknown: [],
+    capability: ["capability", "part"], key: ["module", "slot"], opaque: ["mentions"], unknown: [], keyed: ["key", "value"],
   };
   const keyed = (entries: ReadonlyArray<readonly [string, V]>): Struct => {
     const s = new Struct(entries.map(([k, e]) => [intern(k), e] as const));
@@ -545,6 +546,20 @@ export const createCore = () => {
         if (!(entries instanceof Struct)) return malformed();
         const built: (readonly [V | null, V])[] = [];
         for (const [k, e] of entries.entries) {
+          // An entry whose key is no symbol is written with no key, as {form: `keyed, key, value}:
+          // its key is what the description `key` builds, a key or a parameter that stands for one.
+          const written = seen(e);
+          const head = written instanceof Struct ? entryOf(written, "form") : undefined;
+          if (k === null && written instanceof Struct && head instanceof Quoted && head.inner instanceof Sym && head.inner.fqn === "keyed") {
+            const [keyPart, valuePart] = [entryOf(written, "key"), entryOf(written, "value")];
+            if (keyPart === undefined || valuePart === undefined) return malformed();
+            const [key, value] = [build(keyPart, binders), build(valuePart, binders)];
+            if (key instanceof Refuted) return key;
+            if (value instanceof Refuted) return value;
+            if (!(key instanceof Param || seen(key) instanceof Key)) return new Refuted("an entry's key in a description is a symbol, a key, or a parameter that stands for a key", keyPart);
+            built.push([key, value]);
+            continue;
+          }
           const r = build(e, binders);
           if (r instanceof Refuted) return r;
           built.push([k, r]);
@@ -934,7 +949,15 @@ export const createCore = () => {
     }
     if (v instanceof Expr) return placed(data("apply", describe(v.fn, binders, own), list(v.args.map((a) => describe(a, binders, own)))), v);
     if (v instanceof Struct) {
-      const entries = new Struct(v.entries.map(([k, e]) => [k === null ? null : seen(k) instanceof Key ? describe(seen(k), binders, own) : asData(k, "a structure's key"), describe(e, binders, own)] as const));
+      // An entry keyed by a key, or by a parameter that stands for one, is written with no key, as `keyed`: a description's own keys are symbols.
+      const entries = new Struct(
+        v.entries.map(([k, e]) => {
+          const key = k === null ? null : seen(k);
+          if (key instanceof Key || key instanceof Param) return [null, data("keyed", describe(key, binders, own), describe(e, binders, own))] as const;
+          // A symbol that keys an entry keys the description's entry as it is, so that the structure built from the description has the same key.
+          return [key === null || key instanceof Sym ? key : asData(k as V, "a structure's key"), describe(e, binders, own)] as const;
+        }),
+      );
       settled.add(entries);
       return placed(data("structure", entries), v);
     }

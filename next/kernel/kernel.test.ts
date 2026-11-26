@@ -3658,3 +3658,55 @@ test("the list has a function once, however often it was closed or copied, and n
   const copied = k.evaluate(within(k, [[g, outer]], call(kp("also"), call(g, byte(k, 0)), call(g, byte(k, 0)))), { steps: 1_000, speculative: true });
   assert.deepEqual(shown(copied), ["function, called at 4", "function, called at 5"]);
 });
+
+// Chunk E7 of the book pass, second part: the meaning rules written in Allegretto write a
+// module's function as a description, and a description's own keys are symbols.
+test("a description writes an entry keyed by a module's key as `keyed`, and the function built from it is the same module", () => {
+  const { k, call, kp } = setup();
+  const a = k.symbol("t.a");
+  // module(key) => [ {a: 1, <key>: 42},  o => get(o, key) ]
+  const [key, o] = [k.param("key"), k.param("o")];
+  const fn = k.composedFunction([key], k.structure([[null, k.structure([[a, byte(k, 1)], [key, byte(k, 42)]])], [null, k.composedFunction([o], call(kp("get"), o, key))]]));
+  const d = k.evaluate(call(kp("describe"), k.inspectionRight(), fn)).value;
+  // The private entry is written with no key: {form: `keyed, key: <the parameter>, value: 42}.
+  const holder = form(k, k.entriesOf(form(k, form(k, d).parts[1]).parts[0])[0][1]);
+  assert.equal(holder.form, "structure");
+  const [shown, hidden] = k.entriesOf(holder.parts[0]);
+  assert.equal(k.symbolName(shown[0]!), "t.a");
+  assert.equal(hidden[0], null);
+  const written = form(k, hidden[1]);
+  assert.equal(written.form, "keyed");
+  assert.equal(form(k, written.parts[0]).form, "param");
+  assert.equal(form(k, written.parts[1]).form, "bits");
+  // Built again it is the same function: as a module it has the identity of the one written by hand.
+  // (The entry `a` is keyed by its symbol in the description, as in the structure: until this chunk
+  // a description quoted the symbol, and the structure built from it had another identity.)
+  const built = k.evaluate(call(kp("build"), d, k.structure([])));
+  assert.equal(built.refuted, false);
+  assert.equal(k.moduleOf(k.module(built.value, 1)), k.moduleOf(k.module(fn, 1)));
+  // And its entry is private: not counted, and read by the function that holds the key.
+  const [obj, read] = k.entriesOf(k.evaluate(call(k.module(built.value, 1))).value).map(([, v]) => k.evaluate(v).value);
+  assert.equal(k.bitsOf(k.evaluate(call(kp("count"), obj)).value).bytes.reduce((n, b) => n * 256 + b, 0), 1, "the private entry is not counted");
+  assert.equal(num(k, k.evaluate(call(read, obj)).value), 42);
+});
+
+test("build refuses a `keyed` entry whose key is neither a key nor a parameter, and one with a part missing", () => {
+  const { k, call, kp } = setup();
+  const s = (name: string) => k.symbol(name);
+  const data = (formName: string, parts: Record<string, Value>) => k.structure([[s("form"), k.symbolData(formName)], ...Object.entries(parts).map(([n, v]) => [s(n), v] as const)]);
+  const bits = (n: number) => data("bits", { value: byte(k, n) });
+  // Only the description of a function is built: each structure is the body of a function of no parameter.
+  const none = k.entriesOf(k.evaluate(call(kp("describe"), k.inspectionRight(), k.composedFunction([], byte(k, 0)))).value)[1][1];
+  const body = (d: Value) => data("function", { parameters: none, body: d });
+  const holding = (entry: Value) => body(data("structure", { entries: k.structure([[null, entry]]) }));
+  // A key that is bits: a description cannot make an entry at a place of its choosing.
+  const byBits = k.evaluate(call(kp("build"), holding(data("keyed", { key: bits(1), value: bits(2) })), k.structure([])));
+  assert.equal(byBits.refuted, true);
+  assert.match(k.reasonOf(byBits.value) ?? "", /an entry's key in a description is a symbol, a key, or a parameter that stands for a key/);
+  // No value.
+  const half = k.evaluate(call(kp("build"), holding(data("keyed", { key: bits(1) })), k.structure([])));
+  assert.equal(half.refuted, true);
+  // `keyed` is read only where an entry has no key: under a symbol it is no description of a value.
+  const named = k.evaluate(call(kp("build"), body(data("structure", { entries: k.structure([[s("t.a"), data("keyed", { key: bits(1), value: bits(7) })]]) })), k.structure([])));
+  assert.match(k.reasonOf(named.value) ?? "", /not a description/);
+});
