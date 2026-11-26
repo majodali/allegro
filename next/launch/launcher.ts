@@ -6,10 +6,12 @@
 // result holds), part 1, adds the result: what the run found; part 2 adds
 // to it the source of each value of the configuration; part 3 makes a
 // launch apply a sequence of phases, each supplying capabilities and
-// inputs; part 5 makes the first phase a check where it is one, evaluated
-// by the kernel's `check`, and a run after it; part 6 adds the test phase:
-// the tests of a module, each called by its own evaluation, and their
-// outcomes in the launch's.
+// inputs; part 5 makes the first phase a check where it is one, and a run
+// after it; part 6 adds the test phase: the tests of a module, each called
+// by its own evaluation, and their outcomes in the launch's; part 7 makes
+// the check evaluations the launcher makes with `speculative`, and hands
+// the choice of what it goes into, and what it found, to the checks
+// (next/launch/checks.ts).
 //
 // What it realises, from docs/plans/book-pass-inventory.md:
 //   "Startup, step by step", as far as milestone 2 needs it
@@ -29,10 +31,11 @@
 //    built. After a check the phases are rerun, by the note of 2026-11-18:
 //    the run is a fresh evaluation of the module function in the same
 //    kernel
-//   "Check reaches every claim": a check hands the module function,
-//    applied to its capabilities and inputs, to the kernel's `check`, and
-//    sums the claims it reports, decided, refuted or waiting. A check
-//    leaves every input unknown (the maintainer, 2026-11-21)
+//   "Check reaches every claim": a check evaluates the module function,
+//    applied to its capabilities and inputs, with `speculative`, and then
+//    what the checks choose of what it left untouched, and sums the claims
+//    the kernel reports, decided, refuted or waiting, in two lists. A
+//    check leaves every input unknown (the maintainer, 2026-11-21)
 //   "A phase leaves a capability out as not yet given or as not needed":
 //    a check hands the capabilities it names as not needed and every
 //    other declared capability as not yet given
@@ -103,18 +106,40 @@
 //      of as many parameters as the part's primitive takes, whose body is
 //      the empty structure: a call on it performs nothing and answers the
 //      empty structure, and no part of the capability's implementation is
-//      called. It hands the application to the kernel's `check` once,
-//      under the configuration's budget, or the largest the kernel takes
+//      called. The check is evaluations the launcher makes, each by
+//      `evaluate` with `speculative`, and nothing is filled or advanced.
+//      The first is that application: the program as written. Then, for
+//      each thing an evaluation left untouched (`Result.untouched`) that
+//      has not been gone into before, by its handle, the launcher asks the
+//      checks whether to go into it (`Checks.into` of
+//      next/launch/checks.ts, handed in `Launch.checks`), giving it as
+//      plain data (`UntouchedData`). What is chosen is evaluated: a
+//      function by a call with an unfilled cell for each parameter,
+//      anything else by its value. What that leaves untouched is asked
+//      about in turn, until nothing chosen is left. The module's own
+//      function is never gone into again. With no checks handed, nothing
+//      is gone into after the first. Each evaluation has the
+//      configuration's budget to itself, or the largest the kernel takes
 //      (`Number.MAX_SAFE_INTEGER`) where none is set (the maintainer,
-//      2026-11-21). Nothing is filled and nothing is advanced. The check
-//      ends the launch `refuted` where the whole is refuted, a claim has a
-//      refuted evaluation, or the kernel lists a refutation; `limit` where
-//      its budget ran out and nothing was refuted. Otherwise the check is
-//      over, and the launch goes on to step 5 with the phases after it, or
-//      ends `completed` where there are none. Only the first phase may be
-//      a check, and a check names no input. The rule that a phase after
-//      the first supplies no capability counts from the first phase that
-//      is no check;
+//      2026-11-21). The check's result holds the claims of the first
+//      evaluation (`claims`, `summary`) and, apart, those of every
+//      evaluation after it (`broader`); the refutations of all of them,
+//      each once, among them a part gone into that came out refuted as a
+//      whole with no refuted claim, at the part's place; and what was told
+//      and not gone into (`untouched`), each once. Then the checks are
+//      handed that result and answer the findings (`Checks.findings`),
+//      which the result holds (`findings`), and which the launcher hands
+//      to `Launch.onFindings` once, when the check phase is over, whether
+//      the launch then ends or goes on. The check ends the launch
+//      `refuted` where the whole is refuted, a claim of either list has a
+//      refuted evaluation, or a refutation is listed; `limit` where an
+//      evaluation's budget ran out and nothing was refuted; `findings`
+//      where a finding has the level `error`. Otherwise the check is over,
+//      and the launch goes on to step 5 with the phases after it, or ends
+//      `completed` where there are none. Only the first phase may be a
+//      check, and a check names no input. The rule that a phase after the
+//      first supplies no capability counts from the first phase that is
+//      no check. The launcher hands no message of its own;
 //   5b where the first phase that is no check is a test phase
 //      (`Phase.test`), in place of steps 6 and 7 for a run: the evaluation
 //      of step 5 is the load. It is advanced as a run is, with no later
@@ -197,7 +222,9 @@
 //        (`Launch.sources`);
 //      - `refutations`, the plain data of the kernel's
 //        `Result.refutations`, each with its place: only a check gives
-//        any.
+//        any;
+//      - for a check alone, `broader`, `untouched` and `findings`, as
+//        step 5a says.
 //      A check's result is its own. The claims of a run after it are
 //      summed apart, and the outcome's `result` is the last phase's.
 //      Where the check ends the launch nothing was performed, so no line
@@ -222,12 +249,13 @@
 // `load` has the kernel make the keys, and `declares` lists only the
 // parameters after them.
 //
-// Tested by next/launch/launcher.test.ts, on the kernel that
-// next/kernel/create.ts gives.
+// Tested by next/launch/launcher.test.ts, on both kernel variants
+// (next/launch/kernel-variant.ts).
 
-import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Value } from "../kernel/interface.js";
+import type { Advance, Cell, ClaimRecord, CreateKernel, Declaration, Kernel, Place, PrimitiveDeclaration, Rest, Result, Untouched, Value } from "../kernel/interface.js";
 import { INTERFACE_VERSION, InterfaceError, KernelFault } from "../kernel/interface.js";
 import { check2, load, type SavedProgram } from "../kernel/saved-program.js";
+import type { Checks, Finding } from "./checks.js";
 
 /** A capability's definition: its name and the names of its parts. */
 export interface CapabilityDefinition {
@@ -319,11 +347,13 @@ export interface Phase {
   /** A word for reports, such as `check` or `run`. */
   readonly name: string;
   /**
-   * True for a check: the module function is evaluated by the kernel's
-   * `check`, once, with nothing filled and nothing advanced. Only the
-   * first phase may be a check, and a check names no input: it leaves
-   * every input unknown. A capability it names is handed as not needed,
-   * and every other declared capability as not yet given.
+   * True for a check: evaluations the launcher makes with `speculative`,
+   * with nothing filled and nothing advanced. The first is the module
+   * function applied, the program as written; then each thing an
+   * evaluation left untouched that the checks choose (`Launch.checks`).
+   * Only the first phase may be a check, and a check names no input: it
+   * leaves every input unknown. A capability it names is handed as not
+   * needed, and every other declared capability as not yet given.
    */
   readonly check?: true;
   /**
@@ -348,9 +378,10 @@ export interface Phase {
 
 /**
  * A source of configuration, highest first: the command line, the
- * project's file, the environment, what is built into the launcher.
+ * project's file, what is built into the launcher. No setting comes from
+ * the environment.
  */
-export type SourceName = "command line" | "file" | "environment" | "launcher";
+export type SourceName = "command line" | "file" | "launcher";
 
 /** Which source supplied one value of the configuration. `setting` is the setting's name, or `inputs.<name>` for one input. */
 export interface ConfigurationSource {
@@ -379,6 +410,18 @@ export interface Launch {
   readonly target: Target;
   /** Called with each line as it is printed, besides collecting it. */
   readonly onLine?: (line: string) => void;
+  /**
+   * Called once with a check's findings when the check phase is over,
+   * whether the launch then ends or goes on, and so before a run or the
+   * tests after it begin. Besides putting them in the check's result.
+   */
+  readonly onFindings?: (findings: readonly Finding[]) => void;
+  /**
+   * What a check goes into beyond the program as written, and what it
+   * found (next/launch/checks.ts). None: a check goes into nothing beyond
+   * the program as written and has no findings.
+   */
+  readonly checks?: Checks;
 }
 
 /** How a run ended. */
@@ -411,6 +454,11 @@ export type LaunchEnd =
       readonly inputs: readonly string[];
       readonly capabilities?: readonly string[];
     }
+  /**
+   * A check was not refuted and did not end at its limit, and its findings
+   * hold `errors` of level `error`, as many as `reason` gives.
+   */
+  | { readonly kind: "findings"; readonly steps: number; readonly reason: string; readonly errors: number }
   /** Refused before anything was evaluated. */
   | { readonly kind: "refused"; readonly reason: string; readonly findings: readonly string[] }
   /** The kernel or a capability threw. */
@@ -530,7 +578,31 @@ export interface LaunchResult {
    * a check gives any; it is empty for a phase that is no check.
    */
   readonly refutations: readonly RefutationData[];
+  /**
+   * A check's only: the claims of every evaluation after the first, the
+   * broader analysis, summed apart from `claims`, and their summary. A
+   * claim reached by both is in both.
+   */
+  readonly broader?: { readonly claims: readonly ClaimResult[]; readonly summary: Strength };
+  /**
+   * A check's only: what its evaluations told as not gone into, and the
+   * check did not go into, each once, in the order first told. The module's
+   * own function is left out.
+   */
+  readonly untouched?: readonly UntouchedData[];
+  /** A check's only: what the checks found (`Checks.findings`), as they answered it. */
+  readonly findings?: readonly Finding[];
 }
+
+/**
+ * One thing an evaluation of a check told as not gone into, as plain
+ * data: the kernel's `Untouched` with its handle left out. For a function,
+ * the count of its parameters and whether a call opened it, in any
+ * evaluation that told it. Its place where it has one.
+ */
+export type UntouchedData =
+  | { readonly kind: "function"; readonly parameters: number; readonly called: boolean; readonly at?: Place }
+  | { readonly kind: "binding" | "argument" | "entry"; readonly at?: Place };
 
 /** One refutation found in a part that does not refute the whole, as plain data. */
 export interface RefutationData {
@@ -877,6 +949,8 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
   // The claims of the phase going on, and the refutations a check found. A check's are summed apart from the run's.
   let tallies = new ClaimTallies(keyOf);
   let refutations: RefutationData[] = [];
+  // A check's own fields of the result: the broader analysis, what was not gone into, the findings.
+  let checkFields: Pick<LaunchResult, "broader" | "untouched" | "findings"> = {};
   const result = (of: ClaimTallies = tallies): LaunchResult => {
     const claims = of.claims();
     const builder = configuration.restoreAs === undefined ? {} : { builder: configuration.restoreAs };
@@ -893,6 +967,7 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         ...sources,
       },
       refutations: refutations.map((r) => ({ ...r })),
+      ...checkFields,
     };
   };
   // Each phase applied, with the lines printed before it, and the result as it stood when it was over.
@@ -979,20 +1054,76 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
     const budget = configuration.steps;
     const limitReason = budget === undefined ? "the kernel reached its own limit; no step budget was set" : `the step budget of ${budget} ran out`;
 
-    // A check, where the first phase is one: the module function applied to its capabilities
-    // and inputs, handed to the kernel's `check` once. Nothing is filled and nothing advanced.
+    // A check, where the first phase is one: evaluations with `speculative`, nothing filled and
+    // nothing advanced. The first is the module function applied to its capabilities and inputs.
     if (checkPhase !== undefined) {
       applied.push({ name: checkPhase.name, linesBefore: 0 });
-      // Each input is a cell, so check leaves it unknown. Each capability the check names is
+      // Each input is a cell, so the check leaves it unknown. Each capability the check names is
       // not needed; every other is a cell, not yet given.
       const checkArgs = program.declares.filter((d) => d.role !== "module").map((d) =>
         d.role === "capability" && checkPhase.capabilities.includes(d.name) ? notNeeded(d.name) : kernel.cell());
-      // With no budget set, the largest the kernel takes: a recursion whose argument changes runs to it.
-      const checked = kernel.check(kernel.expression(moduleFn, checkArgs), { steps: budget ?? Number.MAX_SAFE_INTEGER });
-      tallies.add(checked.claims);
-      refutations = (checked.refutations ?? []).map((r) => (r.at === undefined ? { reason: r.reason } : { reason: r.reason, at: placeData(r.at) }));
-      // Refuted where the whole is, where a claim is, or where a part is: each reason once, in the order found.
-      const refutedClaims = tallies.claims().filter((c) => c.refuted > 0);
+      // Each evaluation has the launch's budget to itself; with none set, the largest the kernel takes.
+      const limits = { steps: budget ?? Number.MAX_SAFE_INTEGER, speculative: true } as const;
+      const broader = new ClaimTallies(keyOf);
+      const refutationsSeen = new Set<string>();
+      const refutation = (r: { readonly reason: string; readonly at?: Place }): void => {
+        const data: RefutationData = r.at === undefined ? { reason: r.reason } : { reason: r.reason, at: placeData(r.at) };
+        const key = JSON.stringify(data);
+        if (refutationsSeen.has(key)) return;
+        refutationsSeen.add(key);
+        refutations.push(data);
+      };
+      let spent = 0;
+      let atLimit = false;
+      const speculate = (expression: Value, into: ClaimTallies): Result => {
+        const r = kernel.evaluate(expression, limits);
+        spent += r.steps;
+        into.add(r.claims);
+        if (r.ended === "limit") atLimit = true;
+        for (const x of r.refutations ?? []) refutation(x);
+        return r;
+      };
+      // The program as written.
+      const checked = speculate(kernel.expression(moduleFn, checkArgs), tallies);
+      // What was told and not gone into, by handle, and what was gone into. The module's own function is never gone into again.
+      const gone = new Set<Value>([moduleFn]);
+      const told = new Map<Value, UntouchedData>();
+      const chosen: Untouched[] = [];
+      const consider = (list: readonly Untouched[]): void => {
+        for (const u of list) {
+          if (gone.has(u.value)) continue;
+          const before = told.get(u.value);
+          const data: UntouchedData = u.kind === "function"
+            ? { kind: "function", parameters: u.parameters, called: u.called || (before?.kind === "function" && before.called), ...(u.at === undefined ? {} : { at: placeData(u.at) }) }
+            : { kind: u.kind, ...(u.at === undefined ? {} : { at: placeData(u.at) }) };
+          told.set(u.value, data);
+          // The checks are asked with a copy, so nothing they do reaches the list.
+          if (request.checks?.into(structuredClone(data)) === true) {
+            gone.add(u.value);
+            told.delete(u.value);
+            chosen.push(u);
+          }
+        }
+      };
+      consider(checked.untouched ?? []);
+      // The broader analysis: each thing chosen, a function by a call with an unfilled cell for
+      // each parameter, anything else by its value; what that leaves untouched is asked about in turn.
+      while (chosen.length > 0) {
+        const u = chosen.shift()!;
+        const r = speculate(u.kind === "function" ? kernel.expression(u.value, Array.from({ length: u.parameters }, () => kernel.cell())) : u.value, broader);
+        // A part refuted as a whole with no refuted claim is a refutation, at the part's place.
+        if (r.refuted && !r.claims.some((c) => c.refuted > 0))
+          refutation({ reason: kernel.reasonOf(r.value) ?? "the kernel gives no reason for this refutation", ...(u.at === undefined ? {} : { at: u.at }) });
+        consider(r.untouched ?? []);
+      }
+      const broaderClaims = broader.claims();
+      checkFields = { broader: { claims: broaderClaims, summary: summaryOf(broaderClaims) }, untouched: [...told.values()] };
+      const found = request.checks?.findings(result()) ?? [];
+      checkFields = { ...checkFields, findings: [...found] };
+      // The check phase is over: its findings go to whoever asked, before anything after it begins.
+      request.onFindings?.(found.map((f) => ({ ...f })));
+      // Refuted where the whole is, where a claim of either list is, or where a part is: each reason once, in the order found.
+      const refutedClaims = [...tallies.claims(), ...broaderClaims].filter((c) => c.refuted > 0);
       if (checked.refuted || refutedClaims.length > 0 || refutations.length > 0) {
         const reasons: string[] = [];
         const add = (reason: string): void => {
@@ -1002,15 +1133,18 @@ export async function launch(request: Launch): Promise<LaunchOutcome> {
         for (const c of refutedClaims) for (const reason of c.reasons) add(reason);
         for (const r of refutations) add(r.reason);
         if (reasons.length === 0) add("the kernel gives no reason for this refutation");
-        return ended({ kind: "refuted", steps: checked.steps, reason: reasons.join("; "), reasons });
+        return ended({ kind: "refuted", steps: spent, reason: reasons.join("; "), reasons });
       }
-      if (checked.ended === "limit") return ended({ kind: "limit", steps: checked.steps, reason: limitReason });
-      if (runPhases.length === 0) return ended({ kind: "completed", steps: checked.steps });
+      if (atLimit) return ended({ kind: "limit", steps: spent, reason: limitReason });
+      const errors = found.filter((f) => f.level === "error").length;
+      if (errors > 0) return ended({ kind: "findings", steps: spent, reason: `the check's findings hold ${errors} error(s)`, errors });
+      if (runPhases.length === 0) return ended({ kind: "completed", steps: spent });
       // The check is over. The run after it is a fresh evaluation, and its claims are summed apart.
       over.push(result());
       linesBeforePhase.push(lines.length);
       tallies = new ClaimTallies(keyOf);
       refutations = [];
+      checkFields = {};
     }
 
     // Each capability: the one the first phase of the run supplies, or else a fresh cell that nothing fills.

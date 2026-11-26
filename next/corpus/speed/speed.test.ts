@@ -5,13 +5,16 @@
 // measured sizes are run by `npm run bench:next` (next/corpus/speed/bench.ts)
 // only, never here.
 // The bench's search for the largest size that completes (`largest`) is
-// tested here on a clock the test moves, with no real run.
+// tested here on a clock the test moves, with no real run. Its `--kernel`
+// is tested on a name that is no variant, which it refuses before it runs
+// anything.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "child_process";
 import { runProgram } from "../allegretto.js";
 import { largest } from "./bench.js";
-import { emitTimed, flatInput, nestedInput, read, runNew, SPEED_DIR, typedLines, withInput, withSizes } from "./programs.js";
+import { emitTimed, flatInput, nestedInput, read, ROOT, runNew, SPEED_DIR, typedLines, withInput, withSizes } from "./programs.js";
 
 for (const name of ["parser", "typed"]) {
   test(`speed program ${name}.alg at its pinned size: the lines it prints and how it ends`, async () => {
@@ -73,4 +76,15 @@ test("the search ends at the first run that completes but takes too long, and as
   const found = await largest(async (n) => { asked.push(n); clock += n; return true; }, 1 << 16, 10, () => clock);
   assert.deepEqual(found, { n: 16, capped: false, long: true });
   assert.deepEqual(asked, [1, 2, 4, 8, 16]);
+});
+
+test("the bench refuses a kernel variant's name that is no variant before it runs anything, exit 1, and takes no other argument", () => {
+  const bench = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", `${SPEED_DIR}/bench.ts`, ...args], { cwd: ROOT, encoding: "utf8", timeout: 60000 });
+  const refused = bench("--kernel", "neither");
+  assert.equal(refused.stdout, "");
+  assert.equal(refused.stderr, 'the setting kernel is "neither", which names no kernel variant: the variants are reference and machine\n');
+  assert.equal(refused.status, 1);
+  const other = bench("--fast");
+  assert.equal(other.stderr, "usage: npm run bench:next [-- --kernel <reference|machine>]\n");
+  assert.equal(other.status, 1);
 });

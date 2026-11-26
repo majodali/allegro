@@ -34,7 +34,10 @@
 // `// phases: check, run`, the `// check claim at:` line and the programs
 // `m3/check-*.alg`. Chunk Q13, part 6, added `// phases: test` and
 // `// phases: check, test`, the `// test:` line and the programs
-// `m3/test-*.alg` and `m3/test-import/`.
+// `m3/test-*.alg` and `m3/test-import/`. Chunk Q13, part 7, made a check
+// the launcher's evaluations with the shipped checks, and added the
+// `// check:`, `// broader claim at:` and `// untouched:` lines and the
+// programs `m3/checks-*.alg` and `m3/checks-import/`.
 //
 // Each program is emitted, with the texts it imports, and launched by `runProgram` of
 // next/corpus/allegretto.ts, the implementation the harness's mode
@@ -49,7 +52,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { spawnSync } from "child_process";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, usedVariant } from "../launch/kernel-variant.js";
 import type { Value } from "../kernel/interface.js";
 import { check2, encode, load, type SavedProgram } from "../kernel/saved-program.js";
 import { outputWrite } from "../launch/output.js";
@@ -57,7 +60,7 @@ import { testLines, testMessages } from "../launch/test-output.js";
 import { shippedByName } from "../prims/index.js";
 import { FORMS, type FormId } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { emitted, isImportedText, milestoneOf, programFiles, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readTestLines, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
+import { emitted, isImportedText, milestoneOf, programFiles, readCheckLines, readClaimLines, readPhases, readPins, readReports, readServes, readStatus, readSummary, readTestLines, readUntouchedLines, readUnder, runProgram, PROGRAMS_DIR, STEPS } from "./allegretto.js";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const FILES = programFiles(ROOT);
@@ -380,7 +383,7 @@ test("every record of the programs and their imported texts checks, carries plac
 });
 
 test("npm run allegretto emits and launches in one step: it prints the lines, and exits 0 on completed and 1 otherwise", () => {
-  const run = (file: string) => spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = (file: string) => spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", "--kernel", usedVariant(), file], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   const hello = run("next/launch/fixtures/hello.alg");
   assert.equal(hello.stderr, "");
   assert.equal(hello.stdout, "hello, world\n");
@@ -389,7 +392,7 @@ test("npm run allegretto emits and launches in one step: it prints the lines, an
   assert.equal(refuted.stdout, "before the claim\n");
   assert.equal(refuted.stderr, "refuted: a claim that is not true\n");
   assert.equal(refuted.status, 1);
-  const budget = spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", `${PROGRAMS_DIR}/m3/factorial.alg`, "--steps", "3"], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const budget = spawnSync(process.execPath, ["--import", "tsx", "next/launch/allegretto.ts", "--kernel", usedVariant(), `${PROGRAMS_DIR}/m3/factorial.alg`, "--steps", "3"], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   assert.equal(budget.stderr, "limit: the step budget of 3 ran out\n");
   assert.equal(budget.status, 1);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-run-"));
@@ -602,7 +605,7 @@ test("a check claim at line states a word of the check's result under check, run
   assert.deepEqual((await runProgram(program + "// check claim at: 3:1 waiting\n// check claim at: 4:1 decided\n// claim at: 4:1 decided\n")).problems, []);
   // The claim in the function nothing calls is in the check's result and not in the run's.
   assert.deepEqual((await runProgram(program + "// claim at: 6:14 decided\n")).problems, ["no claim of the result is written at 6:14 of <text>"]);
-  assert.ok(!(await runProgram(program + "// check claim at: 6:14 decided\n")).problems.some((p) => p.includes("no claim of the result is written")));
+  assert.ok(!(await runProgram(program + "// broader claim at: 6:14 decided\n")).problems.some((p) => p.includes("no claim of the result is written")));
   assert.deepEqual((await runProgram(program + "// check claim at: 3:1 decided\n")).problems, ["in the check's result, the claim at 3:1 came out waiting, expected decided"]);
   assert.deepEqual((await runProgram(program + "// check claim at: 9:1 waiting\n")).problems, ["in the check's result, no claim of the result is written at 9:1 of <text>"]);
   const malformed = await runProgram(program + "// check claim at: two decided\n");
@@ -847,7 +850,99 @@ test("program m3/test-load-refuted.alg calls no test, and m3/test-check.alg's te
   const both = await runProgram(text(checked), checked);
   assert.deepEqual(both.problems, []);
   assert.equal(both.tests, undefined, "the check ends the launch before the load");
-  const alone = await runProgram(text(checked).replace("// phases: check, test\n", "// phases: test\n").replace(/\/\/ (end|claim at):.*\n/g, ""), checked);
+  const alone = await runProgram(text(checked).replace("// phases: check, test\n", "// phases: test\n").replace(/\/\/ (end|claim at|broader claim at):.*\n/g, ""), checked);
   assert.deepEqual(alone.tests?.tests.map((t) => [t.name, t.end.kind]), [["greets", "completed"]]);
   assert.deepEqual(alone.lines, ["the test was called"]);
+});
+
+
+// ── The check, broader claim at and untouched lines (chunk Q13, part 7) ─
+
+test("the check lines are read as the convention states: name = value, one of the four and one of its values, each name once", () => {
+  assert.deepEqual(readCheckLines("// check: unread = on\n//check:waiting=error\n// check claim at: 2:1 decided\n"), { settings: { unread: "on", waiting: "error" }, problems: [] });
+  assert.deepEqual(readCheckLines("capability output\n"), { settings: undefined, problems: [] });
+  assert.deepEqual(readCheckLines("// check: unread on\n").problems, ['the line "// check: unread on" is not of the form check: <name> = <value>']);
+  assert.deepEqual(readCheckLines("// check: unused = on\n").problems, ["the program sets check unused, which names no check setting: the names are arguments, uncalled, unread and waiting"]);
+  assert.deepEqual(readCheckLines("// check: unread = yes\n").problems, ['the program sets check unread to "yes", which is none of its values: on and off']);
+  assert.deepEqual(readCheckLines("// check: unread = on\n// check: unread = off\n").problems, ["the check setting unread has two `// check:` lines"]);
+});
+
+test("the broader claim at and untouched lines are read as the convention states, apart from the others", () => {
+  const text = "// broader claim at: 2:14 refuted\n// claim at: 3:1 decided\n// untouched: function 2:1\n//untouched:  binding 4:5 \n";
+  assert.deepEqual(readClaimLines(text, "broader claim at"), { claims: [{ line: 2, column: 14, word: "refuted" }], problems: [] });
+  assert.deepEqual(readClaimLines(text), { claims: [{ line: 3, column: 1, word: "decided" }], problems: [] });
+  assert.deepEqual(readUntouchedLines(text), { untouched: [{ kind: "function", line: 2, column: 1 }, { kind: "binding", line: 4, column: 5 }], problems: [] });
+  assert.deepEqual(readUntouchedLines("// untouched: closure 2:1\n// untouched: entry 2\n").problems, [
+    'the line "// untouched: closure 2:1" is not of the form untouched: <kind> <line>:<column>, the kind one of function, binding, argument, entry',
+    'the line "// untouched: entry 2" is not of the form untouched: <kind> <line>:<column>, the kind one of function, binding, argument, entry',
+  ]);
+  assert.match(readClaimLines("// broader claim at: 2 refuted\n", "broader claim at").problems[0], /is not of the form broader claim at: <line>:<column> <word>/);
+});
+
+test("a program under check is run with the shipped checks its check lines set; its broader claim at lines hold for the broader analysis, and its untouched lines for what was not gone into", async () => {
+  const program = "capability output\nunused(n) => claim(n == 1)\nx = claim(1 == 2)\npositive(n) => claim(n > 0)\npositive(3)\n// phases: check\n";
+  const byDefault = await runProgram(program + "// end: completed\n// broader claim at: 2:14 waiting\n// untouched: binding 3:5\n// claim at: 4:16 decided\n// broader claim at: 4:16 waiting\n");
+  assert.deepEqual(byDefault.problems, []);
+  const read = await runProgram(program + "// check: unread = on\n// end: refuted: a claim that is not true\n// broader claim at: 3:5 refuted\n");
+  assert.deepEqual(read.problems, []);
+  const off = await runProgram(program + "// check: uncalled = off\n// check: arguments = off\n// end: completed\n// untouched: function 2:1\n// untouched: function 4:1\n");
+  assert.deepEqual(off.problems, []);
+  // A line that does not hold is a problem, named in the broader analysis.
+  const wrong = await runProgram(program + "// end: completed\n// broader claim at: 2:14 decided\n// broader claim at: 9:1 decided\n// untouched: function 2:1\n");
+  assert.deepEqual(wrong.problems, [
+    "in the broader analysis, the claim at 2:14 came out waiting, expected decided",
+    "in the broader analysis, no claim of the result is written at 9:1 of <text>",
+    "the check's result tells no function at 2:1 of <text> as untouched",
+  ]);
+});
+
+test("the findings go through the same sink as the program's messages, when the check is over, and are compared by the reports lines", async () => {
+  const program = "capability output\ncapability report\ninput n\nreport.message(\"from the program\")\nclaim(n == 1)\n// phases: check, run\n// input: n = 1\n// check: waiting = warning\n";
+  // The check's finding is handed when the check is over; the run's message while the run goes on, after it. Under the check report is not needed, so the program hands nothing then.
+  const run = await runProgram(program + "// end: completed\n// reports: <text>:5:1: warning: a claim of the program as written waits: the check could not decide it\n// reports: note: from the program\n");
+  assert.deepEqual(run.problems, []);
+  const unstated = await runProgram(program + "// end: completed\n// reports: note: from the program\n");
+  assert.ok(unstated.problems.some((p) => p.startsWith("reported [")), JSON.stringify(unstated.problems));
+});
+
+test("a check, broader claim at or untouched line with phases that include no check, a malformed one, and one where nothing is launched each fail the program", async () => {
+  const body = "capability output\nclaim(1 == 1)\n// end: completed\n";
+  for (const [line, problem] of [
+    ["// check: unread = on", "the program states a `// check:` line, and its phases include no check"],
+    ["// broader claim at: 2:1 decided", "the program states a `// broader claim at:` line, and its phases include no check"],
+    ["// untouched: function 2:1", "the program states an `// untouched:` line, and its phases include no check"],
+    ["// phases: check\n// check: unread = maybe", 'the program sets check unread to "maybe", which is none of its values: on and off'],
+    ["// phases: check\n// untouched: thing 2:1", 'the line "// untouched: thing 2:1" is not of the form untouched: <kind> <line>:<column>, the kind one of function, binding, argument, entry'],
+  ] as const) {
+    const run = await runProgram(body + line + "\n");
+    assert.ok(run.problems.includes(problem), `${line}: ${JSON.stringify(run.problems)}`);
+    assert.equal(run.result, undefined, `${line}: not launched`);
+  }
+  const notLaunched = await runProgram("capability output\noutput.write(x)\n// end: refused: the name x is bound nowhere in the text\n// check: unread = on\n");
+  assert.ok(notLaunched.problems.includes("nothing was launched, and the program states a `// check:`, `// broader claim at:` or `// untouched:` line"), JSON.stringify(notLaunched.problems));
+});
+
+test("the programs of the checks are there, in milestone 3's directory, each with its phases, and none names a case", () => {
+  const phases: Array<[string, string[]]> = [
+    ["decided-waiting", ["check"]], ["arguments-off", ["check"]], ["uncalled", ["check"]], ["uncalled-off", ["check"]], ["unread", ["check"]], ["unread-on", ["check"]],
+    ["list", ["check"]], ["list-unread", ["check"]], ["waiting-note", ["check", "run"]], ["waiting-warning", ["check", "run"]], ["waiting-error", ["check", "run"]],
+    ["not-needed", ["check"]], ["import/main", ["check"]],
+  ];
+  for (const [name, stated] of phases) {
+    const file = `${PROGRAMS_DIR}/m3/checks-${name}.alg`;
+    assert.ok(FILES.includes(file), name);
+    assert.deepEqual(readPhases(text(file)).phases, stated, file);
+    assert.deepEqual(readPins(text(file)).realises, [], file);
+  }
+  assert.ok(isImportedText(`${PROGRAMS_DIR}/m3/checks-import/lib.alg`));
+});
+
+test("program m3/checks-waiting-error.alg ends at its findings and runs nothing; with waiting at pass the run follows", async () => {
+  const file = `${PROGRAMS_DIR}/m3/checks-waiting-error.alg`;
+  const failed = await runProgram(text(file), file);
+  assert.deepEqual(failed.problems, []);
+  assert.deepEqual(failed.lines, []);
+  const passed = await runProgram(text(file).replace("// check: waiting = error\n", "").replace(/\/\/ (end|reports|summary):.*\n/g, "") + "// expect: ran\n// end: completed\n", file);
+  assert.deepEqual(passed.problems, []);
+  assert.deepEqual(passed.messages, [], "a claim that waits is passed by default");
 });

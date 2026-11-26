@@ -1,7 +1,7 @@
 // Under check alone a write is a call on output, which is not yet given:
 // it waits, and nothing is printed. The write is a statement whose value
 // is dropped, so in a run it holds the claim after it until it answers.
-// The kernel's check evaluates what is held ahead, so the false claim
+// The check evaluates what is held ahead, so the false claim
 // written after the write is reached and refuted, and the check ends the
 // launch.
 capability output

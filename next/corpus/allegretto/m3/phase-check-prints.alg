@@ -1,4 +1,4 @@
-// Under check alone the kernel's check evaluates the program, and nothing
+// Under check alone the check evaluates the program, and nothing
 // is performed. The output capability is not yet given: the check names
 // report alone, so output is a cell. The write waits on it and nothing is
 // printed. The claim written before it is reached. A write that waits

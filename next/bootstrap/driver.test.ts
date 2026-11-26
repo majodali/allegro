@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import type { Value } from "../kernel/interface.js";
 import { load } from "../kernel/saved-program.js";
 import { shippedByName } from "../prims/index.js";

@@ -6,10 +6,14 @@
 // file runner cannot run as the suite does. The whole calibration is the
 // command `npm run harness:present`, not a test: it takes about half a
 // minute. The mode `--next` is tested on a report built from stub runs,
-// then over the committed Allegretto programs on the reference kernel.
+// then over the committed Allegretto programs on the kernel `createKernel`
+// of next/launch/kernel-variant.ts gives: the machine, and the reference
+// where next/launch/reference-run.ts loads this file. The command's
+// `--kernel` is tested by spawning it.
 
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -218,4 +222,17 @@ test("--next over the committed programs: no program fails, and every id a progr
   assert.deepEqual(programs.flatMap((p) => p.realises.filter((id) => !ids.has(id)).map((id) => `${p.file}: ${id}`)), []);
   const report = buildNextReport(corpus, programs);
   assert.deepEqual(report.findings, []);
+});
+
+test("--next takes --kernel: the programs run on the variant named, and a name that is no variant is refused before any program runs, exit 1", () => {
+  const harness = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", "next/corpus/harness.ts", "--next", ...args], { cwd: ROOT, encoding: "utf-8", timeout: 60000 });
+  for (const variant of ["reference", "machine"]) {
+    const r = harness("--file", "next/corpus/allegretto/m3/sample.alg", "--kernel", variant);
+    assert.equal(r.status, 0, `${variant}: ${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /programs 1 run \(passing 1, failing 0\)/);
+  }
+  const refused = harness("--kernel", "neither");
+  assert.equal(refused.stdout, "");
+  assert.equal(refused.stderr, 'the setting kernel is "neither", which names no kernel variant: the variants are reference and machine\n');
+  assert.equal(refused.status, 1);
 });

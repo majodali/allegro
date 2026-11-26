@@ -49,7 +49,7 @@
 
 import * as path from "path";
 import type { CreateKernel, Kernel, Value } from "../kernel/interface.js";
-import { createKernel as referenceKernel } from "../kernel/create.js";
+import { createKernel as variantInUse } from "../launch/kernel-variant.js";
 import { load, type SavedProgram } from "../kernel/saved-program.js";
 import { shippedByName } from "../prims/index.js";
 import { read, type Header, type Place } from "./reader.js";
@@ -100,10 +100,12 @@ const nameOf = (file: string): string => path.basename(file, ".alg");
 /**
  * Emits a text and every text it imports, each imported one first.
  * `file` is where the text was read from; `readText` reads every imported
- * text. The kernel identities are taken in a kernel `createKernel` makes,
- * the reference kernel unless the caller passes another.
+ * text. The kernel identities are taken in a kernel `createKernel` makes:
+ * by default the variant in use (`createKernel` of
+ * next/launch/kernel-variant.ts), which a command that takes `--kernel`
+ * replaces with the variant it names.
  */
-export function drive(text: string, file: string, readText: ReadText, createKernel: CreateKernel = referenceKernel): DriveResult {
+export function drive(text: string, file: string, readText: ReadText, createKernel: CreateKernel = variantInUse): DriveResult {
   const kernel: Kernel = createKernel();
   const primitives = new Map<string, Value>();
   const records: DrivenRecord[] = [];

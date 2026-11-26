@@ -2,12 +2,15 @@
 // chunk Q7 (the minimal launcher), parts 1 to 3, and chunk Q5 (the first
 // notation and the bootstrap), part 3): next/launch/launcher.ts
 // and the output capability next/launch/output.ts, on the kernel
-// `createKernel` of next/kernel/create.ts gives: the variant that keeps
-// its own stack, or the reference kernel with `ALLEGRO_KERNEL=reference`. Run
-// by `npm run test:next`. The tests of what a result holds are chunk Q13
+// `createKernel` of next/launch/kernel-variant.ts gives: the variant that
+// keeps its own stack, and the reference kernel where
+// next/launch/reference-run.ts loads this file. Run by
+// `npm run test:next`. A test that spawns a command passes it `--kernel`
+// with the variant in use. The tests of what a result holds are chunk Q13
 // (check and run as configurations, and what a result holds), part 1; of
 // the configuration's sources, part 2; of phases, part 3; of a check, and
-// check then run, part 5; of the test phase, part 6. The tests of the
+// check then run, part 5; of the test phase, part 6; of a check on
+// ordinary evaluation, and the checks, part 7. The tests of the
 // two commands' exit code with check output are chunk Q16 (the
 // capabilities the launchers ship), part 3.
 
@@ -18,14 +21,17 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import type { Cell, Kernel, PrimitiveContext, PrimitiveDeclaration, Value } from "../kernel/interface.js";
-import { createKernel } from "../kernel/create.js";
+import { createKernel, kernelOf, usedVariant } from "./kernel-variant.js";
+import { exitCode, resolveOnTerminal, runTarget, terminalReport } from "./terminal.js";
 import { check2, encode, outcomeKeys, type Node, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { drive } from "../bootstrap/driver.js";
-import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Phase, type Plain, type Target } from "./launcher.js";
+import { claimWord, describe, launch, summaryOf, type CapabilityImplementation, type ClaimResult, type Configuration, type LaunchOutcome, type LaunchResult, type Phase, type Plain, type Target, type UntouchedData } from "./launcher.js";
 import { timer } from "./timer.js";
 import { virtualClock } from "./clock.js";
 import { OUTPUT, output } from "./output.js";
+import { findingMessage, shippedChecks, type Checks, type Finding } from "./checks.js";
+import { collector, messageLine, report } from "./report.js";
 import { shipped } from "../prims/index.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -529,7 +535,7 @@ test("output's part refuses what is not UTF-8 text: a refutation with the part's
 });
 
 test("the terminal entry runs the committed fixture: it prints the line and exits 0", () => {
-  const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), FIXTURE], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), "--kernel", usedVariant(), FIXTURE], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   assert.equal(run.stderr, "");
   assert.equal(run.stdout, "hello, world\n");
   assert.equal(run.status, 0);
@@ -724,7 +730,7 @@ test("the launcher does not import the bootstrap", () => {
 });
 
 test("npm run allegretto takes --input and --later: each later phase in the order written; a value that is not a literal, or a flag with no =, exits 1", () => {
-  const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+  const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-inputs-"));
   try {
     const file = path.join(dir, "inputs.alg");
@@ -852,7 +858,7 @@ test("npm run launch takes the imported records by --import, in load order", () 
     const [lib, main] = drivenRecords("capability output\nimport lib\noutput.write(lib.t)\n", { lib: 'export t = "from lib"\n' });
     fs.writeFileSync(path.join(dir, "lib.json"), encode(lib));
     fs.writeFileSync(path.join(dir, "main.json"), encode(main));
-    const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const run = (...args: string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "terminal.ts"), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     const ok = run(path.join(dir, "main.json"), "--import", path.join(dir, "lib.json"));
     assert.equal(ok.stderr, "");
     assert.equal(ok.stdout, "from lib\n");
@@ -871,7 +877,7 @@ test("npm run allegretto runs a text that imports: the imported texts are found 
     const main = path.join(dir, "main.alg");
     fs.writeFileSync(main, 'capability output\nimport greeter with name: "world"\ngreeter.greet()\n');
     fs.writeFileSync(path.join(dir, "greeter.alg"), 'capability output\ninput name\nexport greet() => output.write("hello, " ++ name)\n');
-    const run = () => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+    const run = () => spawnSync(process.execPath, ["--import", "tsx", path.join(here, "allegretto.ts"), "--kernel", usedVariant(), main], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
     const ok = run();
     assert.equal(ok.stderr, "");
     assert.equal(ok.stdout, "hello, world\n");
@@ -1144,13 +1150,12 @@ test("the word for one claim is the summary's rule, with waiting kept apart from
 // codes only. The resolver's rules are tested in
 // next/tools/configuration.test.ts.
 
-/** Runs one of the two commands with the environment given, beside this process's own with no ALLEGRO_STEPS. */
+/** Runs one of the two commands with the environment given, beside this process's own. */
 function command(entry: "terminal.ts" | "allegretto.ts", args: readonly string[], env: { readonly [name: string]: string } = {}) {
-  const { ALLEGRO_STEPS: _, ...inherited } = process.env;
-  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...inherited, ...env } });
+  return spawnSync(process.execPath, ["--import", "tsx", path.join(here, entry), "--kernel", usedVariant(), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000, env: { ...process.env, ...env } });
 }
 
-test("npm run allegretto reads allegro.json beside its text: its inputs, an input a flag replaces, and the environment's budget under the flag's", () => {
+test("npm run allegretto reads allegro.json beside its text: its inputs, and an input a flag replaces", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-project-"));
   try {
     const file = path.join(dir, "main.alg");
@@ -1163,12 +1168,6 @@ test("npm run allegretto reads allegro.json beside its text: its inputs, an inpu
     const replaced = command("allegretto.ts", [file, "--input", 'b="b from the flag"']);
     assert.equal(replaced.stdout, "a from the file\nb from the flag\n");
     assert.equal(replaced.status, 0);
-    const spent = command("allegretto.ts", [file], { ALLEGRO_STEPS: "0" });
-    assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
-    assert.equal(spent.status, 1);
-    const flagOver = command("allegretto.ts", [file, "--steps", "10000000"], { ALLEGRO_STEPS: "0" });
-    assert.equal(flagOver.stdout, "a from the file\nb from the file\n");
-    assert.equal(flagOver.status, 0);
     fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ steps: 0, later: [{ a: '"late a"' }, { b: '"late b"' }] }));
     const fileSteps = command("allegretto.ts", [file]);
     assert.equal(fileSteps.stderr, "limit: the step budget of 0 ran out\n");
@@ -1198,7 +1197,7 @@ test("npm run allegretto refuses a project file with a finding: a setting it may
     assert.equal(notJson.status, 1);
     fs.writeFileSync(project, JSON.stringify({ budget: 3 }));
     const unknown = command("allegretto.ts", [file]);
-    assert.equal(unknown.stderr, `${project}: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases\n`);
+    assert.equal(unknown.stderr, `${project}: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases, check\n`);
     assert.equal(unknown.status, 1);
     fs.rmSync(project);
     const none = command("allegretto.ts", [file]);
@@ -1209,7 +1208,7 @@ test("npm run allegretto refuses a project file with a finding: a setting it may
   }
 });
 
-test("npm run launch resolves from its flags, the environment and the launcher: --ceiling narrows, and a name the terminal does not supply is refused", () => {
+test("npm run launch resolves from its flags and the launcher: --ceiling narrows, and a name the terminal does not supply is refused", () => {
   const ok = command("terminal.ts", [FIXTURE, "--ceiling", "output"]);
   assert.equal(ok.stdout, "hello, world\n");
   assert.equal(ok.status, 0);
@@ -1220,12 +1219,87 @@ test("npm run launch resolves from its flags, the environment and the launcher: 
   const wider = command("terminal.ts", [FIXTURE, "--ceiling", "output,files"]);
   assert.equal(wider.stderr, "the ceiling of the command line grants files, which the launcher's ceiling does not grant: a ceiling may only narrow the launcher's\n");
   assert.equal(wider.status, 1);
-  const spent = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "0" });
-  assert.equal(spent.stderr, "limit: the step budget of 0 ran out\n");
-  assert.equal(spent.status, 1);
-  const notWhole = command("terminal.ts", [FIXTURE], { ALLEGRO_STEPS: "many" });
-  assert.equal(notWhole.stderr, 'the environment\'s ALLEGRO_STEPS is not a whole number: "many"\n');
-  assert.equal(notWhole.status, 1);
+});
+
+test("no setting comes from the environment: with ALLEGRO_STEPS set, each command runs as it does without it", () => {
+  // The maintainer, 2026-11-25: "command line only" means ALLEGRO_STEPS should be removed.
+  for (const value of ["0", "many"]) {
+    for (const [entry, file] of [["terminal.ts", FIXTURE], ["allegretto.ts", FIXTURE_TEXT]] as const) {
+      const r = command(entry, [file], { ALLEGRO_STEPS: value });
+      assert.equal(r.stderr, "", `${entry} with ALLEGRO_STEPS=${value}`);
+      assert.equal(r.stdout, "hello, world\n");
+      assert.equal(r.status, 0);
+    }
+  }
+  const budget = command("terminal.ts", [FIXTURE, "--steps", "0"], { ALLEGRO_STEPS: "10000000" });
+  assert.equal(budget.stderr, "limit: the step budget of 0 ran out\n", "the budget is the command line's");
+  assert.equal(budget.status, 1);
+});
+
+
+// ── The kernel variant from the command line (chunk Q13) ──────────────
+//
+// By the maintainer's ruling of 2026-11-23 the command line alone chooses
+// the kernel variant: `--kernel <name>`, else the launcher's default,
+// `machine` (`DEFAULT_KERNEL` of next/launch/kernel-variant.ts).
+
+/** Runs a command with exactly these arguments, and no `--kernel` but the ones given. */
+const bare = (entry: string, args: readonly string[]) => spawnSync(process.execPath, ["--import", "tsx", path.join(ROOT, entry), ...args], { cwd: ROOT, encoding: "utf8", timeout: 30000 });
+
+test("--kernel names the variant, the result's restsOn shows it, and its source is the command line; with no flag it is the launcher's machine", async () => {
+  for (const [commandLine, variant, source] of [[{ kernel: "reference" }, "reference", "command line"], [{ kernel: "machine" }, "machine", "command line"], [{}, "machine", "launcher"]] as const) {
+    const resolved = resolveOnTerminal(commandLine);
+    assert.equal(resolved.kernel, variant);
+    const outcome = await launch({ createKernel: kernelOf(resolved.kernel), program: JSON.parse(fs.readFileSync(FIXTURE, "utf8")), configuration: resolved.configuration, sources: resolved.sources, target: runTarget(terminalReport(() => {}).sink) });
+    assert.deepEqual(outcome.lines, ["hello, world"]);
+    assert.match(outcome.result?.restsOn.kernel ?? "", new RegExp(`^${variant}-`), JSON.stringify(commandLine));
+    assert.ok(outcome.result?.restsOn.configuration?.some((s) => s.setting === "kernel" && s.source === source), JSON.stringify(commandLine));
+  }
+});
+
+test("each command runs with --kernel reference and --kernel machine, and refuses a name that is no variant before anything is evaluated: exit 1, the variants listed", () => {
+  const refusal = 'the setting kernel is "neither", which names no kernel variant: the variants are reference and machine\n';
+  for (const [entry, file] of [["next/launch/terminal.ts", FIXTURE], ["next/launch/allegretto.ts", FIXTURE_TEXT]] as const) {
+    for (const variant of ["reference", "machine"]) {
+      const ran = bare(entry, [file, "--kernel", variant]);
+      assert.equal(ran.stdout, "hello, world\n", `${entry} --kernel ${variant}`);
+      assert.equal(ran.stderr, "");
+      assert.equal(ran.status, 0);
+    }
+    const refused = bare(entry, [file, "--kernel", "neither"]);
+    assert.equal(refused.stdout, "", entry);
+    assert.equal(refused.stderr, refusal, entry);
+    assert.equal(refused.status, 1, entry);
+    const noName = bare(entry, [file, "--kernel"]);
+    assert.match(noName.stderr, /^--kernel takes the name of a kernel variant: reference or machine\nusage: npm run /, entry);
+    assert.equal(noName.status, 1, entry);
+  }
+  // A text the driver would refuse is not read: the name is refused first.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-kernel-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, "capability output\noutput.write(\n");
+    const first = bare("next/launch/allegretto.ts", [file, "--kernel", "neither"]);
+    assert.equal(first.stderr, refusal);
+    assert.equal(first.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the project's file may not set the kernel: a finding, exit 1, nothing printed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "allegretto-kernel-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, 'capability output\noutput.write("ran")\n');
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ kernel: "reference" }));
+    const r = command("allegretto.ts", [file]);
+    assert.equal(r.stdout, "");
+    assert.equal(r.stderr, "the setting kernel is set by the project's file allegro.json, which may not set it: only the command line and the launcher may\n");
+    assert.equal(r.status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 
@@ -1395,7 +1469,7 @@ test("npm run allegretto under --phases check: a false claim after a statement b
     fs.writeFileSync(file, 'capability output\nshown <- output.write("hello")\nclaim(2 + 2 == 5)\n');
     const checked = command("allegretto.ts", [file, "--phases", "check"]);
     assert.equal(checked.stdout, "");
-    assert.equal(checked.stderr, "refuted: a claim that is not true\n");
+    assert.equal(checked.stderr, `${file}:3:1: error: a claim of the program as written is refuted: a claim that is not true\nrefuted: a claim that is not true\n`, "the finding, then the end");
     assert.equal(checked.status, 1);
     const ran = command("allegretto.ts", [file]);
     assert.equal(ran.stdout, "hello\n");
@@ -1476,8 +1550,9 @@ test("both commands under --phases check: report is not needed, so no message an
 
 // ── A check, and check then run (chunk Q13, part 5) ───────────────────
 //
-// A first phase that is a check (`Phase.check`) is handed to the kernel's
-// `check` once. Every test here passes on both kernel variants. It asserts
+// A first phase that is a check (`Phase.check`) is evaluations the
+// launcher makes with `speculative` (part 7, below, has the checks that
+// choose them). Every test here passes on both kernel variants. It asserts
 // what must be present: a word, an end, a count above zero. It holds no
 // count of evaluations under check, since the kernel may count one twice.
 
@@ -1500,6 +1575,8 @@ function recordingCapability(name: string, part: string): { capability: Capabili
 const CHECKING = { name: "check", check: true, capabilities: [] } as const;
 const checkThen = (...more: Phase[]): Configuration => ({ ceiling: ["output"], phases: [CHECKING, ...more] });
 const RUN_AFTER = { name: "run", capabilities: ["output"] } as const;
+/** The shipped checks with their defaults: functions for every argument, called or not; nothing unread. */
+const SHIPPED_CHECKS = shippedChecks();
 /** An end as words, without the count of steps a completed run gives. */
 const endWords = (end: LaunchOutcome["end"]): string => (end.kind === "completed" ? "completed" : describe(end));
 /** The word of the claim written at this line and column of `<text>`; undefined where none is. */
@@ -1507,6 +1584,8 @@ const wordAt = (result: LaunchResult, line: number, column: number) => {
   const c = result.claims.find((x) => x.at?.start.line === line && x.at.start.column === column);
   return c === undefined ? undefined : claimWord(c);
 };
+/** The same, in a check's broader analysis (`LaunchResult.broader`). */
+const broaderWordAt = (result: LaunchResult, line: number, column: number) => (result.broader === undefined ? undefined : wordAt({ ...result, claims: result.broader.claims }, line, column));
 
 test("under a check no part of any capability's implementation is called: one the check names, and one it does not", async () => {
   const say = recordingCapability("say", "line");
@@ -1518,7 +1597,7 @@ test("under a check no part of any capability's implementation is called: one th
   assert.deepEqual(note.calls, []);
   assert.deepEqual(outcome.lines, []);
   assert.equal(outcome.end.kind, "completed");
-  assert.deepEqual(r.calls.filter((c) => ["check", "evaluate", "advance", "fill"].includes(c)), ["check"], "the kernel is handed one expression, by check, and nothing is filled or advanced");
+  assert.deepEqual(r.calls.filter((c) => ["check", "evaluate", "advance", "fill"].includes(c)), ["evaluate"], "with no checks handed, the kernel is handed one expression, by evaluate, and nothing is filled or advanced");
   assert.equal(wordAt(resultOf(outcome), 5, 1), "decided");
 });
 
@@ -1552,13 +1631,14 @@ test("under a check every input is unknown: a claim over it waits, a claim over 
 });
 
 test("a check reaches a false claim in a function nothing calls and one under a condition on an unknown input, and ends the launch refuted", async () => {
-  const uncalled = await launch({ createKernel, program: emitted('capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n'), configuration: checkThen(), target: SHIPPED_TARGET });
+  const uncalled = await launch({ createKernel, program: emitted('capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n'), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
   assert.equal(describe(uncalled.end), "refuted: a claim that is not true");
-  assert.equal(wordAt(resultOf(uncalled), 2, 14), "refuted");
+  assert.equal(broaderWordAt(resultOf(uncalled), 2, 14), "refuted");
   assert.deepEqual(uncalled.lines, []);
-  const branch = await launch({ createKernel, program: emitted('capability output\ninput mode\nx = if mode == 1 then claim(1 == 2) else 0\noutput.write("ok")\n'), configuration: checkThen(), target: SHIPPED_TARGET });
+  // The binding x is read by nothing: the shipped checks go into it where unread is on.
+  const branch = await launch({ createKernel, program: emitted('capability output\ninput mode\nx = if mode == 1 then claim(1 == 2) else 0\noutput.write("ok")\n'), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ unread: "on" }) });
   assert.equal(describe(branch.end), "refuted: a claim that is not true");
-  assert.equal(wordAt(resultOf(branch), 3, 23), "refuted");
+  assert.equal(broaderWordAt(resultOf(branch), 3, 23), "refuted");
   // Run alone does not reach the claim in the function nothing calls, and completes.
   const ran = await launch({ createKernel, program: emitted('capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n'), configuration: ONLY_OUTPUT, target: SHIPPED_TARGET });
   assert.equal(ran.end.kind, "completed");
@@ -1591,7 +1671,7 @@ const FREE_IN_UNCALLED: unknown = (() => {
 
 test("a check's result gives the refutations found in parts that do not refute the whole, each with its place, and the launch ends refuted with their reason", async () => {
   assert.deepEqual(check2(FREE_IN_UNCALLED), []);
-  const outcome = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: checkThen(), target: TERMINAL });
+  const outcome = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: checkThen(), target: TERMINAL, checks: SHIPPED_CHECKS });
   assert.equal(outcome.end.kind, "refuted");
   const result = resultOf(outcome);
   const found = result.refutations.find((r) => /nowhere is bound by no block/.test(r.reason));
@@ -1599,6 +1679,7 @@ test("a check's result gives the refutations found in parts that do not refute t
   assert.deepEqual([found.at?.source, found.at?.start.line], ["free.alg", 2]);
   assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result, "the result is plain data");
+  assert.ok(result.findings?.some((f) => f.level === "error" && f.file === "free.alg" && f.line === 2), JSON.stringify(result.findings));
   // A run gives none: the function is never called.
   const ran = await launch({ createKernel, program: FREE_IN_UNCALLED, configuration: ONLY_OUTPUT, target: TERMINAL });
   assert.equal(ran.end.kind, "completed");
@@ -1625,16 +1706,17 @@ test("a check is the first phase or none, and names no input: each is refused be
 test("check then run, on one kernel: two phases, the run a fresh evaluation, its result free of the check's counts, and the outcome's result the run's", async () => {
   const r = recording();
   const program = emitted('capability output\ninput n\nunused(m) => claim(m == m)\nclaim(2 + 2 == 4)\noutput.write(n)\n');
-  const outcome = await launch({ createKernel: r.createKernel, program, configuration: checkThen({ ...RUN_AFTER, inputs: { n: textData("given") } }), target: SHIPPED_TARGET });
+  const outcome = await launch({ createKernel: r.createKernel, program, configuration: checkThen({ ...RUN_AFTER, inputs: { n: textData("given") } }), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
   assert.equal(r.created(), 1);
-  assert.deepEqual(r.calls.filter((c) => c === "check" || c === "evaluate"), ["check", "evaluate"]);
+  assert.ok(!r.calls.includes("check"), "the kernel's check is not called");
+  assert.ok(r.calls.filter((c) => c === "evaluate").length >= 3, "the program as written, the function nothing calls, and the run");
   assert.deepEqual(outcome.lines, ["given"], "the run is given the input the check left unknown");
   assert.equal(outcome.end.kind, "completed");
   assert.deepEqual(outcome.phases?.map((p) => [p.name, p.linesBefore]), [["check", 0], ["run", 0]]);
   const [checked, ran] = outcome.phases ?? [];
   assert.equal(ran.result, outcome.result);
-  // The claim in the function nothing calls is the check's: the run never reaches it, and its result holds none of the check's.
-  assert.ok(wordAt(checked.result, 3, 14) !== undefined, JSON.stringify(checked.result.claims.map((c) => c.at?.start)));
+  // The claim in the function nothing calls is the check's broader analysis: the run never reaches it, and its result holds none of the check's.
+  assert.ok(broaderWordAt(checked.result, 3, 14) !== undefined, JSON.stringify(checked.result.broader?.claims.map((c) => c.at?.start)));
   assert.equal(wordAt(ran.result, 3, 14), undefined);
   assert.equal(wordAt(checked.result, 4, 1), "decided");
   const runClaim = ran.result.claims.find((c) => c.at?.start.line === 4);
@@ -1661,21 +1743,23 @@ test("check then run prints what run alone prints and ends as it ends; where the
 test("both commands under --phases check and --phases check,run: the lines, the messages and the exit codes", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "check-run-"));
   try {
-    const programs: Array<[string, string, [string, string, number], [string, string, number]]> = [
-      // name, text, [stdout, stderr, exit code] under check, and under check,run
-      ["reports", 'capability output\ncapability report\nreport.message("m")\nreport.status(3)\noutput.write("done")\n', ["", "", 0], ["done\n", "note: m\n", 3]],
-      ["refuted", 'capability output\noutput.write("hello")\nclaim(2 + 2 == 5)\n', ["", "refuted: a claim that is not true\n", 1], ["", "refuted: a claim that is not true\n", 1]],
-      ["uncalled", 'capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n', ["", "refuted: a claim that is not true\n", 1], ["", "refuted: a claim that is not true\n", 1]],
+    // The finding of a refuted claim comes before the end, with the place in the text: the file's path, or <text> for a record emitted with no name.
+    const refutedAt = (where: string, list: string) => `${where}: error: a claim of the ${list} is refuted: a claim that is not true\nrefuted: a claim that is not true\n`;
+    const programs: Array<[string, string, (source: string) => [string, string, number], (source: string) => [string, string, number]]> = [
+      // name, text, [stdout, stderr, exit code] under check, and under check,run, for the source of the places
+      ["reports", 'capability output\ncapability report\nreport.message("m")\nreport.status(3)\noutput.write("done")\n', () => ["", "", 0], () => ["done\n", "note: m\n", 3]],
+      ["refuted", 'capability output\noutput.write("hello")\nclaim(2 + 2 == 5)\n', (s) => ["", refutedAt(`${s}:3:1`, "program as written"), 1], (s) => ["", refutedAt(`${s}:3:1`, "program as written"), 1]],
+      ["uncalled", 'capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n', (s) => ["", refutedAt(`${s}:2:14`, "broader analysis"), 1], (s) => ["", refutedAt(`${s}:2:14`, "broader analysis"), 1]],
     ];
     for (const [name, text, checked, both] of programs) {
       const file = path.join(dir, `${name}.alg`);
       fs.writeFileSync(file, text);
       const record = path.join(dir, `${name}.json`);
       fs.writeFileSync(record, encode(emitted(text)));
-      for (const [entry, arg] of [["allegretto.ts", file], ["terminal.ts", record]] as const)
-        for (const [phases, [stdout, stderr, status]] of [["check", checked], ["check,run", both]] as const) {
+      for (const [entry, arg, source] of [["allegretto.ts", file, file], ["terminal.ts", record, "<text>"]] as const)
+        for (const [phases, expected] of [["check", checked], ["check,run", both]] as const) {
           const r = command(entry, [arg, "--phases", phases]);
-          assert.deepEqual([r.stdout, r.stderr, r.status], [stdout, stderr, status], `${entry} ${name} --phases ${phases}`);
+          assert.deepEqual([r.stdout, r.stderr, r.status], expected(source), `${entry} ${name} --phases ${phases}`);
         }
     }
     // Run alone prints the line before the false claim, which check, run does not.
@@ -1706,10 +1790,11 @@ test("both commands under --phases check and --phases check,run: the lines, the 
 const TEST_CEILING = ["output", "timer"];
 const TESTING: Phase = { name: "test", test: true, capabilities: TEST_CEILING };
 const TEST_TARGET = (): Target => ({ capabilities: [output, timer(virtualClock().clock)], primitives: shipped });
-/** Launches a text under a test phase, after a check where `checked` is true. */
+/** Launches a text under a test phase, after a check with the shipped checks where `checked` is true. */
 const tested = (text: string, more: { steps?: number; inputs?: Configuration["inputs"]; checked?: boolean } = {}) =>
   launch({
     createKernel,
+    checks: SHIPPED_CHECKS,
     program: emitted(text),
     configuration: {
       ceiling: TEST_CEILING,
@@ -1815,10 +1900,10 @@ test("check then test: the check reaches a false claim in a function no test cal
   const r = recording();
   const passes = await launch({
     createKernel: r.createKernel, program: emitted('capability output\nhelper(n) => claim(n == n)\nexport a() =>\n  helper(1)\n  output.write("a ran")\nexport b() => claim(2 == 2)\n'),
-    configuration: { ceiling: TEST_CEILING, phases: [CHECKING, TESTING] }, target: TEST_TARGET(),
+    configuration: { ceiling: TEST_CEILING, phases: [CHECKING, TESTING] }, target: TEST_TARGET(), checks: SHIPPED_CHECKS,
   });
   assert.equal(r.created(), 1);
-  assert.deepEqual(r.calls.filter((c) => c === "check" || c === "evaluate").slice(0, 2), ["check", "evaluate"]);
+  assert.ok(!r.calls.includes("check"), "the kernel's check is not called");
   assert.deepEqual(passes.phases?.map((p) => p.name), ["check", "test"]);
   assert.deepEqual(testEnds(passes), [["a", "passed"], ["b", "passed"]]);
   assert.deepEqual(passes.lines, ["a ran"]);
@@ -1909,7 +1994,7 @@ test("both commands under --phases check,test: a false claim no test calls is re
     const passing = writeBoth(dir, "passing", "capability output\nexport t() => claim(1 == 1)\n");
     for (const [entry, which] of [["allegretto.ts", "file"], ["terminal.ts", "record"]] as const) {
       const r = command(entry, [refuted[which], "--phases", "check,test"]);
-      assert.deepEqual([r.stdout, r.stderr, r.status], ["", "refuted: a claim that is not true\n", 1], entry);
+      assert.deepEqual([r.stdout, r.stderr, r.status], ["", `${refuted.file}:2:14: error: a claim of the broader analysis is refuted: a claim that is not true\nrefuted: a claim that is not true\n`, 1], entry);
       const tests = command(entry, [refuted[which], "--phases", "test"]);
       assert.deepEqual([tests.stdout, tests.status], ["test t: passed\ntests: 1 passed, 0 failed\n", 0], `${entry}: the test alone does not reach the claim`);
       const p = command(entry, [passing[which], "--phases", "check,test"]);
@@ -1920,5 +2005,383 @@ test("both commands under --phases check,test: a false claim no test calls is re
     assert.deepEqual([later.stdout, later.stderr, later.status], ["", 'the setting later is given with the phases "test": no later phase follows the tests\n', 1]);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+// ── A check on ordinary evaluation, and the checks (chunk Q13, part 7) ─
+//
+// A check is evaluations the launcher makes with `speculative`: the
+// program as written, then what the checks choose of what was left
+// untouched (`Launch.checks`, next/launch/checks.ts). Every test here
+// passes on both kernel variants. It asserts what must be present: for
+// `untouched`, the things that must be told, never that nothing else is.
+
+/** The kernel `createKernel` gives, wrapped so each `evaluate` is recorded with its expression and its result, and each module function made. */
+function speculating(): { createKernel: () => Kernel; kernel: () => Kernel; evaluated: Array<{ expression: Value; speculative: boolean; result: import("../kernel/interface.js").Result }>; modules: Value[] } {
+  const evaluated: Array<{ expression: Value; speculative: boolean; result: import("../kernel/interface.js").Result }> = [];
+  const modules: Value[] = [];
+  let made: Kernel | undefined;
+  const create = () => {
+    const inner = createKernel();
+    made = inner;
+    return new Proxy(inner, {
+      get(target, name, receiver) {
+        const v = Reflect.get(target, name, receiver);
+        if (typeof v !== "function") return v;
+        return (...args: unknown[]) => {
+          const out = (v as (...a: unknown[]) => unknown).apply(target, args);
+          if (name === "evaluate") evaluated.push({ expression: args[0] as Value, speculative: (args[1] as { speculative?: boolean } | undefined)?.speculative === true, result: out as import("../kernel/interface.js").Result });
+          if (name === "module") modules.push(out as Value);
+          return out;
+        };
+      },
+    });
+  };
+  return { createKernel: create, kernel: () => made!, evaluated, modules };
+}
+
+/** Checks that answer as `answer` does and record what they were asked, and the result `findings` was given. */
+function askingChecks(answer: (item: UntouchedData) => boolean, found: (r: LaunchResult) => Finding[] = () => []): { checks: Checks; asked: UntouchedData[]; given: LaunchResult[] } {
+  const asked: UntouchedData[] = [];
+  const given: LaunchResult[] = [];
+  return {
+    checks: {
+      into: (item) => {
+        asked.push(item);
+        return answer(item);
+      },
+      findings: (r) => {
+        given.push(r);
+        return found(r);
+      },
+    },
+    asked,
+    given,
+  };
+}
+
+/** A module with a called function, an uncalled one, an unread binding and a list holding a function. */
+const FOUR_KINDS = 'capability output\nf(n) => n + 1\nunused(n) => claim(n == 2)\nx = 3 + 4\nl = [(m) => claim(m == 1)]\nclaim(f(1) == 2)\n';
+
+/**
+ * The handle of each thing a check went into after the first evaluation: a
+ * function, called with an unfilled cell for each parameter, by the
+ * function; anything else by its value.
+ */
+function goneIntoHandles(s: ReturnType<typeof speculating>): Value[] {
+  const k = s.kernel();
+  return s.evaluated.slice(1).map(({ expression: e }) => {
+    if (k.kind(e) !== "expression") return e;
+    const { fn, args } = k.expressionOf(e);
+    return args.length > 0 && args.every((a) => k.isCell(a) && !k.filled(a as Cell)) ? fn : e;
+  });
+}
+const goneInto = (s: ReturnType<typeof speculating>): number => s.evaluated.length - 1;
+
+const toldAt = (result: LaunchResult, kind: string, line: number, column: number) =>
+  (result.untouched ?? []).find((u) => u.kind === kind && u.at?.start.line === line && u.at.start.column === column);
+
+test("with no checks handed a check goes into nothing beyond the program as written, and lists as untouched all the kernel told but the module's function", async () => {
+  const s = speculating();
+  const outcome = await launch({ createKernel: s.createKernel, program: emitted(FOUR_KINDS), configuration: checkThen(), target: SHIPPED_TARGET });
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(s.evaluated.length, 1, "one evaluation: the program as written");
+  assert.ok(s.evaluated[0].speculative, "with speculative");
+  const result = resultOf(outcome);
+  assert.equal(wordAt(result, 6, 1), "decided", "the call made decides the claim in the program as written");
+  assert.deepEqual(result.broader?.claims, [], "nothing was gone into after the first");
+  assert.deepEqual(result.findings, []);
+  // What must be told: the called function, the uncalled one, the unread bindings.
+  const f = toldAt(result, "function", 2, 1);
+  assert.ok(f?.kind === "function" && f.called && f.parameters === 1, JSON.stringify(result.untouched));
+  const unused = toldAt(result, "function", 3, 1);
+  assert.ok(unused?.kind === "function" && !unused.called, JSON.stringify(result.untouched));
+  assert.ok(toldAt(result, "binding", 4, 5) !== undefined && toldAt(result, "binding", 5, 5) !== undefined, JSON.stringify(result.untouched));
+  // The list is the kernel's, each handle once, with the module's own function left out.
+  const [module] = s.modules;
+  const kernelTold = new Set((s.evaluated[0].result.untouched ?? []).map((u) => u.value));
+  assert.ok(kernelTold.has(module), "the kernel tells the module's function");
+  kernelTold.delete(module);
+  assert.equal(result.untouched?.length, kernelTold.size);
+});
+
+test("the checks are asked about each thing told, as plain data with no handle, and the module's function is never gone into again", async () => {
+  const s = speculating();
+  const a = askingChecks(() => true);
+  const outcome = await launch({ createKernel: s.createKernel, program: emitted(FOUR_KINDS), configuration: checkThen(), target: SHIPPED_TARGET, checks: a.checks });
+  assert.equal(outcome.end.kind, "completed");
+  assert.ok(a.asked.length > 0);
+  for (const item of a.asked) {
+    assert.deepEqual(JSON.parse(JSON.stringify(item)), item, "plain data");
+    assert.ok(Object.keys(item).every((k) => ["kind", "parameters", "called", "at"].includes(k)), JSON.stringify(item));
+  }
+  assert.ok(a.asked.some((u) => u.kind === "function" && u.at?.start.line === 5 && u.at.start.column === 6), "the function in the list, told once the binding is gone into");
+  const [module] = s.modules;
+  const k = s.kernel();
+  for (const e of s.evaluated.slice(1)) {
+    assert.ok(e.speculative);
+    assert.ok(e.expression !== module && !(k.kind(e.expression) === "expression" && k.expressionOf(e.expression).fn === module), "the module's function is not gone into again");
+  }
+  // Each handle is gone into once.
+  assert.equal(goneInto(s), new Set(goneIntoHandles(s)).size);
+  // Going into everything, nothing is left untouched that was told.
+  assert.deepEqual(resultOf(outcome).untouched, []);
+  // The findings are given the check's result as plain data, with the two lists.
+  assert.equal(a.given.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(a.given[0])), a.given[0]);
+  assert.ok(a.given[0].broader !== undefined && a.given[0].untouched !== undefined);
+});
+
+test("each handle is gone into once, and the check ends, for a function that calls itself and for two that call each other", async () => {
+  const text = "capability output\nloop(n) => if n == 0 then 0 else loop(n - 1)\neven(n) => if n == 0 then true else odd(n - 1)\nodd(n) => if n == 0 then false else even(n - 1)\nclaim(loop(3) == 0)\nclaim(even(4))\n";
+  const s = speculating();
+  const outcome = await launch({ createKernel: s.createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: askingChecks(() => true).checks });
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(goneInto(s), new Set(goneIntoHandles(s)).size, "no handle twice");
+  assert.ok(s.evaluated.length >= 4, "the program as written, loop, even and odd");
+});
+
+test("the two lists are kept apart: a claim decided on the call made is decided as written, and waits for every argument in the broader analysis", async () => {
+  const text = "capability output\npositive(n) => claim(n > 0)\npositive(3)\n";
+  const outcome = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
+  assert.equal(outcome.end.kind, "completed", "a claim that waits refutes nothing");
+  const result = resultOf(outcome);
+  assert.equal(wordAt(result, 2, 16), "decided");
+  assert.equal(broaderWordAt(result, 2, 16), "waiting");
+  assert.equal(result.summary, "decided", "the summary is the program as written's");
+  assert.equal(result.broader?.summary, "undecided");
+  // With arguments off, the function a call opened is not gone into: the broader list has no record of the claim.
+  const off = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ arguments: "off" }) });
+  assert.equal(broaderWordAt(resultOf(off), 2, 16), undefined);
+  assert.ok(toldAt(resultOf(off), "function", 2, 1)?.kind === "function", "it is told as untouched");
+});
+
+test("a check ends refuted where either list has a refuted claim or a refutation is listed; the findings are in its result", async () => {
+  const text = 'capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n';
+  const outcome = await launch({ createKernel, program: emitted(text), configuration: checkThen(RUN_AFTER), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
+  assert.equal(describe(outcome.end), "refuted: a claim that is not true");
+  assert.deepEqual(outcome.phases?.map((p) => p.name), ["check"], "no run after it");
+  const result = resultOf(outcome);
+  assert.equal(wordAt(result, 2, 14), undefined, "the program as written does not reach it");
+  assert.equal(broaderWordAt(result, 2, 14), "refuted");
+  assert.deepEqual(result.findings?.map((f) => messageLine(findingMessage(f))), ["<text>:2:14: error: a claim of the broader analysis is refuted: a claim that is not true"]);
+  // With uncalled off the function is told as untouched, and the check completes.
+  const off = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ uncalled: "off" }) });
+  assert.equal(off.end.kind, "completed");
+  assert.ok(toldAt(resultOf(off), "function", 2, 1) !== undefined);
+  assert.deepEqual(resultOf(off).findings, []);
+});
+
+test("a finding of level error ends the launch at the end findings, with the count of errors, and no run follows; a warning does not", async () => {
+  const text = 'capability output\ninput n\nclaim(n == 1)\noutput.write("ran")\n';
+  const waits = (level: "error" | "warning") => launch({ createKernel, program: emitted(text), configuration: checkThen({ ...RUN_AFTER, inputs: { n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 1), bitLength: 64 } } }), target: SHIPPED_TARGET, checks: shippedChecks({ waiting: level }) });
+  const failed = await waits("error");
+  assert.equal(failed.end.kind, "findings");
+  // Two claims wait: the one over n, and the write's, since output is not yet given under the check.
+  assert.deepEqual(failed.end.kind === "findings" && [failed.end.errors, failed.end.reason], [2, "the check's findings hold 2 error(s)"]);
+  assert.equal(describe(failed.end), "findings: the check's findings hold 2 error(s)");
+  assert.deepEqual(failed.lines, [], "no run after it");
+  assert.deepEqual(failed.phases?.map((p) => p.name), ["check"]);
+  assert.deepEqual(resultOf(failed).findings?.map((f) => messageLine(findingMessage(f))), [
+    "<text>:3:1: error: a claim of the program as written waits: the check could not decide it",
+    "<text>:4:1: error: a claim of the program as written waits: the check could not decide it",
+  ]);
+  const warned = await waits("warning");
+  assert.equal(warned.end.kind, "completed");
+  assert.deepEqual(warned.lines, ["ran"]);
+  assert.deepEqual(warned.phases?.[0].result.findings?.map((f) => f.level), ["warning", "warning"], "the check's result keeps its findings");
+  assert.equal(warned.result?.findings, undefined, "the run's result has none");
+  // A refutation outranks the findings, and so does a limit.
+  const refuted = await launch({ createKernel, program: emitted("capability output\ninput n\nclaim(n == 1)\nclaim(1 == 2)\n"), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ waiting: "error" }) });
+  assert.equal(refuted.end.kind, "refuted");
+  const limited = await launch({ createKernel, program: emitted(text), configuration: { ceiling: ["output"], steps: 1, phases: [CHECKING] }, target: SHIPPED_TARGET, checks: shippedChecks({ waiting: "error" }) });
+  assert.equal(limited.end.kind, "limit");
+  // The findings end is no completed end: the exit code is 1.
+  assert.equal(exitCode(failed.end, 0), 1);
+});
+
+test("a capability the check names as not needed stays as handed: the claim a dropped call on it stands for is decided as written", async () => {
+  const program = emitted('capability report\nreport.message("checked")\nclaim(2 + 2 == 4)\n');
+  const outcome = await launch({ createKernel, program, configuration: { ceiling: ["report"], phases: [{ name: "check", check: true, capabilities: ["report"] }] }, target: { capabilities: [report(collector().sink)], primitives: shipped }, checks: SHIPPED_CHECKS });
+  assert.equal(outcome.end.kind, "completed");
+  assert.equal(wordAt(resultOf(outcome), 2, 1), "decided");
+});
+
+test("a binding nothing reads is told and skipped by default, and gone into with unread on; a function held in a list likewise", async () => {
+  const text = "capability output\nx = if 1 == 1 then claim(1 == 2) else 0\nl = [(m) => claim(m == m + 1)]\n";
+  const skipped = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
+  assert.equal(skipped.end.kind, "completed");
+  assert.ok(toldAt(resultOf(skipped), "binding", 2, 5) !== undefined && toldAt(resultOf(skipped), "binding", 3, 5) !== undefined, JSON.stringify(resultOf(skipped).untouched));
+  const read = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ unread: "on" }) });
+  assert.equal(describe(read.end), "refuted: a claim that is not true");
+  assert.equal(broaderWordAt(resultOf(read), 2, 20), "refuted");
+  assert.ok(resultOf(read).broader?.claims.some((c) => c.at?.start.line === 3), "the function in the list is gone into for every argument");
+});
+
+test("a part gone into that comes out refuted as a whole, with no refuted claim, is a refutation at its place", async () => {
+  const text = "capability output\nx = 1 / 0\nclaim(1 == 1)\n";
+  const outcome = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: shippedChecks({ unread: "on" }) });
+  assert.equal(outcome.end.kind, "refuted");
+  const found = resultOf(outcome).refutations.find((r) => r.at?.start.line === 2 && r.at.start.column === 5);
+  assert.ok(found !== undefined, JSON.stringify(resultOf(outcome).refutations));
+  assert.ok(outcome.end.kind === "refuted" && outcome.end.reasons.includes(found.reason));
+  assert.ok(resultOf(outcome).findings?.some((f) => f.level === "error" && f.line === 2 && f.column === 5 && f.text === `a part is refuted: ${found.reason}`));
+  // By default nothing reads x and nothing goes into it.
+  const skipped = await launch({ createKernel, program: emitted(text), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS });
+  assert.equal(skipped.end.kind, "completed");
+});
+
+test("a check's findings are handed to onFindings once, when the check is over: before the run begins, and where the check ends the launch", async () => {
+  const order: string[] = [];
+  const text = 'capability output\ninput n\nclaim(n == 1)\noutput.write("ran")\n';
+  const outcome = await launch({
+    createKernel, program: emitted(text), configuration: checkThen({ ...RUN_AFTER, inputs: { n: { bits: Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 1), bitLength: 64 } } }), target: SHIPPED_TARGET,
+    checks: shippedChecks({ waiting: "note" }), onLine: (line) => order.push(`line ${line}`), onFindings: (found) => order.push(`findings ${found.map((f) => f.line).join(",")}`),
+  });
+  assert.equal(outcome.end.kind, "completed");
+  assert.deepEqual(order, ["findings 3,4", "line ran"]);
+  // Where the check ends the launch, and where it finds nothing.
+  const ended: Array<readonly unknown[]> = [];
+  await launch({ createKernel, program: emitted('capability output\nclaim(1 == 2)\n'), configuration: checkThen(RUN_AFTER), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS, onFindings: (found) => ended.push(found) });
+  assert.equal(ended.length, 1);
+  assert.equal(ended[0].length, 1);
+  const none: Array<readonly unknown[]> = [];
+  await launch({ createKernel, program: emitted("capability output\nclaim(1 == 1)\n"), configuration: checkThen(), target: SHIPPED_TARGET, checks: SHIPPED_CHECKS, onFindings: (found) => none.push(found) });
+  assert.deepEqual(none, [[]]);
+  // A launch with no check calls it never.
+  let called = 0;
+  await launch({ createKernel, program: HELLO, configuration: ONLY_OUTPUT, target: TERMINAL, onFindings: () => called++ });
+  assert.equal(called, 0);
+});
+
+// ── The checks on both commands (chunk Q13, part 7) ───────────────────
+//
+// Both commands end to end: the setting check from the command line and
+// the project's file, the findings on stderr before the end, and the exit
+// codes, the end `findings` among them.
+
+test("both commands take --check: the shipped checks' defaults, and a setting the command line gives", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "checks-flag-"));
+  try {
+    const { file, record } = writeBoth(dir, "uncalled", 'capability output\nunused(n) => claim(1 == 2)\noutput.write("hello")\n');
+    for (const [entry, arg] of [["allegretto.ts", file], ["terminal.ts", record]] as const) {
+      const byDefault = command(entry, [arg, "--phases", "check"]);
+      assert.deepEqual([byDefault.stdout, byDefault.stderr, byDefault.status], ["", `${file}:2:14: error: a claim of the broader analysis is refuted: a claim that is not true\nrefuted: a claim that is not true\n`, 1], entry);
+      const off = command(entry, [arg, "--phases", "check", "--check", "uncalled=off"]);
+      assert.deepEqual([off.stdout, off.stderr, off.status], ["", "", 0], `${entry}: the function nothing calls is not gone into`);
+      const both = command(entry, [arg, "--phases", "check,run", "--check", "uncalled=off", "--check", "waiting=pass"]);
+      assert.deepEqual([both.stdout, both.stderr, both.status], ["hello\n", "", 0], `${entry}: the run follows`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("both commands: a claim that waits at each level of waiting; with error the end is findings, exit 1, and no run follows", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "checks-waiting-"));
+  try {
+    const { file, record } = writeBoth(dir, "waits", 'capability output\ninput n\nclaim(n == 1)\noutput.write("ran")\n');
+    const waits = (level: string) =>
+      `${file}:3:1: ${level}: a claim of the program as written waits: the check could not decide it\n${file}:4:1: ${level}: a claim of the program as written waits: the check could not decide it\n`;
+    for (const [entry, arg] of [["allegretto.ts", file], ["terminal.ts", record]] as const) {
+      const passed = command(entry, [arg, "--phases", "check"]);
+      assert.deepEqual([passed.stdout, passed.stderr, passed.status], ["", "", 0], `${entry}: waiting is pass by default`);
+      for (const level of ["note", "warning"]) {
+        const r = command(entry, [arg, "--phases", "check", "--check", `waiting=${level}`]);
+        assert.deepEqual([r.stdout, r.stderr, r.status], ["", waits(level), 0], `${entry} ${level}`);
+      }
+      const failed = command(entry, [arg, "--phases", "check", "--check", "waiting=error"]);
+      assert.deepEqual([failed.stdout, failed.stderr, failed.status], ["", `${waits("error")}findings: the check's findings hold 2 error(s)\n`, 1], entry);
+    }
+    // Under check,run the run does not follow the end findings.
+    const noRun = command("allegretto.ts", [file, "--phases", "check,run", "--check", "waiting=error", "--input", "n=1"]);
+    assert.deepEqual([noRun.stdout, noRun.status], ["", 1]);
+    assert.match(noRun.stderr, /findings: the check's findings hold 2 error\(s\)\n$/);
+    const warned = command("allegretto.ts", [file, "--phases", "check,run", "--check", "waiting=warning", "--input", "n=1"]);
+    assert.deepEqual([warned.stdout, warned.stderr, warned.status], ["ran\n", waits("warning"), 0], "the findings are handed after the launch");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("npm run allegretto reads check from allegro.json, and a --check flag replaces one setting of it", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "checks-file-"));
+  try {
+    const file = path.join(dir, "main.alg");
+    fs.writeFileSync(file, 'capability output\nunused(n) => claim(1 == 2)\nx = claim(2 == 3)\noutput.write("hello")\n');
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ phases: ["check"], check: { uncalled: "off" } }));
+    const fromFile = command("allegretto.ts", [file]);
+    assert.deepEqual([fromFile.stdout, fromFile.stderr, fromFile.status], ["", "", 0]);
+    const flagOver = command("allegretto.ts", [file, "--check", "uncalled=on"]);
+    assert.deepEqual([flagOver.stdout, flagOver.status], ["", 1]);
+    assert.match(flagOver.stderr, /:2:14: error: a claim of the broader analysis is refuted/);
+    // Each setting by itself: the file's uncalled stands beside the flag's unread, which goes into the binding nothing reads.
+    const merged = command("allegretto.ts", [file, "--check", "unread=on"]);
+    assert.deepEqual([merged.stdout, merged.status], ["", 1]);
+    assert.match(merged.stderr, /:3:5: error: a claim of the broader analysis is refuted/);
+    assert.doesNotMatch(merged.stderr, /:2:14:/);
+    // A project file that sets check, and phases that include no check: the file's check is not used, and the program runs.
+    const ran = command("allegretto.ts", [file, "--phases", "run"]);
+    assert.deepEqual([ran.stdout, ran.stderr, ran.status], ["hello\n", "", 0]);
+    const tests = path.join(dir, "tests.alg");
+    fs.writeFileSync(tests, "capability output\nexport t() => claim(1 == 1)\n");
+    const tested = command("allegretto.ts", [tests, "--phases", "test"]);
+    assert.deepEqual([tested.stdout, tested.stderr, tested.status], ["test t: passed\ntests: 1 passed, 0 failed\n", "", 0]);
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ check: { uncalled: "off", waiting: "error" } }));
+    const byDefault = command("allegretto.ts", [file]);
+    assert.deepEqual([byDefault.stdout, byDefault.stderr, byDefault.status], ["hello\n", "", 0], "with no phases the default run");
+    // The flag under run is a finding still.
+    const flagged = command("allegretto.ts", [file, "--phases", "run", "--check", "unread=on"]);
+    assert.deepEqual([flagged.stdout, flagged.stderr, flagged.status], ["", 'the setting check is set by the command line, and the phases "run" include no check\n', 1]);
+    fs.writeFileSync(path.join(dir, "allegro.json"), JSON.stringify({ phases: ["check"], check: { uncalled: 1 } }));
+    const bad = command("allegretto.ts", [file]);
+    assert.deepEqual([bad.stdout, bad.stderr, bad.status], ["", `${path.join(dir, "allegro.json")}: check is not an object from a check setting's name to its value, written as a JSON string\n`, 1]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("both commands refuse a --check that names no setting, gives a value that is none, has no =, is given twice, or comes with phases that include no check", () => {
+  for (const [entry, arg] of [["allegretto.ts", FIXTURE_TEXT], ["terminal.ts", FIXTURE]] as const) {
+    const cases: Array<[string[], string]> = [
+      [["--phases", "check", "--check", "unused=on"], "the command line sets check unused, which names no check setting: the names are arguments, uncalled, unread and waiting\n"],
+      [["--phases", "check", "--check", "waiting=fail"], 'the command line sets check waiting to "fail", which is none of its values: pass, note, warning and error\n'],
+      [["--phases", "check", "--check", "unread=on", "--check", "unread=off"], "--check unread is given twice\n"],
+      [["--check", "unread=on"], 'the setting check is set by the command line, and the phases "run" include no check\n'],
+    ];
+    for (const [args, stderr] of cases) {
+      const r = command(entry, [arg, ...args]);
+      assert.deepEqual([r.stdout, r.stderr, r.status], ["", stderr, 1], `${entry} ${args.join(" ")}`);
+    }
+    const noValue = command(entry, [arg, "--phases", "check", "--check", "unread"]);
+    assert.equal(noValue.status, 1);
+    assert.match(noValue.stderr, /^--check takes name=value, the name one of arguments, uncalled, unread and waiting\nusage: npm run /);
+  }
+});
+
+test("both commands hand a check's findings when the check is over: under check,run and check,test before the run's or the tests' own messages", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "checks-order-"));
+  try {
+    // Under the check output is not yet given, so the write's claim waits; report is not needed, so the program hands nothing then.
+    const run = writeBoth(dir, "run", 'capability output\ncapability report\noutput.write("ran")\nreport.message("from the run")\n');
+    const tests = writeBoth(dir, "tests", 'capability output\ncapability report\noutput.write("loaded")\nexport t() => report.message("from the test")\n');
+    const finding = (file: string) => `${file}:3:1: warning: a claim of the program as written waits: the check could not decide it\n`;
+    for (const [entry, which] of [["allegretto.ts", "file"], ["terminal.ts", "record"]] as const) {
+      const ran = command(entry, [run[which], "--phases", "check,run", "--check", "waiting=warning"]);
+      assert.deepEqual([ran.stdout, ran.stderr, ran.status], ["ran\n", `${finding(run.file)}note: from the run\n`, 0], entry);
+      const tested = command(entry, [tests[which], "--phases", "check,test", "--check", "waiting=warning"]);
+      assert.deepEqual([tested.stdout, tested.stderr, tested.status], ["test t: passed\ntests: 1 passed, 0 failed\n", `${finding(tests.file)}note: from the test\n`, 0], entry);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the terminal's usage names --check on both commands", () => {
+  for (const entry of ["terminal.ts", "allegretto.ts"] as const) {
+    const r = command(entry, []);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /\[--check <name>=<value>\]\.\.\./, entry);
   }
 });

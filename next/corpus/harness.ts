@@ -59,10 +59,16 @@
 //                                                            directories m1 to mN,
 //                                                            and rows 1 to N
 //   npx tsx next/corpus/harness.ts --next --file <program>   one program
+//   npx tsx next/corpus/harness.ts --next --kernel <name>    on the kernel variant
+//                                                            named, reference or
+//                                                            machine
 //
 // It runs each program in process with `runProgram` of
 // next/corpus/allegretto.ts, the implementation the programs' test uses:
-// emitted with the texts it imports, launched on the kernel next/kernel/create.ts gives, and
+// emitted with the texts it imports, launched on a kernel of the variant
+// `--kernel` names (`createKernelOf` of next/kernel/create.ts), else of the
+// launcher's default, `machine` (`DEFAULT_KERNEL` of
+// next/launch/kernel-variant.ts), and
 // its lines, end and yielded keys compared with its pins. The texts a
 // program imports, under a directory of its own, are no programs and are
 // not run alone (next/corpus/allegretto/README.md). A case is realised when a passing program
@@ -82,6 +88,8 @@ import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import { CASES_PATH, type Case, type CaseClass, type Corpus, type PinCase } from "../tools/corpus.js";
+import type { CreateKernel } from "../kernel/interface.js";
+import { DEFAULT_KERNEL, kernelOf, variantFinding } from "../launch/kernel-variant.js";
 import { milestoneOf, programFiles, readPins, readUnder, runProgram } from "./allegretto.js";
 
 // ── The runner ────────────────────────────────────────────────────────
@@ -386,13 +394,13 @@ export interface NextReport {
   notes: string[];
 }
 
-/** Run each program with `runProgram`, in process, one after another. */
-export async function runNextPrograms(root: string, files: string[]): Promise<NextProgram[]> {
+/** Run each program with `runProgram`, in process, one after another, on kernels `createKernel` makes: by default of the variant in use. */
+export async function runNextPrograms(root: string, files: string[], createKernel?: CreateKernel): Promise<NextProgram[]> {
   const out: NextProgram[] = [];
   for (const file of files) {
     const text = fs.readFileSync(path.join(root, file), "utf-8");
     let problems: string[];
-    try { problems = (await runProgram(text, file, readUnder(root))).problems; }
+    try { problems = (await runProgram(text, file, readUnder(root), createKernel)).problems; }
     catch (e) { problems = [`the run threw: ${(e as Error).message}`]; }
     out.push({ file, milestone: milestoneOf(file), realises: readPins(text).realises, problems });
   }
@@ -471,11 +479,11 @@ export function nextFailed(report: NextReport): boolean {
 
 function usage(msg: string): never {
   console.error(msg);
-  console.error("usage: npx tsx next/corpus/harness.ts --present|--next [--milestone N] [--file <program>]");
+  console.error("usage: npx tsx next/corpus/harness.ts --present|--next [--milestone N] [--file <program>] [--kernel <reference|machine>]");
   process.exit(2);
 }
 
-async function nextMain(root: string, corpus: Corpus, upTo: number, only: string | undefined, msGiven: boolean): Promise<void> {
+async function nextMain(root: string, corpus: Corpus, upTo: number, only: string | undefined, msGiven: boolean, kernel: string): Promise<void> {
   let files = programFiles(root);
   if (only !== undefined) {
     if (!files.includes(only)) usage(`${only} is no program under next/corpus/allegretto/`);
@@ -483,7 +491,7 @@ async function nextMain(root: string, corpus: Corpus, upTo: number, only: string
   }
   if (msGiven) files = files.filter((f) => { const m = milestoneOf(f); return m === null || m <= upTo; });
   const started = Date.now();
-  const report = buildNextReport(corpus, await runNextPrograms(root, files), upTo);
+  const report = buildNextReport(corpus, await runNextPrograms(root, files, kernelOf(kernel)), upTo);
   for (const f of report.findings) console.log(f);
   for (const n of report.notes) console.log(n);
   for (const r of formatNextRows(report)) console.log(r);
@@ -505,8 +513,15 @@ async function main(): Promise<void> {
   const msArg = value("--milestone");
   const upTo = msArg === undefined ? 9 : Number(msArg);
   if (!Number.isInteger(upTo) || upTo < 1 || upTo > 9) usage(`--milestone takes 1 to 9, not ${msArg}`);
+  const kernel = value("--kernel");
+  if (kernel !== undefined && present) usage("--kernel names a kernel variant of the new tree, and --present runs the present tree");
+  const refused = kernel === undefined ? undefined : variantFinding(kernel);
+  if (refused !== undefined) {
+    console.error(refused);
+    process.exit(1);
+  }
   const corpus = JSON.parse(fs.readFileSync(path.join(root, CASES_PATH), "utf-8")) as Corpus;
-  if (next) return nextMain(root, corpus, upTo, value("--file"), msArg !== undefined);
+  if (next) return nextMain(root, corpus, upTo, value("--file"), msArg !== undefined, kernel ?? DEFAULT_KERNEL);
   const byProgram = pinsByProgram(corpus);
   let files = [...byProgram.keys()];
   const only = value("--file");

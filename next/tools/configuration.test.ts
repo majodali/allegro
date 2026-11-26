@@ -3,27 +3,29 @@
 // result holds), part 2, part 3 for the setting `phases`, and part 5 for
 // check as a check phase and for check then run; chunk Q16
 // (the capabilities the launchers ship), part 3, for the check
-// capabilities; chunk Q13, part 6, for the test phase): `resolve`,
-// `shapeOf`, `readProjectFile` and `readEnvironment` of
+// capabilities; chunk Q13, part 6, for the test phase; chunk Q13, part 7,
+// for the setting `check`): `resolve`,
+// `shapeOf` and `readProjectFile` of
 // next/tools/configuration.ts, and the result's list
 // of sources from the launcher (next/launch/launcher.ts). Run by
 // `npm run test:next`, on the kernel `createKernel` of
-// next/kernel/create.ts gives: the variant that keeps its own stack, or the
-// reference with `ALLEGRO_KERNEL=reference`. The two commands end to end are
+// next/launch/kernel-variant.ts gives: the variant that keeps its own
+// stack, and the reference where next/launch/reference-run.ts loads this
+// file. The two commands end to end are
 // tested in next/launch/launcher.test.ts.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
-import { createKernel } from "../kernel/create.js";
+import { createKernel } from "../launch/kernel-variant.js";
 import { encode, type SavedProgram } from "../kernel/saved-program.js";
 import { emit } from "../bootstrap/emit.js";
 import { readLiteral } from "../bootstrap/literal.js";
 import { launch, type Inputs, type Plain, type SourceName } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
 import { shipped } from "../prims/index.js";
-import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, TEST_PHASE_VALUES, readEnvironment, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
+import { CHECK_CAPABILITIES, MAY_SET, PHASE_VALUES, PROJECT_FILE, SETTINGS, SOURCES, TEST_PHASE_VALUES, readProjectFile, resolve, shapeOf, type Resolved, type Settings, type Setting, type Sources } from "./configuration.js";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const text = (t: string): Plain => ({ bits: new TextEncoder().encode(t) });
@@ -45,11 +47,15 @@ function valueOf(setting: Setting, source: SourceName): Settings[Setting] {
     case "kernel":
       return `variant-${i}`;
     case "phases":
-      // Three values are built, so the four sources share them.
-      return [["check"], ["run"], ["check", "run"], ["run"]][i];
+      // Three values are built, one for each source.
+      return [["check"], ["run"], ["check", "run"]][i];
+    case "check":
+      return { waiting: ["note", "warning", "error"][i] };
   }
 }
-const one = (setting: Setting, source: SourceName): Sources => ({ [source]: { [setting]: valueOf(setting, source) } });
+/** A source's settings with one value of a setting; with check, the phases check from the same source, since check is read only under a check. */
+const settingIn = (setting: Setting, source: SourceName): Settings => ({ [setting]: valueOf(setting, source), ...(setting === "check" ? { phases: ["check"] } : {}) });
+const one = (setting: Setting, source: SourceName): Sources => ({ [source]: settingIn(setting, source) });
 
 function resolved(r: Resolved): Extract<Resolved, { ok: true }> {
   assert.ok(r.ok, r.ok ? "" : r.findings.join("; "));
@@ -72,15 +78,17 @@ function valueIn(r: Extract<Resolved, { ok: true }>, setting: Setting): unknown 
       return r.kernel;
     case "phases":
       return r.configuration.phases?.map((p) => p.name) ?? ["run"];
+    case "check":
+      return r.check;
   }
 }
 const sourceOf = (r: Extract<Resolved, { ok: true }>, setting: string) => r.sources.find((s) => s.setting === setting)?.source;
-const nameOf = (setting: Setting) => (setting === "inputs" ? "inputs.n" : setting);
+const nameOf = (setting: Setting) => (setting === "inputs" ? "inputs.n" : setting === "check" ? "check.waiting" : setting);
 
-test("the table: steps, inputs, later and phases from any source; ceiling, restore and kernel from the command line and the launcher only", () => {
-  assert.deepEqual([...SETTINGS], ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases"]);
-  assert.deepEqual([...SOURCES], ["command line", "file", "environment", "launcher"]);
-  for (const s of ["steps", "inputs", "later", "phases"] as const) assert.deepEqual([...MAY_SET[s]], [...SOURCES]);
+test("the table: steps, inputs, later, phases and check from any source; ceiling, restore and kernel from the command line and the launcher only", () => {
+  assert.deepEqual([...SETTINGS], ["steps", "inputs", "later", "ceiling", "restore", "kernel", "phases", "check"]);
+  assert.deepEqual([...SOURCES], ["command line", "file", "launcher"]);
+  for (const s of ["steps", "inputs", "later", "phases", "check"] as const) assert.deepEqual([...MAY_SET[s]], [...SOURCES]);
   for (const s of ["ceiling", "restore", "kernel"] as const) assert.deepEqual([...MAY_SET[s]], ["command line", "launcher"]);
 });
 
@@ -89,7 +97,8 @@ test("each setting is taken from each source that may set it, alone, and the sou
     for (const source of MAY_SET[setting]) {
       const r = resolved(resolve(one(setting, source)));
       assert.deepEqual(valueIn(r, setting), valueOf(setting, source), `${setting} from ${source}`);
-      assert.deepEqual(r.sources, [{ setting: nameOf(setting), source }], `${setting} from ${source}`);
+      // Check comes with the phases check from the same source.
+      assert.deepEqual(r.sources, [...(setting === "check" ? [{ setting: "phases", source }] : []), { setting: nameOf(setting), source }], `${setting} from ${source}`);
     }
 });
 
@@ -99,13 +108,13 @@ test("a higher source replaces a lower one, for every pair of sources that may b
     const allowed = MAY_SET[setting];
     for (const [hi, higher] of allowed.entries())
       for (const lower of allowed.slice(hi + 1)) {
-        const r = resolved(resolve({ [higher]: { [setting]: valueOf(setting, higher) }, [lower]: { [setting]: valueOf(setting, lower) } }));
+        const r = resolved(resolve({ [higher]: settingIn(setting, higher), [lower]: settingIn(setting, lower) }));
         assert.deepEqual(valueIn(r, setting), valueOf(setting, higher), `${setting}: ${higher} over ${lower}`);
         assert.equal(sourceOf(r, nameOf(setting)), higher);
         pairs++;
       }
   }
-  assert.equal(pairs, 4 * 6 + 3 * 1);
+  assert.equal(pairs, 5 * 3 + 3 * 1);
 });
 
 test("a value missing from one source is taken from the next below it", () => {
@@ -121,19 +130,16 @@ test("inputs are merged by input name: each from the highest source that supplie
   const r = resolved(resolve({
     "command line": { inputs: { a: text("a from the command line") } },
     file: { inputs: { a: text("a from the file"), b: text("b from the file") } },
-    environment: { inputs: { c: text("c from the environment") } },
     launcher: { inputs: { b: text("b from the launcher"), d: text("d from the launcher") } },
   }));
   assert.deepEqual(r.configuration.inputs, {
     a: text("a from the command line"),
     b: text("b from the file"),
-    c: text("c from the environment"),
     d: text("d from the launcher"),
   });
   assert.deepEqual(r.sources, [
     { setting: "inputs.a", source: "command line" },
     { setting: "inputs.b", source: "file" },
-    { setting: "inputs.c", source: "environment" },
     { setting: "inputs.d", source: "launcher" },
   ]);
 });
@@ -144,14 +150,13 @@ test("a setting from a source that may not set it is refused, naming the setting
     for (const source of SOURCES.filter((s) => !MAY_SET[setting].includes(s))) {
       const r = resolve({ ...one(setting, source), launcher: { ceiling: ["output", "timer"] } });
       assert.equal(r.ok, false, `${setting} from ${source}`);
-      const phrase = source === "file" ? `the project's file ${PROJECT_FILE}` : `the ${source}`;
-      assert.deepEqual(r.ok ? [] : r.findings, [`the setting ${setting} is set by ${phrase}, which may not set it: only the command line and the launcher may`]);
+      assert.deepEqual(r.ok ? [] : r.findings, [`the setting ${setting} is set by the project's file ${PROJECT_FILE}, which may not set it: only the command line and the launcher may`]);
       pairs++;
     }
-  assert.equal(pairs, 6);
+  assert.equal(pairs, 3);
   // Beside a source that may set it, the refusal still stands.
-  const both = resolve({ "command line": { kernel: "a" }, environment: { kernel: "b" } });
-  assert.deepEqual(both.ok ? [] : both.findings, ["the setting kernel is set by the environment, which may not set it: only the command line and the launcher may"]);
+  const both = resolve({ "command line": { kernel: "a" }, file: { kernel: "b" } });
+  assert.deepEqual(both.ok ? [] : both.findings, [`the setting kernel is set by the project's file ${PROJECT_FILE}, which may not set it: only the command line and the launcher may`]);
 });
 
 test("the command line's ceiling narrows the launcher's, and a name the launcher's ceiling does not grant is refused", () => {
@@ -169,15 +174,12 @@ test("no budget where no source sets one", () => {
   const r = resolved(resolve({ file: { inputs: { n: text("x") } }, launcher: { ceiling: ["output"] } }));
   assert.equal(r.configuration.steps, undefined);
   assert.equal(sourceOf(r, "steps"), undefined);
-  const env = readEnvironment({});
-  assert.deepEqual(env, { ok: true, settings: {} });
 });
 
-test("the environment gives the step budget from ALLEGRO_STEPS, a whole number, and a value that is not one is a finding", () => {
-  assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: "250", ALLEGRO_KERNEL: "machine" }), { ok: true, settings: { steps: 250 } });
-  assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: "" }), { ok: true, settings: {} });
-  for (const bad of ["-1", "2.5", "many", "1e3"])
-    assert.deepEqual(readEnvironment({ ALLEGRO_STEPS: bad }), { ok: false, findings: [`the environment's ALLEGRO_STEPS is not a whole number: ${JSON.stringify(bad)}`] });
+test("the environment is no source: the resolver names none, and the module exports nothing that reads it", async () => {
+  assert.ok(!(SOURCES as readonly string[]).includes("environment"));
+  const exported = Object.keys(await import("./configuration.js"));
+  assert.ok(!exported.includes("readEnvironment") && !exported.includes("STEPS_VARIABLE"), exported.join(", "));
 });
 
 test("the project's file is read: each setting by its name, inputs and later as literals written as JSON strings", () => {
@@ -207,7 +209,7 @@ test("the project file's findings: JSON that does not parse, not an object, an u
   };
   assert.match(findings("{ steps: 1 ")[0], /^dir\/allegro\.json: the file is not JSON: /);
   assert.deepEqual(findings("[1]"), ["dir/allegro.json: the file is not a JSON object whose keys are setting names"]);
-  assert.deepEqual(findings('{"budget": 3}'), ['dir/allegro.json: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases']);
+  assert.deepEqual(findings('{"budget": 3}'), ['dir/allegro.json: "budget" is not a setting; the settings are steps, inputs, later, ceiling, restore, kernel, phases, check']);
   assert.deepEqual(findings('{"steps": "3"}'), ["dir/allegro.json: steps is not a whole number"]);
   assert.deepEqual(findings('{"steps": -1}'), ["dir/allegro.json: steps is not a whole number"]);
   assert.deepEqual(findings('{"inputs": ["1"]}'), ["dir/allegro.json: inputs is not an object from an input's name to a literal written as a JSON string"]);
@@ -229,14 +231,11 @@ function emitted(source: string): SavedProgram {
 }
 
 test("a run's result names the source of each value of its configuration: values from three sources", async () => {
-  const env = readEnvironment({ ALLEGRO_STEPS: "10000000" });
-  assert.ok(env.ok);
-  const file = readProjectFile(PROJECT_FILE, JSON.stringify({ inputs: { a: '"from the file"', b: '"replaced"' } }));
+  const file = readProjectFile(PROJECT_FILE, JSON.stringify({ steps: 10000000, inputs: { a: '"from the file"', b: '"replaced"' } }));
   assert.ok(file.ok, file.ok ? "" : file.findings.join("; "));
   const r = resolved(resolve({
     "command line": { inputs: { b: text("from the command line") } },
     file: file.settings,
-    environment: env.settings,
     launcher: { ceiling: ["output"] },
   }));
   const outcome = await launch({
@@ -249,7 +248,7 @@ test("a run's result names the source of each value of its configuration: values
   assert.deepEqual(outcome.lines, ["from the file", "from the command line"]);
   assert.equal(outcome.end.kind, "completed");
   assert.deepEqual(outcome.result?.restsOn.configuration, [
-    { setting: "steps", source: "environment" },
+    { setting: "steps", source: "file" },
     { setting: "inputs.b", source: "command line" },
     { setting: "inputs.a", source: "file" },
     { setting: "ceiling", source: "launcher" },
@@ -380,4 +379,75 @@ test("the project's file sets the phases test, and a flag replaces it", () => {
   assert.deepEqual(r.configuration.phases?.map((p) => [p.name, p.test === true]), [["test", true]]);
   const over = resolved(resolve({ "command line": { phases: ["run"] }, file: file.settings, launcher: CEILING3 }));
   assert.equal(over.configuration.phases, undefined);
+});
+
+// ── The setting check (chunk Q13, part 7) ─────────────────────────────
+
+test("the setting check: each of the four from each source, each resolved by itself, and the source of each named", () => {
+  const values = { arguments: "off", uncalled: "off", unread: "on", waiting: "warning" } as const;
+  for (const source of SOURCES)
+    for (const [name, value] of Object.entries(values)) {
+      const r = resolved(resolve({ [source]: { phases: ["check"], check: { [name]: value } } }));
+      assert.deepEqual(r.check, { [name]: value }, `${name} from ${source}`);
+      assert.equal(sourceOf(r, `check.${name}`), source);
+    }
+  // Merged by name: each from the highest source that sets it.
+  const r = resolved(resolve({
+    "command line": { phases: ["check", "run"], check: { arguments: "off" } },
+    file: { check: { arguments: "on", waiting: "error" } },
+    launcher: { check: { unread: "on", waiting: "note" } },
+  }));
+  assert.deepEqual(r.check, { arguments: "off", unread: "on", waiting: "error" });
+  assert.deepEqual(r.sources.filter((s) => s.setting.startsWith("check.")), [
+    { setting: "check.arguments", source: "command line" },
+    { setting: "check.unread", source: "launcher" },
+    { setting: "check.waiting", source: "file" },
+  ]);
+  // No source sets it: none, and the shipped checks have their defaults.
+  assert.deepEqual(resolved(resolve({ "command line": { phases: ["check"] } })).check, {});
+});
+
+test("a name or a value of check that is none is a finding, naming the source", () => {
+  const cases: Array<[Sources, string]> = [
+    [{ "command line": { phases: ["check"], check: { unused: "on" } } }, "the command line sets check unused, which names no check setting: the names are arguments, uncalled, unread and waiting"],
+    [{ file: { phases: ["check"], check: { unread: "yes" } } }, `the project's file ${PROJECT_FILE} sets check unread to "yes", which is none of its values: on and off`],
+    [{ launcher: { phases: ["check"], check: { waiting: "fail" } } }, 'the launcher sets check waiting to "fail", which is none of its values: pass, note, warning and error'],
+  ];
+  for (const [sources, finding] of cases) {
+    const r = resolve(sources);
+    assert.deepEqual(r.ok ? [] : r.findings, [finding]);
+  }
+});
+
+test("check is read under any phases that include a check; under phases that include none the command line's is a finding", () => {
+  for (const phases of [["check"], ["check", "run"], ["check", "test"]])
+    assert.deepEqual(resolved(resolve({ "command line": { phases, check: { waiting: "error" } } })).check, { waiting: "error" }, phases.join(", "));
+  for (const [phases, value] of [[undefined, "run"], [["run"], "run"], [["test"], "test"]] as const) {
+    const r = resolve({ "command line": { ...(phases === undefined ? {} : { phases: [...phases] }), check: { unread: "on" } } });
+    assert.deepEqual(r.ok ? [] : r.findings, [`the setting check is set by the command line, and the phases ${JSON.stringify(value)} include no check`]);
+  }
+});
+
+test("the project file's check is not used under phases that include no check: under run, under test and with no phases, and its sources are not listed", () => {
+  for (const phases of [undefined, ["run"], ["test"]] as const) {
+    const r = resolved(resolve({ ...(phases === undefined ? {} : { "command line": { phases: [...phases] } }), file: { check: { unread: "on", waiting: "error" } } }));
+    assert.deepEqual(r.check, {}, JSON.stringify(phases));
+    assert.ok(!r.sources.some((s) => s.setting.startsWith("check")), JSON.stringify(r.sources));
+  }
+  // Under check the file's settings are used, and the command line's wins by name.
+  const both = resolved(resolve({ "command line": { phases: ["check"], check: { unread: "off" } }, file: { check: { unread: "on", waiting: "error" } } }));
+  assert.deepEqual(both.check, { unread: "off", waiting: "error" });
+  assert.deepEqual(both.sources.filter((s) => s.setting.startsWith("check.")), [
+    { setting: "check.unread", source: "command line" },
+    { setting: "check.waiting", source: "file" },
+  ]);
+});
+
+test("the project's file reads check as an object from a setting's name to its value", () => {
+  const r = readProjectFile("dir/allegro.json", JSON.stringify({ phases: ["check"], check: { arguments: "off", waiting: "warning" } }));
+  assert.deepEqual(r, { ok: true, settings: { phases: ["check"], check: { arguments: "off", waiting: "warning" } } });
+  for (const bad of [{ check: ["arguments"] }, { check: { arguments: false } }, { check: "off" }]) {
+    const read = readProjectFile("dir/allegro.json", JSON.stringify(bad));
+    assert.deepEqual(read.ok ? [] : read.findings, ["dir/allegro.json: check is not an object from a check setting's name to its value, written as a JSON string"], JSON.stringify(bad));
+  }
 });
