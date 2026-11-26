@@ -1688,6 +1688,22 @@ Plan `docs/plans/rebuild-acceptance.md`; lane Q; merge on green where a
 chunk's row says so. Opened 2026-11-13 with the plan; entries newest
 first, directly below this line.
 
+### 2026-11 — A check on ordinary evaluation, and the checks a project chooses (B-196, chunk Q13 (check and run as configurations, and what a result holds), part 7)
+
+B-196 (the rebuild's acceptance side). A check is now evaluations the
+launcher makes with the kernel's `speculative`, and no call of the
+kernel's `check`. The first is the program as written. The checks
+(`next/launch/checks.ts`) choose what else is gone into of what an
+evaluation left untouched, and say what the check found. The shipped
+checks take four settings, `arguments`, `uncalled`, `unread` and
+`waiting`, from `--check name=value` and the project's file. A check's
+result keeps the claims of the program as written apart from those of
+the broader analysis, and lists what was not gone into. Its findings go
+to stderr, and a finding of level `error` ends the launch at the new end
+`findings`. The corpus gains `// check:`, `// broader claim at:` and
+`// untouched:`, and thirteen programs, `m3/checks-*.alg` and
+`m3/checks-import/`.
+
 ### 2026-11 — The command line alone chooses, and six names the emitter writes (B-196)
 
 B-196 (the rebuild's acceptance side). By the maintainer's rulings, the
