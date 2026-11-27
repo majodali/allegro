@@ -574,6 +574,12 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-02 — `use` is a reserved word; the rulings on PR #324.**
+  A notation that adds a line of a name and an expression left a later
+  `use` line two readings; `use` is now no name, as `import` is. One
+  test. Recorded with it: a rival of a line that asks for a change
+  ends at the same byte; and the rule to come for "A notation a text
+  uses can only add", which checks the text and not the grammar.
 - **2026-12-01 — A text changes the grammar it is read in (chunk E8 of
   the book pass, first part).** `use m.a` brings a notation: a list of
   changes a module exports, named by its path. The engine reads a

@@ -80,6 +80,8 @@ claim(count(u.items[0].body.items) == 2 && u.items[0].body.items[0].k == `use &&
 claim(attempt(tree("use a.b\n"), 1000000).reason == "a line asks for a change of the grammar, and whoever began the reading takes none")
 // The line ends at one place: a path or a list cut short is no reading of it.
 claim(is_failure(engine.parses_with(p, "use a. \n", "", [], unchanged)) && is_failure(engine.parses_with(p, "use a changing\n", "", [], unchanged)))
+// `use` is a reserved word, as `import` is: no name, so a notation that adds a line beginning with a name leaves a `use` line one reading.
+claim(is_failure(engine.parses(p, "use = 1\n")) && is_failure(engine.parses(p, "x = use\n")) && !is_failure(engine.parses(p, "used = 1\n")))
 // The lines of a module and of a block are one rule, and the operators are a rule a notation can add a level to.
 claim(allegretto.language.rules.lines.op == `turns && kind(allegretto.language.rules.operators) == `structure)
 

@@ -180,6 +180,23 @@ test("a notation whose form reads what a form in force reads gives two readings,
   assert.deepEqual(r.findings, ["main: the text reads two ways"]);
 });
 
+test("a notation that adds a line of a name and an expression leaves a later `use` one reading: `use` is no name", DEPTH, () => {
+  const commands = [
+    "capability output",
+    "import change",
+    "import grammar",
+    "export said(what, v) => output.write(what ++ \" \" ++ int.text(v))",
+    "line = grammar.giving(grammar.seq([grammar.guard(grammar.lit(\"output\"), false), grammar.ref(`name), grammar.ref(`expression)]), (v, at) => {header: false, k: `statement, expr: {k: `apply, fn: {k: `from, module: \"commands\", name: \"said\", at: at}, args: [{k: `text, bytes: v[1].name, at: at}, v[2]], at: at}, at: at})",
+    "export empty = []",
+    "export lines = [change.add(`name, grammar.giving(grammar.unless(grammar.spaced(grammar.run(\"a word\", \"az\")), `keywords), (v, at) => {name: v})), change.append(`line, line)]",
+    "",
+  ].join("\n");
+  // `use commands.empty` would read as the word `use` and the expression `commands.empty` too, were `use` a name.
+  const r = run(`capability output\nuse commands.lines changing line\nshow 7\nuse commands.empty\ntell 2\n`, { commands });
+  assert.deepEqual(r.findings, [], told(r));
+  assert.deepEqual(r.lines, ["show 7", "tell 2"]);
+});
+
 test("a module that uses itself, through another, is refused", DEPTH, () => {
   const a = "use b.n\nexport n = []\n";
   const b = "use a.n\nexport n = []\n";

@@ -2480,6 +2480,26 @@ its approval.
   - *Not in this part*: the named parts of the parser's state, ruled
     for E8 on PR #314. Until then a notation brings no terminal that
     reads or changes the state, as before.
+- **2026-12-02 — rulings on PR #324 (chunk E8, first part)** (the
+  review session). The term `turns` is ratified.
+  - *`changing` nearly everywhere.* Ruled: the text is checked and not
+    the grammar. After a `use`, each line is also read in the grammar
+    before it, and a different tree is refused. Adding then needs no
+    `changing`. Built in E8's second part; until then `changing` is
+    needed as built. The inventory's entry "A notation a text uses can
+    only add" has the discussion and the example.
+  - *The hidden binding*: no import needed; a module is a dependency
+    only where a part of the tree reads it; the binding is the module
+    as `import` with no list gives it. Confirmed.
+  - *E8 in two parts.* Confirmed. The second part: the comparison of
+    lines above, and the named parts of the parser's state.
+  - *Rivals.* A rival of a line that asks for a change ends at the same
+    byte. `use` is a reserved word, added with this ruling to the same
+    PR. `capability`, `input` and `key` are raised with the acceptance
+    stream.
+  - *Until the loader*: a module with a key cannot be used, and the
+    engine's own modules are handed over as the reader holds them.
+    Confirmed.
 
 ## 8. Sessions
 

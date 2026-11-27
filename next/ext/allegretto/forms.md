@@ -316,6 +316,10 @@ notation acts from the line after it, to the end of the block it is
 written in. It is the one declaration a block may hold. At the top
 level it holds to the end of the text.
 
+`use` is a reserved word, as `import` is, and no name. A notation may
+add a line that begins with a name; were `use` a name, a `use` line
+after it would read two ways.
+
 A part of the text that a notation gives meaning to may read a binding
 of the notation's module. It reads the module itself, whatever the text
 has bound under the module's name.

@@ -238,7 +238,7 @@ use_line = giving(seq([word("use"), name, star(giving(seq([sign("."), name]), (v
 use_changing = giving(seq([word("changing"), name, star(giving(seq([wide, grammar.lit(","), wide, name]), (v, at) => v[3])), grammar.guard(seq([wide, grammar.lit(",")]), false)]), (v, at) => with_first(v[1], v[2], 0, [v[1]]))
 parameters = between("(", listed(name), ")")
 
-export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof"]), o.space, true), offside.begun)
+export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof", "use"]), o.space, true), offside.begun)
 rules = {
   lines: grammar.turns(`lines, ref(`line), o.newline, asks_change),
   module: giving(seq([wide, opt(ref(`lines)), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: [], at: at} else sorted(v[1][0], 0, [], [], at)),
