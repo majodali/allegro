@@ -129,7 +129,7 @@ const READER = [
 /** Three modules of this directory that are written flat, as one text: a little over 200 lines. */
 const MODULE = ["grammar.alg", "class.alg", "map.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
 
-test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in under 10 seconds", DEPTH, async () => {
+test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in the steps of 10 seconds", DEPTH, async () => {
   assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);
   const run = await timed(READER, "next/ext/lib/reader.alg", 50_000_000, MODULE);
   assert.equal(run.end, "completed");
@@ -137,7 +137,11 @@ test("the speed target, with the grammar of flat Allegretto: a module of 200 lin
   console.log(`engine: ${MODULE.split("\n").length} lines, ${MODULE.length} bytes, read in ${run.steps} steps and ${run.ms} ms`);
   // The steps do not depend on the machine the test runs on, so they are what is held tight.
   assert.ok(run.steps < 2_600_000, `${run.steps} steps`);
-  assert.ok(run.ms < 10_000, `${run.ms} ms`);
+  // The time does: the machine that runs the suite for a pull request took 13.4 seconds for these steps where the
+  // one the target was measured on takes 6 to 7, and failed two pull requests that changed nothing here. So the
+  // time is held only where it is asked for, with ALLEGRO_SPEED=1, on a machine one knows. (Until 2026-12-02 this
+  // test held the time on every run; the maintainer ruled the change.)
+  if (process.env.ALLEGRO_SPEED === "1") assert.ok(run.ms < 10_000, `${run.ms} ms`);
 });
 
 // With Allegretto's whole grammar (allegretto.alg), blocks by indentation among it, the same text takes
