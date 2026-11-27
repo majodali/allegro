@@ -2355,8 +2355,9 @@ its approval.
     structure. Such an entry is written with no key, as a structure of
     the form `keyed` with a `key` and a `value`; `build` reads it and `describe`
     writes it, where `describe` threw for a parameter. Built ahead of
-    its ruling, which the PR asked for: the comparison could not pass
-    without it.
+    its ruling, which the PR asks for: the comparison could not pass
+    without it. The inventory's entry "A description is plain data in a
+    fixed set of forms" still says thirteen forms until it is ruled.
   - *A fault found in the kernel.* `describe` quoted a symbol that keys
     an entry, so a structure with a named entry, described and built
     again, was another structure and its module had another identity.
