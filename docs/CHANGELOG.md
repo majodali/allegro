@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-04 — Worked examples for every rule of the parser, each
+  one run by the suite.** Five modules, `next/ext/lib/examples_*.test.alg`
+  with 92 claims, and the texts of `next/ext/examples/`, seven programs
+  with `use` and the three modules they use. Each example names the
+  decision it shows, gives a grammar and a text, and claims what is
+  read. `next/ext/examples.md` is the index, and sixteen entries of the
+  inventory name their example. The comparison of the two readers no
+  longer stops at a text with `use`: it tells that text as refused and
+  reads on.
 - **2026-12-03 — A notation that only adds needs no `changing`: the
   text is checked, and not the grammar (chunk E8 of the book pass,
   second part, first half).** Each line after a `use` is also read in

@@ -104,8 +104,10 @@ const READER = [
   "import allegretto",
   "import engine",
   "p = engine.prepared(allegretto.language)",
-  'shown_or(a) => if is_failure(a) then "no reading at " ++ int.text(a.at) else if count(a.readings.t) > 0 then "two readings" else allegretto.shown(a.readings.h)',
-  "each(i) => if i == count(sources) then 0 else then(output.write(shown_or(engine.parses(p, sources[i]))), each(i + 1))",
+  // A text with a line `use` asks for a change of the grammar, which this reading takes none of: the engine refuses
+  // it, and the attempt keeps that from ending the reading of the texts after it.
+  'shown_or(a) => if is_failure(a) then (if a.failure == `refuted then "refused: " ++ a.reason else "no reading at " ++ int.text(a.at)) else if count(a.readings.t) > 0 then "two readings" else allegretto.shown(a.readings.h)',
+  "each(i) => if i == count(sources) then 0 else then(output.write(shown_or(attempt(engine.parses(p, sources[i]), 2000000000))), each(i + 1))",
   "each(0)",
   "",
 ].join("\n");
