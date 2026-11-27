@@ -2531,6 +2531,10 @@ its approval.
     among the tests of `npm run test:next`, for the kernel's own; `npm
     run test:next:reference` runs the acceptance stream's. 1,175 tests
     pass, and 535 on the reference.
+  - *Ruled on PR #325, 2026-12-03*: the condition that no longer
+    holds is accepted as described above, and the interface's version
+    stays 2 where a call is removed and nothing its callers use
+    changes.
 
 ## 8. Sessions
 
