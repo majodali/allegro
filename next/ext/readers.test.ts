@@ -16,11 +16,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import { chosenVariant } from "../kernel/create.js";
 import { bootstrapTree, compared, comparedAll, engineTree, firstDifference, texts } from "./readers.js";
 
-// The reference kernel evaluates on the host's stack, which the engine outgrows (ext.test.ts).
-const DEPTH = chosenVariant() === "reference" ? { skip: "the reference kernel evaluates on the host's stack, which the engine outgrows" } : {};
+// These tests run on the machine alone. The reference kernel evaluates on the host's stack, which the engine
+// outgrows, and next/kernel/reference.test.ts, which runs the kernel's tests on it, does not load this file.
 
 const ALL = process.env.ALLEGRO_READERS === "all";
 const PART = [
@@ -40,7 +39,7 @@ let read: ReturnType<typeof comparedAll> | undefined;
 const all = (): ReturnType<typeof comparedAll> => (read ??= comparedAll(FILES.map((f) => fs.readFileSync(f, "utf8"))));
 
 FILES.forEach((file, i) =>
-  test(`${file}: the bootstrap and the engine give the same tree, or both refuse the text`, DEPTH, async () => {
+  test(`${file}: the bootstrap and the engine give the same tree, or both refuse the text`, async () => {
     const c = (await all()).each[i];
     assert.ok(c.same, c.same ? "" : firstDifference(c.bootstrap, c.engine));
   }),
@@ -57,7 +56,7 @@ test("the part compared holds a text both readers refuse, and texts with a block
   assert.ok(trees.some((t) => t.includes("(float -")), "a fraction with a minus before it");
 });
 
-test("a difference between the readers is found: a tree with one place moved is not the same text", DEPTH, async () => {
+test("a difference between the readers is found: a tree with one place moved is not the same text", async () => {
   const text = "x = 1 + 2\n";
   const [b, e] = [bootstrapTree(text), await engineTree(text)];
   assert.ok("tree" in b && "tree" in e);
@@ -69,7 +68,7 @@ test("a difference between the readers is found: a tree with one place moved is 
   assert.ok(firstDifference(b.tree, moved).includes("@8-10"));
 });
 
-test("offsets are counted in bytes by both, where a text holds a character of more than one", DEPTH, async () => {
+test("offsets are counted in bytes by both, where a text holds a character of more than one", async () => {
   const c = await compared('x = "é" ++ y\n');
   assert.ok(c.same && !c.refused, c.same ? "" : firstDifference(c.bootstrap, c.engine));
   const b = bootstrapTree('x = "é" ++ y\n');
@@ -87,12 +86,12 @@ const ONE_WAY: Record<string, string> = {
     "n <- late\nm = n < -late\nz = -(1.5) - -2 - 9223372036854775807 - -9223372036854775808 - -0.5 - 0xff - 0XAb\nt = [1,\n2,\n]\nimport m with a: 1, b: x without c, d\n",
 };
 for (const [name, text] of Object.entries(ONE_WAY))
-  test(`one reading where two could arise: ${name}`, DEPTH, async () => {
+  test(`one reading where two could arise: ${name}`, async () => {
     const c = await compared(text);
     assert.ok(c.same && !c.refused, c.same ? "refused by both" : firstDifference(c.bootstrap, c.engine));
   });
 
-test("what the bootstrap refuses to parse, the engine does not read: a reserved word as a name, two statements on a line, a block less deep", DEPTH, async () => {
+test("what the bootstrap refuses to parse, the engine does not read: a reserved word as a name, two statements on a line, a block less deep", async () => {
   for (const text of ["if = 1\n", "x = 1 y = 2\n", "f() =>\n    a\n  b\n", 'x = "a{b}"\n']) {
     const c = await compared(text);
     assert.ok(c.same && c.refused, `${JSON.stringify(text)}: ${c.same ? "read by both" : firstDifference(c.bootstrap, c.engine)}`);

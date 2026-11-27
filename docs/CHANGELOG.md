@@ -574,6 +574,15 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-03 — The kernel's call `check` is removed, and the kernel
+  reads no environment.** Both were ruled earlier and waited for the
+  acceptance stream, which no longer uses either. A check is `evaluate`
+  with `speculative`, and whoever asks goes over what the result lists
+  as untouched; the nine kernel tests written for the call hold what
+  they held through a helper that does that. The variant is chosen in
+  the process, `useVariant` of `next/kernel/create.ts`, and no longer
+  by the variable `ALLEGRO_KERNEL`. Two assertions changed, each with a
+  comment. 184 kernel tests on each variant.
 - **2026-12-02 — The speed test holds steps, and time only on
   request.** `next/ext/ext.test.ts` failed two pull requests on the
   machine that runs the suite for them: 13.4 seconds where the limit
