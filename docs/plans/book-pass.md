@@ -2501,6 +2501,36 @@ its approval.
   - *Until the loader*: a module with a key cannot be used, and the
     engine's own modules are handed over as the reader holds them.
     Confirmed.
+- **2026-12-03 — the kernel's call `check` removed; no environment
+  read** (the review session). The acceptance stream reported that it
+  uses neither `Kernel.check` nor `ALLEGRO_KERNEL` any more, and the
+  maintainer asked for this before E8's second part.
+  - *`check`* is gone from the interface and from both variants, with
+    the going-over of what was left untouched that only it did. The
+    interface's version stays 2: the launcher asks for 2, and nothing
+    it calls has changed.
+  - *The tests.* Nine tests called it. They now call a helper in the
+    test file that does what a caller does: a speculative evaluation,
+    then one of each thing the result lists as untouched, a function
+    with a cell for each parameter, until nothing is left. Every
+    condition they held holds, but one: that a host that listens is
+    told of a refutation found in a function nothing calls. That
+    function is now evaluated by itself, and the refutation is that
+    evaluation's own result; there is no part to tell of. A new test
+    holds what remains true: a refuted branch of a conditional is told.
+  - *The variant.* `next/kernel/create.ts` read `ALLEGRO_KERNEL`.
+    `useVariant(name)` now sets the variant `createKernel` gives, in
+    the process, as the acceptance stream's helper does for its side.
+    `next/kernel/reference.test.ts` calls it and loads the kernel's
+    tests. Its first test held that the kernel followed the variable;
+    it now holds the same of `useVariant`, and that the variable is
+    not read.
+  - *The engine's tests* no longer carry a skip for the reference
+    kernel: nothing loads them on it.
+  - *How the reference is run now*: `next/kernel/reference.test.ts` is
+    among the tests of `npm run test:next`, for the kernel's own; `npm
+    run test:next:reference` runs the acceptance stream's. 1,175 tests
+    pass, and 535 on the reference.
 
 ## 8. Sessions
 

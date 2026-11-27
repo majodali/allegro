@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Untouched, Kernel, PrimitiveDeclaration, Rest, Value } from "./interface.js";
+import type { Untouched, Kernel, Place, PrimitiveDeclaration, Rest, Value } from "./interface.js";
 import { chosenVariant, createKernel } from "./create.js";
 import { InterfaceError, LimitFailure } from "./interface.js";
 import { Refusal } from "./interface.js";
@@ -3373,6 +3373,45 @@ test("the host is told of a claim that waits and of its outcome when the answer 
 const recordsOf = (r: { claims: readonly { at?: { start: { line: number } }; decided: number; refuted: number; waiting: number }[] }) =>
   r.claims.map((c) => `${c.at?.start.line ?? "?"}: ${c.decided} ${c.refuted} ${c.waiting}`).sort();
 
+/**
+ * A check, as whoever asks for one makes it since the kernel's own call `check` was removed
+ * (2026-12-02): a speculative evaluation, and then a speculative evaluation of everything a
+ * result lists as untouched, a function with a cell for each parameter, until nothing is
+ * left. The records of a claim reached more than once are added up by its place. A part
+ * that comes out refuted with no claim of that run refuted is listed among the refutations.
+ * The tests below were written for the kernel's call and hold what they held, through this.
+ */
+const check = (k: Kernel, expression: Value, limits: { steps: number }) => {
+  const first = k.evaluate(expression, { ...limits, speculative: true });
+  const sums = new Map<string, { at?: Place; decided: number; refuted: number; waiting: number }>();
+  const refutations = [...(first.refutations ?? [])];
+  let [ended, steps] = [first.ended as string, first.steps];
+  const note = (r: ReturnType<Kernel["evaluate"]>) => {
+    for (const c of r.claims) {
+      const key = c.at === undefined ? "?" : `${c.at.source}:${c.at.start.line}:${c.at.start.column}:${c.at.start.index}`;
+      const sum = sums.get(key) ?? { ...(c.at === undefined ? {} : { at: c.at }), decided: 0, refuted: 0, waiting: 0 };
+      [sum.decided, sum.refuted, sum.waiting] = [sum.decided + c.decided, sum.refuted + c.refuted, sum.waiting + c.waiting];
+      sums.set(key, sum);
+    }
+  };
+  note(first);
+  const todo = [...(first.untouched ?? [])];
+  const gone = new Set<Value>();
+  while (todo.length > 0) {
+    const u = todo.shift()!;
+    if (gone.has(u.value)) continue;
+    gone.add(u.value);
+    const r = k.evaluate(u.kind === "function" ? k.expression(u.value, Array.from({ length: u.parameters }, () => k.cell())) : u.value, { ...limits, speculative: true });
+    note(r);
+    steps += r.steps;
+    if (r.ended !== "complete") ended = r.ended;
+    refutations.push(...(r.refutations ?? []));
+    if (r.refuted && !r.claims.some((c) => c.refuted > 0)) refutations.push({ reason: k.reasonOf(r.value) ?? "refuted", ...(u.at === undefined ? {} : { at: u.at }) });
+    todo.push(...(r.untouched ?? []));
+  }
+  return { value: first.value, ended, steps, refuted: first.refuted, claims: [...sums.values()], refutations };
+};
+
 test("check reaches a claim in a function nothing calls, in both branches of an unknown conditional, and in a binding nothing reads", () => {
   const { k, isZero, call, kp, said, say } = sayer();
   const line = (n: number) => place("m.alg", n, 1, 10);
@@ -3387,7 +3426,7 @@ test("check reaches a claim in a function nothing calls, in both branches of an 
     [g, k.composedFunction([y], claimAt(5, call(isZero, byte(k, 0))))],
     [unread, claimAt(6, call(isZero, byte(k, 0)))],
   ], call(kp("then"), call(say, byte(k, 9)), k.expression(kp("if"), [call(isZero, n), claimAt(8, call(isZero, byte(k, 0))), claimAt(9, call(isZero, n))])));
-  const checked = k.check(program, { steps: 10_000 });
+  const checked = check(k, program, { steps: 10_000 });
   assert.equal(checked.ended, "complete");
   assert.equal(checked.refuted, false, "one branch of a function nothing calls is refuted, and the program is not");
   assert.deepEqual(said, [], "nothing is performed");
@@ -3410,7 +3449,7 @@ test("check takes one branch where the condition is known, and reaches an argume
     [null, call(ignores, claimAt(3, call(isZero, byte(k, 0))))],
     [null, claimAt(4, call(isZero, byte(k, 0)))],
   ]);
-  const checked = k.check(program, { steps: 10_000 });
+  const checked = check(k, program, { steps: 10_000 });
   // Line 2 is in the branch a known condition does not take: it cannot be reached, and has no record.
   assert.deepEqual(recordsOf(checked), ["1: 1 0 0", "3: 1 0 0", "4: 1 0 0"]);
 });
@@ -3421,15 +3460,30 @@ test("check finds a refutation that is no claim, says where, and tells a host th
   const [f, x] = [k.symbol("t.f"), k.param("x")];
   // f(x) = x + nowhere      -- the name nowhere is bound by nothing; f is never called
   const program = within(k, [[f, k.composedFunction([x], k.expression(add, [x, k.symbol("t.nowhere")], line(2)), line(2))]], byte(k, 1));
-  const checked = k.check(program, { steps: 10_000 });
+  const checked = check(k, program, { steps: 10_000 });
   assert.equal(checked.refuted, false);
   assert.equal(num(k, checked.value), 1);
   assert.equal(checked.refutations?.length, 1);
   assert.match(checked.refutations?.[0].reason ?? "", /t\.nowhere is bound by no block/);
   assert.equal(checked.refutations?.[0].at?.start.line, 2);
-  assert.ok(told.some((t) => /^refutation@2 .*t\.nowhere is bound by no block/.test(t)), "the host is told of it, with the reason");
+  // (Until 2026-12-02 this test also held that a host that listens is told of the refutation by an observation. The
+  // kernel's call `check` evaluated the function's body as a part of one evaluation, and told. Now whoever checks
+  // evaluates the function by itself, and that evaluation's own result is the refutation: there is no part to tell of.
+  // A part of one evaluation that is refuted is still told: the test after this one holds it, for a conditional's branch.)
+  assert.deepEqual(told.filter((t) => t.startsWith("refutation")), []);
   // An evaluation gives no such list.
   assert.equal(k.evaluate(program).refutations, undefined);
+});
+
+test("a host that listens is told of a refuted part of a speculative evaluation: a branch under a condition it cannot decide", () => {
+  const { k, add, isZero, call, kp, told } = listening();
+  const line = (n: number) => place("m.alg", n, 1, 10);
+  // if isZero(n) then 1 + nowhere else 2, with n unknown: one branch is refuted, and the whole is not.
+  const r = k.evaluate(k.expression(kp("if"), [call(isZero, k.param("n")), k.expression(add, [byte(k, 1), k.symbol("t.nowhere")], line(2)), byte(k, 2)], line(1)), { steps: 1_000, speculative: true });
+  assert.equal(r.refuted, false);
+  assert.equal(r.refutations?.length, 1);
+  assert.match(r.refutations?.[0].reason ?? "", /t\.nowhere is bound by no block/);
+  assert.ok(told.some((t) => /^refutation@2 .*t\.nowhere is bound by no block/.test(t)), `the host is told of it, with the reason: ${JSON.stringify(told)}`);
 });
 
 test("check of a function that calls itself ends, and a function a call opened with known values is specialized as well", () => {
@@ -3439,20 +3493,20 @@ test("check of a function that calls itself ends, and a function a call opened w
   // count(n) = then(claim(isZero(isZero-of-nothing...)), ...) is too much: count(n) = if isZero(n) then 0 else 1 + count(n - 1), with a claim on n at line 2
   const body = call(kp("then"), k.expression(kp("claim"), [call(isZero, call(dec, call(add, n, byte(k, 1))))], line(2)), call(kp("if"), call(isZero, n), byte(k, 0), call(add, byte(k, 1), call(count, call(dec, n)))));
   const program = within(k, [[count, k.composedFunction([n], body)]], call(count, byte(k, 0)));
-  const checked = k.check(program, { steps: 10_000 });
+  const checked = check(k, program, { steps: 10_000 });
   assert.equal(checked.ended, "complete");
   assert.equal(num(k, checked.value), 0);
   // The call count(0) decides the claim for 0; the function is then evaluated with n unknown, where the claim waits.
   assert.deepEqual(recordsOf(checked), ["2: 1 0 1"]);
   // A budget too small ends the check at its limit, with the records so far.
-  const short = k.check(program, { steps: 6 });
+  const short = check(k, program, { steps: 6 });
   assert.equal(short.ended, "limit");
 });
 
 test("a host that listens to a check is told that a conditional under an unknown condition had both branches evaluated", () => {
   const { k, isZero, call, kp, told } = listening();
   const line = (n: number) => place("m.alg", n, 1, 10);
-  k.check(k.expression(kp("if"), [call(isZero, k.param("n")), byte(k, 1), byte(k, 2)], line(4)), { steps: 1_000 });
+  check(k, k.expression(kp("if"), [call(isZero, k.param("n")), byte(k, 1), byte(k, 2)], line(4)), { steps: 1_000 });
   assert.deepEqual(told, ["branch@4 both ahead"]);
 });
 
@@ -3465,17 +3519,17 @@ test("a check opens a call a run would make, a function that calls itself among 
   const fn = k.composedFunction([n], k.expression(kp("if"), [call(isZero, n), n, call(down, call(dec, n))]));
   const claiming = (of: Value) => within(k, [[down, fn]], call(kp("claim"), of));
   // down(2) is 0: the claim that it is zero is decided, and nothing waits.
-  const holds = k.check(claiming(call(isZero, call(down, byte(k, 2)))), { steps: 10_000 });
+  const holds = check(k, claiming(call(isZero, call(down, byte(k, 2)))), { steps: 10_000 });
   assert.equal(holds.ended, "complete");
   assert.equal(holds.refuted, false);
   assert.deepEqual(holds.claims.map((c) => [c.decided > 0, c.waiting, c.refuted]), [[true, 0, 0]]);
   // The claim that dec(down(2)) is zero is false, and a check finds it as a run does.
-  const fails = k.check(claiming(call(isZero, call(dec, call(down, byte(k, 2))))), { steps: 10_000 });
+  const fails = check(k, claiming(call(isZero, call(dec, call(down, byte(k, 2))))), { steps: 10_000 });
   assert.equal(fails.refuted, true);
   assert.deepEqual(fails.claims.map((c) => [c.decided, c.waiting, c.refuted > 0]), [[0, 0, true]]);
   assert.equal(k.evaluate(claiming(call(isZero, call(dec, call(down, byte(k, 2)))))).refuted, true, "as a run finds it");
   // Under a condition the check cannot decide, a function being opened stays a call: the check ends.
-  const unknown = k.check(within(k, [[down, fn]], call(down, k.cell())), { steps: 10_000 });
+  const unknown = check(k, within(k, [[down, fn]], call(down, k.cell())), { steps: 10_000 });
   assert.equal(unknown.ended, "complete");
   assert.ok(unknown.steps < 200, `${unknown.steps} steps`);
 });
@@ -3484,7 +3538,7 @@ test("what a check leaves waiting does not outlast it: a run after it in the sam
   const { k, call, kp } = setup();
   const x = k.param("x");
   const f = k.composedFunction([x], call(kp("claim"), x));
-  const checked = k.check(call(f, k.cell()), { steps: 10_000 });
+  const checked = check(k, call(f, k.cell()), { steps: 10_000 });
   assert.ok(checked.claims[0].waiting > 0, "the check itself says the claim waits");
   const run = k.evaluate(call(f, k.bits(Uint8Array.of(1), 1)));
   assert.deepEqual(run.claims.map((c) => [c.decided, c.waiting]), [[1, 0]]);
@@ -3494,7 +3548,7 @@ test("what a check leaves waiting does not outlast it: a run after it in the sam
   const cell = k2.cell();
   const before = k2.evaluate(call2(kp2("claim"), cell));
   assert.equal(before.claims[0].waiting, 1);
-  k2.check(call2(kp2("claim"), k2.cell()), { steps: 1_000 });
+  check(k2, call2(kp2("claim"), k2.cell()), { steps: 1_000 });
   assert.equal(k2.waiting().length, 1, "the earlier claim is still waiting");
   // And it is still counted so: filling its cell with something that is no truth leaves the record to show.
   const filled = k2.fill(cell, k2.bits(Uint8Array.of(1), 1));
@@ -3506,10 +3560,10 @@ test("a check opens a function nothing binds by name: one written as an entry, a
   const [x, f, kept] = [k.param("x"), k.param("f"), k.symbol("t.kept")];
   const falseClaim = () => k.composedFunction([x], call(kp("claim"), call(isZero, byte(k, 1))));
   // kept = [x => claim(isZero(1))], and nothing reads kept.
-  const inEntry = k.check(within(k, [[kept, k.structure([[null, falseClaim()]])]], byte(k, 0)), { steps: 10_000 });
+  const inEntry = check(k, within(k, [[kept, k.structure([[null, falseClaim()]])]], byte(k, 0)), { steps: 10_000 });
   assert.deepEqual(inEntry.claims.map((c) => c.refuted), [1]);
   // (f => 0)(x => claim(isZero(1))): the function handed over is never called.
-  const handed = k.check(call(k.composedFunction([f], byte(k, 0)), falseClaim()), { steps: 10_000 });
+  const handed = check(k, call(k.composedFunction([f], byte(k, 0)), falseClaim()), { steps: 10_000 });
   assert.deepEqual(handed.claims.map((c) => c.refuted), [1]);
   // A run of either finds nothing: the claim is never reached.
   assert.deepEqual(k.evaluate(call(k.composedFunction([f], byte(k, 0)), falseClaim())).claims, []);
@@ -3608,7 +3662,7 @@ test("nothing of a speculative evaluation stays in the kernel: no claim waits af
   assert.equal(k.evaluate(call(m)).claims.length, 1, "the run makes its own instance and its claim is counted");
   // The same holds after a check.
   const m2 = k.module(k.composedFunction([], call(kp("then"), call(kp("claim"), k.bits(Uint8Array.of(1), 1)), call(add, byte(k, 2), byte(k, 1)))), 0);
-  k.check(call(m2), { steps: 1_000 });
+  check(k, call(m2), { steps: 1_000 });
   assert.equal(k.evaluate(call(m2)).claims.length, 1);
 });
 
@@ -3623,9 +3677,11 @@ test("a module's function is a function called, and a speculative evaluation has
   assert.equal(k.evaluate(forever, { steps: 500, speculative: true }).ended, "limit");
 });
 
+// (Until 2026-12-02 this test compared the kernel's call `check` with the same thing done by hand. The call is removed,
+// and `check` above is the test file's own, so the comparison now holds the helper to the loop written out here.)
 test("a check is a speculative evaluation and then all it left untouched: the two find the same claims", () => {
   const { k, call, program } = untouchedProgram();
-  const checked = recordsOf(k.check(program, { steps: 10_000 })).map((r) => r.split(":")[0]);
+  const checked = recordsOf(check(k, program, { steps: 10_000 })).map((r) => r.split(":")[0]);
   // By hand: the evaluation, then every binding, argument and entry, and every function with unfilled cells, until nothing is left.
   const lines = new Set<string>();
   const todo: Value[] = [program];

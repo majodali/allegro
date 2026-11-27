@@ -16,12 +16,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import { chosenVariant } from "../kernel/create.js";
 import { comparedModules, shownEmitted, type ComparedModule } from "./modules.js";
 import { texts } from "./readers.js";
 
-// The reference kernel evaluates on the host's stack, which the engine outgrows (ext.test.ts).
-const DEPTH = chosenVariant() === "reference" ? { skip: "the reference kernel evaluates on the host's stack, which the engine outgrows" } : {};
+// These tests run on the machine alone. The reference kernel evaluates on the host's stack, which the engine
+// outgrows, and next/kernel/reference.test.ts, which runs the kernel's tests on it, does not load this file.
 
 const ALL = process.env.ALLEGRO_MODULES === "all";
 const M3 = "next/corpus/allegretto/m3/";
@@ -61,13 +60,13 @@ const all = (): ComparedModule[] => (emitted ??= comparedModules(FILES.map((file
 const told = (c: ComparedModule): string => `bootstrap: ${shownEmitted(c.bootstrap)}\nengine:    ${shownEmitted(c.engine)}${c.places === undefined ? "" : `\nplaces:    ${c.places}`}`;
 
 FILES.forEach((file, i) =>
-  test(`${file}: the bootstrap and the meaning rules give the same module by identity, or both refuse the text`, DEPTH, () => {
+  test(`${file}: the bootstrap and the meaning rules give the same module by identity, or both refuse the text`, () => {
     const c = all()[i];
     assert.ok(c.same, told(c));
   }),
 );
 
-test("the part compared holds texts both emitters give a module for, and the three the bootstrap refuses", DEPTH, () => {
+test("the part compared holds texts both emitters give a module for, and the three the bootstrap refuses", () => {
   const each = all().slice(0, PART.length);
   if (ALL) return;
   const refused = each.filter((c) => "refused" in c.bootstrap).map((c) => c.file);
@@ -110,7 +109,7 @@ let faulty: ComparedModule[] | undefined;
 const faults = (): ComparedModule[] => (faulty ??= comparedModules(FAULTY.map(([, text], i) => ({ file: `faulty/${i}.alg`, text })), reader).each);
 
 FAULTY.forEach(([what, , message], i) =>
-  test(`${what}: both emitters refuse the text, in the same words`, DEPTH, () => {
+  test(`${what}: both emitters refuse the text, in the same words`, () => {
     const c = faults()[i];
     assert.ok("refused" in c.bootstrap && "refused" in c.engine, told(c));
     assert.match(c.bootstrap.refused.join("\n"), message);
@@ -118,7 +117,7 @@ FAULTY.forEach(([what, , message], i) =>
   }),
 );
 
-test("a binding above `x <- e` that uses x is no finding: both emitters give the module", DEPTH, () => {
+test("a binding above `x <- e` that uses x is no finding: both emitters give the module", () => {
   const [c, own] = comparedModules(
     [
       { file: "above.alg", text: "capability timer\nf() =>\n  y = x\n  x <- timer.after(1)\n  y\nf()\n" },
@@ -143,7 +142,7 @@ const UNREAD: readonly (readonly [string, string, RegExp, RegExp])[] = [
 ];
 let unread: ComparedModule[] | undefined;
 UNREAD.forEach(([what, , theirs, mine], i) =>
-  test(`${what}: both refuse the text, each in its own words`, DEPTH, () => {
+  test(`${what}: both refuse the text, each in its own words`, () => {
     const c = (unread ??= comparedModules(UNREAD.map(([, text], n) => ({ file: `unread/${n}.alg`, text })), reader).each)[i];
     assert.ok("refused" in c.bootstrap && "refused" in c.engine, told(c));
     assert.match(c.bootstrap.refused.join("\n"), theirs);
@@ -151,7 +150,7 @@ UNREAD.forEach(([what, , theirs, mine], i) =>
   }),
 );
 
-test("a difference between the emitters is found: one byte of a text changed gives another identity", DEPTH, () => {
+test("a difference between the emitters is found: one byte of a text changed gives another identity", () => {
   const [a, b] = comparedModules([
     { file: "a.alg", text: "x = 1\nx + 1\n" },
     { file: "b.alg", text: "x = 1\nx + 2\n" },

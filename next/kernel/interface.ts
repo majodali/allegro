@@ -23,7 +23,9 @@
 // with four older forms removed: the names `Kernel2` and
 // `CreateKernel2`; `scope()` and the scope argument of `evaluate`;
 // `fill` that only records unless told otherwise; and `steps` given to
-// `advance`.
+// `advance`. On 2026-12-02 the call `check` was removed, as ruled on
+// 2026-11-29: a check is `evaluate` with `speculative`, and whoever asks
+// goes over what the result lists as untouched.
 //
 // The kernel is passive. Creating one does nothing but create it. It
 // reads no file, no text, no environment and no clock. Every effect a
@@ -278,7 +280,7 @@ export interface Result {
    */
   readonly cutShort?: true;
   /**
-   * From a speculative evaluation and from `check`: the refutations found in parts that do not refute
+   * From a speculative evaluation: the refutations found in parts that do not refute
    * the whole, each with the place of the part where it has one. A
    * refuted claim is not repeated here: it is among `claims`.
    */
@@ -605,31 +607,6 @@ export interface Kernel {
    * it.
    */
   evaluate(expression: Value, limits?: Limits): Result;
-  /**
-   * Evaluates an expression as a check does, so that every claim in it is
-   * reached. Nothing is performed and nothing waits: a call on a
-   * capability stays in what is left, and an unfilled cell is one more
-   * unknown. Both branches of a conditional whose condition is unknown
-   * are evaluated. Then everything the evaluation left untouched is
-   * evaluated too, with what it needs unknown: a binding nothing read, an
-   * argument nothing needed, an entry nothing read, and the body of every
-   * function met, called or not. A function is opened once.
-   *
-   * `value` is what is left of the expression. `claims` has a record for
-   * every claim reached: decided, refuted, or waiting. `refutations` has
-   * what else was found refuted. `refuted` is true only where the whole
-   * is refuted whatever is unknown. A check is given a budget, since a
-   * recursion whose argument changes runs to it; a spent budget ends the
-   * check at "limit", with the records so far.
-   *
-   * To be retired. By the maintainer's ruling of 2026-11-29 a check is
-   * no call of the kernel's: it is `evaluate` with `speculative`, and
-   * whoever asks chooses what else is gone into from the result's
-   * `untouched`. This call is that evaluation followed by everything it
-   * left untouched, each function with its parameters unknown, with no
-   * choice. It stays until the launcher has moved.
-   */
-  check(expression: Value, limits?: Limits): Result;
   /**
    * Takes up every evaluation in this kernel that waited on a cell filled
    * since the last call, within the limits. The kernel knows which

@@ -22,7 +22,7 @@ import * as path from "node:path";
 import { emitted, runProgram } from "../corpus/allegretto.js";
 import { launch } from "../launch/launcher.js";
 import { output } from "../launch/output.js";
-import { chosenVariant, createKernel } from "../kernel/create.js";
+import { createKernel } from "../kernel/create.js";
 import { shipped, shippedByName } from "../prims/index.js";
 import { load } from "../kernel/saved-program.js";
 import type { Kernel, Value } from "../kernel/interface.js";
@@ -31,8 +31,7 @@ const ROOT = "next/ext";
 
 // These modules are run on the machine. The reference kernel evaluates on the host's own stack, and a
 // map of fifty entries is already deeper than that stack allows: it ends such a run as out of budget.
-// So where the environment asks for the reference, the tests that run a module are left out and say so.
-const DEPTH = chosenVariant() === "reference" ? { skip: "the reference kernel evaluates on the host's stack, which these modules outgrow" } : {};
+// So next/kernel/reference.test.ts, which runs the kernel's tests on the reference, does not load this file.
 
 /** Every `*.test.alg` under next/ext/, in name order. */
 function testFiles(dir: string): string[] {
@@ -59,7 +58,7 @@ test("there are tests to run", () => {
 });
 
 for (const file of files)
-  test(`${file}: prints what it states, ends as it states, and its claims come out as it states`, DEPTH, async () => {
+  test(`${file}: prints what it states, ends as it states, and its claims come out as it states`, async () => {
     const text = fs.readFileSync(file, "utf8");
     const run = await runProgram(text, file);
     assert.deepEqual(run.findings, [], "the text is read");
@@ -100,7 +99,7 @@ const mapProgram = (n: number): string =>
     "",
   ].join("\n");
 
-test("a map of ten thousand entries is built and read, and the work grows with its size", DEPTH, async () => {
+test("a map of ten thousand entries is built and read, and the work grows with its size", async () => {
   const [small, large] = [await timed(mapProgram(2_500), "next/ext/lib/measure.alg", 50_000_000), await timed(mapProgram(10_000), "next/ext/lib/measure.alg", 50_000_000)];
   assert.equal(small.end, "completed");
   assert.equal(large.end, "completed");
@@ -129,7 +128,7 @@ const READER = [
 /** Three modules of this directory that are written flat, as one text: a little over 200 lines. */
 const MODULE = ["grammar.alg", "class.alg", "map.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
 
-test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in the steps of 10 seconds", DEPTH, async () => {
+test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in the steps of 10 seconds", async () => {
   assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);
   const run = await timed(READER, "next/ext/lib/reader.alg", 50_000_000, MODULE);
   assert.equal(run.end, "completed");
@@ -148,7 +147,7 @@ test("the speed target, with the grammar of flat Allegretto: a module of 200 lin
 // about 1.6 times the steps, and the time is over the target: 13 seconds where this was measured. That
 // is recorded and not hidden: the test holds the steps, so that they do not grow unseen, and prints the
 // time. Whether the target stands, and what is done to meet it, is the maintainer's to rule.
-test("the same module with Allegretto's whole grammar: read one way, the steps held, the time printed", DEPTH, async () => {
+test("the same module with Allegretto's whole grammar: read one way, the steps held, the time printed", async () => {
   const reader = READER.replace("import flat", "import allegretto").replace("flat.allegretto", "allegretto.language");
   assert.notEqual(reader, READER);
   const run = await timed(reader, "next/ext/lib/reader.alg", 50_000_000, MODULE);
@@ -158,7 +157,7 @@ test("the same module with Allegretto's whole grammar: read one way, the steps h
   assert.ok(run.steps < 4_300_000, `${run.steps} steps`);
 });
 
-test("a text of twice the length takes about twice the steps", DEPTH, async () => {
+test("a text of twice the length takes about twice the steps", async () => {
   const one = fs.readFileSync(path.join(ROOT, "lib", "class.alg"), "utf8");
   const [once, twice] = [await timed(READER, "next/ext/lib/reader.alg", 50_000_000, one), await timed(READER, "next/ext/lib/reader.alg", 50_000_000, `${one}\n${one.replace(/^import class$/m, "")}`)];
   assert.deepEqual([once.lines, twice.lines], [["1"], ["1"]]);
@@ -166,7 +165,7 @@ test("a text of twice the length takes about twice the steps", DEPTH, async () =
   assert.ok(growth > 1.7 && growth < 2.3, `twice the text took ${growth.toFixed(2)} times the steps (${once.steps} and ${twice.steps})`);
 });
 
-test("a rule that begins with itself costs in line with its text: twice the operands, about twice the steps", DEPTH, async () => {
+test("a rule that begins with itself costs in line with its text: twice the operands, about twice the steps", async () => {
   const program = [
     "capability output",
     "input source",
@@ -217,7 +216,7 @@ function reading(k: Kernel, reader: Value, ways: Value, text: string): { trees: 
   return { trees: Number(new DataView(bytes.buffer, bytes.byteOffset, 8).getBigInt64(0)), steps: r.steps };
 }
 
-test("the engine specialized over a grammar reads the same, in fewer steps; how few is recorded as a finding", DEPTH, () => {
+test("the engine specialized over a grammar reads the same, in fewer steps; how few is recorded as a finding", () => {
   const cases: [string, string, string, number][] = [
     ["a sequence", '{s: grammar.seq([grammar.lit("a"), grammar.ref(`b), grammar.lit("c")]), b: grammar.run("bees", "bb")}', "abbbbc", 1],
     ["a rule that names itself", '{s: grammar.alt([grammar.seq([grammar.lit("("), grammar.ref(`s), grammar.lit(")")]), grammar.lit("x")])}', "(((x)))", 1],

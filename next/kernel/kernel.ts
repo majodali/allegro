@@ -250,14 +250,13 @@ export const createKernel: CreateKernel = () => {
   let cut = false;
   /** True while a function is specialized: both branches of a conditional whose condition is unknown are evaluated. */
   let speculative = false;
-  /** Under a check: how many conditions it could not decide enclose what is being evaluated. */
+  /** In a speculative evaluation: how many conditions it could not decide enclose what is being evaluated. */
   let unsure = 0;
   /**
-   * Set while a check is made (`check`): what the evaluation made and has not needed, each
-   * to be evaluated before the check is over, the functions it met, each to have its body
-   * evaluated, and the refutations found in parts that do not refute the whole.
+   * Set during a speculative evaluation: what it made and has not needed, the functions it
+   * met, and the refutations found in parts that do not refute the whole.
    */
-  interface Reaching { readonly lazies: Lazy[]; readonly why: Map<Lazy, Untouched["kind"]>; readonly instances: { fn: Fn; instance: { args: readonly V[]; value: Lazy } }[]; readonly fns: Fn[]; readonly opened: Set<Fn>; readonly found: { reason: string; at?: Place }[]; readonly noted: Set<Refuted>; draining: boolean }
+  interface Reaching { readonly lazies: Lazy[]; readonly why: Map<Lazy, Untouched["kind"]>; readonly instances: { fn: Fn; instance: { args: readonly V[]; value: Lazy } }[]; readonly fns: Fn[]; readonly opened: Set<Fn>; readonly found: { reason: string; at?: Place }[]; readonly noted: Set<Refuted> }
   let reaching: Reaching | undefined;
   /** A part came out refuted that the whole is not refuted by. A refuted claim is in the claims' records already. */
   const found = (r: V, part: V): void => {
@@ -858,13 +857,12 @@ export const createKernel: CreateKernel = () => {
       const env = new Map(fn.params.map((p, i) => [p, given[i]] as const));
       // Ahead of what is done, a function already being opened ahead is not opened again,
       // whatever it is given: the call stays in the residual. Evaluation ahead only finds a
-      // refutation early, and a loop that carries state would otherwise never end. And where
-      // a check goes over what was left untouched, a function it has opened is not opened again.
-      // A check is otherwise: it has a budget, and it must find what a run would find. There a
-      // call stays a call only under a condition the check could not decide, where a run might
+      // refutation early, and a loop that carries state would otherwise never end.
+      // A speculative evaluation is otherwise: it has a budget, and it must find what a run would find. There a
+      // call stays a call only under a condition it could not decide, where a run might
       // not make it. A call a run would make is opened as a run would open it, a function that
       // calls itself among them, so a claim that rests on such a call is decided or refuted.
-      const leftAsCall = ahead && (reaching === undefined || unsure > 0) && (opening.includes(fn) || (reaching?.draining === true && reaching.opened.has(fn)));
+      const leftAsCall = ahead && (reaching === undefined || unsure > 0) && opening.includes(fn);
       if (observed() && !leftAsCall) tell(v, { kind: "call", function: out(fn) });
       if (!leftAsCall) reaching?.opened.add(fn);
       if (!ahead) return evaluate(substitute(fn.body, env, new Map()), scope);
@@ -1083,19 +1081,17 @@ export const createKernel: CreateKernel = () => {
   };
   /**
    * An evaluation ahead of what is done: nothing performed, both branches of what cannot be
-   * decided. With `drain`, what it left untouched is evaluated too, and every function met
-   * gone over with its parameters unknown: that is `check`. Without, what it left untouched
-   * is listed, for whoever asked to choose from.
+   * decided. What it left untouched is listed, for whoever asked to choose from.
    */
-  const speculated = (expression: Value, limits: Limits | undefined, drain: boolean): Result => {
+  const speculated = (expression: Value, limits: Limits | undefined): Result => {
       const e = into(expression, "the expression");
       tallies.clear();
       cut = false;
-      const reach: Reaching = { lazies: [], why: new Map(), instances: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>(), draining: false };
+      const reach: Reaching = { lazies: [], why: new Map(), instances: [], fns: [], opened: new Set<Fn>(), found: [], noted: new Set<Refuted>() };
       reaching = reach;
       let untouched: Untouched[] | undefined;
       unsure = 0;
-      // A check performs nothing and what it evaluated is dropped when it ends, so a claim it
+      // It performs nothing and what it evaluated is dropped when it ends, so a claim it
       // left waiting waits for nothing afterwards: the count of waiting claims is put back.
       const waitingBefore = new Map(waitingAt);
       const [wasAhead, wasSpeculative] = [ahead, speculative];
@@ -1106,34 +1102,8 @@ export const createKernel: CreateKernel = () => {
         const r = within(limits, (): V => {
           const scope = new ScopeV(undefined);
           const value = (evaluate(e, scope));
-          // What the evaluation left untouched is evaluated too, and the body of every
-          // function it met, each with its parameters unknown. What that leaves untouched
-          // in turn is gone over as well, until nothing is left.
-          if (!drain) {
-            untouched = leftBy(reach);
-            return value;
-          }
-          reach.draining = true;
-          const reached = new Set<Fn>();
-          while (reach.lazies.length > 0 || reach.fns.length > 0) {
-            const l = reach.lazies.pop();
-            if (l !== undefined) {
-              if (!l.done && !l.busy) found((evaluate(l, l.scope)), l.value);
-              continue;
-            }
-            const f = reach.fns.pop() as Fn;
-            // Every function is specialized, one a call has opened with known values too.
-            if (reached.has(f)) continue;
-            reached.add(f);
-            reach.opened.add(f);
-            const params = f.params.map((p) => new Param(p.name));
-            opening.push(f);
-            try {
-              found((evaluate(substitute(f.body, new Map(f.params.map((p, i) => [p, params[i]] as const)), new Map()), scope)), f);
-            } finally {
-              opening.pop();
-            }
-          }
+          // What the evaluation left untouched is listed: whoever asked goes over it, part by part.
+          untouched = leftBy(reach);
           return value;
         });
         const value = r.value ?? e;
@@ -1178,7 +1148,7 @@ export const createKernel: CreateKernel = () => {
     },
 
     evaluate: (expression, limits): Result => {
-      if (limits?.speculative === true) return speculated(expression, limits, false);
+      if (limits?.speculative === true) return speculated(expression, limits);
       const e = into(expression, "the expression");
       const s = new ScopeV(undefined);
       tallies.clear();
@@ -1264,7 +1234,6 @@ export const createKernel: CreateKernel = () => {
       });
       return { ended: r.ended, steps: r.steps, refuted, claims: claimRecords(), ...(cut ? { cutShort: true as const } : {}), ...(limited.length > 0 ? { limited } : {}) };
     },
-    check: (expression, limits): Result => speculated(expression, limits, true),
     current: (value) => {
       const v = into(value, "the value");
       const root = rootOf.get(v);

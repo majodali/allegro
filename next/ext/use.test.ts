@@ -8,11 +8,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chosenVariant } from "../kernel/create.js";
 import { runTexts, type Ran } from "./run.js";
 
-// The reference kernel evaluates on the host's stack, which the engine outgrows (ext.test.ts).
-const DEPTH = chosenVariant() === "reference" ? { skip: "the reference kernel evaluates on the host's stack, which the engine outgrows" } : {};
+// These tests run on the machine alone. The reference kernel evaluates on the host's stack, which the engine
+// outgrows, and next/kernel/reference.test.ts, which runs the kernel's tests on it, does not load this file.
 
 /** A module with two notations and the functions their parts read. */
 const RATIO = [
@@ -41,13 +40,13 @@ const SHOW = 'show(r) => output.write(int.text(r.top) ++ "/" ++ int.text(r.botto
 const run = (main: string, more: Record<string, string> = {}): Ran => runTexts("main", { main, ratio: RATIO, ...more });
 const told = (r: Ran): string => JSON.stringify({ lines: r.lines, findings: r.findings, refuted: r.refuted });
 
-test("a text uses a notation: the lines after `use` are read in the grammar the notation changed", DEPTH, () => {
+test("a text uses a notation: the lines after `use` are read in the grammar the notation changed", () => {
   const r = run(`capability output\n${SHOW}use ratio.fractions changing operators\nshow(1 :/ 2)\n`);
   assert.deepEqual(r.findings, [], told(r));
   assert.deepEqual(r.lines, ["1/2"]);
 });
 
-test("the notation's sign binds where its level says: tighter than a product", DEPTH, () => {
+test("the notation's sign binds where its level says: tighter than a product", () => {
   // 2 * 3 :/ 4 is 2 * (3 :/ 4): a number times a structure, which the primitive refuses when it is evaluated.
   const r = run("capability output\nuse ratio.fractions changing operators\nr = 2 * 3 :/ 4\noutput.write(int.text(r))\n");
   assert.deepEqual(r.findings, [], told(r));
@@ -56,47 +55,47 @@ test("the notation's sign binds where its level says: tighter than a product", D
   assert.deepEqual(s.lines, ["6"], told(s));
 });
 
-test("the text needs no import of the notation's module, and may bind the module's name itself", DEPTH, () => {
+test("the text needs no import of the notation's module, and may bind the module's name itself", () => {
   const r = run(`capability output\n${SHOW}use ratio.fractions changing operators\nf(ratio) => 6 :/ ratio\nshow(f(3))\nratio = 5\nshow(ratio :/ ratio)\n`);
   assert.deepEqual(r.findings, [], told(r));
   assert.deepEqual(r.lines, ["6/3", "5/5"]);
 });
 
-test("a text that also imports the module reads its bindings as ever", DEPTH, () => {
+test("a text that also imports the module reads its bindings as ever", () => {
   const r = run(`capability output\nimport ratio\n${SHOW}use ratio.fractions changing operators\nshow(1 :/ 2)\nshow(ratio.ratio(3, 4))\n`);
   assert.deepEqual(r.lines, ["1/2", "3/4"], told(r));
 });
 
-test("a notation's part inside a function reads its module too", DEPTH, () => {
+test("a notation's part inside a function reads its module too", () => {
   const r = run(`capability output\n${SHOW}use ratio.fractions changing operators\ng = (a) => a :/ 2\nshow(g(9))\n`);
   assert.deepEqual(r.findings, [], told(r));
   assert.deepEqual(r.lines, ["9/2"]);
 });
 
-test("the path after `use` is followed to its end", DEPTH, () => {
+test("the path after `use` is followed to its end", () => {
   const r = run(`capability output\n${SHOW}use ratio.sets.signs changing operators\nshow(1 :/ 2)\n`);
   assert.deepEqual(r.lines, ["1/2"], told(r));
 });
 
-test("a `use` on the last line of a text is still made: one that is refused refuses the text", DEPTH, () => {
+test("a `use` on the last line of a text is still made: one that is refused refuses the text", () => {
   const r = run("capability output\noutput.write(\"never\")\nuse nowhere.signs\n");
   assert.deepEqual(r.lines, []);
   assert.deepEqual(r.findings, ["main: 3:1: use nowhere: the text of the module nowhere was not handed to the reader"]);
 });
 
-test("a notation the text lets replace the rule of its lines leaves no lines to go on with, and is refused", DEPTH, () => {
+test("a notation the text lets replace the rule of its lines leaves no lines to go on with, and is refused", () => {
   const r = run("capability output\nuse ratio.flat changing lines\noutput.write(\"never\")\n");
   assert.deepEqual(r.lines, []);
   assert.deepEqual(r.findings, ["main: a change of the grammar left the rule of the lines being read no lines"]);
 });
 
-test("a notation does not reach back: its sign above the `use` line is no reading", DEPTH, () => {
+test("a notation does not reach back: its sign above the `use` line is no reading", () => {
   const r = run("capability output\nx = 1 :/ 2\nuse ratio.fractions changing operators\noutput.write(\"never\")\n");
   assert.deepEqual(r.lines, []);
   assert.match(r.findings.join("\n"), /^main: no reading at \d+$/);
 });
 
-test("a `use` in a block ends with the block", DEPTH, () => {
+test("a `use` in a block ends with the block", () => {
   const inBlock = `capability output\n${SHOW}f() =>\n  use ratio.fractions changing operators\n  1 :/ 2\nshow(f())\n`;
   const r = run(inBlock);
   assert.deepEqual(r.lines, ["1/2"], told(r));
@@ -105,12 +104,12 @@ test("a `use` in a block ends with the block", DEPTH, () => {
   assert.match(after.findings.join("\n"), /^main: no reading at \d+$/);
 });
 
-test("a `use` at the top holds inside the blocks after it", DEPTH, () => {
+test("a `use` at the top holds inside the blocks after it", () => {
   const r = run(`capability output\n${SHOW}use ratio.fractions changing operators\nf(a) =>\n  b = a :/ 2\n  b\nshow(f(7))\n`);
   assert.deepEqual(r.lines, ["7/2"], told(r));
 });
 
-test("a module holds several notations, and a text uses the ones it names", DEPTH, () => {
+test("a module holds several notations, and a text uses the ones it names", () => {
   const both = run("capability output\nuse ratio.fractions changing operators\nuse ratio.doubling changing primary\noutput.write(int.text((twice 4 :/ 1).top))\n");
   assert.deepEqual(both.lines, ["8"], told(both));
   const one = run("capability output\nuse ratio.doubling changing primary\noutput.write(int.text(twice 21))\nx = 1 :/ 2\n");
@@ -118,13 +117,13 @@ test("a module holds several notations, and a text uses the ones it names", DEPT
   assert.match(one.findings.join("\n"), /^main: no reading at \d+$/);
 });
 
-test("a notation only adds: adding to a rule a rule in force tests cannot be read is refused unless the text names it", DEPTH, () => {
+test("a notation only adds: adding to a rule a rule in force tests cannot be read is refused unless the text names it", () => {
   const r = run("capability output\nuse ratio.fractions\noutput.write(\"never\")\n");
   assert.deepEqual(r.lines, []);
   assert.deepEqual(r.findings, ["main: 2:1: use ratio: the notation adds to the rule operators, which a rule in force tests cannot be read"]);
 });
 
-test("a notation that replaces a rule it did not add is refused, and allowed where the text names the rule", DEPTH, () => {
+test("a notation that replaces a rule it did not add is refused, and allowed where the text names the rule", () => {
   const r = run("capability output\nuse ratio.greedy\noutput.write(\"never\")\n");
   assert.deepEqual(r.findings, ["main: 2:1: use ratio: the notation changes the rule primary, which it did not add and the text does not name"]);
   // Named, the rule is replaced: an operand is the word `all` and nothing else, so a text literal is no reading.
@@ -132,17 +131,17 @@ test("a notation that replaces a rule it did not add is refused, and allowed whe
   assert.match(named.findings.join("\n"), /^main: no reading at \d+$/);
 });
 
-test("a notation cannot change the grammar again: lines that ask for a change are refused in what it brings, also where the text names the rule", DEPTH, () => {
+test("a notation cannot change the grammar again: lines that ask for a change are refused in what it brings, also where the text names the rule", () => {
   const r = run("capability output\nuse ratio.again changing primary\noutput.write(\"never\")\n");
   assert.deepEqual(r.findings, ["main: 2:1: use ratio: the notation brings lines that change the grammar, in the rule primary: that right is the grammar's a reading began with"]);
 });
 
-test("the same notation used twice in one block conflicts with itself", DEPTH, () => {
+test("the same notation used twice in one block conflicts with itself", () => {
   const r = run("capability output\nuse ratio.fractions changing operators\nuse ratio.fractions changing operators\noutput.write(\"never\")\n");
   assert.deepEqual(r.findings, ["main: 3:1: use ratio: a change adds the level ratio, which the rule operators has"]);
 });
 
-test("what `use` names is a notation of a module whose text was handed", DEPTH, () => {
+test("what `use` names is a notation of a module whose text was handed", () => {
   const unknown = run("capability output\nuse nowhere.signs\noutput.write(\"never\")\n");
   assert.deepEqual(unknown.findings, ["main: 2:1: use nowhere: the text of the module nowhere was not handed to the reader"]);
   const module = run("capability output\nuse ratio\noutput.write(\"never\")\n");
@@ -151,7 +150,7 @@ test("what `use` names is a notation of a module whose text was handed", DEPTH, 
   assert.match(absent.findings.join("\n"), /^main: 2:1: use ratio: the structure has no entry keyed absent$/);
 });
 
-test("a module that is used is read while the text is read, with its own `use` lines", DEPTH, () => {
+test("a module that is used is read while the text is read, with its own `use` lines", () => {
   // `half` is written in the notation of `ratio`, and brings a notation of its own that reads its binding.
   const half = [
     "import change",
@@ -172,7 +171,7 @@ test("a module that is used is read while the text is read, with its own `use` l
   assert.deepEqual(imported.lines, ["2"], told(imported));
 });
 
-test("a notation whose form reads what a form in force reads gives two readings, which is refused", DEPTH, () => {
+test("a notation whose form reads what a form in force reads gives two readings, which is refused", () => {
   // The word `six` is a name already: a notation that makes it an operand of its own leaves the text two ways to be read.
   const words = "import change\nimport grammar\nexport n = [change.append(`primary, grammar.giving(grammar.spaced(grammar.lit(\"six\")), (v, at) => {k: `int, value: 6, at: at}))]\n";
   const r = run("capability output\nuse words.n changing primary\nsix = 7\noutput.write(int.text(six))\n", { words });
@@ -180,7 +179,7 @@ test("a notation whose form reads what a form in force reads gives two readings,
   assert.deepEqual(r.findings, ["main: the text reads two ways"]);
 });
 
-test("a notation that adds a line of a name and an expression leaves a later `use` one reading: `use` is no name", DEPTH, () => {
+test("a notation that adds a line of a name and an expression leaves a later `use` one reading: `use` is no name", () => {
   const commands = [
     "capability output",
     "import change",
@@ -197,7 +196,7 @@ test("a notation that adds a line of a name and an expression leaves a later `us
   assert.deepEqual(r.lines, ["show 7", "tell 2"]);
 });
 
-test("a module that uses itself, through another, is refused", DEPTH, () => {
+test("a module that uses itself, through another, is refused", () => {
   const a = "use b.n\nexport n = []\n";
   const b = "use a.n\nexport n = []\n";
   const r = run("capability output\nuse a.n\noutput.write(\"never\")\n", { a, b });
@@ -205,7 +204,7 @@ test("a module that uses itself, through another, is refused", DEPTH, () => {
   assert.match(r.findings.join("\n"), /the module a is used while it is being read for its notation/);
 });
 
-test("a notation is taken from an instance with no capability and no input", DEPTH, () => {
+test("a notation is taken from an instance with no capability and no input", () => {
   // The notation needs nothing the module declares: it is read, and at the run the part it made is handed the text's own `output`.
   const loud = [
     "capability output",
@@ -226,13 +225,13 @@ test("a notation is taken from an instance with no capability and no input", DEP
   assert.match(refused.findings.join("\n"), /the input signs is not handed to a module read for its notation/);
 });
 
-test("a module with a key cannot be used yet: only the kernel makes a key, and the loader is not written", DEPTH, () => {
+test("a module with a key cannot be used yet: only the kernel makes a key, and the loader is not written", () => {
   const keyed = "key k\nexport n = []\n";
   const r = run("capability output\nuse keyed.n\noutput.write(\"never\")\n", { keyed });
   assert.match(r.findings.join("\n"), /the module keyed has a key/);
 });
 
-test("a text with no `use` is read as before, and a notation costs its module's reading once", DEPTH, () => {
+test("a text with no `use` is read as before, and a notation costs its module's reading once", () => {
   const plain = run("capability output\nx = 1\noutput.write(int.text(x))\n");
   assert.deepEqual(plain.lines, ["1"], told(plain));
   const used = run("capability output\nuse ratio.fractions changing operators\nx = 1\noutput.write(int.text(x))\n");
