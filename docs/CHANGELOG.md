@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-02 — The speed test holds steps, and time only on
+  request.** `next/ext/ext.test.ts` failed two pull requests on the
+  machine that runs the suite for them: 13.4 seconds where the limit
+  was 10, for the same 2,558,315 steps that take 6 to 7 seconds where
+  the target was measured. Ruled: the steps stay held on every run,
+  and the time is held with `ALLEGRO_SPEED=1`.
+- **2026-11-30 — The form `keyed` is ratified.** Ruled on PR #322: a
+  description writes a structure's entry keyed by a module's key as the
+  form `keyed`, with no key. The inventory's entry "A description is
+  plain data in a fixed set of forms" says so, with fourteen forms.
+  Records only.
 - **2026-11-29 — What a tree of Allegretto means, written in Allegretto
   (chunk E7 of the book pass, second part).** `next/ext/lib/meaning.alg`
   takes the tree the engine reads and gives the description of the

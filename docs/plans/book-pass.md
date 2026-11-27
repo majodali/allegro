@@ -2382,6 +2382,18 @@ its approval.
     everything. 1,089 tests pass on the machine kernel; the reference
     kernel, run since a file of the kernel changed, passes 999 and
     leaves out 89 that run an Allegretto module.
+- **2026-11-30 — rulings on PR #322 (chunk E7, second part)** (the
+  review session). All four asks confirmed.
+  - The form `keyed` is a form of description. The inventory's entry
+    "A description is plain data in a fixed set of forms" is reworded:
+    fourteen forms, and a symbol that keys an entry is written as it
+    is.
+  - Until the loader of E9 the meaning rules are handed the shipped
+    primitives' names and hashes, each imported module's declarations
+    and identity, and the tree of Allegretto's own functions.
+  - `and`, `or` and a number in binary keep the engine's refusal, which
+    says where the reading stopped; `use` is refused by the rules until
+    E8.
 
 ## 8. Sessions
 
