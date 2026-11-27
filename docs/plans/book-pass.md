@@ -2579,6 +2579,42 @@ its approval.
   - *Faults.* 12 deliberate faults. 10 failed a test at once; a test
     was added for each of the other 2, which were in what counts as
     alike.
+- **2026-12-03 — rulings on PR #326, and two notes** (the review
+  session). All asks confirmed; the terms `beside` and `alike` are
+  ratified.
+  - The rule as built stands: each reading a line had must still be
+    among its readings. A reading a notation adds beside one that stays
+    is refused at the end of the text, as two readings. How well that
+    tells the author the cause, and how a notation reserves a word, go
+    to the backlog: B-204 (a notation's form that reads what a form in
+    force reads) and B-205 (how a notation reserves a word).
+  - A reading of a part of a line stays compared, until a case comes
+    up.
+  - `changing` is to be understood as precedence: with it the
+    notation's rules win over those of before; without it a line both
+    read otherwise is refused.
+  - E8's second part is two PRs. Before the second, the named parts of
+    the parser's state, a chunk of its own: worked examples for every
+    rule of the parser, each one run by the suite.
+  - *A note on speed, for after the parser plan.* The maintainer: the
+    engine keeps several partial readings until they die or meet, which
+    is slow where there are often several; lookahead or abstract parse
+    states will be wanted, and the analysis either needs also finds
+    where a grammar is ambiguous. The review session's answer.
+    Lookahead can be added step by step, in the way the engine already
+    works: the analysis writes a fact on the prepared grammar and the
+    engine obeys it, as with the first byte of each alternative today.
+    The first steps would be a repetition that keeps only its longest
+    result where what follows cannot begin as an item does, a test of
+    more than one byte, and rules proved to have one result. Abstract
+    states are another way of running a grammar and do not grow out of
+    this engine form by form; they can come in beside it, for a part
+    of a grammar as one terminal, or as a second engine over the same
+    grammar value. Whatever is worked out ahead is worked out again at
+    each `use`; a terminal is a function and may leave what it begins
+    with unknown; and nothing may be dropped that is not proved dead,
+    or an ambiguity is hidden. To begin with: a count of results for
+    each form on real texts, and the measure of E10's specialization.
 
 ## 8. Sessions
 
