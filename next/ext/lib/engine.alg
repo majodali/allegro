@@ -76,7 +76,9 @@ export parses_of(p, text, source) => parses_with(p, text, source, [], no_change)
 // gives {held, prepared}: the prepared grammar the lines after it are
 // read in, and what it is handed the next time; or a failure with a
 // `reason`, which refuses the reading. `held` is what it is handed the
-// first time. The engine changes the grammar nowhere else.
+// first time. Where it gives `beside: true` as well, each line after the
+// change is also read in the grammar before it, and must mean the same
+// where both read it. The engine changes the grammar nowhere else.
 export parses_with(p, text, source, held, change) => read_all(context(p, text, source, held, change), p)
 no_change = (held, asked) => {failure: `no_change, reason: "a line asks for a change of the grammar, and whoever began the reading takes none"}
 export parse(p, text) => parse_of(p, text, "")
@@ -323,20 +325,58 @@ alone(rs, end) => ending_at(rs, end, 0) == 1
 ending_at(rs, end, n) => if count(rs) == 0 then n else ending_at(rs.t, end, if rs.h.end == end then n + 1 else n)
 first_lines(c, g, rs, every) =>
   if count(rs) == 0 then []
-  else {h: line_in(world(c, g, g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: rs.h.via, value: {h: rs.h.value, t: []}}), t: first_lines(c, g, rs.t, every)}
+  else {h: line_in(world({c: c, g: g, before: []}, g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: rs.h.via, value: {h: rs.h.value, t: []}}), t: first_lines(c, g, rs.t, every)}
 line_in(w, r) => {r: r, w: w}
-world(c, g, asked, every, end) => if count(asked) == 0 then {c: c, g: g} else then(claim(alone(every, end)), moved(c, g, c.change(c.held, asked[0])))
-moved(c, g, to) => if is_failure(to) then refuse(to.reason) else same_lines(regrammared(c, to.prepared, to.held), g.rule)
-same_lines(c, rule) => as_lines(c, get(c.rules, rule))
-as_lines(c, g) => if g.op == `turns then {c: c, g: g} else refuse("a change of the grammar left the rule of the lines being read no lines")
+world(w, asked, every, end) => if count(asked) == 0 then w else then(claim(alone(every, end)), moved(w, w.c.change(w.c.held, asked[0])))
+moved(w, to) => if is_failure(to) then refuse(to.reason) else same_lines(regrammared(w.c, to.prepared, to.held), w.g.rule, if count(to) > 2 && to.beside then [w] else [])
+same_lines(c, rule, before) => as_lines(c, get(c.rules, rule), before)
+as_lines(c, g, before) => if g.op == `turns then {c: c, g: g, before: before} else refuse("a change of the grammar left the rule of the lines being read no lines")
 lines_grow(todo, done, far) =>
   if count(todo) == 0 then {rs: turned(done, []), far: far}
   else lines_grown(todo.h, todo.t, done, far, next_line(todo.h.w.c, todo.h.w.g, todo.h.r))
 next_line(c, g, r) => if g.open || class.has(g.set, grammar.byte(c.text, r.end)) then read(c, g.more, r.end, r.state) else none_at(r.end)
-lines_grown(e, todo, done, far, p) => lines_grow(more_lines(e, p.rs, todo, p.rs), {h: e.r, t: done}, most(far, p.far))
+lines_grown(e, todo, done, far, p) => lines_grow(more_lines(e, compared(e, p.rs), todo, p.rs), {h: e.r, t: done}, most(far, p.far))
+// Where the change that made this context asked for it (`beside`), the line is read in the context before
+// the change as well. Each reading the line had there must still be among its readings to the same end:
+// where the line is read to that end and none of the readings is alike, what the text meant has changed, and
+// that is refused. A reading the change adds beside one that stays is no harm here: if both live to the end,
+// the text reads two ways, and that is refused there. A reading of a part of a line counts as one.
+compared(e, rs) => if count(e.w.before) == 0 then rs else then(kept_all(e.w.c, next_line(e.w.before[0].c, e.w.before[0].g, e.r).rs, rs), rs)
+kept_all(c, old, rs) => if count(old) == 0 then true else then(kept_one(c, old.h, rs, rs, []), kept_all(c, old.t, rs))
+// `other` is a reading to the same end that is not alike, where one was met.
+kept_one(c, o, rs, every, other) =>
+  if count(rs) == 0 then (if count(other) == 0 then true else refuse("the line that ends at " ++ int.text(location(c, o.stop).line) ++ ":" ++ int.text(location(c, o.stop).column) ++ " reads one way before the change of the grammar and another after it. Before: " ++ outline(o.value, 6) ++ " After: " ++ outline(other[0].value, 6)))
+  else if rs.h.end != o.end then kept_one(c, o, rs.t, every, other)
+  else if alike(o.value, rs.h.value) then true
+  else kept_one(c, o, rs.t, every, [rs.h])
+// A value in outline, for a refusal: a structure as its entries between brackets, to a depth, each key before
+// its entry and an entry keyed `at` left out; a symbol by its name; bits as the text they are where every byte
+// is a letter, a digit or a sign, and as a dot otherwise.
+outline(v, depth) =>
+  if kind(v) == `structure then (if depth == 0 then "…" else "(" ++ outline_from(v, 0, depth) ++ ")")
+  else if kind(v) == `symbol then spelling(v)
+  else if kind(v) == `bits && bits.length(v) > 0 && bits.length(v) / 8 * 8 == bits.length(v) && written(v, 0) then v
+  else "."
+outline_from(v, i, depth) =>
+  if i == count(v) then ""
+  else if kind(key(v, i)) == `symbol && key(v, i) == `at then outline_from(v, i + 1, depth)
+  else (if kind(key(v, i)) == `symbol then spelling(key(v, i)) ++ ":" else "") ++ outline(get(v, i), depth - 1) ++ (if i + 1 == count(v) then "" else " ") ++ outline_from(v, i + 1, depth)
+written(t, i) => i * 8 >= bits.length(t) || (grammar.byte(t, i) > 32 && grammar.byte(t, i) < 127 && written(t, i + 1))
+// Two values are alike where they are the same bits or the same symbol, or structures with the same keys
+// in the same order and entries that are alike. A function is alike to nothing: a form's value is data.
+alike(a, b) =>
+  if kind(a) != kind(b) then false
+  else if kind(a) == `structure then count(a) == count(b) && alike_from(a, b, 0)
+  else if kind(a) == `bits || kind(a) == `symbol then a == b
+  else false
+// An entry keyed `at` is a place, by the forms' own convention (grammar.giving): two values that are alike in
+// all else were read from the same bytes, and working out the places of both would be most of the cost.
+alike_from(a, b, i) => i == count(a) || (alike_keys(key(a, i), key(b, i)) && (is_place(key(a, i)) || alike(get(a, i), get(b, i))) && alike_from(a, b, i + 1))
+is_place(k) => kind(k) == `symbol && k == `at
+alike_keys(j, k) => kind(j) == kind(k) && (kind(j) != `symbol || j == k)
 more_lines(e, rs, todo, every) =>
   if count(rs) == 0 then todo
-  else if rs.h.end > e.r.end then {h: line_in(world(e.w.c, e.w.g, e.w.g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: e.r.via || rs.h.via, value: {h: rs.h.value, t: e.r.value}}), t: more_lines(e, rs.t, todo, every)}
+  else if rs.h.end > e.r.end then {h: line_in(world(e.w, e.w.g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: e.r.via || rs.h.via, value: {h: rs.h.value, t: e.r.value}}), t: more_lines(e, rs.t, todo, every)}
   else more_lines(e, rs.t, todo, every)
 
 maybe(at, st, p) => {rs: {h: {end: at, stop: at, state: st, via: false, value: []}, t: maybe_each(p.rs)}, far: p.far}

@@ -190,6 +190,12 @@ claim(breach(turning) == "the notation brings lines that change the grammar, in 
 claim(count(change.breaches(base, turning, {rules: [`value], words: []})) == 1)
 claim(count(change.breaches(base, [change.add(`fresh, seq([lit("("), grammar.opt(grammar.turns(`fresh, lit("x"), lit(";"), v => []))]))], nothing_named)) == 1)
 
+// ---- A notation whose lines are compared ----
+// Adding to a rule that a rule in force tests cannot be read is no breach where the lines are compared; the other rules hold.
+claim(count(change.breaches(deep, [change.append(`b, lit("d"))], nothing_named)) == 1 && !is_failure(attempt(count(change.used_compared(deep, [change.append(`b, lit("d"))]).rules), 100000)))
+claim(attempt(change.used_compared(base, [change.replace(`value, lit("n"))]), 100000).reason == "the notation changes the rule value, which it did not add and the text does not name")
+claim(attempt(change.used_compared(base, turning), 100000).reason == "the notation brings lines that change the grammar, in the rule value: that right is the grammar's a reading began with")
+
 output.write("change: ok")
 // expect: change: ok
 // end: completed

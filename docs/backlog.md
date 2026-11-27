@@ -3931,6 +3931,32 @@ table and the stream plans.
   copies the entries it is given; and whether a structure whose
   entries are evaluated when read serves as a stream. Raised by the
   maintainer on 2026-11-19.
+- [ ] **B-204** (a notation's form that reads what a form in force reads) ·
+  L1 · Needed, not urgent; filed 2026-12-03 by the maintainer's ruling
+  on PR #326. A notation may add a terminal or a form that reads text a
+  form in force reads already: a word that is also a name; a name
+  written with hyphens, which is also a subtraction. A text that meets
+  both readings is refused, as reading two ways, and that is all it is
+  told. Two things are wanted. To find the overlap on the grammar when
+  the notation is brought in, for every terminal in force and for
+  forms made of several. And a refusal that names the two forms and
+  the notation that brought one of them. The analysis is the one that
+  finds where a grammar can read a text two ways, which the engine's
+  later speed work needs too (`docs/plans/book-pass.md` §7, the note of
+  2026-12-03 on lookahead). To do after the parser plan, chunk E11.
+- [ ] **B-205** (how a notation reserves a word) · L1 · Needed, not
+  urgent; filed 2026-12-03 with B-204 (a notation's form that reads
+  what a form in force reads). Where a notation's word has the form of
+  a name, the one way to leave the text one reading is to make the
+  word reserved. `change.reserve` adds a word to a set, and is refused
+  unless the using text names the word after `changing`, since a
+  reserved word stops a text that used it as a name from reading. Not
+  designed: how a notation says which words it reserves and a text
+  sees them; which set a word goes into where a grammar has several;
+  and what a text is told where a name it binds has become reserved.
+  `capability`, `input` and `key`, which begin a line in Allegretto and
+  are no reserved words, are the same question, raised with the
+  acceptance stream on PR #324.
 - [x] **B-149** · T-tooling · L0 · **The unit DAG joins the gate.** LANDED
   2026-10-25: `npm run lint:units` (`scripts/analyze/index.ts units
   --check`) holds `scripts/analyze/units-baseline.json` — 2 violations

@@ -574,6 +574,17 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-03 — A notation that only adds needs no `changing`: the
+  text is checked, and not the grammar (chunk E8 of the book pass,
+  second part, first half).** Each line after a `use` is also read in
+  the grammar before it, and a line that no longer has the reading it
+  had is refused, with both readings shown. So `use ratio.fractions`
+  is enough, and a notation that would turn `1` and `+ 2` on two lines
+  from 3 into 2 is refused where it was let by. `changing` stays for a
+  notation meant to replace, remove or wrap a rule; its lines are not
+  compared. Lines after a `use` take about twice the steps. 26 tests
+  in `next/ext/use.test.ts`. Still to come in E8: the named parts of
+  the parser's state.
 - **2026-12-03 — The kernel's call `check` is removed, and the kernel
   reads no environment.** Both were ruled earlier and waited for the
   acceptance stream, which no longer uses either. A check is `evaluate`
