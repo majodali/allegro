@@ -99,6 +99,16 @@ marks = grammar.with_settled(grammar.with_settled(other, [`s]), [`w, `x])
 claim(count(marks.settled) == 3 && marks.settled[0] == `s && marks.settled[2] == `x && count(marks.reserved) == 2 && marks.state == 7)
 claim(count(grammar.with_state(marks, 1).settled) == 3 && count(grammar.with_reserved(marks, `words, ["a"]).settled) == 3 && count(grammar.with_space(marks, marks.space, false).settled) == 3)
 
+// ---- Lines read in turns with the grammar ----
+lines_form = grammar.turns(`lines, grammar.ref(`line), grammar.lit(";"), v => [])
+claim(lines_form.op == `turns && lines_form.rule == `lines && lines_form.item.name == `line && count(lines_form.asks(1)) == 0)
+// Written out it is the item, and then the item after what stands between, any number of times.
+claim(grammar.spelled(lines_form).op == `seq && grammar.spelled(lines_form).items[0].name == `line && grammar.spelled(lines_form).items[1].op == `star)
+// Every other form is what it is.
+claim(grammar.spelled(grammar.lit("a")).op == `term)
+// Given a function it keeps its parts.
+claim(grammar.giving(lines_form, (v, at) => v).rule == `lines && kind(grammar.giving(lines_form, (v, at) => v).gives) == `function)
+
 output.write("grammar: ok")
 // expect: grammar: ok
 // end: completed

@@ -15,7 +15,21 @@
 // A module's tree is {headers, items, at}, `at` the place of the whole
 // text. A header is
 // {k, name, pairs, without, at}, with k one of `capability, `input,
-// `key, `import and `use. An item is one of
+// `key, `import and `use. A `use` has two things more: `path`, the names
+// of `use m.a.b` in order, and `changing`, the names after that word. A
+// `use` in a block is an item of the block, in its place. A line `use`
+// asks for a change of the grammar (grammar.turns): the lines after it,
+// to the end of its lines, are read in the grammar whoever began the
+// reading gives for it (reader.alg).
+//
+// The rules a notation may name: `lines` and `line`; `body` and `block`;
+// `expression`, which is `taking` (a form that takes all that follows:
+// `if`, a function, a sign before an operand) or `operators`, the row
+// of signs, whose levels are `piped`, `either`, `both`, `equal`,
+// `ordered`, `joined`, `sum` and `product`, each binding tighter than
+// the one before; `prefixed` and `applied`, an operand with what stands
+// before and after it; `primary`, an operand by itself; and `field`.
+// An item is one of
 //
 //   {k: `binding, name, value, exported, at}
 //   {k: `function, name, params, body, exported, at}
@@ -207,23 +221,29 @@ gathered(clauses, with, i, out) =>
 
 // ---- The rules ----
 
-statements = giving(seq([ref(`line), star(giving(seq([o.newline, ref(`line)]), (v, at) => v[1]))]), (v, at) => with_first(v[0], v[1], 0, [v[0]]))
+// A line `use` asks for a change of the grammar: the lines after it, to the end of its lines, are read in the grammar changed.
+asks_change(v) => if v.header && v.k == `use then [v] else []
 // The space on one line: what stands between a sign and a block, which begins at the end of that line.
 level_space = grammar.term("space", (text, at) => blank(text, at) - at, false, class.no_ranges, true)
 // A word and a sign that a body follows read no space: the body says what space it takes.
 bare_word(t) => grammar.term(t, whole_word(grammar.lit(t).match), true, grammar.lit(t).ranges, false)
-block = giving(seq([o.indent_from, statements, o.dedent]), (v, at) => v[1])
+block = giving(seq([o.indent_from, ref(`lines), o.dedent]), (v, at) => v[1])
 with_clause = giving(seq([word("with"), giving(seq([name, sign(":"), ref(`expression)]), (v, at) => {name: v[0], value: v[2]}), star(giving(seq([wide, grammar.lit(","), wide, giving(seq([name, sign(":"), ref(`expression)]), (v, at) => {name: v[0], value: v[2]})]), (v, at) => v[3]))]), (v, at) => {with: true, v: with_first(v[1], v[2], 0, [v[1]])})
 without_clause = giving(seq([word("without"), name, star(giving(seq([wide, grammar.lit(","), wide, name]), (v, at) => v[3]))]), (v, at) => {with: false, v: with_first(v[1], v[2], 0, [v[1]])})
 module_line(w, k) => giving(seq([word(w), name, star(alt([with_clause, without_clause]))]), (v, at) => headed(k, v, at))
 header_line(w, k) => giving(seq([word(w), name]), (v, at) => {header: true, k: k, name: v[1], pairs: [], without: [], at: at})
+// `use m.a` with the rules it may change beyond adding: the path as names, the first of them the module's.
+// The line asks for a change of the grammar, so it ends at one place: each repetition is read as far as it goes.
+use_line = giving(seq([word("use"), name, star(giving(seq([sign("."), name]), (v, at) => v[1])), grammar.guard(grammar.lit("."), false), opt(use_changing), grammar.guard(grammar.lit("changing"), false)]), (v, at) => {header: true, k: `use, name: v[1], path: with_first(v[1], v[2], 0, [v[1]]), changing: if count(v[4]) == 0 then [] else v[4][0], pairs: [], without: [], at: at})
+use_changing = giving(seq([word("changing"), name, star(giving(seq([wide, grammar.lit(","), wide, name]), (v, at) => v[3])), grammar.guard(seq([wide, grammar.lit(",")]), false)]), (v, at) => with_first(v[1], v[2], 0, [v[1]]))
 parameters = between("(", listed(name), ")")
 
-export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof"]), o.space, true), offside.begun)
+export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof", "use"]), o.space, true), offside.begun)
 rules = {
-  module: giving(seq([wide, opt(statements), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: [], at: at} else sorted(v[1][0], 0, [], [], at)),
+  lines: grammar.turns(`lines, ref(`line), o.newline, asks_change),
+  module: giving(seq([wide, opt(ref(`lines)), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: [], at: at} else sorted(v[1][0], 0, [], [], at)),
   line: alt([
-    header_line("capability", `capability), header_line("input", `input), header_line("key", `key), module_line("import", `import), module_line("use", `use),
+    header_line("capability", `capability), header_line("input", `input), header_line("key", `key), module_line("import", `import), use_line,
     giving(seq([opt(word("export")), plain_name, parameters, grammar.lit("=>"), ref(`body)]), (v, at) => {header: false, k: `function, name: v[1], params: v[2].v, body: v[4], exported: count(v[0]) == 1, at: at}),
     giving(seq([opt(word("export")), name, grammar.lit("="), ref(`body)]), (v, at) => {header: false, k: `binding, name: v[1], value: v[3], exported: count(v[0]) == 1, at: at}),
     giving(seq([name, grammar.lit("<-"), ref(`body)]), (v, at) => {header: false, k: `arrow, name: v[0], value: v[2], at: at}),
@@ -234,7 +254,8 @@ rules = {
     giving(seq([grammar.guard(alt([seq([level_space, ref(`block)]), ref(`sync_block)]), false), gap, ref(`expression)]), (v, at) => v[2])]),
   sync_block: seq([level_space, bare_word("sync"), level_space, ref(`block)]),
   block: block,
-  expression: alt([ref(`taking), levels.row_ending(ref(`prefixed), ref(`taking), ladder, sign, signed)]),
+  expression: alt([ref(`taking), ref(`operators)]),
+  operators: levels.row_ending(ref(`prefixed), ref(`taking), ladder, sign, signed),
   taking: alt([
     giving(seq([word("if"), ref(`expression), bare_word("then"), ref(`body), gap, bare_word("else"), ref(`body)]), (v, at) => {k: `if, condition: v[1], then: v[3], otherwise: v[6], at: at}),
     giving(seq([name, sign("=>"), ref(`expression)]), (v, at) => {k: `lambda, params: [v[0]], body: v[2], at: at}),

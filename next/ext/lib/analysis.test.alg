@@ -179,6 +179,27 @@ claim(attempt(analysis.prepared(grammar.grammar(`t, {s: lit("a")})), 100000).rea
 claim(attempt(analysis.prepared(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words)})), 100000).reason == "the rule s names the reserved set words, which the grammar has not")
 claim(analysis.prepared(grammar.grammar(`s, {s: ref(`a), a: lit("a"), u: ref(`a)})).start == `s)
 
+// ---- Lines read in turns with the grammar ----
+//   text  = lines
+//   lines = line (";" line)*        between which the grammar may change
+//   line  = "a" | "(" lines ")"
+turning = grammar.grammar(`text, {
+  text: ref(`lines),
+  lines: grammar.turns(`lines, ref(`line), lit(";"), v => []),
+  line: alt([lit("a"), seq([lit("("), ref(`lines), lit(")")])])})
+turned = analysis.prepared(turning)
+claim(count(analysis.faults(turning)) == 0)
+// The lines begin with what a line begins with, and a line after the first with what stands between.
+claim(turned.rules.lines.op == `turns && turned.rules.lines.rule == `lines && class.has(turned.rules.lines.set, 59) && !class.has(turned.rules.lines.set, 97) && !turned.rules.lines.open)
+claim(turned.rules.lines.more.op == `seq && turned.rules.lines.item.op == `ref)
+// What holds the lines begins with what a line begins with: an option of them is tried at the letter, and not at what stands between.
+optional = analysis.prepared(grammar.grammar(`text, {text: grammar.opt(ref(`lines)), lines: grammar.turns(`lines, lit("a"), lit(";"), v => [])}))
+claim(class.has(optional.rules.text.set, 97) && !class.has(optional.rules.text.set, 59))
+// They read a byte where a line does, and a rule they name that the grammar has not is an error.
+claim(!analysis.can_be_empty(turning.rules.lines, {line: false, lines: false, text: false}))
+claim(count(analysis.errors(grammar.grammar(`lines, {lines: grammar.turns(`lines, ref(`absent), lit(";"), v => [])}))) == 1)
+claim(count(analysis.errors(grammar.grammar(`lines, {lines: grammar.turns(`lines, lit("a"), ref(`absent), v => [])}))) == 1)
+
 output.write("analysis: ok")
 // expect: analysis: ok
 // end: completed

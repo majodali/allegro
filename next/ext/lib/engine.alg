@@ -70,7 +70,15 @@ import grammar
 export prepared(g) => analysis.prepared(g)
 
 export parses(p, text) => parses_of(p, text, "")
-export parses_of(p, text, source) => read_all(context(p, text, source), p)
+export parses_of(p, text, source) => parses_with(p, text, source, [], no_change)
+// The same, for a grammar with lines that may ask for a change
+// (grammar.turns). `change(held, asked)` is handed what a line asks and
+// gives {held, prepared}: the prepared grammar the lines after it are
+// read in, and what it is handed the next time; or a failure with a
+// `reason`, which refuses the reading. `held` is what it is handed the
+// first time. The engine changes the grammar nowhere else.
+export parses_with(p, text, source, held, change) => read_all(context(p, text, source, held, change), p)
+no_change = (held, asked) => {failure: `no_change, reason: "a line asks for a change of the grammar, and whoever began the reading takes none"}
 export parse(p, text) => parse_of(p, text, "")
 export parse_of(p, text, source) => only(parses_of(p, text, source))
 only(a) => if is_failure(a) then a else then(claim(count(a.readings.t) == 0), a.readings.h)
@@ -79,10 +87,14 @@ only(a) => if is_failure(a) then a else then(claim(count(a.readings.t) == 0), a.
 // bytes, the rules, the function for space, the state a reading begins
 // with, the table of what is remembered, and what the rules being read
 // in turns have so far at the position `seed_at`.
-context(p, text, source) => knot(p, text, source, bits.length(text) / 8)
+context(p, text, source, held, change) => knot(p, text, source, bits.length(text) / 8, held, change)
 // The table reads the context it is part of.
-knot(p, text, source, len) =>
-  c = {text: text, source: source, len: len, lines: line_starts(text, len, 0, [0]), rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: []}
+knot(p, text, source, len, held, change) =>
+  c = {text: text, source: source, len: len, lines: line_starts(text, len, 0, [0]), rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: change}
+  c
+// The context of the same text with another grammar: its own table, and no rule being read in turns.
+regrammared(old, p, held) =>
+  c = {text: old.text, source: old.source, len: old.len, lines: old.lines, rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: old.change}
   c
 
 read_all(c, p) => answer(c, read(c, p.top, 0, p.state))
@@ -144,6 +156,7 @@ plain(c, g, at, st) =>
   else if g.op == `term then (if g.stateful then stepped(c, at, g.step(c.text, at, st)) else terminal(c, g, at, st, g.match(c.text, at)))
   else if g.op == `seq then in_order(c, g.items, at, st)
   else if g.op == `alt then branches(c, g.items, 0, at, st, grammar.byte(c.text, at))
+  else if g.op == `turns then lines_begun(c, g, read(c, g.item, at, st))
   else if g.op == `star then grow(c, g, {h: {end: at, stop: at, state: st, via: false, value: []}, t: []}, [], -1)
   else if g.op == `opt then maybe(at, st, gate(c, g, at, st))
   else guarded(g.holds, at, st, read(c, g.item, at, st))
@@ -237,7 +250,7 @@ next_turn(c, name, body, at, st, n, k, p, m) =>
   else if k > c.len - at + 1 then refuse("a rule reads itself and no byte between")
   else in_turns(c, name, body, at, st, p.rs, m, k + 1)
 // The context with one more rule being read in turns at this position.
-seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, lines: c.lines, rules: c.rules, space: c.space, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}}
+seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, lines: c.lines, rules: c.rules, space: c.space, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}, held: c.held, change: c.change}
 // What a rule being read in turns at this position has so far, as {h}, or [].
 seed_of(c, name, at) => if at == c.seed_at then seed_in(c.seeds, name) else []
 seed_in(l, name) => if count(l) == 0 then [] else if l.name == name then {h: l} else seed_in(l.t, name)
@@ -292,6 +305,39 @@ turned(done, out) =>
   if count(done) == 0 then out
   else turned(done.t, {h: {end: done.h.end, stop: done.h.stop, state: done.h.state, via: done.h.via, value: laid(reversed(done.h.value, []), [])}, t: out})
 reversed(l, out) => if count(l) == 0 then out else reversed(l.t, {h: l.h, t: out})
+
+// ---- Lines read in turns with the grammar ----
+//
+// As a repetition, with one thing more: each result not yet tried
+// further carries the context its next line is read in, `w`, which is
+// {c, g}: the context and this form as that context's grammar has it.
+// A line that asks for a change is claimed to be the only reading of
+// the text so far: no other reading of the line ends where it ends. A
+// reading that ends elsewhere has read another text, and goes on in the
+// grammar as it was. The change is made when the result is tried
+// further, which every result is: so also for the last of its lines,
+// and a change that is refused refuses the reading wherever it is asked.
+lines_begun(c, g, p) => lines_grow(first_lines(c, g, p.rs, p.rs), [], p.far)
+// True where one result of rs, and no more, ends at `end`.
+alone(rs, end) => ending_at(rs, end, 0) == 1
+ending_at(rs, end, n) => if count(rs) == 0 then n else ending_at(rs.t, end, if rs.h.end == end then n + 1 else n)
+first_lines(c, g, rs, every) =>
+  if count(rs) == 0 then []
+  else {h: line_in(world(c, g, g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: rs.h.via, value: {h: rs.h.value, t: []}}), t: first_lines(c, g, rs.t, every)}
+line_in(w, r) => {r: r, w: w}
+world(c, g, asked, every, end) => if count(asked) == 0 then {c: c, g: g} else then(claim(alone(every, end)), moved(c, g, c.change(c.held, asked[0])))
+moved(c, g, to) => if is_failure(to) then refuse(to.reason) else same_lines(regrammared(c, to.prepared, to.held), g.rule)
+same_lines(c, rule) => as_lines(c, get(c.rules, rule))
+as_lines(c, g) => if g.op == `turns then {c: c, g: g} else refuse("a change of the grammar left the rule of the lines being read no lines")
+lines_grow(todo, done, far) =>
+  if count(todo) == 0 then {rs: turned(done, []), far: far}
+  else lines_grown(todo.h, todo.t, done, far, next_line(todo.h.w.c, todo.h.w.g, todo.h.r))
+next_line(c, g, r) => if g.open || class.has(g.set, grammar.byte(c.text, r.end)) then read(c, g.more, r.end, r.state) else none_at(r.end)
+lines_grown(e, todo, done, far, p) => lines_grow(more_lines(e, p.rs, todo, p.rs), {h: e.r, t: done}, most(far, p.far))
+more_lines(e, rs, todo, every) =>
+  if count(rs) == 0 then todo
+  else if rs.h.end > e.r.end then {h: line_in(world(e.w.c, e.w.g, e.w.g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: e.r.via || rs.h.via, value: {h: rs.h.value, t: e.r.value}}), t: more_lines(e, rs.t, todo, every)}
+  else more_lines(e, rs.t, todo, every)
 
 maybe(at, st, p) => {rs: {h: {end: at, stop: at, state: st, via: false, value: []}, t: maybe_each(p.rs)}, far: p.far}
 maybe_each(rs) =>

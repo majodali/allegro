@@ -1,5 +1,6 @@
 // Tests of next/ext/lib/engine.alg.
 capability output
+import change
 import class
 import engine
 import grammar
@@ -282,6 +283,41 @@ claim(readings(engine.prepared(grammar.with_settled(unsettled, [`s])), "xx!") ==
 // A settled rule with one result, and with none.
 settled_one = engine.prepared(grammar.with_settled(grammar.grammar(`s, {s: star(ref(`a)), a: seq([number, lit(";")])}), [`a]))
 claim(readings(settled_one, "1;22;") == 1 && readings(settled_one, "1;2") == 0)
+
+// ---- Lines read in turns with the grammar ----
+
+// A tiny language: lines of the letter a, a line `+x` that adds the
+// letter x to what a line may be, and lines between brackets.
+letters = grammar.grammar(`text, {
+  text: seq([ref(`lines), grammar.end]),
+  lines: grammar.turns(`lines, ref(`line), lit("\n"), asks_change),
+  line: alt([lit("a"), grammar.giving(seq([lit("+"), grammar.one("letter", "bz")]), (v, at) => {add: v[1]}), seq([lit("(\n"), ref(`lines), lit("\n)")])])})
+asks_change(v) => if kind(v) == `structure && count(v) == 1 && kind(key(v, 0)) == `symbol then [v] else []
+// What a line asks is added to the grammar held, which is prepared again.
+adding(held, asked) => if asked.add == "z" then {failure: `no_change, reason: "no z"} else held_and_prepared(change.changed(held, [[change.append(`line, lit(asked.add))]]))
+held_and_prepared(g) => {held: g, prepared: engine.prepared(g)}
+letters_ready = engine.prepared(letters)
+turns_read(text) => size(engine.parses_with(letters_ready, text, "", letters, adding))
+turns_tree(text) => engine.shown(engine.parses_with(letters_ready, text, "", letters, adding).readings.h)
+turns_failed(text) => engine.parses_with(letters_ready, text, "", letters, adding).at
+// Lines with no change read as a repetition does.
+claim(turns_read("a") == 1 && turns_read("a\na\na") == 1 && turns_read("a\nb") == 0 && turns_failed("a\nb") == 2)
+claim(turns_tree("a\na") == "[[a a] ]")
+// A change holds from the line after it: not on its own line, and not before it.
+claim(turns_read("+b\nb\na\nb") == 1 && turns_read("b\n+b") == 0 && turns_read("+b\nc") == 0)
+// Two changes, each beside the one before.
+claim(turns_read("+b\n+c\nc\nb\na") == 1)
+// A change ends with its lines: one made between brackets holds there, and not after them.
+claim(turns_read("(\n+b\nb\n)\na") == 1 && turns_read("(\n+b\nb\n)\nb") == 0 && turns_failed("(\n+b\nb\n)\nb") == 9)
+// One made before the brackets holds between them and after them.
+claim(turns_read("+b\n(\nb\n+c\nc\n)\nb") == 1 && turns_read("+b\n(\n+c\n)\nc") == 0)
+// The same prepared grammar reads another text as it was: a change touches no grammar, it gives another.
+claim(turns_read("+b\nb") == 1 && turns_read("b") == 0)
+// A change that is refused refuses the reading, with its reason, also where the last of its lines asks it.
+claim(attempt(turns_read("+z\na"), 200000).reason == "no z" && attempt(turns_read("a\n+z"), 200000).reason == "no z")
+// Whoever begins a reading with `parses` takes no change.
+claim(attempt(size(engine.parses(letters_ready, "+b\nb")), 200000).reason == "a line asks for a change of the grammar, and whoever began the reading takes none")
+claim(size(engine.parses(letters_ready, "a\na")) == 1)
 
 output.write("engine: ok")
 // expect: engine: ok

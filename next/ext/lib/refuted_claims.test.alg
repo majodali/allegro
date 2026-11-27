@@ -24,6 +24,12 @@ unsettled = grammar.grammar(`s, {s: seq([grammar.ref(`a), lit("!")]), a: alt([li
 claim(count(engine.parses(engine.prepared(unsettled), "xx!").readings.t) == 0)
 claim(attempt(engine.parses(engine.prepared(grammar.with_settled(unsettled, [`a])), "xx!"), 100000).failure == `refuted)
 
+// ---- A line that asks for a change is the only reading of the text so far ----
+// The line "+" is read two ways, both ending where it ends, and each asks: the claim is refuted.
+asks_twice = grammar.grammar(`lines, {lines: grammar.turns(`lines, grammar.ref(`line), lit(";"), v => [v]), line: alt([lit("+"), seq([lit("+"), grammar.opt(lit("!"))])])})
+taking_any = (held, asked) => {held: held, prepared: engine.prepared(held)}
+claim(attempt(engine.parses_with(engine.prepared(asks_twice), "+;+", "", asks_twice, taking_any), 100000).failure == `refuted)
+
 output.write("refuted claims: ok")
 // expect: refuted claims: ok
 // end: completed

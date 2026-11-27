@@ -301,10 +301,28 @@ The imported module's top-level statements are started then, in written
 order, and once: two imports of one module with the same arguments are
 one instance. An import nothing needs is never instantiated.
 
-`use name` brings a module's bindings and its notation. It takes `with`
-and `without` as `import` does. Its place in the text matters, as no
-other declaration's does: the notation acts from that line. The notation
-is taken from an instance made with no capability and no input.
+`use name.notation` brings a notation, and no bindings. A notation is a
+value a module exports: a list of changes to a grammar. What follows
+`use` is a path from a module's name to it, so a module holds as many
+notations as it exports, each under a name of its own. The text need not
+import the module. `use` takes no `with` and no `without`: the notation
+is taken from an instance made with no capability and no input. It may
+end with `changing` and a list of rules the notation may replace, remove,
+wrap or add to where a notation otherwise only adds:
+`use units.signs changing operators`.
+
+Its place in the text matters, as no other declaration's does: the
+notation acts from the line after it, to the end of the block it is
+written in. It is the one declaration a block may hold. At the top
+level it holds to the end of the text.
+
+`use` is a reserved word, as `import` is, and no name. A notation may
+add a line that begins with a name; were `use` a name, a `use` line
+after it would read two ways.
+
+A part of the text that a notation gives meaning to may read a binding
+of the notation's module. It reads the module itself, whatever the text
+has bound under the module's name.
 
 The rest of the text is the module's block. What the module yields is a
 structure of its bindings, keyed by symbols of their names: those marked

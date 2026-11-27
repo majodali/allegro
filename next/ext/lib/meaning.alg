@@ -33,6 +33,13 @@
 // parameters; or a name a block binds, which the kernel looks up from
 // where it is used. A name Allegretto binds is what it stands for.
 //
+// A notation's part of the tree may be a node the reader gives no text:
+// {k: `from, module, name, at}, which reads a binding of the notation's
+// module, whatever the text has bound ("What a notation's parts read").
+// A line `use` is passed over: the reader has made its change already.
+// `needed(tree)` gives the names of the modules a text needs emitted
+// before it: its imports, and the modules its `from` nodes read.
+//
 // A name nothing binds, a name bound twice in a block, and an import
 // that does not fit what it imports are findings. A finding is written
 // into the description where it is met, and gathered when the
@@ -75,7 +82,7 @@ found_in(scope, name, m) => if count(m) > 0 then m else looked(scope.outer, name
 in_names(names, name, i) => if i == count(names) then [] else if names[i].name == name then names[i].m else in_names(names, name, i + 1)
 has_name(names, name, i) => i < count(names) && (names[i].name == name || has_name(names, name, i + 1))
 
-kernel_names = ["then", "also", "first", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling"]
+kernel_names = ["then", "also", "first", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling", "specialize", "sample"]
 namespaces = ["int", "float", "text", "bits"]
 own_public = ["is_failure", "handle", "each", "each_at_once", "each_within", "all"]
 allegretto_scope = {names: joined(mapped(namespaces, n => {name: n, m: {k: `namespace}}, 0, []), 0, mapped(kernel_names, n => {name: n, m: {k: `kernel, name: n}}, 0, [])), outer: []}
@@ -128,6 +135,7 @@ expr(e, c) =>
   else if e.k == `binary then binary(e.op, c, expr(e.left, c), expr(e.right, c), e.at)
   else if e.k == `record then record(e.fields, c, e.at, 0, [])
   else if e.k == `list then structure(c, mapped(e.items, i => expr(i, c), 0, []), e.at)
+  else if e.k == `from then apply(c, kernel("get"), [named(hidden(e.module)), datum(e.name)], e.at)
   else block_value(e, c)
 
 name_used(e, c, m) => if count(m) == 0 then finding("the name " ++ e.name ++ " is bound nowhere in the text", e.at) else standing(c, e.name, m)
@@ -233,9 +241,13 @@ with_bindings(c, values, chain, at) => if count(values) == 0 then chain else app
 
 // ---- Lines in their place ----
 
-// A header line belongs to the module, and so does `export`: in a block inside it each is a finding.
+// A header line belongs to the module, and so does `export`: in a block
+// inside it each is a finding. `use` is the one a block may hold: it
+// brings a notation to the end of that block, and the rules here pass
+// over it, since whoever read the text has made the change already.
 out_of_place(items, i, out) =>
   if i == count(items) then out
+  else if items[i].header && items[i].k == `use then out_of_place(items, i + 1, out)
   else if items[i].header then out_of_place(items, i + 1, put(out, [], finding("the header line " ++ spelling(items[i].k) ++ " belongs at the top level of the module, not in a block", items[i].at)))
   else if (items[i].k == `binding || items[i].k == `function) && items[i].exported then out_of_place(items, i + 1, put(out, [], finding("export marks a binding of the module, and this one is in a block inside it", items[i].at)))
   else out_of_place(items, i + 1, out)
@@ -307,25 +319,74 @@ gathered(m) => judged(m, findings(m.description, m.findings))
 judged(m, found) => if count(found) > 0 then {failure: `not_a_module, findings: found} else {description: m.description, declares: m.declares, keys: m.keys}
 
 is_key(h) => h.k == `key
-not_key(h) => h.k != `key
+not_key(h) => h.k != `key && h.k != `use
 // The header lines are the module function's parameters: the keys
 // first, then the others, each in written order.
 module(tree, given) => module_with(tree, given, joined(kept(tree.headers, not_key, 0, []), 0, kept(tree.headers, is_key, 0, [])), count(kept(tree.headers, is_key, 0, [])))
-module_with(tree, given, params, keys) => module_in(tree, params, keys, {scope: {names: header_names(params, keys, 0, []), outer: {names: mapped(own_public, n => {name: n, m: {k: `own}}, 0, []), outer: allegretto_scope}}, level: 1, placing: true, given: given})
+module_with(tree, given, params, keys) => module_in(tree, params, keys, used_modules(tree), {scope: {names: header_names(params, keys, 0, []), outer: {names: mapped(own_public, n => {name: n, m: {k: `own}}, 0, []), outer: allegretto_scope}}, level: 1, placing: true, given: given})
 header_names(params, keys, i, out) =>
   if i == count(params) then out
   else if params[i].k == `import then header_names(params, keys, i + 1, put(out, [], {name: params[i].name.name, m: {k: `bound}}))
   else header_names(params, keys, i + 1, put(out, [], {name: params[i].name.name, m: {k: `param, level: 0, index: i, role: params[i].k}}))
-module_in(tree, params, keys, c) =>
-  {description: function(c, count(params), around(c, block(tree.items, c, true, yielded(c, tree, params), false, tree.at, imports(params, c, 0, []))[0]), tree.at),
-   declares: declared(params, c.given.modules, keys, []),
+// `used` is the modules a notation's parts of the tree read (`from`).
+// One the text does not import is a parameter after those written, and
+// declared as an import is.
+module_in(tree, params, keys, used, c) => module_as(tree, params, joined(unwritten(tree, params, used, 0, []), 0, params), keys, used, c)
+module_as(tree, params, all, keys, used, c) =>
+  {description: function(c, count(all), around(c, with_hidden(c, tree, all, used, block(tree.items, c, true, yielded(c, tree, params), false, tree.at, imports(params, c, 0, []))[0])), tree.at),
+   declares: declared(all, c.given.modules, keys, []),
    keys: keys,
-   findings: not_read(params, 0, twice(item_names(params, 0, []), 0, []))}
-// `use` brings a module's notation: a later chunk of the engine reads it.
-not_read(params, i, out) =>
-  if i == count(params) then out
-  else if params[i].k == `use then not_read(params, i + 1, put(out, [], finding("use " ++ params[i].name.name ++ " brings a module's notation, which is not read yet", params[i].at)))
-  else not_read(params, i + 1, out)
+   findings: twice(item_names(params, 0, []), 0, [])}
+unwritten(tree, params, used, i, out) =>
+  if i == count(used) then out
+  else if place_of_import(params, used[i], 0) >= 0 then unwritten(tree, params, used, i + 1, out)
+  else unwritten(tree, params, used, i + 1, put(out, [], unwritten_import(used[i], tree.at)))
+unwritten_import(name, at) => {header: true, k: `import, name: {name: name, at: at}, pairs: [], without: [], at: at}
+place_of_import(params, name, i) => if i == count(params) then -1 else if params[i].k == `import && params[i].name.name == name then i else place_of_import(params, name, i + 1)
+
+// ---- What a notation's parts read ----
+
+// A part of the tree a notation made reads a binding of the notation's
+// module with {k: `from, module, name, at}. The module is bound a second
+// time for it, in a block around the module's own, under a name no text
+// can write: so nothing the text binds stands between the part and what
+// it reads, and the text need not import the module. The binding is the
+// module as `import` with no list gives it.
+hidden(name) => "use " ++ name
+with_hidden(c, tree, all, used, body) => if count(used) == 0 then body else {form: `apply, function: kernel("block"), arguments: [{form: `structure, entries: hidden_entries(c, tree, all, used, 0, [])}, body]}
+hidden_entries(c, tree, all, used, i, out) =>
+  if i == count(used) then out
+  else hidden_entries(c, tree, all, used, i + 1, put(out, symbol(hidden(used[i])), imported(c, unwritten_import(used[i], tree.at), place_of_import(all, used[i], 0), module_given(c.given.modules, used[i], 0))))
+// The modules read so, each once, in the order met.
+used_modules(tree) => froms_items(tree.items, 0, froms_items(tree.headers, 0, []))
+// The modules a text needs emitted before it: those it imports, and those its notations' parts read.
+export needed(tree) => joined(used_less(used_modules(tree), tree.headers, 0, []), 0, import_names(tree.headers, 0, []))
+import_names(headers, i, out) => if i == count(headers) then out else import_names(headers, i + 1, if headers[i].k == `import then put(out, [], headers[i].name.name) else out)
+used_less(used, headers, i, out) => if i == count(used) then out else used_less(used, headers, i + 1, if place_of_import(headers, used[i], 0) >= 0 then out else put(out, [], used[i]))
+froms(e, out) =>
+  if e.k == `from then with_name(out, e.module)
+  else if e.k == `lambda then froms(e.body, out)
+  else if e.k == `apply then froms_each(e.args, 0, froms(e.fn, out))
+  else if e.k == `pipe then froms(e.fn, froms(e.value, out))
+  else if e.k == `dot then froms(e.object, out)
+  else if e.k == `index then froms(e.index, froms(e.object, out))
+  else if e.k == `if then froms(e.otherwise, froms(e.then, froms(e.condition, out)))
+  else if e.k == `binary then froms(e.right, froms(e.left, out))
+  else if e.k == `unary then froms(e.operand, out)
+  else if e.k == `record then froms_fields(e.fields, 0, out)
+  else if e.k == `list then froms_each(e.items, 0, out)
+  else if e.k == `block then froms_items(e.items, 0, out)
+  else out
+froms_each(es, i, out) => if i == count(es) then out else froms_each(es, i + 1, froms(es[i], out))
+froms_fields(fs, i, out) => if i == count(fs) then out else froms_fields(fs, i + 1, froms(fs[i].value, if fs[i].k == `named then out else froms(fs[i].key, out)))
+froms_pairs(pairs, i, out) => if i == count(pairs) then out else froms_pairs(pairs, i + 1, froms(pairs[i].value, out))
+froms_items(items, i, out) => if i == count(items) then out else froms_items(items, i + 1, froms_item(items[i], out))
+froms_item(it, out) =>
+  if it.header then froms_pairs(it.pairs, 0, out)
+  else if it.k == `statement then froms(it.expr, out)
+  else if it.k == `function then froms(it.body, out)
+  else froms(it.value, out)
+
 declared(params, modules, i, out) =>
   if i == count(params) then out
   else if params[i].k == `import then declared(params, modules, i + 1, put(out, [], declared_module(params[i].name.name, module_given(modules, params[i].name.name, 0))))

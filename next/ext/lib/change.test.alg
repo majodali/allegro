@@ -184,6 +184,12 @@ claim(count(change.changed_by(base, [[change.wrap(`plain, f => f)], [change.appe
 claim(change.conflicts_by(base, [units], [change.replace(`number, lit("n")), change.replace(`number, lit("m"))])[0] == "the rule number is replaced or wrapped twice")
 claim(change.conflicts_by(base, [], [change.append(`nothing, lit("n"))])[0] == "a change is to the rule nothing, which the grammar has not")
 
+// A notation brings no lines that change the grammar, whatever the text names: that right is not a notation's.
+turning = [change.append(`value, grammar.turns(`value, lit("x"), lit(";"), v => []))]
+claim(breach(turning) == "the notation brings lines that change the grammar, in the rule value: that right is the grammar's a reading began with")
+claim(count(change.breaches(base, turning, {rules: [`value], words: []})) == 1)
+claim(count(change.breaches(base, [change.add(`fresh, seq([lit("("), grammar.opt(grammar.turns(`fresh, lit("x"), lit(";"), v => []))]))], nothing_named)) == 1)
+
 output.write("change: ok")
 // expect: change: ok
 // end: completed
