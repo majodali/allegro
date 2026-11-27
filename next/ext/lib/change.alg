@@ -195,6 +195,10 @@ reserved(g, ops, i) =>
 // ---- A notation can only add ----
 
 export used(g, change, named) => allowed(g, change, breaches(g, change, named))
+// The same for a notation whose lines are compared: each line after it is read in the grammar before it as
+// well, and a line both read with different trees is refused (engine.alg). That finds a change of what a text
+// meant whatever causes it, so adding to a rule that a rule in force tests cannot be read is no breach here.
+export used_compared(g, change) => allowed(g, change, breach(g, change, {rules: [], words: []}, [], 0, []))
 allowed(g, change, found) => if count(found) > 0 then refuse(found[0]) else changed(g, [change])
 
 export breaches(g, change, named) => breach(g, change, named, tested(g.rules, 0, []), 0, [])

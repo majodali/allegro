@@ -319,6 +319,34 @@ claim(attempt(turns_read("+z\na"), 200000).reason == "no z" && attempt(turns_rea
 claim(attempt(size(engine.parses(letters_ready, "+b\nb")), 200000).reason == "a line asks for a change of the grammar, and whoever began the reading takes none")
 claim(size(engine.parses(letters_ready, "a\na")) == 1)
 
+// ---- Lines read in the grammar before a change as well ----
+// `+w` puts brackets around what every line gives: a change of what a line means. `+b` only adds.
+wrapping(held, asked) => if asked.add == "w" then held_beside(change.changed(held, [[change.wrap(`line, f => grammar.giving(f, (v, at) => [v]))]])) else held_beside(change.changed(held, [[change.append(`line, lit(asked.add))]]))
+held_beside(g) => {held: g, prepared: engine.prepared(g), beside: true}
+unwatched(held, asked) => held_and_prepared(change.changed(held, [[change.wrap(`line, f => grammar.giving(f, (v, at) => [v]))]]))
+beside_read(text) => size(engine.parses_with(letters_ready, text, "", letters, wrapping))
+// A line the grammar before could not read, and a line both read alike: no harm.
+claim(beside_read("+b\nb\na\n(\na\n)") == 1)
+// A line both read, and not alike: refused, with where and both readings.
+refusal = attempt(beside_read("+w\na"), 400000).reason
+claim(refusal == "the line that ends at 2:2 reads one way before the change of the grammar and another after it. Before: a After: (a)")
+// The same change, made by one who did not ask for the lines to be compared, goes through.
+claim(size(engine.parses_with(letters_ready, "+w\na", "", letters, unwatched)) == 1)
+// The comparison is with the grammar before the last change: after `+b`, a line `b` is read by both sides of `+c`.
+claim(beside_read("+b\n+c\nb\nc") == 1)
+
+// What is alike: the same keys, and the same bits at every leaf. A line `a` gives a structure, and `!` asks for
+// the rule of a line to be replaced by one that gives another.
+keyed_line(made) => alt([grammar.giving(lit("a"), (v, at) => made(v)), grammar.giving(lit("!"), (v, at) => `go)])
+keyed = grammar.grammar(`lines, {lines: grammar.turns(`lines, ref(`line), lit(";"), v => if kind(v) == `symbol then [v] else []), line: keyed_line(v => {p: v})})
+replacing(made) => (held, asked) => held_beside(change.changed(held, [[change.replace(`line, keyed_line(made))]]))
+keyed_read(made) => attempt(size(engine.parses_with(engine.prepared(keyed), "!;a", "", keyed, replacing(made))), 400000)
+claim(keyed_read(v => {p: v}) == 1)
+claim(keyed_read(v => {q: v}).reason == "the line that ends at 1:4 reads one way before the change of the grammar and another after it. Before: (p:a) After: (q:a)")
+claim(keyed_read(v => {p: "b"}).reason == "the line that ends at 1:4 reads one way before the change of the grammar and another after it. Before: (p:a) After: (p:b)")
+// A place is left out of the comparison and of the outline: two readings of the same bytes that are alike in all else have the same places.
+claim(keyed_read(v => {p: v, at: 7}).failure == `refuted && keyed_read(v => {at: 1, p: v}).failure == `refuted)
+
 output.write("engine: ok")
 // expect: engine: ok
 // end: completed

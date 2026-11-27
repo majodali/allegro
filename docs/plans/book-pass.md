@@ -606,7 +606,7 @@ are:
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Second part done 2026-11-29: `next/ext/lib/meaning.alg` gives the description, the declarations and the count of keys, and for all 172 texts the bootstrap emits the module is the bootstrap's by identity, with the same places (`next/ext/modules.ts`). Open: the speed target, missed with the whole grammar (§7); the imported modules and the shipped primitives are handed to the rules, until the loader of E9 |
-| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream. First part done 2026-12-01: `use m.a` read in turns with the grammar, in a block too; a notation's part reads its module whatever the text binds (`next/ext/use.test.ts`). Open: the named parts of the parser's state; the right to change the grammar as a capability of the launcher |
+| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream. First part done 2026-12-01: `use m.a` read in turns with the grammar, in a block too; a notation's part reads its module whatever the text binds (`next/ext/use.test.ts`). Second part, first half, done 2026-12-03: a notation that only adds needs no `changing`, and each line after a `use` is compared with its reading in the grammar before. Open: the named parts of the parser's state; the right to change the grammar as a capability of the launcher |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
 | E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
 | E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
@@ -2535,6 +2535,50 @@ its approval.
     holds is accepted as described above, and the interface's version
     stays 2 where a call is removed and nothing its callers use
     changes.
+- **2026-12-03 — chunk E8, second part, first half: the text is
+  checked, and not the grammar** (the review session). Built as ruled
+  on PR #324. The named parts of the parser's state are the other
+  half, in a PR of their own: the two share no code.
+  - *The rule.* A change may ask that the lines after it be compared
+    (`beside`). The engine then reads each such line in the context
+    before the change as well. Each reading the line had there must
+    still be among its readings to the same end; where the line is
+    read to that end and none is alike, the text is refused, with the
+    place and both readings in outline.
+  - *Two things the rule lets by, on purpose.* A reading the notation
+    adds beside one the line keeps: if both live, the text reads two
+    ways and is refused at its end, as ever. And the comparison is
+    with the grammar before the last `use` only.
+  - *One thing it counts that could be let by.* A reading of a part of
+    a line is compared like any other, though it may be one that dies
+    at the next byte. A first version refused wherever any reading to
+    the same end differed, and refused a text for such a part; the
+    rule above is what came of it.
+  - *Alike.* Two values are alike where they are the same bits or
+    symbol, or structures with the same keys in order and entries
+    alike. An entry keyed `at`, a place, is left out: two readings of
+    the same bytes that are alike in all else have the same places,
+    and working the places out was a fifth of the cost.
+  - *The reader.* A `use` with no `changing` asks for the comparison,
+    and is checked on the grammar by `change.used_compared`, which
+    lets adding to a rule under a negative test by. A `use` with
+    `changing` is as it was: checked on the grammar by `change.used`,
+    and its lines not compared.
+  - *The example of the ruling* is a test: a sign `+` before an
+    operand turns `1` and `+ 2` on two lines from 3 into 2. With
+    `use plus.signs` the text is refused, and the refusal shows the
+    sum and the block. With `changing prefixed` it runs and gives 2.
+  - *Cost.* Forty lines take 671,733 steps. After a `use` with
+    `changing` they take 1,223,212, of which about 550,000 are the
+    `use` itself. After a `use` with none they take 1,969,368: the
+    lines cost about twice.
+  - *Assertions changed*, each with a comment: the test that held
+    `use ratio.fractions` refused with no `changing` is replaced by
+    three tests of the new rule; and the tests that wrote `changing`
+    for a notation that only adds no longer write it.
+  - *Faults.* 12 deliberate faults. 10 failed a test at once; a test
+    was added for each of the other 2, which were in what counts as
+    alike.
 
 ## 8. Sessions
 

@@ -306,10 +306,16 @@ value a module exports: a list of changes to a grammar. What follows
 `use` is a path from a module's name to it, so a module holds as many
 notations as it exports, each under a name of its own. The text need not
 import the module. `use` takes no `with` and no `without`: the notation
-is taken from an instance made with no capability and no input. It may
-end with `changing` and a list of rules the notation may replace, remove,
-wrap or add to where a notation otherwise only adds:
-`use units.signs changing operators`.
+is taken from an instance made with no capability and no input.
+
+A notation only adds. What the text meant before the `use`, it means
+after it: each line after the `use` is read in the grammar before it as
+well, and a line that both read, and that no longer has the reading it
+had, is refused, with both readings shown. A `use` may end with
+`changing` and a list of rules, where the notation is meant to change
+what a rule reads: to replace, remove or wrap it.
+`use units.signs changing operators`. The lines after such a `use` are
+not compared.
 
 Its place in the text matters, as no other declaration's does: the
 notation acts from the line after it, to the end of the block it is

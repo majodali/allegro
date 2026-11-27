@@ -14,9 +14,12 @@
 // m, has the meaning rules write its function, builds it, and makes an
 // instance with no capability and no input. `m.a` of that instance is a
 // notation: a list of changes (change.alg). The grammar in force is
-// changed by it, as far as a notation may change one (`change.used`),
-// with the rules the line names after `changing` open to it. The lines
-// after the `use`, to the end of its block, are read in that grammar.
+// changed by it, as far as a notation may change one. The lines after
+// the `use`, to the end of its block, are read in that grammar. A `use`
+// with no `changing` only adds, and the engine reads each of those
+// lines in the grammar before it as well: a line that no longer has the
+// reading it had is refused. A `use` with `changing` may replace,
+// remove or wrap the rules it names, and its lines are not compared.
 // So the text of m is read while this text is being read, and nothing
 // is scanned ahead.
 //
@@ -62,10 +65,14 @@ unread(message, at) => {failure: `not_read, findings: [{message: message, at: at
 
 // What the engine is handed where a line asks: the grammar held, changed by the notation the line names.
 taking(given, above) => (held, asked) => taken(held, asked, attempt(changed_grammar(held, asked, notation(given, asked.path, above)), long))
-taken(held, asked, g) => if is_failure(g) then {failure: `no_change, reason: line_column(asked.at) ++ ": use " ++ asked.name.name ++ ": " ++ g.reason} else {held: g, prepared: engine.prepared(g)}
+taken(held, asked, g) => if is_failure(g) then {failure: `no_change, reason: line_column(asked.at) ++ ": use " ++ asked.name.name ++ ": " ++ g.reason} else {held: g, prepared: engine.prepared(g), beside: count(asked.changing) == 0}
 line_column(at) => int.text(at.start.line) ++ ":" ++ int.text(at.start.column)
 // The grammar is worked out here, inside the attempt: a grammar is a value whose parts are read late.
-changed_grammar(held, asked, n) => whole(change.used(held, n, {rules: rule_names(asked.changing, 0, []), words: words(asked.changing, 0, [])}))
+// A `use` with no `changing` only adds, and its lines are compared with the grammar before it. One with
+// `changing` means to change what the rules it names read, and is checked on the grammar alone.
+changed_grammar(held, asked, n) =>
+  if count(asked.changing) == 0 then whole(change.used_compared(held, n))
+  else whole(change.used(held, n, {rules: rule_names(asked.changing, 0, []), words: words(asked.changing, 0, [])}))
 whole(g) => then(count(analysis.errors(g)), g)
 rule_names(names, i, out) => if i == count(names) then out else rule_names(names, i + 1, put(out, [], symbol(names[i].name)))
 words(names, i, out) => if i == count(names) then out else words(names, i + 1, put(out, [], names[i].name))
