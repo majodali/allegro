@@ -56,17 +56,23 @@ claim(g.start == `s && g.rules.s.op == `seq && count(g.rules.s.items) == 2)
 claim(g.rules.s.items[0].name == `w && g.rules.s.items[1].item.op == `alt)
 claim(!g.rules.s.items[1].item.items[1].holds)
 
-// A grammar begins with no state to speak of, no space and no reserved word.
-claim(g.state == "" && count(g.reserved) == 0 && !g.space_reads && g.space(t, 3, "") == 0)
+// (Until 2026-12-04 the state was one value, set by `with_state`, and these claims held it as 7. It is now
+// parts by name, added by `with_part`; the claims hold the same of a part named `count`.)
+// A grammar begins with no part of a state, no space and no reserved word.
+claim(count(g.state) == 0 && count(g.reserved) == 0 && !g.space_reads && g.space(t, 3, "") == 0)
 // Each of the three is given by a function that leaves the rest as it was.
-stated = grammar.with_state(g, 7)
-claim(stated.state == 7 && stated.start == `s && count(stated.rules) == 2)
-spaced_g = grammar.with_space(stated, (text, at, state) => 1, true)
-claim(spaced_g.space(t, 0, 0) == 1 && spaced_g.space_reads && spaced_g.state == 7)
+stated = grammar.with_part(g, `count, 7)
+claim(stated.state.count == 7 && stated.start == `s && count(stated.rules) == 2)
+// A second part is beside the first.
+claim(count(grammar.with_part(stated, `depth, 0).state) == 2 && grammar.with_part(stated, `depth, 0).state.count == 7)
+// Space that reads a part names it; space that reads none names none.
+spaced_g = grammar.with_space(stated, (text, at, part) => 1, `count)
+claim(spaced_g.space(t, 0, 0) == 1 && spaced_g.space_reads && spaced_g.space_part == `count && spaced_g.state.count == 7)
+claim(!grammar.with_space(stated, (text, at, part) => 1, []).space_reads)
 // Words are added to a set: the second call keeps the words of the first.
 kept = grammar.with_reserved(grammar.with_reserved(spaced_g, `words, ["if", "else"]), `words, ["when"])
 claim(count(kept.reserved) == 1 && count(kept.reserved.words) == 3 && kept.reserved.words[0] == "if" && kept.reserved.words[2] == "when")
-claim(kept.state == 7 && kept.space_reads)
+claim(kept.state.count == 7 && kept.space_reads)
 other = grammar.with_reserved(kept, `signs, ["+"])
 claim(count(other.reserved) == 2 && count(other.reserved.words) == 3 && count(other.reserved.signs) == 1)
 claim(count(grammar.words_of(other.reserved, `signs, 0)) == 1 && count(grammar.words_of(other.reserved, `none_such, 0)) == 0)
@@ -77,8 +83,8 @@ marked = grammar.unless(grammar.spaced(word), `words)
 claim(marked.spaced && marked.unless == `words && marked.name == "a word" && marked.match(t, 0) == 3 && marked.known && !marked.empty)
 claim(grammar.spaced(marked).unless == `words && grammar.unless(marked, `others).spaced)
 // A terminal that reads the state.
-counting = grammar.stepper("a count", (text, at, n) => {read: 1, state: n + 1}, false, word.ranges, false)
-claim(counting.stateful && counting.op == `term && counting.step(t, 0, 4).state == 5 && counting.step(t, 0, 4).read == 1)
+counting = grammar.stepper("a count", `count, (text, at, n) => {read: 1, state: n + 1}, false, word.ranges, false)
+claim(counting.stateful && counting.part == `count && counting.op == `term && counting.step(t, 0, 4).state == 5 && counting.step(t, 0, 4).read == 1)
 
 // A form given a function is the same form otherwise, whichever of the seven it is.
 twice = (v, at) => v ++ v
@@ -96,8 +102,8 @@ claim(grammar.giving(grammar.giving(word, twice), (v, at) => v ++ "!").gives("a"
 // Rules are marked settled by name, beside those marked already.
 claim(count(g.settled) == 0)
 marks = grammar.with_settled(grammar.with_settled(other, [`s]), [`w, `x])
-claim(count(marks.settled) == 3 && marks.settled[0] == `s && marks.settled[2] == `x && count(marks.reserved) == 2 && marks.state == 7)
-claim(count(grammar.with_state(marks, 1).settled) == 3 && count(grammar.with_reserved(marks, `words, ["a"]).settled) == 3 && count(grammar.with_space(marks, marks.space, false).settled) == 3)
+claim(count(marks.settled) == 3 && marks.settled[0] == `s && marks.settled[2] == `x && count(marks.reserved) == 2 && marks.state.count == 7)
+claim(count(grammar.with_part(marks, `depth, 1).settled) == 3 && count(grammar.with_reserved(marks, `words, ["a"]).settled) == 3 && count(grammar.with_space(marks, marks.space, []).settled) == 3)
 
 // ---- Lines read in turns with the grammar ----
 lines_form = grammar.turns(`lines, grammar.ref(`line), grammar.lit(";"), v => [])

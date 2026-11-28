@@ -25,12 +25,12 @@ o = offside.made(blank)
 name = grammar.spaced(grammar.run("a name", "az"))
 value = grammar.spaced(grammar.run("a value", "az09"))
 sign(t) => grammar.spaced(grammar.lit(t))
-blocks = grammar.with_state(grammar.with_space(grammar.grammar(`module, {
+blocks = grammar.with_part(grammar.with_space(grammar.grammar(`module, {
   module: seq([ref(`statements), o.ending]),
   statements: seq([ref(`statement), grammar.star(seq([o.newline, ref(`statement)]))]),
   statement: alt([seq([name, sign("="), value]), seq([name, sign(":"), ref(`block)])]),
   block: seq([o.indent, ref(`statements), o.dedent])
-}), o.space, true), offside.begun)
+}), o.space, offside.part), offside.part, offside.begun)
 p = engine.prepared(blocks)
 
 readings(text) => size(engine.parses(p, text))

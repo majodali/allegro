@@ -14,6 +14,8 @@
 //   remove(name)           the rule is gone
 //   wrap(name, around)     around(form) in place of the rule's form
 //   reserve(set, words)    more words for a reserved set
+//   part(name, begun)      one more part of the state, and what it
+//                          begins as
 //   level(name, l)         one more level for the rule, which is a row
 //                          of signs (levels.alg)
 //   signs(name, l, signs)  more signs for the level l of that row
@@ -62,8 +64,8 @@
 //   holds where the rule cannot be read, and the rule is not named
 //   it adds a word to a reserved set a terminal in force keeps out, and
 //   the word is not named
-//   a form it brings has a terminal that reads or changes the state,
-//   and its rule is not named
+//   a form it brings has a terminal that reads or changes a part of
+//   the state that the notation does not add, and its rule is not named
 //
 // The last is stricter than its decision, which lets a notation's
 // terminal write a part of the state its own grammar declares: a state
@@ -89,6 +91,8 @@ export replace(name, form) => {op: `replace, name: name, form: form}
 export remove(name) => {op: `remove, name: name, form: []}
 export wrap(name, around) => {op: `wrap, name: name, form: around}
 export reserve(set, words) => {op: `reserve, name: set, form: words}
+// One more part of the state, and what it begins as: for the terminals the change brings that keep a state of their own.
+export part(name, begun) => {op: `part, name: name, form: begun}
 export level(name, l) => {op: `level, name: name, form: l}
 export signs(name, l, signs) => {op: `signs, name: name, form: {level: l, signs: signs}}
 
@@ -106,7 +110,7 @@ how_many(ops, op, name, i, n) =>
 // The names the operations are on, each once, reserved sets left out.
 names_of(ops, i, out) =>
   if i == count(ops) then out
-  else if ops[i].op == `reserve || has(out, ops[i].name, 0) then names_of(ops, i + 1, out)
+  else if ops[i].op == `reserve || ops[i].op == `part || has(out, ops[i].name, 0) then names_of(ops, i + 1, out)
   else names_of(ops, i + 1, put(out, [], ops[i].name))
 
 // ---- Conflicts ----
@@ -117,9 +121,16 @@ export conflicts_by(g, changes, own) => conflicts_in(g, taken(all(changes, 0, []
 taken(ops, own) => joined(own, 0, left(ops, own, 0, []))
 left(ops, own, i, out) =>
   if i == count(ops) then out
-  else if ops[i].op != `reserve && how_many(own, `replace, ops[i].name, 0, 0) + how_many(own, `remove, ops[i].name, 0, 0) > 0 then left(ops, own, i + 1, out)
+  else if ops[i].op != `reserve && ops[i].op != `part && how_many(own, `replace, ops[i].name, 0, 0) + how_many(own, `remove, ops[i].name, 0, 0) > 0 then left(ops, own, i + 1, out)
   else left(ops, own, i + 1, put(out, [], ops[i]))
-conflicts_in(g, ops) => rows_judged(g, ops, 0, each_name(g, ops, names_of(ops, 0, []), 0, []))
+conflicts_in(g, ops) => parts_judged(g, ops, 0, rows_judged(g, ops, 0, each_name(g, ops, names_of(ops, 0, []), 0, [])))
+// A part added: one the grammar has not, and added once.
+parts_judged(g, ops, i, out) =>
+  if i == count(ops) then out
+  else if ops[i].op != `part then parts_judged(g, ops, i + 1, out)
+  else if has_key(g.state, ops[i].name, 0) then parts_judged(g, ops, i + 1, put(out, [], "a change adds the part " ++ spelling(ops[i].name) ++ " of the state, which the grammar has"))
+  else if how_many(ops, `part, ops[i].name, 0, 0) > 1 && how_many(ops, `part, ops[i].name, i + 1, 0) == 0 then parts_judged(g, ops, i + 1, put(out, [], "two changes add the part " ++ spelling(ops[i].name) ++ " of the state"))
+  else parts_judged(g, ops, i + 1, out)
 each_name(g, ops, names, i, out) =>
   if i == count(names) then out
   else each_name(g, ops, names, i + 1, judged(g, names[i], has_key(g.rules, names[i], 0), how_many(ops, `add, names[i], 0, 0), how_many(ops, `append, names[i], 0, 0) + how_many(ops, `level, names[i], 0, 0) + how_many(ops, `signs, names[i], 0, 0), how_many(ops, `replace, names[i], 0, 0) + how_many(ops, `wrap, names[i], 0, 0), how_many(ops, `remove, names[i], 0, 0), out))
@@ -190,6 +201,7 @@ with_item(form, item) =>
 reserved(g, ops, i) =>
   if i == count(ops) then g
   else if ops[i].op == `reserve then reserved(grammar.with_reserved(g, ops[i].name, ops[i].form), ops, i + 1)
+  else if ops[i].op == `part then reserved(grammar.with_part(g, ops[i].name, ops[i].form), ops, i + 1)
   else reserved(g, ops, i + 1)
 
 // ---- A notation can only add ----
@@ -207,12 +219,13 @@ breach(g, change, named, tested_names, i, out) =>
   else breach(g, change, named, tested_names, i + 1, weighed(g, change, named, tested_names, change[i], out))
 weighed(g, change, named, tested_names, o, out) =>
   if o.op == `reserve then barred_words(g, o.name, o.form, named.words, 0, out)
+  else if o.op == `part then out
   // No naming allows this one: the right to change the grammar is not a notation's.
   else if (o.op == `add || o.op == `append || o.op == `replace) && changes_grammar(o.form) then put(out, [], "the notation brings lines that change the grammar, in the rule " ++ spelling(o.name) ++ ": that right is the grammar's a reading began with")
   else if has(named.rules, o.name, 0) then out
   else if (o.op == `replace || o.op == `remove || o.op == `wrap) && how_many(change, `add, o.name, 0, 0) == 0 then put(out, [], "the notation changes the rule " ++ spelling(o.name) ++ ", which it did not add and the text does not name")
   else if (o.op == `append || o.op == `level || o.op == `signs) && has(tested_names, o.name, 0) then put(out, [], "the notation adds to the rule " ++ spelling(o.name) ++ ", which a rule in force tests cannot be read")
-  else if (o.op == `add || o.op == `append || o.op == `replace) && touches(o.form) then put(out, [], "the notation brings a terminal that reads or changes the state, in the rule " ++ spelling(o.name))
+  else if (o.op == `add || o.op == `append || o.op == `replace) && count(strays(o.form, change, [])) > 0 then put(out, [], "the notation brings a terminal that reads or changes the part " ++ spelling(strays(o.form, change, [])[0]) ++ " of the state, which it does not add, in the rule " ++ spelling(o.name))
   else out
 // A word added to a set that a terminal in force keeps out.
 barred_words(g, set, words, named_words, i, out) =>
@@ -234,14 +247,14 @@ changes_grammar(f) =>
   else if f.op == `seq || f.op == `alt then any_changes(f.items, 0)
   else changes_grammar(f.item)
 any_changes(items, i) => i < count(items) && (changes_grammar(items[i]) || any_changes(items, i + 1))
-// True where a form holds a terminal that reads or changes the state.
-touches(f) =>
-  if f.op == `turns then touches(grammar.spelled(f))
-  else if f.op == `term then f.stateful
-  else if f.op == `ref then false
-  else if f.op == `seq || f.op == `alt then any_touches(f.items, 0)
-  else touches(f.item)
-any_touches(items, i) => i < count(items) && (touches(items[i]) || any_touches(items, i + 1))
+// The parts of the state that the terminals of a form read or change and the notation does not add, added to out.
+strays(f, change, out) =>
+  if f.op == `turns then strays(grammar.spelled(f), change, out)
+  else if f.op == `term then (if f.stateful && how_many(change, `part, f.part, 0, 0) == 0 && !has(out, f.part, 0) then put(out, [], f.part) else out)
+  else if f.op == `ref then out
+  else if f.op == `seq || f.op == `alt then strays_each(f.items, change, 0, out)
+  else strays(f.item, change, out)
+strays_each(items, change, i, out) => if i == count(items) then out else strays_each(items, change, i + 1, strays(items[i], change, out))
 
 // The names of the rules that a guard in force tests cannot be read:
 // each rule that can be reached from the item of a guard whose `holds`

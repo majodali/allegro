@@ -107,7 +107,7 @@ claim(ways(called, "f(") == 0)
 pairs = grammar.grammar(`pair, {pair: seq([ref(`number), lit("="), lit("'"), grammar.until("the text", "'"), lit("'")]), number: number})
 claim(gives(pairs, "7='it is 7'") == "[7 = ' it is 7 ']")
 // Space is a terminal too. A grammar may say what space is and which terminals read it after themselves.
-spaced = grammar.with_space(grammar.grammar(`sum, {sum: seq([grammar.spaced(number), star(seq([grammar.spaced(lit("+")), grammar.spaced(number)]))])}), (text, at, state) => blanks(text, at, 0), false)
+spaced = grammar.with_space(grammar.grammar(`sum, {sum: seq([grammar.spaced(number), star(seq([grammar.spaced(lit("+")), grammar.spaced(number)]))])}), (text, at, state) => blanks(text, at, 0), [])
 blanks(text, at, n) => if grammar.byte(text, at + n) == 32 then blanks(text, at, n + 1) else n
 claim(gives(spaced, "1 +  2") == "[1 [[+ 2]]]" && ways(spaced, "1+2") == 1)
 

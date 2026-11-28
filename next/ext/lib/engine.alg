@@ -55,9 +55,10 @@
 // state is refused, and so is a rule that reads itself and no byte
 // between.
 //
-// A state is carried beside the position (grammar.alg). A terminal made
-// with `stepper` reads it and may change it; every other form hands on
-// the state it was given, or the state its parts left.
+// A state is carried beside the position (grammar.alg): parts by name,
+// each a bits value. A terminal made with `stepper` reads the part it
+// names and may change it; every other form hands on the state it was
+// given, or the state its parts left.
 //
 // A rule the grammar marks settled is claimed to have one result at
 // most wherever it is read: "Ambiguity is a claim" calls the mark
@@ -92,11 +93,11 @@ only(a) => if is_failure(a) then a else then(claim(count(a.readings.t) == 0), a.
 context(p, text, source, held, change) => knot(p, text, source, bits.length(text) / 8, held, change)
 // The table reads the context it is part of.
 knot(p, text, source, len, held, change) =>
-  c = {text: text, source: source, len: len, lines: line_starts(text, len, 0, [0]), rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: change}
+  c = {text: text, source: source, len: len, lines: line_starts(text, len, 0, [0]), rules: p.rules, space: p.space, space_part: p.space_part, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: change}
   c
 // The context of the same text with another grammar: its own table, and no rule being read in turns.
 regrammared(old, p, held) =>
-  c = {text: old.text, source: old.source, len: old.len, lines: old.lines, rules: p.rules, space: p.space, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: old.change}
+  c = {text: old.text, source: old.source, len: old.len, lines: old.lines, rules: p.rules, space: p.space, space_part: p.space_part, state: p.state, rows: rows(c, p.kept, 0, []), seed_at: -1, seeds: [], held: held, change: old.change}
   c
 
 read_all(c, p) => answer(c, read(c, p.top, 0, p.state))
@@ -155,10 +156,10 @@ row(c, kept, at, k, out) =>
 read(c, g, at, st) => if g.acts then acted(c, g.gives, at, plain(c, g, at, st)) else plain(c, g, at, st)
 plain(c, g, at, st) =>
   if g.op == `ref then rule(c, g, at, st)
-  else if g.op == `term then (if g.stateful then stepped(c, at, g.step(c.text, at, st)) else terminal(c, g, at, st, g.match(c.text, at)))
+  else if g.op == `term then (if g.stateful then stepped(c, g, at, st, g.step(c.text, at, get(st, g.part))) else terminal(c, g, at, st, g.match(c.text, at)))
   else if g.op == `seq then in_order(c, g.items, at, st)
   else if g.op == `alt then branches(c, g.items, 0, at, st, grammar.byte(c.text, at))
-  else if g.op == `turns then lines_begun(c, g, read(c, g.item, at, st))
+  else if g.op == `turns then lines_begun(c, g, st, read(c, g.item, at, st))
   else if g.op == `star then grow(c, g, {h: {end: at, stop: at, state: st, via: false, value: []}, t: []}, [], -1)
   else if g.op == `opt then maybe(at, st, gate(c, g, at, st))
   else guarded(g.holds, at, st, read(c, g.item, at, st))
@@ -176,12 +177,15 @@ one_at(end, stop, st, value) => {rs: {h: {end: end, stop: stop, state: st, via: 
 // the space after it is read too.
 terminal(c, g, at, st, n) =>
   if n < 0 || barred(g.words, c.text, at, n) then none_at(at)
-  else one_at(if g.spaced then at + n + c.space(c.text, at + n, st) else at + n, at + n, st, bits.slice(c.text, at * 8, n * 8))
+  else one_at(if g.spaced then at + n + c.space(c.text, at + n, if kind(c.space_part) == `symbol then get(st, c.space_part) else []) else at + n, at + n, st, bits.slice(c.text, at * 8, n * 8))
 barred(words, text, at, n) => count(words) > n && among(get(words, n), bits.slice(text, at * 8, n * 8), 0)
 among(l, w, i) => i < count(l) && (get(l, i) == w || among(l, w, i + 1))
-stepped(c, at, r) =>
+// A terminal that steps is handed the one part of the state it names, and what it gives for the part is put back.
+stepped(c, g, at, st, r) =>
   if count(r) == 0 then none_at(at)
-  else one_at(at + r.read, at + r.read, r.state, bits.slice(c.text, at * 8, r.read * 8))
+  else one_at(at + r.read, at + r.read, put(st, g.part, r.state), bits.slice(c.text, at * 8, r.read * 8))
+// Two states are the same where each part of one is the same bits in the other.
+same_parts(a, b, i) => i == count(a) || (get(a, i) == get(b, key(a, i)) && same_parts(a, b, i + 1))
 
 // A rule. Where it is being read in turns at this position, it gives
 // what the turn before gave. Where it is remembered, the table has it;
@@ -195,7 +199,7 @@ settled(c, g, at, st) =>
   else body_of(c, g.name, g.grows, at, st)
 growing(c, g, at, st, seed) =>
   if count(seed) == 0 then settled(c, g, at, st)
-  else if seed.h.state == st then {rs: seed.h.rs, far: -1}
+  else if same_parts(seed.h.state, st, 0) then {rs: seed.h.rs, far: -1}
   else refuse("a rule is met again at one position with another state")
 body_of(c, name, grows, at, st) =>
   if !grows then read(c, get(c.rules, name), at, st)
@@ -252,7 +256,7 @@ next_turn(c, name, body, at, st, n, k, p, m) =>
   else if k > c.len - at + 1 then refuse("a rule reads itself and no byte between")
   else in_turns(c, name, body, at, st, p.rs, m, k + 1)
 // The context with one more rule being read in turns at this position.
-seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, lines: c.lines, rules: c.rules, space: c.space, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}, held: c.held, change: c.change}
+seeded(c, name, at, st, seed) => {text: c.text, source: c.source, len: c.len, lines: c.lines, rules: c.rules, space: c.space, space_part: c.space_part, state: c.state, rows: c.rows, seed_at: at, seeds: {name: name, state: st, rs: seed, t: if c.seed_at == at then c.seeds else []}, held: c.held, change: c.change}
 // What a rule being read in turns at this position has so far, as {h}, or [].
 seed_of(c, name, at) => if at == c.seed_at then seed_in(c.seeds, name) else []
 seed_in(l, name) => if count(l) == 0 then [] else if l.name == name then {h: l} else seed_in(l.t, name)
@@ -319,14 +323,26 @@ reversed(l, out) => if count(l) == 0 then out else reversed(l.t, {h: l.h, t: out
 // grammar as it was. The change is made when the result is tried
 // further, which every result is: so also for the last of its lines,
 // and a change that is refused refuses the reading wherever it is asked.
-lines_begun(c, g, p) => lines_grow(first_lines(c, g, p.rs, p.rs), [], p.far)
+lines_begun(c, g, st, p) => parts_ended(st, lines_grow(first_lines(c, g, p.rs, p.rs), [], p.far))
+// A part of the state that a change among these lines brought ends with them, as the change does: what is
+// read after the lines has the parts it had before them. Parts are only ever added, so a state with as many
+// parts as before has the same ones.
+parts_ended(st, p) => {rs: ended_each(st, p.rs), far: p.far}
+ended_each(st, rs) =>
+  if count(rs) == 0 then []
+  else if count(rs.h.state) == count(st) then {h: rs.h, t: ended_each(st, rs.t)}
+  else {h: {end: rs.h.end, stop: rs.h.stop, state: parts_of(st, rs.h.state, 0, []), via: rs.h.via, value: rs.h.value}, t: ended_each(st, rs.t)}
+parts_of(st, state, i, out) => if i == count(st) then out else parts_of(st, state, i + 1, put(out, key(st, i), get(state, key(st, i))))
 // True where one result of rs, and no more, ends at `end`.
 alone(rs, end) => ending_at(rs, end, 0) == 1
 ending_at(rs, end, n) => if count(rs) == 0 then n else ending_at(rs.t, end, if rs.h.end == end then n + 1 else n)
 first_lines(c, g, rs, every) =>
   if count(rs) == 0 then []
-  else {h: line_in(world({c: c, g: g, before: []}, g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: rs.h.via, value: {h: rs.h.value, t: []}}), t: first_lines(c, g, rs.t, every)}
-line_in(w, r) => {r: r, w: w}
+  else {h: line_in(world({c: c, g: g, before: []}, g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: rs.h.via, value: {h: rs.h.value, t: []}}, g.asks(rs.h.value)), t: first_lines(c, g, rs.t, every)}
+// A change may bring parts of the state the grammar before had not: each begins where the change is made.
+line_in(w, r, asked) => if count(asked) == 0 then {r: r, w: w} else {r: {end: r.end, stop: r.stop, state: begun_parts(r.state, w.c.state, 0), via: r.via, value: r.value}, w: w}
+begun_parts(st, parts, i) => if i == count(parts) then st else begun_parts(if has_part(st, key(parts, i), 0) then st else put(st, key(parts, i), get(parts, i)), parts, i + 1)
+has_part(st, name, i) => i < count(st) && (key(st, i) == name || has_part(st, name, i + 1))
 world(w, asked, every, end) => if count(asked) == 0 then w else then(claim(alone(every, end)), moved(w, w.c.change(w.c.held, asked[0])))
 moved(w, to) => if is_failure(to) then refuse(to.reason) else same_lines(regrammared(w.c, to.prepared, to.held), w.g.rule, if count(to) > 2 && to.beside then [w] else [])
 same_lines(c, rule, before) => as_lines(c, get(c.rules, rule), before)
@@ -376,7 +392,7 @@ is_place(k) => kind(k) == `symbol && k == `at
 alike_keys(j, k) => kind(j) == kind(k) && (kind(j) != `symbol || j == k)
 more_lines(e, rs, todo, every) =>
   if count(rs) == 0 then todo
-  else if rs.h.end > e.r.end then {h: line_in(world(e.w, e.w.g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: e.r.via || rs.h.via, value: {h: rs.h.value, t: e.r.value}}), t: more_lines(e, rs.t, todo, every)}
+  else if rs.h.end > e.r.end then {h: line_in(world(e.w, e.w.g.asks(rs.h.value), every, rs.h.end), {end: rs.h.end, stop: rs.h.stop, state: rs.h.state, via: e.r.via || rs.h.via, value: {h: rs.h.value, t: e.r.value}}, e.w.g.asks(rs.h.value)), t: more_lines(e, rs.t, todo, every)}
   else more_lines(e, rs.t, todo, every)
 
 maybe(at, st, p) => {rs: {h: {end: at, stop: at, state: st, via: false, value: []}, t: maybe_each(p.rs)}, far: p.far}

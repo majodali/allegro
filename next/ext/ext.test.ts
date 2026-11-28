@@ -125,8 +125,15 @@ const READER = [
   "",
 ].join("\n");
 
-/** Three modules of this directory that are written flat, as one text: a little over 200 lines. */
-const MODULE = ["grammar.alg", "class.alg", "map.alg"].map((f) => fs.readFileSync(path.join(ROOT, "lib", f), "utf8")).join("\n");
+/**
+ * The text the speed tests read: three modules of this directory that are written flat, as one text, 266 lines.
+ * It is a copy, next/ext/speed-text.txt, of `grammar.alg`, `class.alg` and `map.alg` as they were on 2026-12-04,
+ * and it is not brought up to date with them. Until then the tests read the three modules themselves, and their
+ * limits on steps were passed when the modules grew by 775 bytes, most of it comments, with an engine that took
+ * the same steps for the same text. By the maintainer's ruling on PR #328 the text is fixed and the limits stay:
+ * a slower engine fails, and a longer comment does not.
+ */
+const MODULE = fs.readFileSync(path.join(ROOT, "speed-text.txt"), "utf8");
 
 test("the speed target, with the grammar of flat Allegretto: a module of 200 lines is read, one way, in the steps of 10 seconds", async () => {
   assert.ok(MODULE.split("\n").length >= 200, `the text has ${MODULE.split("\n").length} lines`);

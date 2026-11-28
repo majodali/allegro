@@ -52,7 +52,7 @@ claim(engine.parse(circle, "1+2+3") == "((1+2)+3)")
 spaces = (text, at, state) => blanks(text, at, 0)
 blanks(text, at, n) => if grammar.byte(text, at + n) == 32 then blanks(text, at, n + 1) else n
 spaced_sign(t) => grammar.spaced(grammar.lit(t))
-placing = engine.prepared(grammar.with_space(grammar.grammar(`e, {e: levels.row(grammar.spaced(number), [sum, product], spaced_sign, (sign, left, right, at) => {sign: sign, left: left, right: right, at: at})}), spaces, false))
+placing = engine.prepared(grammar.with_space(grammar.grammar(`e, {e: levels.row(grammar.spaced(number), [sum, product], spaced_sign, (sign, left, right, at) => {sign: sign, left: left, right: right, at: at})}), spaces, []))
 v = engine.parse_of(placing, "10 + 2 * 345  ", "row")
 claim(v.sign == "+" && v.left == "10" && v.right.sign == "*" && v.right.left == "2" && v.right.right == "345")
 claim(v.at.start.index == 0 && v.at.end.index == 12 && v.at.source == "row")

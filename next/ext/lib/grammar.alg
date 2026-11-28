@@ -66,15 +66,21 @@
 // in one step each, and take their place when a text can name them.
 import class
 
-export grammar(start, rules) => {start: start, rules: rules, state: "", reserved: [], space: no_space, space_reads: false, settled: []}
+export grammar(start, rules) => {start: start, rules: rules, state: [], reserved: [], space: no_space, space_reads: false, space_part: [], settled: []}
 no_space = (text, at, state) => 0
-export with_state(g, state) => {start: g.start, rules: g.rules, state: state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: g.settled}
-export with_space(g, space, reads) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: space, space_reads: reads, settled: g.settled}
-export with_reserved(g, name, words) => {start: g.start, rules: g.rules, state: g.state, reserved: put(g.reserved, name, added(words, 0, words_of(g.reserved, name, 0))), space: g.space, space_reads: g.space_reads, settled: g.settled}
+// The state a reading carries is parts by name, each a bits value. A
+// grammar says which parts it has and what each begins as; a terminal
+// made with `stepper` names the one part it reads and may change.
+export with_part(g, name, begun) => {start: g.start, rules: g.rules, state: put(g.state, name, begun), reserved: g.reserved, space: g.space, space_reads: g.space_reads, space_part: g.space_part, settled: g.settled}
+// What space is: a function of the text, a position and a part of the
+// state, giving how many bytes are space there. `part` is the name of
+// the part it is handed, or [] where it reads none.
+export with_space(g, space, part) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: space, space_reads: kind(part) == `symbol, space_part: part, settled: g.settled}
+export with_reserved(g, name, words) => {start: g.start, rules: g.rules, state: g.state, reserved: put(g.reserved, name, added(words, 0, words_of(g.reserved, name, 0))), space: g.space, space_reads: g.space_reads, space_part: g.space_part, settled: g.settled}
 // The grammar with other rules, and all else as it was.
-export with_rules(g, rules) => {start: g.start, rules: rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: g.settled}
+export with_rules(g, rules) => {start: g.start, rules: rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, space_part: g.space_part, settled: g.settled}
 // The grammar with the rules of these names marked settled, beside those marked already.
-export with_settled(g, names) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, settled: added(names, 0, g.settled)}
+export with_settled(g, names) => {start: g.start, rules: g.rules, state: g.state, reserved: g.reserved, space: g.space, space_reads: g.space_reads, space_part: g.space_part, settled: added(names, 0, g.settled)}
 // The words of the set of that name, or none where there is no such set.
 export words_of(reserved, name, i) =>
   if i == count(reserved) then []
@@ -82,13 +88,14 @@ export words_of(reserved, name, i) =>
   else words_of(reserved, name, i + 1)
 added(words, i, out) => if i == count(words) then out else added(words, i + 1, put(out, [], words[i]))
 
-export term(name, match, known, ranges, empty) => {op: `term, gives: [], name: name, match: match, step: [], stateful: false, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
-// A terminal that reads the state, and may change it.
-export stepper(name, step, known, ranges, empty) => {op: `term, gives: [], name: name, match: [], step: step, stateful: true, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
+export term(name, match, known, ranges, empty) => {op: `term, gives: [], name: name, match: match, step: [], part: [], stateful: false, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
+// A terminal that reads one part of the state, and may change it: `step(text, at, part)` gives
+// {read, state}, the bytes read and the part after, or [] where it does not read.
+export stepper(name, part, step, known, ranges, empty) => {op: `term, gives: [], name: name, match: [], step: step, part: part, stateful: true, spaced: false, unless: [], known: known, ranges: ranges, empty: empty}
 // The terminal t, reading the space after what it reads.
-export spaced(t) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: true, unless: t.unless, known: t.known, ranges: t.ranges, empty: t.empty}
+export spaced(t) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, part: t.part, stateful: t.stateful, spaced: true, unless: t.unless, known: t.known, ranges: t.ranges, empty: t.empty}
 // The terminal t, reading no word of the reserved set of that name.
-export unless(t, set) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, stateful: t.stateful, spaced: t.spaced, unless: set, known: t.known, ranges: t.ranges, empty: t.empty}
+export unless(t, set) => {op: `term, gives: t.gives, name: t.name, match: t.match, step: t.step, part: t.part, stateful: t.stateful, spaced: t.spaced, unless: set, known: t.known, ranges: t.ranges, empty: t.empty}
 export ref(name) => {op: `ref, gives: [], name: name}
 export seq(items) => {op: `seq, gives: [], items: items}
 export alt(items) => {op: `alt, gives: [], items: items}
@@ -113,7 +120,7 @@ export spelled(g) => if g.op == `turns then seq([g.item, star(seq([g.between, g.
 export giving(g, f) => given(g, if kind(g.gives) == `function then after(g.gives, f) else f)
 after(first, second) => (value, at) => second(first(value, at), at)
 given(g, f) =>
-  if g.op == `term then {op: `term, gives: f, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, unless: g.unless, known: g.known, ranges: g.ranges, empty: g.empty}
+  if g.op == `term then {op: `term, gives: f, name: g.name, match: g.match, step: g.step, part: g.part, stateful: g.stateful, spaced: g.spaced, unless: g.unless, known: g.known, ranges: g.ranges, empty: g.empty}
   else if g.op == `ref then {op: `ref, gives: f, name: g.name}
   else if g.op == `seq || g.op == `alt then {op: g.op, gives: f, items: g.items}
   else if g.op == `guard then {op: `guard, gives: f, item: g.item, holds: g.holds}

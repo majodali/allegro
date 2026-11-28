@@ -40,7 +40,7 @@ import set
 
 export prepared(g) => sound(g, errors(g))
 sound(g, found) => if count(found) > 0 then refuse(found[0]) else made(g, facts(g))
-made(g, x) => {start: g.start, top: ready(grammar.ref(g.start), x), rules: readied(g.rules, x, 0, []), kept: kept_names(g.rules, x, 0, []), state: g.state, space: g.space}
+made(g, x) => {start: g.start, top: ready(grammar.ref(g.start), x), rules: readied(g.rules, x, 0, []), kept: kept_names(g.rules, x, 0, []), state: g.state, space: g.space, space_part: g.space_part}
 
 // What the analysis knows of a grammar: its rules, the number of each
 // rule by name, which rules can read no byte, which read or change the
@@ -164,7 +164,7 @@ readied(rules, x, i, out) =>
   if i == count(rules) then out
   else readied(rules, x, i + 1, put(out, key(rules, i), ready(get(rules, i), x)))
 ready(g, x) =>
-  if g.op == `term then {op: `term, acts: kind(g.gives) == `function, gives: g.gives, name: g.name, match: g.match, step: g.step, stateful: g.stateful, spaced: g.spaced, words: by_length(g.unless, x.reserved), known: g.known, ranges: g.ranges, empty: g.empty}
+  if g.op == `term then {op: `term, acts: kind(g.gives) == `function, gives: g.gives, name: g.name, match: g.match, step: g.step, part: g.part, stateful: g.stateful, spaced: g.spaced, words: by_length(g.unless, x.reserved), known: g.known, ranges: g.ranges, empty: g.empty}
   else if g.op == `ref then {op: `ref, acts: kind(g.gives) == `function, gives: g.gives, name: g.name, kept: is_kept(x, g.name), grows: get(x.grows, g.name), settles: is_among(x.settled, g.name, 0)}
   else if g.op == `seq then {op: `seq, acts: kind(g.gives) == `function, gives: g.gives, items: ready_items(g.items, 0, x, [])}
   else if g.op == `alt then {op: `alt, acts: kind(g.gives) == `function, gives: g.gives, items: ready_choices(g.items, 0, x, [])}

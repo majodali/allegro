@@ -102,7 +102,7 @@ o = offside.made(blank)
 wide = grammar.term("space", (text, at) => widely(text, at, blank(text, at)), false, class.no_ranges, true)
 widely(text, at, p) => if byte(text, p) == 10 then widely(text, at, blank(text, p + 1)) else p - at
 // The space the grammar's own function reads, as a terminal: after a block ends, under the block around it.
-gap = grammar.stepper("space", (text, at, st) => {read: o.space(text, at, st), state: st}, false, class.no_ranges, true)
+gap = grammar.stepper("space", offside.part, (text, at, st) => {read: o.space(text, at, st), state: st}, false, class.no_ranges, true)
 
 // ---- Words and signs ----
 
@@ -238,7 +238,7 @@ use_line = giving(seq([word("use"), name, star(giving(seq([sign("."), name]), (v
 use_changing = giving(seq([word("changing"), name, star(giving(seq([wide, grammar.lit(","), wide, name]), (v, at) => v[3])), grammar.guard(seq([wide, grammar.lit(",")]), false)]), (v, at) => with_first(v[1], v[2], 0, [v[1]]))
 parameters = between("(", listed(name), ")")
 
-export language = grammar.with_state(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof", "use"]), o.space, true), offside.begun)
+export language = grammar.with_part(grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `keywords, ["if", "else", "when", "is", "of", "and", "import", "export", "true", "false", "none", "error", "instanceof", "subtypeof", "use"]), o.space, offside.part), offside.part, offside.begun)
 rules = {
   lines: grammar.turns(`lines, ref(`line), o.newline, asks_change),
   module: giving(seq([wide, opt(ref(`lines)), o.ending]), (v, at) => if count(v[1]) == 0 then {headers: [], items: [], at: at} else sorted(v[1][0], 0, [], [], at)),
