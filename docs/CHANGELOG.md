@@ -584,8 +584,10 @@ name.
   A part a `use` brings begins at the `use`. Both readers give the same
   tree for 206 of 215 texts and both refuse 9; both emitters give the
   same module for 195 and both refuse 20. 12 deliberate faults, 12
-  caught. The speed test's two limits on steps are passed by the
-  growth of the text it reads, and wait for a ruling. With this E8 is built, but for the right to change the
+  caught. A part ends with the block its `use` is in. The speed test
+  reads a fixed text, `next/ext/speed-text.txt`, by ruling: its limits
+  on steps were passed when the modules it read grew, with an engine
+  no slower. With this E8 is built, but for the right to change the
   grammar as a capability of the launcher.
 - **2026-12-04 — Worked examples for every rule of the parser, each
   one run by the suite.** Five modules, `next/ext/lib/examples_*.test.alg`

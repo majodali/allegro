@@ -242,6 +242,9 @@ test("a notation's terminal keeps a state in a part the notation adds, and in no
   const r = run("capability output\nuse once.marks\nx = @@\noutput.write(int.text(x + 1))\n", { once });
   assert.deepEqual(r.findings, [], told(r));
   assert.deepEqual(r.lines, ["2"]);
+  // The part ends with the block its `use` is in: two blocks that each use the notation each have their one sign.
+  const blocks = run("capability output\nf() =>\n  use once.marks\n  @@\ng() =>\n  use once.marks\n  @@\noutput.write(int.text(f() + g()))\n", { once });
+  assert.deepEqual(blocks.lines, ["2"], told(blocks));
   const again = run("capability output\nuse once.marks\nx = @@\ny = @@\n", { once });
   assert.match(again.findings.join("\n"), /^main: no reading at \d+$/);
   const refused = run("capability output\nuse once.intruding\noutput.write(\"never\")\n", { once });

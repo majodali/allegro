@@ -363,6 +363,16 @@ twice_s = grammar.stepper("s", `seen, (text, at, n) => if grammar.byte(text, at)
 parted(held, asked) => held_and_prepared(change.changed(held, [[change.part(`seen, 0), change.append(`line, twice_s)]]))
 parts_read(text) => size(engine.parses_with(letters_ready, text, "", letters, parted))
 claim(parts_read("a\n+s\ns\na\ns") == 1 && parts_read("+s\ns\ns\ns") == 0)
+// A part ends with the lines its change was made among. Two pairs of brackets that each bring it count for
+// themselves, and after the brackets the part is gone with the line that needed it.
+claim(parts_read("(\n+s\ns\ns\n)\n(\n+s\ns\ns\n)") == 1 && parts_read("(\n+s\ns\ns\ns\n)") == 0)
+claim(parts_read("(\n+s\ns\n)\na") == 1 && parts_read("(\n+s\ns\n)\ns") == 0)
+// A part the lines had before a block keeps what the block did to it, though the block brought a part of its own
+// that ends with it. `+x` brings the line x, read twice and no more, counted in a part named for the letter.
+twice_of(letter) => grammar.stepper(letter, symbol(letter), (text, at, n) => if bits.slice(text, at * 8, 8) == letter && n < 2 then {read: 1, state: n + 1} else [], true, class.pairs(letter ++ letter), false)
+each_parted(held, asked) => held_and_prepared(change.changed(held, [[change.part(symbol(asked.add), 0), change.append(`line, twice_of(asked.add))]]))
+each_read(text) => size(engine.parses_with(letters_ready, text, "", letters, each_parted))
+claim(each_read("+s\n(\n+t\ns\nt\n)\ns") == 1 && each_read("+s\n(\n+t\ns\nt\n)\ns\ns") == 0)
 // Between brackets the part is as the lines before left it, and what is read there counts after them.
 claim(parts_read("+s\ns\n(\ns\n)\na") == 1 && parts_read("+s\ns\n(\ns\n)\ns") == 0)
 

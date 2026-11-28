@@ -159,7 +159,7 @@ plain(c, g, at, st) =>
   else if g.op == `term then (if g.stateful then stepped(c, g, at, st, g.step(c.text, at, get(st, g.part))) else terminal(c, g, at, st, g.match(c.text, at)))
   else if g.op == `seq then in_order(c, g.items, at, st)
   else if g.op == `alt then branches(c, g.items, 0, at, st, grammar.byte(c.text, at))
-  else if g.op == `turns then lines_begun(c, g, read(c, g.item, at, st))
+  else if g.op == `turns then lines_begun(c, g, st, read(c, g.item, at, st))
   else if g.op == `star then grow(c, g, {h: {end: at, stop: at, state: st, via: false, value: []}, t: []}, [], -1)
   else if g.op == `opt then maybe(at, st, gate(c, g, at, st))
   else guarded(g.holds, at, st, read(c, g.item, at, st))
@@ -323,7 +323,16 @@ reversed(l, out) => if count(l) == 0 then out else reversed(l.t, {h: l.h, t: out
 // grammar as it was. The change is made when the result is tried
 // further, which every result is: so also for the last of its lines,
 // and a change that is refused refuses the reading wherever it is asked.
-lines_begun(c, g, p) => lines_grow(first_lines(c, g, p.rs, p.rs), [], p.far)
+lines_begun(c, g, st, p) => parts_ended(st, lines_grow(first_lines(c, g, p.rs, p.rs), [], p.far))
+// A part of the state that a change among these lines brought ends with them, as the change does: what is
+// read after the lines has the parts it had before them. Parts are only ever added, so a state with as many
+// parts as before has the same ones.
+parts_ended(st, p) => {rs: ended_each(st, p.rs), far: p.far}
+ended_each(st, rs) =>
+  if count(rs) == 0 then []
+  else if count(rs.h.state) == count(st) then {h: rs.h, t: ended_each(st, rs.t)}
+  else {h: {end: rs.h.end, stop: rs.h.stop, state: parts_of(st, rs.h.state, 0, []), via: rs.h.via, value: rs.h.value}, t: ended_each(st, rs.t)}
+parts_of(st, state, i, out) => if i == count(st) then out else parts_of(st, state, i + 1, put(out, key(st, i), get(state, key(st, i))))
 // True where one result of rs, and no more, ends at `end`.
 alone(rs, end) => ending_at(rs, end, 0) == 1
 ending_at(rs, end, n) => if count(rs) == 0 then n else ending_at(rs.t, end, if rs.h.end == end then n + 1 else n)

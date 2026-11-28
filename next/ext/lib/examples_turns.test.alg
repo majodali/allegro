@@ -91,6 +91,8 @@ claim(count(change.breaches(letters, [change.part(`seen, 0), change.append(`line
 // The part begins where the change is made: the line `s` is read twice after `+s`, and no more.
 counted = (held, asked) => held_as(change.changed(held, [[change.part(`seen, 0), change.append(`line, counting)]]), false)
 claim(size(engine.parses_with(ready, "+s\ns\ns", "", letters, counted)) == 1 && size(engine.parses_with(ready, "+s\ns\ns\ns", "", letters, counted)) == 0)
+// And it ends where the change ends, with its block: two pairs of brackets that each bring it count for themselves.
+claim(size(engine.parses_with(ready, "(\n+s\ns\ns\n)\n(\n+s\ns\ns\n)", "", letters, counted)) == 1)
 
 // ---- "A notation a text uses can only add": checked on the text ----
 //

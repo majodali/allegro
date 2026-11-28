@@ -2666,8 +2666,9 @@ its approval.
     state was before. Two changes that add one part conflict, and so
     does a part the grammar has.
   - *At a `use`.* A part the changed grammar has and the running state
-    has not begins where the change is made. It stays in the state
-    after the block ends, where nothing reads it.
+    has not begins where the change is made. As first built it stayed
+    in the state after the block ended; by the ruling below it ends
+    with the block.
   - *Assertions changed*, each with a comment: the grammar module's
     claims that held a state of 7 hold it of a part; the refusal "reads
     or changes the state" names the part, and is no breach where the
@@ -2675,7 +2676,7 @@ its approval.
   - *Cost.* On the text the speed test read on main, the flat grammar
     takes the same 2,558,315 steps, and Allegretto's whole grammar
     4,190,731 where it took 4,186,208.
-  - *The speed test fails, and the maintainer is asked.* Its two
+  - *The speed test failed, and the maintainer was asked.* Its two
     limits are on steps for reading three of the engine's own modules,
     and those modules have grown by 775 bytes with this chunk and the
     two before. 2,633,792 steps against 2,600,000, and 4,314,685
@@ -2688,6 +2689,15 @@ its approval.
   - *Faults.* 12 deliberate faults, 12 failed a test at once.
   - *Examples* of `next/ext/lib/examples_layout.test.alg` and
     `examples_turns.test.alg` are brought up to the parts.
+  - *Ruled on PR #328, 2026-12-04, and built on the same branch.*
+    The speed test reads a fixed text, `next/ext/speed-text.txt`, the
+    three modules as they were on main that day, and its limits stay:
+    2,558,315 steps against 2,600,000, and 4,209,044 against 4,300,000.
+    A part of the state is scoped to the block its `use` is in: it
+    ends with the block, and a later block that uses the notation
+    begins it anew. A wider scope, that shares between uses, may be
+    wanted one day and is left. `with_state` is gone. The term `part`
+    is ratified.
 
 ## 8. Sessions
 
