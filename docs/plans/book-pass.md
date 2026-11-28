@@ -2645,6 +2645,10 @@ its approval.
     refused by both. Where a module is found is the loader's, E9.
   - No deliberate faults: the chunk adds examples and one attempt in a
     command, and no rule.
+  - *Ruled on PR #327, 2026-12-04*: the shape of an example and the
+    place of the `use` examples, `next/ext/examples/`, are confirmed.
+    The maintainer reads the examples as the engine's rules are
+    discussed, and says where one does not carry its rule.
 
 ## 8. Sessions
 
