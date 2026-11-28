@@ -908,7 +908,8 @@ export const createKernel: CreateKernel = () => {
       } finally {
         running = before;
       }
-      return r instanceof CellV ? r : asData(r, "what a primitive returned");
+      // PROTOTYPE, not ruled: an effectful primitive may answer with a module this kernel made.
+      return r instanceof CellV || (d.purity === "effectful" && r instanceof Fn && moduleIds.has(r)) ? r : asData(r, "what a primitive returned");
     }
   };
 

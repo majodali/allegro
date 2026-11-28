@@ -26,6 +26,8 @@
 //             identity}, `declares` as above
 //   own       the tree of Allegretto's own functions: `is_failure` and
 //             `handle`, the four for iteration and their helpers
+//   names     the kernel's primitives a text may name; left out, they
+//             are the list `kernel_names` below
 //
 // How each form is written is one line of `expr` below. A name is one of
 // two things, as the kernel has them: a parameter of a function, written
@@ -85,7 +87,12 @@ has_name(names, name, i) => i < count(names) && (names[i].name == name || has_na
 kernel_names = ["then", "also", "first", "attempt", "describe", "build", "refuse", "assume", "undecided", "get", "count", "claim", "put", "key", "kind", "symbol", "spelling", "specialize", "sample"]
 namespaces = ["int", "float", "text", "bits"]
 own_public = ["is_failure", "handle", "each", "each_at_once", "each_within", "all"]
-allegretto_scope = {names: joined(mapped(namespaces, n => {name: n, m: {k: `namespace}}, 0, []), 0, mapped(kernel_names, n => {name: n, m: {k: `kernel, name: n}}, 0, [])), outer: []}
+allegretto_scope = scope_of(kernel_names)
+scope_of(names) => {names: joined(mapped(namespaces, n => {name: n, m: {k: `namespace}}, 0, []), 0, mapped(names, n => {name: n, m: {k: `kernel, name: n}}, 0, [])), outer: []}
+// What the rules are handed, with the scope every text is read in: the kernel's primitives a text may name are
+// those handed as `names`, or the list above where none is handed.
+ready(given) => {shipped: given.shipped, modules: given.modules, own: given.own, scope: if has_names(given, 0) then scope_of(given.names) else allegretto_scope}
+has_names(given, i) => i < count(given) && (key(given, i) == `names || has_names(given, i + 1))
 own_names(items, i, out) => if i == count(items) then out else own_names(items, i + 1, put(out, [], {name: items[i].name.name, m: {k: `own}}))
 
 // What a name stands for where it is used. A parameter is written by how
@@ -309,7 +316,7 @@ used_by(uses, n, i) => if i < 0 then [] else if uses[i].name == n then uses[i].u
 
 // The function of one of them: written in the scope that binds them
 // all, with no place, since no text the reader was given holds it.
-own_function(c, name) => own_from(c.given.own.items, name, 0, {scope: {names: own_names(c.given.own.items, 0, []), outer: allegretto_scope}, level: 1, placing: false, given: c.given})
+own_function(c, name) => own_from(c.given.own.items, name, 0, {scope: {names: own_names(c.given.own.items, 0, []), outer: c.given.scope}, level: 1, placing: false, given: c.given})
 own_from(items, name, i, c) => if items[i].name.name == name then lambda(c, items[i].params, items[i].body, []) else own_from(items, name, i + 1, c)
 
 // ---- The module ----
@@ -322,8 +329,8 @@ is_key(h) => h.k == `key
 not_key(h) => h.k != `key && h.k != `use
 // The header lines are the module function's parameters: the keys
 // first, then the others, each in written order.
-module(tree, given) => module_with(tree, given, joined(kept(tree.headers, not_key, 0, []), 0, kept(tree.headers, is_key, 0, [])), count(kept(tree.headers, is_key, 0, [])))
-module_with(tree, given, params, keys) => module_in(tree, params, keys, used_modules(tree), {scope: {names: header_names(params, keys, 0, []), outer: {names: mapped(own_public, n => {name: n, m: {k: `own}}, 0, []), outer: allegretto_scope}}, level: 1, placing: true, given: given})
+module(tree, given) => module_with(tree, ready(given), joined(kept(tree.headers, not_key, 0, []), 0, kept(tree.headers, is_key, 0, [])), count(kept(tree.headers, is_key, 0, [])))
+module_with(tree, given, params, keys) => module_in(tree, params, keys, used_modules(tree), {scope: {names: header_names(params, keys, 0, []), outer: {names: mapped(own_public, n => {name: n, m: {k: `own}}, 0, []), outer: given.scope}}, level: 1, placing: true, given: given})
 header_names(params, keys, i, out) =>
   if i == count(params) then out
   else if params[i].k == `import then header_names(params, keys, i + 1, put(out, [], {name: params[i].name.name, m: {k: `bound}}))
