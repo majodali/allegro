@@ -114,9 +114,20 @@ claim(allowed([change.reserve(`words, ["unit"])], {rules: [], words: ["unit"]}))
 claim(count(change.breaches(base, [change.reserve(`words, ["unit", "of", "is"])], {rules: [], words: ["of"]})) == 2)
 // A set no terminal in force keeps out is the notation's own.
 claim(allowed([change.reserve(`others, ["unit"])], nothing_named))
-// It brings no terminal that reads or changes the state.
-step = grammar.stepper("a step", (text, at, n) => {read: 0, state: n}, false, class.no_ranges, true)
-claim(breach([change.add(`stepping, seq([lit("s"), grammar.opt(step)]))]) == "the notation brings a terminal that reads or changes the state, in the rule stepping")
+// A terminal it brings reads or changes only a part of the state that it adds itself.
+// (Until 2026-12-04 a notation brought no terminal that touched the state at all, and this claim held the
+// words "reads or changes the state". The state now has parts by name, and a notation may add one of its own.)
+step = grammar.stepper("a step", `count, (text, at, n) => {read: 0, state: n}, false, class.no_ranges, true)
+claim(breach([change.add(`stepping, seq([lit("s"), grammar.opt(step)]))]) == "the notation brings a terminal that reads or changes the part count of the state, which it does not add, in the rule stepping")
+// With the part added by the same notation, it is no breach, and the grammar changed has the part as it begins.
+counted = [change.part(`count, 0), change.add(`stepping, seq([lit("s"), grammar.opt(step)]))]
+claim(allowed(counted, nothing_named) && change.used(base, counted, nothing_named).state.count == 0)
+// A part of another name does not cover it.
+claim(count(change.breaches(base, [change.part(`depth, 0), change.add(`stepping, step)], nothing_named)) == 1)
+// A part the grammar has, and a part two changes add, conflict.
+claim(change.conflicts(change.changed(base, [counted]), [[change.part(`count, 1)]])[0] == "a change adds the part count of the state, which the grammar has")
+claim(change.conflicts(base, [[change.part(`count, 0)], [change.part(`count, 1)]])[0] == "two changes add the part count of the state")
+claim(count(change.conflicts(base, [[change.part(`count, 0)], [change.part(`depth, 1)]])) == 0)
 claim(count(change.breaches(base, [change.append(`value, step)], nothing_named)) == 1)
 claim(allowed([change.add(`stepping, step)], {rules: [`stepping], words: []}))
 // Using a notation with a breach is refused, before any text is read.

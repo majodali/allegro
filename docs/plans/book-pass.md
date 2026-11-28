@@ -606,7 +606,7 @@ are:
 | E5 (the engine: what a parse gives) | rebuild | each form maps what it matched to a description, with places; precedence levels; ambiguity as a claim, and the mark `unambiguous` | done 2026-11-26: `grammar.giving` and values with places in `engine.alg`; `engine.parse` and the settled mark; `next/ext/lib/levels.alg`, new; each with tests |
 | E6 (grammars changed and combined) | rebuild | the five changes to a production; combining without regard to order; the three rules of "A notation a text uses can only add", as analyses of the grammar | done 2026-11-27: `next/ext/lib/change.alg`, new, and `analysis.faults`, with tests; a conflict is refused by `changed` with no text read |
 | E7 (Allegretto read by the engine) | rebuild | Allegretto's grammar as a value; the text of a module gives the description of its function, its declarations and the number of its keys | first part done 2026-11-28: `next/ext/lib/allegretto.alg` gives the tree of a text, and both readers give the same tree for all 165 texts the bootstrap reads (`next/ext/readers.ts`). Second part done 2026-11-29: `next/ext/lib/meaning.alg` gives the description, the declarations and the count of keys, and for all 172 texts the bootstrap emits the module is the bootstrap's by identity, with the same places (`next/ext/modules.ts`). Open: the speed target, missed with the whole grammar (§7); the imported modules and the shipped primitives are handed to the rules, until the loader of E9 |
-| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream. First part done 2026-12-01: `use m.a` read in turns with the grammar, in a block too; a notation's part reads its module whatever the text binds (`next/ext/use.test.ts`). Second part, first half, done 2026-12-03: a notation that only adds needs no `changing`, and each line after a `use` is compared with its reading in the grammar before. Open: the named parts of the parser's state; the right to change the grammar as a capability of the launcher |
+| E8 (a text that changes its grammar) | rebuild | `parser.extend` as a capability; `use`; parsing and evaluation taking turns | its tests; what milestone 6 of `docs/plans/rebuild.md` needs from this stream. First part done 2026-12-01: `use m.a` read in turns with the grammar, in a block too; a notation's part reads its module whatever the text binds (`next/ext/use.test.ts`). Second part done 2026-12-04: a notation that only adds needs no `changing`, and each line after a `use` is compared with its reading in the grammar before; the parser's state has parts by name, and a notation's terminal is held to the parts it adds. Open: the right to change the grammar as a capability of the launcher |
 | E9 (the loader) | rebuild | finding a text through a capability, having it parsed, making the module; imports by identity; a cycle refused | its tests; a program of several files runs from its texts |
 | E10 (the engine shipped built) | rebuild | the engine and the loader as a saved program, with the engine specialized over Allegretto's grammar; the engine reads its own text | speed measured and reported; the engine's own text read by the engine gives the engine |
 | E11 (the bootstrap retired) | rebuild | with the acceptance stream, whose plan has a chunk for it: `next/bootstrap/` is deleted | the maintainer: milestone 8 |
@@ -2649,6 +2649,45 @@ its approval.
     place of the `use` examples, `next/ext/examples/`, are confirmed.
     The maintainer reads the examples as the engine's rules are
     discussed, and says where one does not carry its rule.
+- **2026-12-04 — chunk E8, second part, second half: the parser's
+  state has parts by name** (the review session). Built as ruled on
+  PR #314.
+  - *The state.* It was one bits value. It is a structure of parts by
+    name, each a bits value. `grammar.with_part(g, name, begun)` adds
+    one and replaces `with_state`. `grammar.stepper` takes the name of
+    the part its function is handed and gives back. `grammar.with_space`
+    takes the name of the part the space function reads, or none. The
+    engine hands a terminal its part and puts back what it gives.
+  - *Layout.* The offside terminals keep the columns of the blocks in
+    the part `layout`, `offside.part`.
+  - *A notation's own state.* `change.part(name, begun)` adds a part. A
+    terminal a notation brings that keeps a state must keep it in a
+    part the same notation adds; any other part is a breach, as any
+    state was before. Two changes that add one part conflict, and so
+    does a part the grammar has.
+  - *At a `use`.* A part the changed grammar has and the running state
+    has not begins where the change is made. It stays in the state
+    after the block ends, where nothing reads it.
+  - *Assertions changed*, each with a comment: the grammar module's
+    claims that held a state of 7 hold it of a part; the refusal "reads
+    or changes the state" names the part, and is no breach where the
+    notation adds the part.
+  - *Cost.* On the text the speed test read on main, the flat grammar
+    takes the same 2,558,315 steps, and Allegretto's whole grammar
+    4,190,731 where it took 4,186,208.
+  - *The speed test fails, and the maintainer is asked.* Its two
+    limits are on steps for reading three of the engine's own modules,
+    and those modules have grown by 775 bytes with this chunk and the
+    two before. 2,633,792 steps against 2,600,000, and 4,314,685
+    against 4,300,000. For each byte the engine takes fewer steps than
+    on main. The limits are not changed here.
+  - *Compared again*, since the state is under every text: the two
+    readers give the same tree for 206 of 215 texts and both refuse 9;
+    the two emitters give the same module for 195 and both refuse 20,
+    ten of them the texts of `next/ext/examples/`.
+  - *Faults.* 12 deliberate faults, 12 failed a test at once.
+  - *Examples* of `next/ext/lib/examples_layout.test.alg` and
+    `examples_turns.test.alg` are brought up to the parts.
 
 ## 8. Sessions
 

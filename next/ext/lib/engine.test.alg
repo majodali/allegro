@@ -182,30 +182,30 @@ claim(attempt(readings(idle_rule, "x"), 100000).reason == "a rule reads itself a
 // ---- A state beside the position ----
 // The state counts the brackets open: one that closes is read where one
 // is open, and the text ends where none is.
-opened = grammar.stepper("(", (text, at, depth) => if grammar.byte(text, at) == 40 then {read: 1, state: depth + 1} else [], true, class.pairs("(("), false)
-closed = grammar.stepper(")", (text, at, depth) => if grammar.byte(text, at) == 41 && depth > 0 then {read: 1, state: depth - 1} else [], true, class.pairs("))"), false)
-level = grammar.stepper("no bracket open", (text, at, depth) => if depth == 0 then {read: 0, state: depth} else [], false, class.no_ranges, true)
-brackets = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), 0))
+opened = grammar.stepper("(", `count, (text, at, depth) => if grammar.byte(text, at) == 40 then {read: 1, state: depth + 1} else [], true, class.pairs("(("), false)
+closed = grammar.stepper(")", `count, (text, at, depth) => if grammar.byte(text, at) == 41 && depth > 0 then {read: 1, state: depth - 1} else [], true, class.pairs("))"), false)
+level = grammar.stepper("no bracket open", `count, (text, at, depth) => if depth == 0 then {read: 0, state: depth} else [], false, class.no_ranges, true)
+brackets = engine.prepared(grammar.with_part(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), `count, 0))
 claim(readings(brackets, "(x(x))x") == 1 && readings(brackets, "") == 1)
 claim(readings(brackets, "(x") == 0 && failed_at(brackets, "(x") == 2)
 claim(readings(brackets, "x)") == 0 && failed_at(brackets, "x)") == 1)
 // A state the grammar begins with.
-begun = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), 2))
+begun = engine.prepared(grammar.with_part(grammar.grammar(`s, {s: seq([star(alt([opened, closed, lit("x")])), level, grammar.end])}), `count, 2))
 claim(readings(begun, "x))") == 1 && readings(begun, "x)") == 0)
 // A rule remembered touches no state, and what it gives is read with the
 // state of whoever asks: `more` changes the state before n is read twice.
-more = grammar.stepper("more", (text, at, n) => {read: 0, state: n + 1}, false, class.no_ranges, true)
-is_one = grammar.stepper("the state 1", (text, at, n) => if n == 1 then {read: 0, state: n} else [], false, class.no_ranges, true)
-asked = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([more, alt([seq([ref(`n), is_one]), seq([ref(`n), lit("!")])])]), n: number}), 0))
+more = grammar.stepper("more", `count, (text, at, n) => {read: 0, state: n + 1}, false, class.no_ranges, true)
+is_one = grammar.stepper("the state 1", `count, (text, at, n) => if n == 1 then {read: 0, state: n} else [], false, class.no_ranges, true)
+asked = engine.prepared(grammar.with_part(grammar.grammar(`s, {s: seq([more, alt([seq([ref(`n), is_one]), seq([ref(`n), lit("!")])])]), n: number}), `count, 0))
 claim(count(asked.kept) == 1 && readings(asked, "12") == 1 && readings(asked, "12!") == 1)
 // A rule that touches the state is not remembered, though two items begin with it.
-touching = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: alt([seq([ref(`n), lit("?")]), seq([ref(`n), lit("!")])]), n: seq([more, number])}), 0))
+touching = engine.prepared(grammar.with_part(grammar.grammar(`s, {s: alt([seq([ref(`n), lit("?")]), seq([ref(`n), lit("!")])]), n: seq([more, number])}), `count, 0))
 claim(count(touching.kept) == 0 && readings(touching, "12!") == 1)
 // A rule met again at one position with another state is refused.
-restless = engine.prepared(grammar.with_state(grammar.grammar(`a, {a: alt([seq([more, ref(`a), lit("!")]), lit("x")])}), 0))
+restless = engine.prepared(grammar.with_part(grammar.grammar(`a, {a: alt([seq([more, ref(`a), lit("!")]), lit("x")])}), `count, 0))
 claim(attempt(readings(restless, "x!"), 100000).reason == "a rule is met again at one position with another state")
 // A guard leaves the state as it was, whatever its item would have made of it.
-looking = engine.prepared(grammar.with_state(grammar.grammar(`s, {s: seq([grammar.guard(opened, true), level, opened, closed])}), 0))
+looking = engine.prepared(grammar.with_part(grammar.grammar(`s, {s: seq([grammar.guard(opened, true), level, opened, closed])}), `count, 0))
 claim(readings(looking, "()") == 1)
 
 // ---- Space after a terminal, and reserved words ----
@@ -213,7 +213,7 @@ spaces = (text, at, state) => blanks(text, at, 0)
 blanks(text, at, n) => if grammar.byte(text, at + n) == 32 then blanks(text, at, n + 1) else n
 word_of = grammar.spaced(grammar.unless(grammar.run("a name", "az"), `words))
 when_word = grammar.spaced(lit("when"))
-plain_words = grammar.with_reserved(grammar.with_space(grammar.grammar(`s, {s: alt([seq([when_word, word_of]), seq([word_of, lit("="), word_of])])}), spaces, false), `words, ["if", "else"])
+plain_words = grammar.with_reserved(grammar.with_space(grammar.grammar(`s, {s: alt([seq([when_word, word_of]), seq([word_of, lit("="), word_of])])}), spaces, []), `words, ["if", "else"])
 spaced_words = engine.prepared(plain_words)
 // A terminal gives the word and not the space after it, and the reading goes on after the space.
 claim(tree(spaced_words, "a   =b  ") == "[a = b]")
@@ -233,7 +233,7 @@ a_number = grammar.spaced(giving(number, (v, at) => {number: v, at: at}))
 adds = engine.prepared(grammar.with_space(grammar.grammar(`sum, {
   sum: alt([giving(seq([ref(`sum), grammar.spaced(lit("+")), ref(`one)]), (v, at) => {add: [v[0], v[2]], sign: v[1], at: at}), ref(`one)]),
   one: a_number
-}), wide, false))
+}), wide, []))
 added = engine.parse(adds, "1 + 23  ")
 claim(added.add[0].number == "1" && added.add[1].number == "23" && added.sign == "+")
 // A place is of what was read, the space after it not counted: bytes 0 to 6.
@@ -346,6 +346,25 @@ claim(keyed_read(v => {q: v}).reason == "the line that ends at 1:4 reads one way
 claim(keyed_read(v => {p: "b"}).reason == "the line that ends at 1:4 reads one way before the change of the grammar and another after it. Before: (p:a) After: (p:b)")
 // A place is left out of the comparison and of the outline: two readings of the same bytes that are alike in all else have the same places.
 claim(keyed_read(v => {p: v, at: 7}).failure == `refuted && keyed_read(v => {at: 1, p: v}).failure == `refuted)
+
+// ---- Parts of the state ----
+// The state is parts by name, and a terminal reads and changes the one it names. Round brackets are counted
+// in the part `count` (above) and angle brackets in a part `angle`: each closes where its own is open,
+// whatever the other is, and the text ends where neither is.
+angled = grammar.stepper("<", `angle, (text, at, depth) => if grammar.byte(text, at) == 60 then {read: 1, state: depth + 1} else [], true, class.pairs("<<"), false)
+unangled = grammar.stepper(">", `angle, (text, at, depth) => if grammar.byte(text, at) == 62 && depth > 0 then {read: 1, state: depth - 1} else [], true, class.pairs(">>"), false)
+flat_angle = grammar.stepper("no angle open", `angle, (text, at, depth) => if depth == 0 then {read: 0, state: depth} else [], false, class.no_ranges, true)
+both_kinds = engine.prepared(grammar.with_part(grammar.with_part(grammar.grammar(`s, {s: seq([star(alt([opened, closed, angled, unangled, lit("x")])), level, flat_angle, grammar.end])}), `count, 0), `angle, 0))
+claim(readings(both_kinds, "(<)>") == 1 && readings(both_kinds, "<(x)>") == 1)
+claim(readings(both_kinds, "(<)") == 0 && readings(both_kinds, "(>") == 0 && readings(both_kinds, "<)") == 0)
+// A part a change of the grammar adds begins where the change is made. `+s` brings the line `s`, which is
+// read twice and no more: its terminal counts in a part of its own.
+twice_s = grammar.stepper("s", `seen, (text, at, n) => if grammar.byte(text, at) == 115 && n < 2 then {read: 1, state: n + 1} else [], true, class.pairs("ss"), false)
+parted(held, asked) => held_and_prepared(change.changed(held, [[change.part(`seen, 0), change.append(`line, twice_s)]]))
+parts_read(text) => size(engine.parses_with(letters_ready, text, "", letters, parted))
+claim(parts_read("a\n+s\ns\na\ns") == 1 && parts_read("+s\ns\ns\ns") == 0)
+// Between brackets the part is as the lines before left it, and what is read there counts after them.
+claim(parts_read("+s\ns\n(\ns\n)\na") == 1 && parts_read("+s\ns\n(\ns\n)\ns") == 0)
 
 output.write("engine: ok")
 // expect: engine: ok

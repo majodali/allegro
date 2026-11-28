@@ -574,6 +574,19 @@ newest first, directly below this line. A second stream in lane A, told
 apart from the closed `## Stream A — the book chapters` above by its
 name.
 
+- **2026-12-04 — The parser's state has parts by name (chunk E8 of the
+  book pass, second part, second half).** A grammar says which parts it
+  has (`grammar.with_part`); a terminal that keeps a state names the
+  one it reads and changes; space that reads the state names its part.
+  The layout's columns are the part `layout`. A notation adds a part
+  with `change.part`, and a terminal it brings is held to the parts it
+  adds: it can keep a state of its own, and cannot touch the layout's.
+  A part a `use` brings begins at the `use`. Both readers give the same
+  tree for 206 of 215 texts and both refuse 9; both emitters give the
+  same module for 195 and both refuse 20. 12 deliberate faults, 12
+  caught. The speed test's two limits on steps are passed by the
+  growth of the text it reads, and wait for a ruling. With this E8 is built, but for the right to change the
+  grammar as a capability of the launcher.
 - **2026-12-04 — Worked examples for every rule of the parser, each
   one run by the suite.** Five modules, `next/ext/lib/examples_*.test.alg`
   with 92 claims, and the texts of `next/ext/examples/`, seven programs

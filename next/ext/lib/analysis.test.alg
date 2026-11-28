@@ -124,17 +124,17 @@ claim(class.has(turns.rules.a.items[0].set, 120) && class.size(turns.rules.a.ite
 
 // A rule that reads the state or changes it, itself or through another,
 // is not remembered; nor one with a spaced terminal where space reads the state.
-step = grammar.stepper("a step", (text, at, n) => {read: 0, state: n}, false, class.no_ranges, true)
+step = grammar.stepper("a step", `count, (text, at, n) => {read: 0, state: n}, false, class.no_ranges, true)
 twice_begun(rules) => grammar.grammar(`s, put(rules, `s, alt([seq([ref(`a), lit("1")]), seq([ref(`a), lit("2")])])))
 claim(count(analysis.prepared(twice_begun({a: lit("a")})).kept) == 1)
 claim(count(analysis.prepared(twice_begun({a: seq([lit("a"), step])})).kept) == 0)
 claim(count(analysis.prepared(twice_begun({a: seq([lit("a"), ref(`b)]), b: grammar.opt(step)})).kept) == 0)
 spaced_rule = twice_begun({a: grammar.spaced(lit("a"))})
 claim(count(analysis.prepared(spaced_rule).kept) == 1)
-claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, true)).kept) == 0)
-claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, false)).kept) == 1)
+claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, `count)).kept) == 0)
+claim(count(analysis.prepared(grammar.with_space(spaced_rule, (text, at, state) => 0, [])).kept) == 1)
 // The state and the space of the grammar are handed on.
-claim(analysis.prepared(grammar.with_state(spaced_rule, 5)).state == 5)
+claim(analysis.prepared(grammar.with_part(spaced_rule, `count, 5)).state.count == 5)
 
 // The words a terminal does not read, by their length in bytes.
 worded = analysis.prepared(grammar.with_reserved(grammar.grammar(`s, {s: grammar.unless(grammar.run("a name", "az"), `words), t: grammar.run("a name", "az")}), `words, ["if", "else", "of", "when"]))

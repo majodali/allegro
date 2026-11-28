@@ -8,6 +8,7 @@
 // index is next/ext/examples.md.
 capability output
 import change
+import class
 import engine
 import grammar
 
@@ -82,6 +83,14 @@ name = grammar.unless(grammar.run("a name", "az"), `words)
 worded = grammar.with_reserved(grammar.grammar(`s, {s: name}), `words, ["if"])
 claim(change.breaches(worded, [change.reserve(`words, ["of"])], named([]))[0] == "the notation reserves the word of, which the text does not name")
 claim(count(change.breaches(worded, [change.reserve(`words, ["of"])], {rules: [], words: ["of"]})) == 0)
+
+// A terminal it brings keeps a state only in a part of the state that the notation adds itself.
+counting = grammar.stepper("a count", `seen, (text, at, n) => if grammar.byte(text, at) == 115 && n < 2 then {read: 1, state: n + 1} else [], true, class.pairs("ss"), false)
+claim(change.breaches(letters, [change.append(`line, counting)], named([]))[0] == "the notation brings a terminal that reads or changes the part seen of the state, which it does not add, in the rule line")
+claim(count(change.breaches(letters, [change.part(`seen, 0), change.append(`line, counting)], named([]))) == 0)
+// The part begins where the change is made: the line `s` is read twice after `+s`, and no more.
+counted = (held, asked) => held_as(change.changed(held, [[change.part(`seen, 0), change.append(`line, counting)]]), false)
+claim(size(engine.parses_with(ready, "+s\ns\ns", "", letters, counted)) == 1 && size(engine.parses_with(ready, "+s\ns\ns\ns", "", letters, counted)) == 0)
 
 // ---- "A notation a text uses can only add": checked on the text ----
 //

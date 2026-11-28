@@ -226,6 +226,28 @@ test("a notation that adds a line of a name and an expression leaves a later `us
   assert.deepEqual(r.lines, ["show 7", "tell 2"]);
 });
 
+test("a notation's terminal keeps a state in a part the notation adds, and in no part of the language's", () => {
+  // `@@` is an operand that may be written once in a text: its terminal counts in a part of its own.
+  const once = [
+    "import change",
+    "import class",
+    "import grammar",
+    "sign = grammar.stepper(\"@@\", `once, (text, at, n) => if grammar.byte(text, at) == 64 && grammar.byte(text, at + 1) == 64 && n == 0 then {read: 2, state: 1} else [], true, class.pairs(\"@@\"), false)",
+    "export marks = [change.part(`once, 0), change.append(`primary, grammar.giving(sign, (v, at) => {k: `int, value: 1, at: at}))]",
+    // The same terminal in the part Allegretto keeps its layout in, which the notation does not add.
+    "intruder = grammar.stepper(\"@@\", `layout, (text, at, n) => [], true, class.pairs(\"@@\"), false)",
+    "export intruding = [change.append(`primary, intruder)]",
+    "",
+  ].join("\n");
+  const r = run("capability output\nuse once.marks\nx = @@\noutput.write(int.text(x + 1))\n", { once });
+  assert.deepEqual(r.findings, [], told(r));
+  assert.deepEqual(r.lines, ["2"]);
+  const again = run("capability output\nuse once.marks\nx = @@\ny = @@\n", { once });
+  assert.match(again.findings.join("\n"), /^main: no reading at \d+$/);
+  const refused = run("capability output\nuse once.intruding\noutput.write(\"never\")\n", { once });
+  assert.deepEqual(refused.findings, ["main: 2:1: use once: the notation brings a terminal that reads or changes the part layout of the state, which it does not add, in the rule primary"]);
+});
+
 test("a module that uses itself, through another, is refused", () => {
   const a = "use b.n\nexport n = []\n";
   const b = "use a.n\nexport n = []\n";

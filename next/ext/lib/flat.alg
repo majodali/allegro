@@ -151,7 +151,7 @@ signed = (sign, left, right, at) => {sign: sign, left: left, right: right, at: a
 // Items with commas between, or none.
 listed(item) => opt(seq([item, star(seq([sign(","), item]))]))
 
-export allegretto = grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `forms, ["if", "else", "true", "false"]), (text, at, state) => space(text, at), false)
+export allegretto = grammar.with_space(grammar.with_reserved(grammar.grammar(`module, rules), `forms, ["if", "else", "true", "false"]), (text, at, state) => space(text, at), [])
 rules = {
   module: seq([opening, star(seq([ref(`line), ending])), grammar.end]),
   line: alt([ref(`declaration), ref(`binding), ref(`expression)]),

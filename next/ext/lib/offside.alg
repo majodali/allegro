@@ -40,6 +40,8 @@ import grammar
 byte = grammar.byte
 
 export begun = 0
+// The name of the part of the state these terminals keep: grammar.with_part(g, offside.part, offside.begun).
+export part = `layout
 top(st) => bits.int(bits.slice(st, 0, 64))
 
 // The position of what the next line with anything on it has, from the
@@ -60,10 +62,10 @@ leads(text, at) =>
 
 export made(blank) => {
   space: (text, at, st) => space_to(text, blank, at, st, blank(text, at)),
-  newline: grammar.stepper("a new line", (text, at, st) => line_to(text, blank, at, st, blank(text, at)), false, class.no_ranges, false),
-  indent: grammar.stepper("a deeper line", (text, at, st) => deeper(text, at, st), false, class.no_ranges, true),
-  indent_from: grammar.stepper("a deeper line", (text, at, st) => deeper_from(text, at, st, content(text, blank, at + 1)), false, class.no_ranges, false),
-  dedent: grammar.stepper("the end of a block", (text, at, st) => shallower(text, blank, st, blank(text, at)), false, class.no_ranges, true),
+  newline: grammar.stepper("a new line", part, (text, at, st) => line_to(text, blank, at, st, blank(text, at)), false, class.no_ranges, false),
+  indent: grammar.stepper("a deeper line", part, (text, at, st) => deeper(text, at, st), false, class.no_ranges, true),
+  indent_from: grammar.stepper("a deeper line", part, (text, at, st) => deeper_from(text, at, st, content(text, blank, at + 1)), false, class.no_ranges, false),
+  dedent: grammar.stepper("the end of a block", part, (text, at, st) => shallower(text, blank, st, blank(text, at)), false, class.no_ranges, true),
   sameline: grammar.term("more on the line", (text, at) => if leads(text, at) || byte(text, at) == 10 || byte(text, at) == -1 then -1 else 0, false, class.no_ranges, true),
   ending: grammar.term("the end of the text", (text, at) => if content(text, blank, at) < 0 then bits.length(text) / 8 - at else -1, false, class.no_ranges, true)}
 
