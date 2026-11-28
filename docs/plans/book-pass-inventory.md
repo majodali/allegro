@@ -1665,6 +1665,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Held finding (2026-11-12, DR3): parsing is a host stage: the engine is TypeScript (`src/grammar2/engine.ts`) and no Allegro function parses a program's text.
 - Notes (2026-11-20, the second adversarial review, cluster 14): the last two sentences replace "A text that does not parse is a refutation", by ruling. A reader saw that a program which parses text it receives would be wrong on bad input unless it wrapped the parser in an attempt. With a failure as plain data ("A failure a program can handle is plain data of one shape") the parser answers one, and only the loader's claim makes it a refutation. What a parser returns for a text that does parse is under discussion.
 - Notes (2026-11-20, the second adversarial review, cluster 14): "to an expression" becomes "to a description", by ruling: no program holds an expression.
+- Worked example: `next/ext/lib/examples_forms.test.alg` — a reading is a call that gives every reading as data, or a failure with the farthest byte reached. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### No parser is privileged
@@ -1692,6 +1693,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: none recorded (the Pratt and Earley hybrid it replaced is noted as superseded); a grammar as a third kind of extension item beside functions and fields (rejected 2026-11-12: to the kernel a grammar definition is a value)
 - Sources: docs/book/grammar-formalism.md §1, §2, §9, §6; docs/book/extension/grammar.md §1; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: was "Grammars are Allegro values", stated as an Object over a `Rule` union: terms of the typed language, which comes later in the order.
+- Worked example: `next/ext/lib/examples_forms.test.alg` — a grammar made by a function; a grammar made from another leaves the first as it was. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Every notation stands for an expression
@@ -1709,6 +1711,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling: "Meaning comes before notation" made concrete. A form that changes the grammar is no exception: its expression's value is the new grammar ("A text can change the grammar it is read in"). Absorbs the hygiene clause of "The `grammar { … }` block".
 - Held finding (2026-11-12, DR3): the base grammar's trees are turned into expressions by host code (`src/grammar2/tree-builder.ts`), which can do what no form's expression can.
 - Notes (2026-11-14, issue 15 of the adversarial review): the mapping from what a form matched to its expression is a pure function, and it may compute on what it matched before it returns the expression; the templates of the `grammar { … }` block are one way of writing one. "A language checks the names it cares about" relies on this.
+- Worked example: `next/ext/lib/examples_forms.test.alg`; `next/ext/examples/ratio.alg` — a sum whose form gives its total; a notation's sign that gives a call of its module's function, read through `from`. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### A language checks the names it cares about
@@ -1753,6 +1756,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: the kernel recording source positions in its own origin field (rejected: "Source attachment is not a promise the kernel needs to know about")
 - Sources: the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: new, by ruling. Was "a metadata field the parser's extension registers and writes", with the kernel knowing nothing of it. The ruling of 2026-11-22 made a place an entry of a part's description, kept by the kernel on what it builds and told to a host with a claim's record; the maintainer confirmed on PR #305 that this entry follows the later ruling. The origin field is unchanged: it holds the expression an expression came from.
+- Worked example: `next/ext/lib/examples_forms.test.alg` — the place of a number on the second line of a text. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Scannerless parsing
@@ -1766,6 +1770,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Units: grammar-formalism
 - Options recorded: a tokenizer layer, kept as the known optimization "if larger files demand it" (benchmark first); an external LL(k) and Pratt experiment, deferred
 - Sources: docs/book/grammar-formalism.md §1, §4; docs/book/extension/grammar.md §3 "Performance headroom"
+- Worked example: `next/ext/lib/examples_forms.test.alg` — a number and a quoted text in one grammar, with no pass that cuts words first; space as a terminal. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### A terminal is a function, so a grammar can define its own
@@ -1781,6 +1786,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: new, by ruling.
 - Held finding (2026-11-12, DR3): the terminals are a closed set implemented in the engine (`src/grammar2/engine.ts`).
 - Notes (2026-11-19, the second adversarial review, cluster 12): the last two sentences are added by ruling. A terminal may change the state and match no text, as the indentation terminals do, so the usual argument that left recursion ends, finitely many pairs of rule and position, fails. The maintainer: "Agreed - or the parser engine simply prevents it." Not built: the engine written in Allegretto does not exist yet.
+- Worked example: `next/ext/lib/examples_forms.test.alg` — a terminal that reads the letter a an even number of times. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Offside rule through stateful indent terminals
@@ -1795,6 +1801,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a dedicated continuation construct (rejected); tab handling proposals (tabs forbidden by default, `tab_width` opt-in)
 - Sources: docs/book/grammar-formalism.md §5.1–§5.5; docs/book/extension/grammar.md §3
 - Notes: `SAMELINE` is not implemented in the present tree (`src/grammar2/engine.ts:712`); the rebuild's `next/ext/lib/offside.alg` has all four. Was "at or below the block's indent": with every reading of a text kept, a `NEWLINE` that held below the block's column too would read the outer block's next statement as the inner block's as well. The tab question of docs/book/grammar-formalism.md §5.4 is ruled as above; the empty-stack question does not arise, since the outermost block has no `DEDENT`.
+- Worked example: `next/ext/lib/examples_layout.test.alg` — brackets balanced by a state and no recursion; blocks by indentation, however deep. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Guards and reserved words separate keywords from identifiers
@@ -1809,6 +1816,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: reserving `left`, `right` and `none` only inside a `grammar { … }` block, to revisit if the global reservation breaks user code
 - Sources: docs/book/grammar-formalism.md §2.4, §3.3, §4.1, §11 item 3; docs/book/extension/grammar.md §4
 - Notes: `left`, `right` and `none` are reserved everywhere "for simplicity": a wart, since three words of the grammar notation are taken from every program.
+- Worked example: `next/ext/lib/examples_forms.test.alg` — `if` is no name and `iffy` is; a name with no bracket after it. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Named, partially ordered precedence levels
@@ -1823,6 +1831,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: integer precedence (rejected); requiring a total order (rejected in favour of "specify what you know")
 - Sources: docs/book/grammar-formalism.md §3.1, §7.3, §11 item 4; §6.4; archive dappled-cascading-cantor.md "Inside the block"
 - Notes: the error for constraints that leave a case unsettled is specified and not shipped (docs/book/grammar-formalism.md §7.5); only the cycle error ships.
+- Worked example: `next/ext/lib/examples_rows.test.alg` — three levels each placed by the one it names; two with no order between them, read apart and refused side by side. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Ambiguity is a claim
@@ -1839,6 +1848,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Ambiguity is banned and detected, not resolved by alternative order" and absorbs "Static analysis of grammars". FIRST-set completion is an open gap of the analyses.
 - Held finding (2026-11-12, DR3): the disjointness check is opt-in because the base grammar relies on the order of its alternatives (`analyzeWithDisjointnessCheck`, `src/grammar2/analyzer.ts`).
 - Notes (2026-11-20, the second adversarial review, cluster 12): the mark `unambiguous` is added by ruling, as a feature any grammar may use; the form that changes the grammar is its first use ("A text can change the grammar it is read in").
+- Worked example: `next/ext/lib/examples_forms.test.alg` — `parses` gives both readings of a text that reads two ways; `parse` claims there is one. The index is `next/ext/examples.md`.
 - Chapter: Parsing
 
 #### Parse failure reporting and recovery
@@ -1877,6 +1887,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes (2026-11-17, hand-off from the acceptance stream): the last sentence is added by the maintainer's ruling of 2026-11-17 in the acceptance stream's session, on the backlog's item for embeddable grammars (docs/plans/rebuild.md §7).
 - Notes (2026-11-18, the second adversarial review, cluster 6): the last sentence is added by ruling. "Loading evaluates nothing" holds for a record; a text that uses a notation needs the notation's value while it is being read.
 - Notes (2026-11-20, the second adversarial review, cluster 12): reworded by ruling. A reviewer showed that "exactly one parse" before the change and "every parse reported" hold together only with a stated boundary, and the review session proposed one in terms of statements. The maintainer: "If it's a wholly new grammar, can we use 'statement boundary'?", and: "It seems we only need to identify one thing - which is the phrase that returns the parser extension operation. I think in general we should be able to flag any phrase as needing to be unambiguous - it's just a useful feature for grammars." On who may define such a form: "If a grammar is extending the standard language, I'd be hesitant to allow it to change how the grammar is then further extended - just from a user experience perspective. I would at a minimum have a configurable policy to prevent that. For new self-contained grammars, they can do what they want." The policy is who holds the capability. The terms `unambiguous` and `parser.extend` are ratified. Not built: the engine written in Allegretto does not exist yet.
+- Worked example: `next/ext/lib/examples_turns.test.alg`; `next/ext/examples/uses.main.alg`; `next/ext/examples/before.main.alg` — a line that adds a letter to its language, from the next line on; `use` in Allegretto. The index is `next/ext/examples.md`.
 - Chapter: Changing the grammar
 
 #### Every production can be extended
@@ -1891,6 +1902,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Options recorded: a gate marking which productions may be extended (rejected); a future opt-out to freeze whitespace and core terminals; selecting an alternative by position (allowed, discouraged)
 - Sources: docs/book/grammar-formalism.md §6, §6.1, §11 items 1–2
 - Notes: was "Grammar extension as operation deltas, extensible by default".
+- Worked example: `next/ext/lib/examples_changes.test.alg` — each of the operations on a small grammar of sums. The index is `next/ext/examples.md`.
 - Chapter: Changing the grammar
 
 #### Grammars combine without regard to order
@@ -1907,6 +1919,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Notes: replaces "Conflicts are validated before activation".
 - Held finding (2026-11-12, DR3): replacing a production of the base only warns (`src/grammar2/fragments.ts:154`–`165`).
 - Held finding (2026-11-12, DR3): an appended alternative and a form spliced at the front take their meaning from their position among the alternatives.
+- Worked example: `next/ext/lib/examples_changes.test.alg` — two changes in either order; two that conflict, refused before any text is read. The index is `next/ext/examples.md`.
 - Chapter: Changing the grammar
 
 #### A grammar change reaches to the end of its block
@@ -1923,6 +1936,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/grammar-formalism.md §6.2, §6.3; docs/book/extension/grammar.md §4; docs/book/extension/modules.md "Known limit"; the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Activation by a `use` header, per file and not transitive".
 - Notes (2026-11-16, hand-off from the acceptance stream): extended by the maintainer's ruling of 2026-11-15 (next/corpus/scenarios/README.md, "Rulings of 2026-11-15", ruling Q). With rulings R and S: nobody has to claim a combined grammar unambiguous, and a text with two parses is always refuted, with both readings named.
+- Worked example: `next/ext/lib/examples_turns.test.alg`; `next/ext/examples/block.main.alg`; `next/ext/examples/after-block.main.alg` — a change made between brackets holds there and not after them; `use` in a block. The index is `next/ext/examples.md`.
 - Chapter: Changing the grammar
 
 #### A notation a text uses can only add
@@ -1939,6 +1953,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: the maintainer's rulings of 2026-11-17 (../records/book-pass/adversarial-review.md, Rulings taken)
 - Notes: new, by ruling, for issue 7 of the adversarial review. A form's mapping works on descriptions, so it reads and rearranges what the user wrote inside the form; that is what a notation is. What it cannot do is reach the user's names, or change a form it does not own without the user's word. An author who builds a variant of a language owns its grammar, or chooses it in the configuration.
 - Notes (2026-11-19, the second adversarial review, cluster 12): the three rules are added by ruling. A reviewer found three ways an addition changed text that parsed before: longest match preferred a new and longer alternative; a word added to a shared set of reserved words stopped a name the user had written from being a name; an added terminal changed the parser's state. Working it through found a fourth, of which the second is a case: an alternative appended to a production that a rule in force tests with "not followed by". The review session first proposed that a check parse the text with and without the addition. The maintainer: "couldn't analysis of the grammar additions directly tell us if it breaks those rules?" It can, and the second parse is withdrawn. On reserved words, an example settled it: a notation `units` may not make `unit` a keyword of the base grammar, where the user has a variable of that name, unless the using text names the word.
+- Worked example: `next/ext/lib/examples_turns.test.alg`; `next/ext/examples/carried.main.alg`; `next/ext/examples/changing.main.alg`; `next/ext/examples/two-ways.main.alg` — what a notation may do, checked on the grammar; a line that no longer reads as it did, refused with both readings; what is alike; a reading added beside one that stays. The index is `next/ext/examples.md`.
 - Chapter: Changing the grammar
 
 ### The parser engine
@@ -1956,6 +1971,7 @@ They came together over years of exploration into most of what Allegro is today.
 - Sources: docs/book/grammar-formalism.md status header, §1 non-goals, §5.1, §7.1; docs/book/extension/grammar.md §1, §3; B-157 P7 and P5 (docs/book/extension/grammar.md §1); the maintainer's rulings of 2026-11-12 (../records/book-pass/dr3-part-3-syntax-and-modules.md, Rulings taken)
 - Notes: replaces "Memoized recursive-descent engine with seed-growing left recursion" and "The precedence ladder runs as repetition, and memo invalidation tracks dependencies", which describe the shipped engine and stop being decisions. The sources disagree on the algorithm (docs/book/grammar-formalism.md §1 says GLL is chosen; docs/book/extension/grammar.md §1 and §4 describe ordered choice); the maintainer: the algorithm stays swappable and ordered choice must not be required. The Earley parser (`src/parser.ts`, `src/grammar-ext.ts`) remains only for the standalone combinators.
 - Held finding (2026-11-12, DR3): the engine commits to the first alternative that matches (`matchAlt`, `src/grammar2/engine.ts:945`), reports one parse, and cannot change grammar during a parse.
+- Worked example: `next/ext/lib/examples_rows.test.alg` — a rule that begins with itself groups from the left, one that ends with itself from the right; one that reads itself and nothing between is refused. The index is `next/ext/examples.md`.
 - Chapter: The parser engine
 
 #### The platform's parser engine ships already built

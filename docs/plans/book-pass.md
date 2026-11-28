@@ -2615,6 +2615,40 @@ its approval.
     with unknown; and nothing may be dropped that is not proved dead,
     or an ambiguity is hidden. To begin with: a count of results for
     each form on real texts, and the measure of E10's specialization.
+- **2026-12-04 — worked examples for every rule of the parser** (the
+  review session). The maintainer, on PR #326: "We need solid examples
+  for all parser rules to enable sound reasoning." A chunk of its own,
+  before the named parts of the parser's state.
+  - *What an example is.* It names the decision it shows, gives a small
+    grammar in a comment and as a value, a text, and a claim of what
+    the engine reads. The suite runs every claim, so an example cannot
+    drift from the engine.
+  - *Where.* Five modules of `next/ext/lib/`, `examples_forms`,
+    `examples_rows`, `examples_layout`, `examples_changes` and
+    `examples_turns`, 92 claims in all, each module under a second.
+    And `next/ext/examples/`: seven programs that use a notation and
+    the three modules they use, written to be read, each program
+    stating what it writes or why it is refused;
+    `next/ext/examples.test.ts` runs them. `next/ext/examples.md` is
+    the index, in reading order, with a table from decision to example.
+  - *The inventory.* Sixteen entries of the chapters "Parsing",
+    "Changing the grammar" and "The parser engine" have a line `Worked
+    example` that names theirs.
+  - *The modules' own tests stay.* They hold every case; the examples
+    hold one clear case for each rule, with its explanation.
+  - *Found on the way.* `next/ext/readers.ts` reads every text in one
+    launch, and a text with `use` ended it refuted, so every text after
+    it was told as not read. Each text is now read inside an attempt.
+    And the modules of `next/ext/examples/` import the engine's own
+    modules, which the bootstrap looks for beside them and does not
+    find: the two comparisons with the bootstrap count those texts as
+    refused by both. Where a module is found is the loader's, E9.
+  - No deliberate faults: the chunk adds examples and one attempt in a
+    command, and no rule.
+  - *Ruled on PR #327, 2026-12-04*: the shape of an example and the
+    place of the `use` examples, `next/ext/examples/`, are confirmed.
+    The maintainer reads the examples as the engine's rules are
+    discussed, and says where one does not carry its rule.
 
 ## 8. Sessions
 
